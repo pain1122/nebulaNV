@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "./dist",
+    "target": "ES2021",         // ✅ Make sure it's not ES5
+    "lib": ["ES2021"],          // ✅ Required for private fields
+    "module": "CommonJS",       // Still fine for NestJS
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src"]
+}

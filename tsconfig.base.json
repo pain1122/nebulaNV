@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@packages/*": [
+                "packages/*/dist"
+            ],
+            "@apps/*": [
+                "apps/*/src"
+            ]
+        },
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "target": "ES2021",
+        "module": "CommonJS",
+        "lib": [
+            "ES2021"
+        ],
+        "strict": true,
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "skipDefaultLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": true,
+        "outDir": "dist"
+    },
+    "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}

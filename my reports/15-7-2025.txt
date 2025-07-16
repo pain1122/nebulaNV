@@ -1,0 +1,228 @@
+Project NebulaNV — Progress Report (Today’s Session)
+Starting Point
+The user-service was successfully running inside Docker.
+
+PostgreSQL container was up and accessible.
+
+The Prisma client was generated and migrations were applied.
+
+The project was stable enough to start implementing authentication.
+
+Major Tasks Completed Today
+1. Docker & Monorepo Setup Fixes
+Diagnosed and fixed Docker multi-stage build issues related to:
+
+Missing modules inside the runtime container (@nestjs/core, others).
+
+Problems with workspace dependencies (@packages/config import errors).
+
+Corrected Dockerfile to copy node_modules and build outputs properly.
+
+Ensured Prisma schema and generated client were available inside the container.
+
+Validated Docker Compose environment variables loading (env_file addition).
+
+Ensured wait-port correctly waits for Postgres before app start.
+
+Fixed persistent errors related to Prisma schema location and migrations inside Docker.
+
+2. JWT Auth & Auth Module Integration
+Added auth.module.ts with JwtModule configured.
+
+Implemented auth.controller.ts with /auth/register and /auth/login endpoints.
+
+Created DTOs for user registration and login.
+
+Connected auth.service.ts for handling:
+
+User registration (password hashing, user creation).
+
+User login (validation and JWT token issuance).
+
+Registered AuthModule in app.module.ts to enable routes.
+
+Ensured environment variables like JWT_SECRET and PORT are loaded inside Docker.
+
+3. App Bootstrap & Environment Configuration
+Updated main.ts bootstrap file to:
+
+Read PORT from ConfigService.
+
+Start app listening on configured port.
+
+Validated .env file correctness and passed to Docker container.
+
+Verified logs confirming successful mapping of /auth/register and /auth/login routes.
+
+4. Bug Fixes & Debugging
+Debugged and fixed:
+
+404 Not Found error for /auth/register by ensuring AuthModule is imported in AppModule.
+
+Prisma error table "User" does not exist by running prisma migrate deploy during build.
+
+Role casing inconsistency: changed role stored from uppercase (USER) to lowercase (user).
+
+Resolved Docker runtime errors like:
+
+Missing modules at runtime (copying full /app from builder stage solved this).
+
+JWT secret missing warning in container by properly passing environment variables.
+
+Current Status
+Docker containers for Postgres and user-service are running and healthy.
+
+User registration endpoint /auth/register works and successfully creates hashed users in the database.
+
+JWT tokens are generated and login endpoint /auth/login validates credentials.
+
+Environment variables (JWT_SECRET, DATABASE_URL, PORT) are correctly injected inside Docker.
+
+Prisma migrations are applied automatically in the build stage ensuring database schema exists.
+
+The monorepo workspace and package dependencies (@packages/config, NestJS modules) are resolved properly in the Docker context.
+
+Basic authentication feature is functional and tested with sample data.
+
+Next Suggested Steps
+Add proper error handling and validation to auth endpoints.
+
+Implement middleware to protect routes with JWT authentication.
+
+Expand user roles and authorization logic.
+
+Add automated tests for auth service and controllers.
+
+Start working on the next core feature or polish Docker and CI pipelines.
+
+Summary
+Today was a critical infrastructure day with heavy focus on:
+
+Debugging Docker multi-stage builds and dependency resolutions.
+
+Integrating and enabling JWT-based authentication.
+
+Fixing environment variable propagation in containers.
+
+Applying Prisma migrations reliably during build/deploy.
+
+Though it felt rough at times, these foundational fixes unlock smooth future development and ease adding new features. You have a working, containerized backend with auth ready to build upon.
+
+
+
+
+Project NebulaNV — Progress Report (Detailed with Challenges & Solutions)
+Starting Point
+Project running with Docker containers (Postgres + user-service).
+
+Prisma client generated; initial migrations applied.
+
+Ready to add authentication and JWT.
+
+Key Challenges & How We Overcame Them
+1. Docker Multi-Stage Build Issues
+Problem: Runtime container couldn’t find key modules (e.g., @nestjs/core), despite building successfully.
+
+Cause: Partial copying of build artifacts and node_modules in runtime stage led to missing dependencies.
+
+Solution:
+
+Initially tried copying only dist, node_modules, and package.json.
+
+Ultimately decided to copy the entire /app directory from builder stage to runtime stage, ensuring all files and dependencies are available.
+
+This slightly larger image gave reliable runtime environment and prevented missing module errors.
+
+Tradeoff:
+
+Larger container size vs. stability and faster development iteration.
+
+Chose stability for now; can optimize later.
+
+2. Monorepo Workspace Dependency Resolution
+Problem: Errors like Cannot find module '@packages/config' due to workspace package imports not resolving inside Docker.
+
+Cause: Workspace packages not properly installed or available during build/runtime.
+
+Solution:
+
+Copied workspace lockfiles and package manifests early in the build.
+
+Ran pnpm install --no-frozen-lockfile in the root.
+
+Copied full monorepo to the builder stage before building user-service.
+
+Used pnpm --filter @nebula/user-service commands to generate Prisma client and build.
+
+Outcome: Workspace dependencies resolved correctly in Docker environment.
+
+3. Prisma Migrations and Schema Issues
+Problem: Errors like The table "User" does not exist when trying to create users.
+
+Cause: Database schema migrations were not applied inside the Docker container before running the app.
+
+Solution:
+
+Added pnpm --filter @nebula/user-service exec prisma migrate deploy command in the Docker build stage.
+
+Ensured migrations run before Prisma client generation and app build.
+
+This guarantees database schema exists matching Prisma schema.
+
+Outcome: Prisma operations succeeded with proper schema.
+
+4. Environment Variables Not Passed to Docker Container
+Problem: JWT secret missing warning and incorrect database URL due to environment variables not being injected.
+
+Solution:
+
+Added .env file inside the Docker image by copying it explicitly.
+
+Also used Docker Compose env_file: directive to load environment variables into container.
+
+Outcome: Variables like JWT_SECRET, PORT, and DATABASE_URL were available in runtime, removing warnings and errors.
+
+5. Routing 404 on /auth/register Endpoint
+Problem: POST /auth/register returned 404 Not Found.
+
+Cause: AuthModule was not imported in AppModule.
+
+Solution:
+
+Imported AuthModule alongside UserModule in the AppModule imports array.
+
+Outcome: Routes became available, and endpoints worked as expected.
+
+6. Role Casing Consistency
+Problem: Roles saved in uppercase (USER) while the user preferred lowercase.
+
+Solution:
+
+Modified the role assignment in user creation to store 'user' lowercase.
+
+Outcome: Data consistent with expectations.
+
+Final Decided Approach
+Use full monorepo copy in Docker builder stage, then copy entire /app folder to runtime stage — to avoid missing dependencies at runtime.
+
+Run Prisma migrations explicitly in build stage with prisma migrate deploy to ensure schema consistency.
+
+Use env_file in Docker Compose and copy .env into the container for environment variables.
+
+Import all required modules explicitly in the main app module to avoid missing route handlers.
+
+Keep the role strings lowercase for consistency in DB.
+
+Summary
+We faced foundational infrastructure and environment setup challenges that affected nearly every feature build step. By iterating on:
+
+Dockerfile multi-stage copying strategy,
+
+Dependency installation and workspace awareness,
+
+Prisma migrations execution timing,
+
+Environment variable injection,
+
+we established a solid, reproducible base for further development.
+
