@@ -1,0 +1,97 @@
+NebulaNV — gRPC Integration & Auth Service Update (22‑07‑2025)
+🧩 Modules Updated
+
+AuthService (apps/user-service/src/auth/auth.service.ts)
+
+AuthModule (apps/user-service/src/auth/auth.module.ts)
+
+AuthController (apps/user-service/src/auth/auth.controller.ts)
+
+Main bootstrap (apps/user-service/src/main.ts)
+
+UserGrpcController (apps/user-service/src/user/grpc/user-grpc.controller.ts)
+
+GrpcJwtAuthGuard (apps/user-service/src/user/grpc/grpc-jwt-auth.guard.ts)
+
+Unit Tests (apps/user-service/test/auth.service.spec.ts)
+
+✅ What Was Done
+gRPC client wrapper in AuthService
+
+Added getUserById(id, jwt) using firstValueFrom(this.userClient.GetUser…).
+
+Centralized metadata creation via buildJwtMeta(accessToken).
+
+AuthModule registered the gRPC client
+
+Moved ClientsModule.registerAsync([{ name: 'USER_SERVICE', … }]) into imports.
+
+Ensured ConfigModule and JwtModule co‑exist at top level.
+
+Hybrid HTTP + gRPC bootstrap
+
+Switched main.ts to NestFactory.create(AppModule).
+
+Called app.connectMicroservice({ transport: GRPC, options: { … } }).
+
+Started both transports with app.startAllMicroservices() and app.listen(port).
+
+gRPC‑side JWT guard
+
+Created GrpcJwtAuthGuard to extract authorization from Metadata.
+
+Applied it on both GetUser and UpdateProfile RPC handlers.
+
+TypeScript fixes & path adjustments
+
+Corrected protoPath to join(__dirname, '..', 'proto', 'user.proto').
+
+Aligned all @nestjs/* dependencies to 11.1.5 so modulesContainer.addRpcTarget exists.
+
+Adjusted getUserById to return UserResponse instead of destructuring a non‑existent user field.
+
+Added non‑null assertion (req.user!) in AuthController.getProfile().
+
+Unit tests for AuthService
+
+Mocked ClientGrpc.getService().GetUser() with RxJS of() and throwError().
+
+Verified successful user retrieval and error propagation.
+
+🧪 Feature Verification
+Bootstrapping: Both HTTP (port 3000) and gRPC (port 50051) listeners start without errors.
+
+/auth endpoints:
+
+POST /auth/register → 201
+
+POST /auth/login → { access_token, refresh_token }
+
+POST /auth/refresh → new token pair
+
+/auth/me: Returns user via gRPC call under the hood.
+
+gRPC GetUser:
+
+Unauthenticated when metadata omitted or invalid.
+
+Authenticated returns user when valid Bearer token provided.
+
+Unit Tests for AuthService.getUserById all green.
+
+⏭️ Next Steps
+E2E test for full HTTP→gRPC round‑trip
+
+Extend app.e2e.spec.ts to directly call the gRPC GetUser with metadata.
+
+Unit tests for UserGrpcController
+
+Mock UserService methods to validate RPC error mapping (NOT_FOUND, PERMISSION_DENIED, etc.).
+
+Tests for UserController.updateProfile
+
+Cover email‑only and password‑change flows.
+
+Scaffold Product‑Service MVP
+
+Define DTOs, guards, Prisma schema, controllers, and tests in a new service.

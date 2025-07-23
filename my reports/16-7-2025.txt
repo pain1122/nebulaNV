@@ -1,0 +1,144 @@
+NebulaNV — Auth Module Progress Report (16-07-2025)
+Today, we successfully implemented and verified JWT-based authentication in the user-service. The service now supports secure registration and login via /auth/register and /auth/login, issuing signed tokens that grant access to protected routes like /auth/me. This was done using NestJS’s @nestjs/passport and passport-jwt, combined with Prisma and full Docker support. Tokens are validated with a custom JwtStrategy, and access control is enforced using JwtAuthGuard.
+
+With this in place, the user-service now provides a fully functional, production-ready authentication base that other services can reuse. All logic is modularized, and the auth flow is working end-to-end within a monorepo and Docker environment. The finalized file structure is as follows:
+
+D:\Salar\nebula-nv\apps\user-service\src\auth
+├── auth.controller.ts       (✓ Public + protected endpoints)
+├── auth.module.ts           (✓ Registers AuthService + JWT strategy)
+├── auth.service.ts          (✓ Handles register/login logic)
+├── dto\
+│   ├── create-user.dto.ts   (✓ Registration input)
+│   └── login-user.dto.ts    (✓ Login input)
+└── jwt\
+    ├── jwt-auth.guard.ts    (✓ Route guard for token auth)
+    └── jwt.strategy.ts      (✓ Token validation logic)
+
+Project NebulaNV — Role-Based Auth Report (16-07-2025)
+Summary:
+We implemented and successfully tested Role-Based Access Control (RBAC) using global guards in NestJS. The goal was to secure sensitive endpoints (like /auth/admin-only) with role enforcement layered on top of existing JWT authentication. After resolving a guard execution order issue, access control now works as expected.
+
+🛠️ What We Built
+Custom Decorator:
+
+roles.decorator.ts — Used SetMetadata() to tag routes with required roles.
+
+Guard:
+
+roles.guard.ts — Used Reflector to read metadata and compare req.user.role.
+
+Guard Integration:
+
+Updated app.module.ts to register both JwtAuthGuard and RolesGuard as APP_GUARDs — in correct order.
+
+Controller Enhancements:
+
+Updated auth.controller.ts to use @Roles('admin') and simplified @UseGuards() since guards are now global.
+
+Verified /auth/me shows role; verified /auth/admin-only is protected.
+
+🐞 Key Problem & Solution
+Issue: RolesGuard received undefined for req.user, resulting in 403 errors even for admins.
+
+Root Cause: NestJS global guards run in order. RolesGuard ran before JwtAuthGuard.
+
+Fix: Registered both guards in order (JwtAuthGuard first, then RolesGuard) in app.module.ts.
+
+📁 Directory Summary
+pgsql
+Copy
+Edit
+D:\Salar\nebula-nv\apps\user-service\src
+├── auth
+│   ├── dto
+│   │   ├── create-user.dto.ts
+│   │   └── login-user.dto.ts
+│   ├── jwt
+│   │   ├── jwt-auth.guard.ts
+│   │   └── jwt.strategy.ts
+│   ├── auth.controller.ts
+│   ├── auth.module.ts
+│   └── auth.service.ts
+├── common
+│   ├── decorators
+│   │   └── roles.decorator.ts
+│   └── guards
+│       └── roles.guard.ts
+├── user
+│   ├── user.controller.ts
+│   ├── user.module.ts
+│   └── user.service.ts
+├── app.module.ts
+├── main.ts
+
+
+
+Test Coverage Report: apps/user-service
+📁 test/
+Total Test Files: 4
+
+All tests passing: ✅ Yes
+
+🧪 Unit Tests Created
+1. app.service.spec.ts
+Verifies getHello() returns correct message with port from ConfigService.
+
+2. jest-globals.spec.ts
+Confirms Jest globals (describe, it, beforeEach, afterAll, expect) are working correctly in environment.
+
+3. user.service.spec.ts
+createUser – ensures bcrypt hashing and Prisma user creation.
+
+validateUser
+
+Returns user on correct credentials.
+
+Returns null when user not found.
+
+Returns null on incorrect password.
+
+getUserById
+
+Returns user by ID.
+
+Returns null when not found.
+
+getAllUsers – returns all users with selected fields.
+
+4. auth.service.spec.ts
+register – hashes password and creates user via Prisma.
+
+validateUser – checks email & password match logic.
+
+login – signs and returns a JWT token using user data.
+
+🗂 Files & Structure
+plaintext
+Copy
+Edit
+apps/user-service/
+├── src/
+│   ├── app.service.ts
+│   ├── prisma.service.ts
+│   ├── user/user.service.ts
+│   └── auth/auth.service.ts
+├── test/
+│   ├── app.service.spec.ts
+│   ├── jest-globals.spec.ts
+│   ├── user.service.spec.ts
+│   └── auth.service.spec.ts
+🧼 Cleanup & Configuration
+✅ jest.config inside package.json retained and correctly recognizes files in test/.
+
+✅ tsconfig.json includes test/**/*.spec.ts properly.
+
+❌ jest-e2e.json removed (not needed currently).
+
+❌ app.e2e-spec.ts removed (you chose to defer E2E tests for now).
+
+🟢 Current Status
+All services (UserService, AuthService) are fully tested.
+
+Test environment is clean and stable.
+
+Next up: UserController
