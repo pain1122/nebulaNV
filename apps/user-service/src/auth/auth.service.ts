@@ -1,36 +1,41 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { PrismaService } from '../prisma.service';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Metadata } from '@grpc/grpc-js';
-import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
-import {
-  UserServiceClient,
-  UserResponse,
-} from './user-service-client.interface';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UserResponse } from './grpc/user-service-client.interface';
+import { dtoToProtoUpdate } from './mappers';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private grpcAuth: GrpcAuthService,
-    private prisma: PrismaService,
-    private jwtService: JwtService,
-    private config: ConfigService,
-    @Inject('USER_SERVICE') private client: ClientGrpc,
+    private readonly grpcAuth: GrpcAuthService,
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
-  
-  private buildJwtMeta(accessToken: string): Metadata {
-    const meta = new Metadata();
-    meta.add('Authorization', `Bearer ${accessToken}`);
-    return meta;
-  }
-
-  async getUserById(id: string, jwt: string): Promise<UserResponse> {
-   return this.grpcAuth.getUser(id, jwt);
+  async getUserById(id: string): Promise<UserResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (!user.email) {
+      // you could also throw, but at least coalesce to empty string:
+      throw new NotFoundException('User has no email');
+    }
+    // Now email is definitely a string
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
   }
 
   async updateProfileViaGrpc(
@@ -38,7 +43,7 @@ export class AuthService {
     dto: UpdateProfileDto,
     jwt: string,
   ): Promise<UserResponse> {
-    const req = { id, ...dto };
+    const req = dtoToProtoUpdate(id, dto);
     return this.grpcAuth.updateProfile(req, jwt);
   }
 
@@ -49,21 +54,30 @@ export class AuthService {
     });
   }
 
-  async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  /**
+   * Login with either email or phone.
+   * We keep this path using Prisma directly (not gRPC) because proto UserResponse
+   * does not expose password hashes (and it shouldn't).
+   */
+  async validateUser(identifier: string, password: string) {
+    const isEmail = identifier.includes('@');
+    const user = await this.prisma.user.findUnique({
+      where: isEmail ? { email: identifier } : { phone: identifier },
+    });
     if (!user) return null;
+
     const ok = await bcrypt.compare(password, user.password);
     return ok ? user : null;
   }
 
   async login(user: any) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email ?? '', role: user.role };
 
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRATION'),
+      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRATION'),
     });
 
     const hash = await bcrypt.hash(refreshToken, 10);
@@ -77,7 +91,7 @@ export class AuthService {
 
   async refreshTokens(token: string) {
     const payload = this.jwtService.verify(token, {
-      secret: this.config.get('JWT_REFRESH_SECRET'),
+      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
     });
 
     const user = await this.prisma.user.findUnique({
@@ -92,14 +106,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const newPayload = { sub: user.id, email: user.email, role: user.role };
+    const newPayload = {
+      sub: user.id,
+      email: user.email ?? '',
+      role: user.role,
+    };
     const newAccess = this.jwtService.sign(newPayload, {
-      secret: this.config.get('JWT_ACCESS_SECRET'),
-      expiresIn: this.config.get('JWT_ACCESS_EXPIRATION'),
+      secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+      expiresIn: this.config.get<string>('JWT_ACCESS_EXPIRATION'),
     });
     const newRefresh = this.jwtService.sign(newPayload, {
-      secret: this.config.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRATION'),
+      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRATION'),
     });
 
     const newHash = await bcrypt.hash(newRefresh, 10);

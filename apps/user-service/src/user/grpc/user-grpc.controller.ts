@@ -34,7 +34,7 @@ export class UserGrpcController {
         // convert a “not found” to an RPC error
         throw new RpcException({ code: 5, message: 'User not found' });
       }
-      return { id: user.id, email: user.email, role: user.role };
+      return { id: user.id, email: user.email ?? '', role: user.role };
     } catch (err: any) {
       console.error('[gRPC][GetUser] error:', err);
       // rethrow any RpcException, wrap others
@@ -56,7 +56,7 @@ export class UserGrpcController {
 
       return {
         id: updated.id,
-        email: updated.email,
+        email: updated.email ?? '',
         role: updated.role,
       };
     } catch (err: any) {
@@ -67,5 +67,15 @@ export class UserGrpcController {
         ? new RpcException({ code: 3, message: err.message })
         : new RpcException(err.message);
     }
+  }
+
+  @GrpcMethod('UserService', 'FindUser')
+  async findUser(data: { email?: string; phone?: string }): Promise<UserResponse> {
+    const user = data.email
+  ? await this.userService.getUserByEmail(data.email)
+  : await this.userService.getUserByPhone(data.phone!);
+
+    if (!user) throw new RpcException({ code: 5, message: 'User not found' });
+    return { id: user.id, email: user.email ?? '', role: user.role };
   }
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../src/auth/auth.service';
 import { PrismaService } from '../src/prisma.service';
+import { GrpcAuthService } from '../src/auth/grpc/grpc-auth.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -12,6 +13,10 @@ jest.mock('bcrypt', () => ({
 
 describe('AuthService', () => {
   let authService: AuthService;
+  const grpcAuthMock = {
+      getUser: jest.fn(),
+      updateProfile: jest.fn(),
+  };
   const prismaMock = {
     user: {
       create: jest.fn(),
@@ -29,8 +34,9 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: PrismaService, useValue: prismaMock },
-        { provide: JwtService, useValue: jwtServiceMock },
+        { provide: GrpcAuthService, useValue: grpcAuthMock },
+        { provide: PrismaService,  useValue: prismaMock },
+        { provide: JwtService,      useValue: jwtServiceMock },
         {
           provide: ConfigService,
           useValue: {

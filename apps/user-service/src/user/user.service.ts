@@ -35,6 +35,7 @@ export class UserService {
       select: {
         id: true,
         email: true,
+        phone: true,
         role: true,
         createdAt: true,
       },
@@ -79,5 +80,12 @@ export class UserService {
       where: { id: userId },
       data: dataToUpdate,
     });
+  }
+
+  async getUserByEmail(email: string) {
+    return this.prisma.user.findUnique({ where: { email } });
+  }
+  async getUserByPhone(phone: string) {
+    return this.prisma.user.findUnique({ where: { phone } });
   }
 }

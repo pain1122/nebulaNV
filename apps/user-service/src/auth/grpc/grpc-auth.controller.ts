@@ -2,7 +2,7 @@ import { Controller, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { AuthService } from '../auth.service';
 import { GrpcJwtAuthGuard } from '../../user/grpc/grpc-jwt-auth.guard';
-import { UserResponse } from '../user-service-client.interface';
+import { UserResponse } from '../user';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 
@@ -28,7 +28,7 @@ export class AuthGrpcController {
   ): Promise<UserResponse> {
     const token = (metadata.get('authorization')[0] as string).split(' ')[1];
     try {
-      return await this.authService.getUserById(data.userId, token);
+      return await this.authService.getUserById(data.userId);
     } catch (err: any) {
       throw err instanceof RpcException
         ? err

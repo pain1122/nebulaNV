@@ -23,9 +23,17 @@ string newPassword     = 3;
 string currentPassword = 4;
 }
 
+message FindUserRequest {
+  oneof identifier {
+    string email = 1;
+    string phone = 2;   // E.164 format, e.g. "+994501234567"
+  }
+}
+
 // The gRPC service definition for User operations
 service UserService {
 // Fetch a user by ID
+rpc FindUser (FindUserRequest) returns (UserResponse);
 rpc GetUser(GetUserRequest) returns (UserResponse);
 
 // Update the profile (email and/or password)

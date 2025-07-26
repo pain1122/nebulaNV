@@ -45,7 +45,7 @@ export class AuthController {
   @Public()
   @Post('login')
   async login(@Body() dto: LoginUserDto) {
-    const user = await this.authService.validateUser(dto.email, dto.password);
+    const user = await this.authService.validateUser(dto.identifier, dto.password);
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     return this.authService.login(user);
@@ -65,14 +65,7 @@ export class AuthController {
   @Roles('user','admin','root-admin')
   @Get('me')
   getProfile(@Req() req: Request) {
-    const raw = req.headers.authorization ?? '';
-  const token = raw.split(' ')[1];
-  return this.authService.getUserById(req.user!.userId, token);
-    // return {
-    //   userId: req.user?.userId,
-    //   email: req.user?.email,
-    //   role: req.user?.role,
-    // };
+    return this.authService.getUserById(req.user!.userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -80,24 +73,5 @@ export class AuthController {
   @Get('admin-only')
   adminRoute(@Req() req: Request) {
     return { message: 'Admin access granted', user: req.user };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Roles('user','admin','root-admin')
-  @Put('profile')
-  async updateProfile(
-    @Req() req: Request,
-    @Body() dto: UpdateProfileDto,
-  ) {
-    const raw = req.headers.authorization ?? '';
-    const token = raw.split(' ')[1];
-
-    // Delegate to gRPC wrapper in AuthService
-    const updated = await this.authService.updateProfileViaGrpc(
-      req.user!.userId,
-      dto,
-      token,
-    );
-    return updated;
   }
 }

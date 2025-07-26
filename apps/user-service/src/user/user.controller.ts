@@ -24,22 +24,25 @@ export class UserController {
   async getAllUsers() {
     return this.userService.getAllUsers();
   }
-  @Roles('user')
-  @Put('me')
-  async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
-    return this.userService.updateProfile(req.user!.userId, dto);
-  }
-
+  @Roles('user','admin','root-admin')
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: Request) {
-    const requester = req.user;
-    const isAdmin = requester?.role === 'admin';
-    const isSelf = requester?.userId === id;
-
-    if (!isAdmin && !isSelf) {
+  async findOne(
+    @Param('id') id: string,
+    @Req() req: Request
+  ) {
+    // only allow admins or the owner
+    if (req.user!.userId !== id && req.user!.role !== 'admin') {
       throw new ForbiddenException('Access denied');
     }
-
     return this.userService.getUserById(id);
+  }
+  @UseGuards(JwtAuthGuard)
+  @Roles('user','admin','root-admin')
+  @Put('me')
+  updateProfile(
+    @Req() req: Request,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.userService.updateProfile(req.user!.userId, dto);
   }
 }

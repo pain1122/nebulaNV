@@ -133,8 +133,8 @@ describe('UserService', () => {
   describe('getAllUsers', () => {
     it('should return all users with selected fields', async () => {
       const users = [
-        { id: '1', email: 'user1@example.com', role: 'user', createdAt: new Date() },
-        { id: '2', email: 'user2@example.com', role: 'admin', createdAt: new Date() },
+        { id: '1', email: 'user1@example.com', phone: '+1234567890', role: 'user', createdAt: new Date() },
+        { id: '2', email: 'user2@example.com', phone: '+1234567890', role: 'admin', createdAt: new Date() },
       ];
   
       prismaServiceMock.user.findMany.mockResolvedValue(users);
@@ -145,6 +145,7 @@ describe('UserService', () => {
         select: {
           id: true,
           email: true,
+          phone: true,
           role: true,
           createdAt: true,
         },

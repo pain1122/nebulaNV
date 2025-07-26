@@ -28,7 +28,7 @@ describe('Auth E2E (e2e)', () => {
 
     const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email, password })
+      .send({ identifier: email, password })
       .expect(201);
 
     accessToken = loginRes.body.access_token;
@@ -70,7 +70,7 @@ describe('Auth E2E (e2e)', () => {
     expect(meRes2.body.email).toBe(email);
   });
 
-  describe('Profile Update E2E', () => {
+  describe('me Update E2E', () => {
     beforeAll(async () => {
       // tokens already set from above
     });
