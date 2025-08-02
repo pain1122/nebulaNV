@@ -9,7 +9,6 @@
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
-    "@bufbuild/protobuf": "^2.6.2",
     "@types/bcrypt": "^5.0.2",
     "nx": "^21.3.2",
     "prettier": "^3.6.0",
@@ -25,6 +24,8 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.6.2",
+    "@grpc/grpc-js": "^1.13.4",
     "@prisma/client": "^6.11.1",
     "bcrypt": "^6.0.0"
   }

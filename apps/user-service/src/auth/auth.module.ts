@@ -9,6 +9,8 @@ import { GrpcAuthService } from './grpc/grpc-auth.service';
 import { AuthGrpcController } from './grpc/grpc-auth.controller';
 import { PrismaService } from '../prisma.service';
 import { JwtStrategy } from './jwt/jwt.strategy';
+const USER_PROTO = require.resolve('@nebula/protos/user.proto');
+
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { JwtStrategy } from './jwt/jwt.strategy';
           transport: Transport.GRPC,
           options: {
             package: 'user',
-            protoPath: join(__dirname, '..', '..', 'proto', 'user.proto'),
+            protoPath: USER_PROTO,
             url: cfg.get<string>('USER_SERVICE_URL', '0.0.0.0:50051'),
           },
         }),

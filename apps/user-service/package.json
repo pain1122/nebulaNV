@@ -26,6 +26,7 @@
     "proto:gen": "pnpm exec protoc --ts_proto_out=src/auth --ts_proto_opt=outputClientGrpc=true,useOptionals=true --proto_path=proto proto/user.proto"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.6.2",
     "@grpc/grpc-js": "^1.13.4",
     "@grpc/proto-loader": "^0.7.15",
     "@nestjs/common": "^11.1.3",
@@ -39,6 +40,7 @@
     "@types/passport-jwt": "^4.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

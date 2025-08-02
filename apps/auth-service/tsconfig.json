@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDirs": [
+      "src",
+      "../../packages/protos/generated"
+    ],
+    "outDir": "./dist",
+    
+  },
+  "include": [
+    "src/**/*.ts",
+    "../../packages/protos/generated/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
+}

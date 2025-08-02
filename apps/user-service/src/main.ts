@@ -4,19 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+
+const USER_PROTO = require.resolve('@nebula/protos/user.proto');
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  // const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-  //   AppModule,
-  //   {
-  //     transport: Transport.GRPC,
-  //     options: {
-  //       package: 'user',
-  //       protoPath: __dirname + '/protos/user.proto',
-  //       url: '0.0.0.0:50051',
-  //     },
-  //   }
-  // );
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -30,7 +22,7 @@ async function bootstrap() {
     transport: Transport.GRPC,
     options: {
       package: 'user',
-      protoPath: join(__dirname, '..','proto', 'user.proto'),
+      protoPath: USER_PROTO,
       url: '0.0.0.0:50051',
     },
   });
