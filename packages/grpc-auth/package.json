@@ -1,0 +1,23 @@
+{
+  "name": "@nebula/grpc-auth",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist"
+  },
+  "peerDependencies": {
+    "@nebula/protos": "workspace:*",
+    "@nestjs/common": "^11",
+    "@nestjs/core": "^11",
+    "@nestjs/microservices": "^11",
+    "rxjs": "^7",
+    "@grpc/grpc-js": "^1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

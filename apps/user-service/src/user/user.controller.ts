@@ -9,13 +9,13 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Roles } from '../common/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
+import { Roles } from '@nebula/grpc-auth';
 import { UserService } from './user.service';
-import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { ReqUser, ReqUser as ReqUserType } from '../common/decorators/req-user.decorator';
+
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -24,25 +24,18 @@ export class UserController {
   async getAllUsers() {
     return this.userService.getAllUsers();
   }
-  @Roles('user','admin','root-admin')
-  @Get(':id')
-  async findOne(
-    @Param('id') id: string,
-    @Req() req: Request
-  ) {
-    // only allow admins or the owner
-    if (req.user!.userId !== id && req.user!.role !== 'admin') {
-      throw new ForbiddenException('Access denied');
-    }
-    return this.userService.getUserById(id);
-  }
-  @UseGuards(JwtAuthGuard)
-  @Roles('user','admin','root-admin')
   @Put('me')
-  updateProfile(
-    @Req() req: Request,
-    @Body() dto: UpdateProfileDto,
-  ) {
-    return this.userService.updateProfile(req.user!.userId, dto);
+  @Roles('user', 'admin', 'root-admin')
+  updateProfile(@ReqUser() user: ReqUserType, @Body() dto: UpdateProfileDto) {
+    return this.userService.updateProfile(user.userId, dto);
+  }
+
+  @Get(':id')
+  @Roles('user', 'admin', 'root-admin')
+  async findOne(@Param('id') id: string, @ReqUser() user: ReqUserType) {
+    const isAdmin = user.role === 'admin' || user.role === 'root-admin';
+    if (user.userId !== id && !isAdmin)
+      throw new ForbiddenException('Access denied');
+    return this.userService.getUserById(id);
   }
 }

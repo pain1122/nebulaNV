@@ -1,18 +1,16 @@
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateProfileRequest } from '../generated/user';
+import { userv1 } from '@nebula/protos';
 
-/**
- * Convert the HTTP UpdateProfileDto into the gRPC UpdateProfileRequest,
- * filling empty strings for optional fields.
- */
+type UpdateProfileRequest = userv1.UpdateProfileRequest;
+
 export function dtoToProtoUpdate(
   userId: string,
   dto: UpdateProfileDto,
 ): UpdateProfileRequest {
-  return {
+  return userv1.UpdateProfileRequest.create({
     id: userId,
-    email: dto.email ?? '',
-    newPassword: dto.newPassword ?? '',
-    currentPassword: dto.currentPassword ?? '',
-  };
+    email: dto.email ?? undefined,
+    newPassword: dto.newPassword ?? undefined,
+    currentPassword: dto.currentPassword ?? undefined,
+  });
 }

@@ -18,7 +18,7 @@ import { LoginUserDto } from './dto/login-user.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from '../common/decorators/public.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
+import { Roles } from '@nebula/grpc-auth';
 
 // Extend Express Request with our User payload
 declare module 'express' {

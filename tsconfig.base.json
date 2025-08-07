@@ -2,14 +2,12 @@
     "compilerOptions": {
         "baseUrl": ".",
         "paths": {
-            "@nebula/protos/*": ["packages/protos/generated/*"],
+            "@nebula/protos": ["packages/protos/dist/index"],
+            "@nebula/grpc-auth": ["packages/grpc-auth/dist/index"],
             "@apps/*": ["apps/*/src"],
             "@packages/*": ["packages/*/dist"]
         },
-        "typeRoots": [
-        "./types",
-        "./node_modules/@types"
-        ],
+        "typeRoots": ["./node_modules/@types"],
         "lib": [
             "ES2021"
         ],

@@ -18,38 +18,46 @@ import {
   type ServiceError,
   type UntypedServiceImplementation,
 } from "@grpc/grpc-js";
+import { messageTypeRegistry } from "./typeRegistry";
 
 export const protobufPackage = "auth";
 
 export interface ValidateUserRequest {
+  $type: "auth.ValidateUserRequest";
   /** email or phone */
   identifier: string;
   password: string;
 }
 
 export interface ValidateUserResponse {
+  $type: "auth.ValidateUserResponse";
   isValid: boolean;
   userId: string;
 }
 
 export interface GetTokensRequest {
+  $type: "auth.GetTokensRequest";
   userId: string;
 }
 
 export interface RefreshTokensRequest {
+  $type: "auth.RefreshTokensRequest";
   refreshToken: string;
 }
 
 export interface GetTokensResponse {
+  $type: "auth.GetTokensResponse";
   accessToken: string;
   refreshToken: string;
 }
 
 export interface ValidateTokenRequest {
+  $type: "auth.ValidateTokenRequest";
   token: string;
 }
 
 export interface ValidateTokenResponse {
+  $type: "auth.ValidateTokenResponse";
   isValid: boolean;
   userId: string;
   email: string;
@@ -57,10 +65,12 @@ export interface ValidateTokenResponse {
 }
 
 function createBaseValidateUserRequest(): ValidateUserRequest {
-  return { identifier: "", password: "" };
+  return { $type: "auth.ValidateUserRequest", identifier: "", password: "" };
 }
 
-export const ValidateUserRequest: MessageFns<ValidateUserRequest> = {
+export const ValidateUserRequest: MessageFns<ValidateUserRequest, "auth.ValidateUserRequest"> = {
+  $type: "auth.ValidateUserRequest" as const,
+
   encode(message: ValidateUserRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.identifier !== "") {
       writer.uint32(10).string(message.identifier);
@@ -105,6 +115,7 @@ export const ValidateUserRequest: MessageFns<ValidateUserRequest> = {
 
   fromJSON(object: any): ValidateUserRequest {
     return {
+      $type: ValidateUserRequest.$type,
       identifier: isSet(object.identifier) ? globalThis.String(object.identifier) : "",
       password: isSet(object.password) ? globalThis.String(object.password) : "",
     };
@@ -132,11 +143,15 @@ export const ValidateUserRequest: MessageFns<ValidateUserRequest> = {
   },
 };
 
+messageTypeRegistry.set(ValidateUserRequest.$type, ValidateUserRequest);
+
 function createBaseValidateUserResponse(): ValidateUserResponse {
-  return { isValid: false, userId: "" };
+  return { $type: "auth.ValidateUserResponse", isValid: false, userId: "" };
 }
 
-export const ValidateUserResponse: MessageFns<ValidateUserResponse> = {
+export const ValidateUserResponse: MessageFns<ValidateUserResponse, "auth.ValidateUserResponse"> = {
+  $type: "auth.ValidateUserResponse" as const,
+
   encode(message: ValidateUserResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.isValid !== false) {
       writer.uint32(8).bool(message.isValid);
@@ -181,6 +196,7 @@ export const ValidateUserResponse: MessageFns<ValidateUserResponse> = {
 
   fromJSON(object: any): ValidateUserResponse {
     return {
+      $type: ValidateUserResponse.$type,
       isValid: isSet(object.isValid) ? globalThis.Boolean(object.isValid) : false,
       userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
     };
@@ -208,11 +224,15 @@ export const ValidateUserResponse: MessageFns<ValidateUserResponse> = {
   },
 };
 
+messageTypeRegistry.set(ValidateUserResponse.$type, ValidateUserResponse);
+
 function createBaseGetTokensRequest(): GetTokensRequest {
-  return { userId: "" };
+  return { $type: "auth.GetTokensRequest", userId: "" };
 }
 
-export const GetTokensRequest: MessageFns<GetTokensRequest> = {
+export const GetTokensRequest: MessageFns<GetTokensRequest, "auth.GetTokensRequest"> = {
+  $type: "auth.GetTokensRequest" as const,
+
   encode(message: GetTokensRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.userId !== "") {
       writer.uint32(10).string(message.userId);
@@ -245,7 +265,7 @@ export const GetTokensRequest: MessageFns<GetTokensRequest> = {
   },
 
   fromJSON(object: any): GetTokensRequest {
-    return { userId: isSet(object.userId) ? globalThis.String(object.userId) : "" };
+    return { $type: GetTokensRequest.$type, userId: isSet(object.userId) ? globalThis.String(object.userId) : "" };
   },
 
   toJSON(message: GetTokensRequest): unknown {
@@ -266,11 +286,15 @@ export const GetTokensRequest: MessageFns<GetTokensRequest> = {
   },
 };
 
+messageTypeRegistry.set(GetTokensRequest.$type, GetTokensRequest);
+
 function createBaseRefreshTokensRequest(): RefreshTokensRequest {
-  return { refreshToken: "" };
+  return { $type: "auth.RefreshTokensRequest", refreshToken: "" };
 }
 
-export const RefreshTokensRequest: MessageFns<RefreshTokensRequest> = {
+export const RefreshTokensRequest: MessageFns<RefreshTokensRequest, "auth.RefreshTokensRequest"> = {
+  $type: "auth.RefreshTokensRequest" as const,
+
   encode(message: RefreshTokensRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.refreshToken !== "") {
       writer.uint32(10).string(message.refreshToken);
@@ -303,7 +327,10 @@ export const RefreshTokensRequest: MessageFns<RefreshTokensRequest> = {
   },
 
   fromJSON(object: any): RefreshTokensRequest {
-    return { refreshToken: isSet(object.refreshToken) ? globalThis.String(object.refreshToken) : "" };
+    return {
+      $type: RefreshTokensRequest.$type,
+      refreshToken: isSet(object.refreshToken) ? globalThis.String(object.refreshToken) : "",
+    };
   },
 
   toJSON(message: RefreshTokensRequest): unknown {
@@ -324,11 +351,15 @@ export const RefreshTokensRequest: MessageFns<RefreshTokensRequest> = {
   },
 };
 
+messageTypeRegistry.set(RefreshTokensRequest.$type, RefreshTokensRequest);
+
 function createBaseGetTokensResponse(): GetTokensResponse {
-  return { accessToken: "", refreshToken: "" };
+  return { $type: "auth.GetTokensResponse", accessToken: "", refreshToken: "" };
 }
 
-export const GetTokensResponse: MessageFns<GetTokensResponse> = {
+export const GetTokensResponse: MessageFns<GetTokensResponse, "auth.GetTokensResponse"> = {
+  $type: "auth.GetTokensResponse" as const,
+
   encode(message: GetTokensResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.accessToken !== "") {
       writer.uint32(10).string(message.accessToken);
@@ -373,6 +404,7 @@ export const GetTokensResponse: MessageFns<GetTokensResponse> = {
 
   fromJSON(object: any): GetTokensResponse {
     return {
+      $type: GetTokensResponse.$type,
       accessToken: isSet(object.accessToken) ? globalThis.String(object.accessToken) : "",
       refreshToken: isSet(object.refreshToken) ? globalThis.String(object.refreshToken) : "",
     };
@@ -400,11 +432,15 @@ export const GetTokensResponse: MessageFns<GetTokensResponse> = {
   },
 };
 
+messageTypeRegistry.set(GetTokensResponse.$type, GetTokensResponse);
+
 function createBaseValidateTokenRequest(): ValidateTokenRequest {
-  return { token: "" };
+  return { $type: "auth.ValidateTokenRequest", token: "" };
 }
 
-export const ValidateTokenRequest: MessageFns<ValidateTokenRequest> = {
+export const ValidateTokenRequest: MessageFns<ValidateTokenRequest, "auth.ValidateTokenRequest"> = {
+  $type: "auth.ValidateTokenRequest" as const,
+
   encode(message: ValidateTokenRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.token !== "") {
       writer.uint32(10).string(message.token);
@@ -437,7 +473,7 @@ export const ValidateTokenRequest: MessageFns<ValidateTokenRequest> = {
   },
 
   fromJSON(object: any): ValidateTokenRequest {
-    return { token: isSet(object.token) ? globalThis.String(object.token) : "" };
+    return { $type: ValidateTokenRequest.$type, token: isSet(object.token) ? globalThis.String(object.token) : "" };
   },
 
   toJSON(message: ValidateTokenRequest): unknown {
@@ -458,11 +494,15 @@ export const ValidateTokenRequest: MessageFns<ValidateTokenRequest> = {
   },
 };
 
+messageTypeRegistry.set(ValidateTokenRequest.$type, ValidateTokenRequest);
+
 function createBaseValidateTokenResponse(): ValidateTokenResponse {
-  return { isValid: false, userId: "", email: "", role: "" };
+  return { $type: "auth.ValidateTokenResponse", isValid: false, userId: "", email: "", role: "" };
 }
 
-export const ValidateTokenResponse: MessageFns<ValidateTokenResponse> = {
+export const ValidateTokenResponse: MessageFns<ValidateTokenResponse, "auth.ValidateTokenResponse"> = {
+  $type: "auth.ValidateTokenResponse" as const,
+
   encode(message: ValidateTokenResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.isValid !== false) {
       writer.uint32(8).bool(message.isValid);
@@ -529,6 +569,7 @@ export const ValidateTokenResponse: MessageFns<ValidateTokenResponse> = {
 
   fromJSON(object: any): ValidateTokenResponse {
     return {
+      $type: ValidateTokenResponse.$type,
       isValid: isSet(object.isValid) ? globalThis.Boolean(object.isValid) : false,
       userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
       email: isSet(object.email) ? globalThis.String(object.email) : "",
@@ -565,6 +606,8 @@ export const ValidateTokenResponse: MessageFns<ValidateTokenResponse> = {
     return message;
   },
 };
+
+messageTypeRegistry.set(ValidateTokenResponse.$type, ValidateTokenResponse);
 
 export type AuthServiceService = typeof AuthServiceService;
 export const AuthServiceService = {
@@ -701,18 +744,19 @@ type Builtin = Date | Function | Uint8Array | string | number | boolean | undefi
 export type DeepPartial<T> = T extends Builtin ? T
   : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
   : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : T extends {} ? { [K in Exclude<keyof T, "$type">]?: DeepPartial<T[K]> }
   : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P> | "$type">]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
 }
 
-export interface MessageFns<T> {
+export interface MessageFns<T, V extends string> {
+  readonly $type: V;
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
   fromJSON(object: any): T;

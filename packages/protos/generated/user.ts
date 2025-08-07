@@ -18,12 +18,14 @@ import {
   type ServiceError,
   type UntypedServiceImplementation,
 } from "@grpc/grpc-js";
+import { messageTypeRegistry } from "./typeRegistry";
 
 export const protobufPackage = "user";
 
 /** user.proto - gRPC contract for UserService */
 
 export interface FindUserRequest {
+  $type: "user.FindUserRequest";
   email?:
     | string
     | undefined;
@@ -33,12 +35,14 @@ export interface FindUserRequest {
 
 /** Request message for fetching a user by ID */
 export interface GetUserRequest {
+  $type: "user.GetUserRequest";
   /** The UUID of the user to fetch */
   id: string;
 }
 
 /** Response message representing a User */
 export interface UserResponse {
+  $type: "user.UserResponse";
   /** Unique identifier of the user */
   id: string;
   /** Email address */
@@ -49,6 +53,7 @@ export interface UserResponse {
 
 /** Request message for updating a profile */
 export interface UpdateProfileRequest {
+  $type: "user.UpdateProfileRequest";
   /** The UUID of the user making the update */
   id: string;
   /** Only include fields if they should be updated */
@@ -59,6 +64,7 @@ export interface UpdateProfileRequest {
 
 /** New messages below: */
 export interface CreateUserRequest {
+  $type: "user.CreateUserRequest";
   email: string;
   /** hashed */
   password: string;
@@ -66,11 +72,13 @@ export interface CreateUserRequest {
 }
 
 export interface FindUserWithHashRequest {
+  $type: "user.FindUserWithHashRequest";
   email?: string | undefined;
   phone?: string | undefined;
 }
 
 export interface FindUserWithHashResponse {
+  $type: "user.FindUserWithHashResponse";
   id: string;
   email: string;
   role: string;
@@ -80,15 +88,18 @@ export interface FindUserWithHashResponse {
 }
 
 export interface SetRefreshTokenRequest {
+  $type: "user.SetRefreshTokenRequest";
   userId: string;
   refreshToken: string;
 }
 
 function createBaseFindUserRequest(): FindUserRequest {
-  return { email: undefined, phone: undefined };
+  return { $type: "user.FindUserRequest", email: undefined, phone: undefined };
 }
 
-export const FindUserRequest: MessageFns<FindUserRequest> = {
+export const FindUserRequest: MessageFns<FindUserRequest, "user.FindUserRequest"> = {
+  $type: "user.FindUserRequest" as const,
+
   encode(message: FindUserRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.email !== undefined) {
       writer.uint32(10).string(message.email);
@@ -133,6 +144,7 @@ export const FindUserRequest: MessageFns<FindUserRequest> = {
 
   fromJSON(object: any): FindUserRequest {
     return {
+      $type: FindUserRequest.$type,
       email: isSet(object.email) ? globalThis.String(object.email) : undefined,
       phone: isSet(object.phone) ? globalThis.String(object.phone) : undefined,
     };
@@ -160,11 +172,15 @@ export const FindUserRequest: MessageFns<FindUserRequest> = {
   },
 };
 
+messageTypeRegistry.set(FindUserRequest.$type, FindUserRequest);
+
 function createBaseGetUserRequest(): GetUserRequest {
-  return { id: "" };
+  return { $type: "user.GetUserRequest", id: "" };
 }
 
-export const GetUserRequest: MessageFns<GetUserRequest> = {
+export const GetUserRequest: MessageFns<GetUserRequest, "user.GetUserRequest"> = {
+  $type: "user.GetUserRequest" as const,
+
   encode(message: GetUserRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.id !== "") {
       writer.uint32(10).string(message.id);
@@ -197,7 +213,7 @@ export const GetUserRequest: MessageFns<GetUserRequest> = {
   },
 
   fromJSON(object: any): GetUserRequest {
-    return { id: isSet(object.id) ? globalThis.String(object.id) : "" };
+    return { $type: GetUserRequest.$type, id: isSet(object.id) ? globalThis.String(object.id) : "" };
   },
 
   toJSON(message: GetUserRequest): unknown {
@@ -218,11 +234,15 @@ export const GetUserRequest: MessageFns<GetUserRequest> = {
   },
 };
 
+messageTypeRegistry.set(GetUserRequest.$type, GetUserRequest);
+
 function createBaseUserResponse(): UserResponse {
-  return { id: "", email: "", role: "" };
+  return { $type: "user.UserResponse", id: "", email: "", role: "" };
 }
 
-export const UserResponse: MessageFns<UserResponse> = {
+export const UserResponse: MessageFns<UserResponse, "user.UserResponse"> = {
+  $type: "user.UserResponse" as const,
+
   encode(message: UserResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.id !== "") {
       writer.uint32(10).string(message.id);
@@ -278,6 +298,7 @@ export const UserResponse: MessageFns<UserResponse> = {
 
   fromJSON(object: any): UserResponse {
     return {
+      $type: UserResponse.$type,
       id: isSet(object.id) ? globalThis.String(object.id) : "",
       email: isSet(object.email) ? globalThis.String(object.email) : "",
       role: isSet(object.role) ? globalThis.String(object.role) : "",
@@ -310,11 +331,15 @@ export const UserResponse: MessageFns<UserResponse> = {
   },
 };
 
+messageTypeRegistry.set(UserResponse.$type, UserResponse);
+
 function createBaseUpdateProfileRequest(): UpdateProfileRequest {
-  return { id: "", email: "", newPassword: "", currentPassword: "" };
+  return { $type: "user.UpdateProfileRequest", id: "", email: "", newPassword: "", currentPassword: "" };
 }
 
-export const UpdateProfileRequest: MessageFns<UpdateProfileRequest> = {
+export const UpdateProfileRequest: MessageFns<UpdateProfileRequest, "user.UpdateProfileRequest"> = {
+  $type: "user.UpdateProfileRequest" as const,
+
   encode(message: UpdateProfileRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.id !== "") {
       writer.uint32(10).string(message.id);
@@ -381,6 +406,7 @@ export const UpdateProfileRequest: MessageFns<UpdateProfileRequest> = {
 
   fromJSON(object: any): UpdateProfileRequest {
     return {
+      $type: UpdateProfileRequest.$type,
       id: isSet(object.id) ? globalThis.String(object.id) : "",
       email: isSet(object.email) ? globalThis.String(object.email) : "",
       newPassword: isSet(object.newPassword) ? globalThis.String(object.newPassword) : "",
@@ -418,11 +444,15 @@ export const UpdateProfileRequest: MessageFns<UpdateProfileRequest> = {
   },
 };
 
+messageTypeRegistry.set(UpdateProfileRequest.$type, UpdateProfileRequest);
+
 function createBaseCreateUserRequest(): CreateUserRequest {
-  return { email: "", password: "", role: "" };
+  return { $type: "user.CreateUserRequest", email: "", password: "", role: "" };
 }
 
-export const CreateUserRequest: MessageFns<CreateUserRequest> = {
+export const CreateUserRequest: MessageFns<CreateUserRequest, "user.CreateUserRequest"> = {
+  $type: "user.CreateUserRequest" as const,
+
   encode(message: CreateUserRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.email !== "") {
       writer.uint32(10).string(message.email);
@@ -478,6 +508,7 @@ export const CreateUserRequest: MessageFns<CreateUserRequest> = {
 
   fromJSON(object: any): CreateUserRequest {
     return {
+      $type: CreateUserRequest.$type,
       email: isSet(object.email) ? globalThis.String(object.email) : "",
       password: isSet(object.password) ? globalThis.String(object.password) : "",
       role: isSet(object.role) ? globalThis.String(object.role) : "",
@@ -510,11 +541,15 @@ export const CreateUserRequest: MessageFns<CreateUserRequest> = {
   },
 };
 
+messageTypeRegistry.set(CreateUserRequest.$type, CreateUserRequest);
+
 function createBaseFindUserWithHashRequest(): FindUserWithHashRequest {
-  return { email: undefined, phone: undefined };
+  return { $type: "user.FindUserWithHashRequest", email: undefined, phone: undefined };
 }
 
-export const FindUserWithHashRequest: MessageFns<FindUserWithHashRequest> = {
+export const FindUserWithHashRequest: MessageFns<FindUserWithHashRequest, "user.FindUserWithHashRequest"> = {
+  $type: "user.FindUserWithHashRequest" as const,
+
   encode(message: FindUserWithHashRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.email !== undefined) {
       writer.uint32(10).string(message.email);
@@ -559,6 +594,7 @@ export const FindUserWithHashRequest: MessageFns<FindUserWithHashRequest> = {
 
   fromJSON(object: any): FindUserWithHashRequest {
     return {
+      $type: FindUserWithHashRequest.$type,
       email: isSet(object.email) ? globalThis.String(object.email) : undefined,
       phone: isSet(object.phone) ? globalThis.String(object.phone) : undefined,
     };
@@ -586,11 +622,15 @@ export const FindUserWithHashRequest: MessageFns<FindUserWithHashRequest> = {
   },
 };
 
+messageTypeRegistry.set(FindUserWithHashRequest.$type, FindUserWithHashRequest);
+
 function createBaseFindUserWithHashResponse(): FindUserWithHashResponse {
-  return { id: "", email: "", role: "", passwordHash: "", refreshToken: "" };
+  return { $type: "user.FindUserWithHashResponse", id: "", email: "", role: "", passwordHash: "", refreshToken: "" };
 }
 
-export const FindUserWithHashResponse: MessageFns<FindUserWithHashResponse> = {
+export const FindUserWithHashResponse: MessageFns<FindUserWithHashResponse, "user.FindUserWithHashResponse"> = {
+  $type: "user.FindUserWithHashResponse" as const,
+
   encode(message: FindUserWithHashResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.id !== "") {
       writer.uint32(10).string(message.id);
@@ -668,6 +708,7 @@ export const FindUserWithHashResponse: MessageFns<FindUserWithHashResponse> = {
 
   fromJSON(object: any): FindUserWithHashResponse {
     return {
+      $type: FindUserWithHashResponse.$type,
       id: isSet(object.id) ? globalThis.String(object.id) : "",
       email: isSet(object.email) ? globalThis.String(object.email) : "",
       role: isSet(object.role) ? globalThis.String(object.role) : "",
@@ -710,11 +751,15 @@ export const FindUserWithHashResponse: MessageFns<FindUserWithHashResponse> = {
   },
 };
 
+messageTypeRegistry.set(FindUserWithHashResponse.$type, FindUserWithHashResponse);
+
 function createBaseSetRefreshTokenRequest(): SetRefreshTokenRequest {
-  return { userId: "", refreshToken: "" };
+  return { $type: "user.SetRefreshTokenRequest", userId: "", refreshToken: "" };
 }
 
-export const SetRefreshTokenRequest: MessageFns<SetRefreshTokenRequest> = {
+export const SetRefreshTokenRequest: MessageFns<SetRefreshTokenRequest, "user.SetRefreshTokenRequest"> = {
+  $type: "user.SetRefreshTokenRequest" as const,
+
   encode(message: SetRefreshTokenRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.userId !== "") {
       writer.uint32(10).string(message.userId);
@@ -759,6 +804,7 @@ export const SetRefreshTokenRequest: MessageFns<SetRefreshTokenRequest> = {
 
   fromJSON(object: any): SetRefreshTokenRequest {
     return {
+      $type: SetRefreshTokenRequest.$type,
       userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
       refreshToken: isSet(object.refreshToken) ? globalThis.String(object.refreshToken) : "",
     };
@@ -785,6 +831,8 @@ export const SetRefreshTokenRequest: MessageFns<SetRefreshTokenRequest> = {
     return message;
   },
 };
+
+messageTypeRegistry.set(SetRefreshTokenRequest.$type, SetRefreshTokenRequest);
 
 export type UserServiceService = typeof UserServiceService;
 export const UserServiceService = {
@@ -960,18 +1008,19 @@ type Builtin = Date | Function | Uint8Array | string | number | boolean | undefi
 export type DeepPartial<T> = T extends Builtin ? T
   : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
   : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : T extends {} ? { [K in Exclude<keyof T, "$type">]?: DeepPartial<T[K]> }
   : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
-  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P> | "$type">]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
 }
 
-export interface MessageFns<T> {
+export interface MessageFns<T, V extends string> {
+  readonly $type: V;
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
   fromJSON(object: any): T;

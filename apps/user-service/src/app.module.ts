@@ -1,53 +1,36 @@
+// apps/user-service/src/app.module.ts
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService  } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD, Reflector } from '@nestjs/core';
+
+import { AuthClientModule } from './auth-client.module';
+import { GrpcTokenAuthGuard } from '@nebula/grpc-auth';
+
+import { UserModule } from './user/user.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma.service';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { UserModule } from './user/user.module';
-import { AuthModule } from './auth/auth.module';
-import { APP_GUARD } from '@nestjs/core';
-import { JwtAuthGuard } from './auth/jwt/jwt-auth.guard';
-import { RolesGuard } from './common/guards/roles.guard';
-import { JwtAndRolesGuard } from './auth/jwt/jwt-and-roles';
-import { join } from 'path';
+
+
+export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
+export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
 
 @Module({
   imports: [
-    UserModule,
-    AuthModule,
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['apps/user-service/.env', '.env'],
+      expandVariables: true,
     }),
-    ClientsModule.registerAsync([
-      {
-        name: 'AUTH_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (cfg: ConfigService) => ({
-          transport: Transport.GRPC,
-          options: {
-            package: 'auth',
-            protoPath: join(
-              __dirname,
-              '../../packages/protos/auth.proto'
-            ),
-            url: cfg.get<string>('AUTH_GRPC_URL') || 'localhost:50052',
-          },
-        }),
-      },
-    ]),
+    AuthClientModule,         // <— brings AUTH_SERVICE *and* Reflector
+    UserModule,
   ],
   controllers: [AppController],
   providers: [
+    Reflector,
     AppService,
     PrismaService,
-    JwtAuthGuard,
-    RolesGuard,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAndRolesGuard,
-    }
+    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },   // global guard
   ],
 })
 export class AppModule {}

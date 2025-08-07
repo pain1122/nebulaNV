@@ -1,9 +1,7 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { AppModule, AUTH_PROTO } from './app.module';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
 import { join } from 'path';
-
-const AUTH_PROTO_PATH = require.resolve('@nebula/protos/auth.proto');
 
 
 async function bootstrap() {
@@ -14,7 +12,7 @@ async function bootstrap() {
     transport: Transport.GRPC,
     options: {
       package: 'auth',
-      protoPath: AUTH_PROTO_PATH,
+      protoPath: AUTH_PROTO,
       url: '0.0.0.0:50052',
     },
   });

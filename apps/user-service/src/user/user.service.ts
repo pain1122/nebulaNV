@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { Prisma } from '../../prisma/generated/client';
-import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 type User = Prisma.UserGetPayload<{}>;
 
@@ -87,5 +87,18 @@ export class UserService {
   }
   async getUserByPhone(phone: string) {
     return this.prisma.user.findUnique({ where: { phone } });
+  }
+
+  async createUserWithHash(email: string, passwordHash: string, role: string) {
+    return this.prisma.user.create({
+      data: { email, password: passwordHash, role },
+    });
+  }
+  
+  async setRefreshToken(userId: string, hash: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: hash },
+    });
   }
 }

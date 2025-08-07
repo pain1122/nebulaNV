@@ -1,16 +1,21 @@
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
-import {
-  UserResponse,
-  CreateUserRequest,
-  FindUserWithHashRequest,
-  UpdateProfileRequest,
-  SetRefreshTokenRequest,
-} from '../generated/user';
+import { userv1 } from '@nebula/protos';
+
+type UserResponse = userv1.UserResponse;
+type CreateUserRequest = userv1.CreateUserRequest;
+type FindUserWithHashRequest = userv1.FindUserWithHashRequest;
+type UpdateProfileRequest = userv1.UpdateProfileRequest;
+type FindUserWithHashResponse = userv1.FindUserWithHashResponse;
+type SetRefreshTokenRequest = userv1.SetRefreshTokenRequest;
 
 @Injectable()
 export class AuthService {
@@ -22,13 +27,19 @@ export class AuthService {
 
   async register(email: string, password: string): Promise<UserResponse> {
     const hash = await bcrypt.hash(password, 10);
-    return this.grpc.createUser({ email, password: hash, role: 'user' });
+    const req: CreateUserRequest = userv1.CreateUserRequest.create({
+      email,
+      password: hash,
+      role: 'user',
+    });
+
+    return this.grpc.createUser(req);
   }
 
   async validateUser(identifier: string, password: string) {
     const req: FindUserWithHashRequest = identifier.includes('@')
-      ? { email: identifier }
-      : { phone: identifier };
+      ? userv1.FindUserWithHashRequest.create({ email: identifier })
+      : userv1.FindUserWithHashRequest.create({ phone: identifier });
 
     const u = await this.grpc.findUserWithHash(req);
     if (!u) return null;
@@ -45,20 +56,30 @@ export class AuthService {
       expiresIn: this.cfg.get('JWT_REFRESH_EXPIRATION'),
     });
     const hash = await bcrypt.hash(rt, 10);
-    await this.grpc.setRefreshToken({ userId: user.id, refreshToken: hash });
+    const setReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create({
+      userId: user.id,
+      refreshToken: hash,
+    });
+    await this.grpc.setRefreshToken(setReq);
     return { access_token: at, refresh_token: rt };
   }
 
   async refreshTokens(oldRt: string) {
     let payload: any;
     try {
-      payload = this.jwt.verify(oldRt, { secret: this.cfg.get('JWT_REFRESH_SECRET') });
+      payload = this.jwt.verify(oldRt, {
+        secret: this.cfg.get('JWT_REFRESH_SECRET'),
+      });
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const u = await this.grpc.findUserWithHash({ email: '' /*or use getUser*/ });
-    if (!u || !(await bcrypt.compare(oldRt, u.refreshToken))) {
+    const findReq: FindUserWithHashRequest = userv1.FindUserWithHashRequest.create({
+      email: payload.email,
+    });
+    const u = await this.grpc.findUserWithHash(findReq);
+    
+    if (!u || !u.refreshToken || !(await bcrypt.compare(oldRt, u.refreshToken))) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -68,8 +89,11 @@ export class AuthService {
       secret: this.cfg.get('JWT_REFRESH_SECRET'),
       expiresIn: this.cfg.get('JWT_REFRESH_EXPIRATION'),
     });
-    const hash = await bcrypt.hash(rt, 10);
-    await this.grpc.setRefreshToken({ userId: p.sub, refreshToken: hash });
+    const setReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create({
+      userId: p.sub,
+      refreshToken: await bcrypt.hash(rt, 10),
+    });
+    await this.grpc.setRefreshToken(setReq);
     return { access_token: at, refresh_token: rt };
   }
 
@@ -82,17 +106,13 @@ export class AuthService {
   }
 
   // new signature: accept your DTO + the userId
-  async updateProfile(
-    userId: string,
-    dto: UpdateProfileDto,
-    token: string,
-  ): Promise<UserResponse> {
-    const req: UpdateProfileRequest = {
+  async updateProfile(userId: string, dto: UpdateProfileDto, token: string): Promise<UserResponse> {
+    const req: UpdateProfileRequest = userv1.UpdateProfileRequest.create({
       id: userId,
       email: dto.email ?? '',
       newPassword: dto.newPassword ?? '',
       currentPassword: dto.currentPassword ?? '',
-    };
+    });
     return this.grpc.updateProfile(req, token);
   }
 }

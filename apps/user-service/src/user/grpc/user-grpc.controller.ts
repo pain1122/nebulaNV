@@ -1,81 +1,136 @@
-import { Controller, ForbiddenException, UseGuards  } from '@nestjs/common';
-import { GrpcMethod, RpcException } from '@nestjs/microservices';
+import { Controller, SetMetadata } from '@nestjs/common';
+import { GrpcMethod } from '@nestjs/microservices';
+import { userv1 } from '@nebula/protos';
 import { UserService } from '../user.service';
-import { GrpcJwtAuthGuard } from './grpc-jwt-auth.guard';
-import { UpdateProfileDto } from '../../auth/dto/update-profile.dto';
 
-// These interfaces mirror your .proto definitions
-interface GetUserRequest {
-  id: string;
-}
-interface UserResponse {
-  id: string;
-  email: string;
-  role: string;
-}
-interface UpdateProfileRequest {
-  id: string;
-  email?: string;
-  newPassword?: string;
-  currentPassword?: string;
-}
+// Public() flag the guard skips
+const Public = () => SetMetadata('isPublic', true);
 
-@Controller() // no path needed, gRPC uses the package/service from .proto
+@Controller()
 export class UserGrpcController {
-  constructor(private readonly userService: UserService) {}
-  
-  @UseGuards(GrpcJwtAuthGuard)
+  constructor(private readonly users: UserService) {}
+
+  // ------------------------------------------------------
+  // GetUser
+  // ------------------------------------------------------
   @GrpcMethod('UserService', 'GetUser')
-  async getUser(data: GetUserRequest): Promise<UserResponse> {
-    console.log('[gRPC][GetUser] incoming request, id=', data.id);
-    try {
-      const user = await this.userService.getUserById(data.id);
-      if (!user) {
-        // convert a “not found” to an RPC error
-        throw new RpcException({ code: 5, message: 'User not found' });
-      }
-      return { id: user.id, email: user.email ?? '', role: user.role };
-    } catch (err: any) {
-      console.error('[gRPC][GetUser] error:', err);
-      // rethrow any RpcException, wrap others
-      throw err instanceof RpcException ? err : new RpcException(err.message);
+  async getUser(
+    data: userv1.GetUserRequest,
+  ): Promise<userv1.UserResponse> {
+    const u = await this.users.getUserById(data.id);
+    if (!u) {
+      return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
     }
+    return userv1.UserResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+    });
   }
 
-  @UseGuards(GrpcJwtAuthGuard)
-  @GrpcMethod('UserService', 'UpdateProfile')
-  async updateProfile(data: UpdateProfileRequest): Promise<UserResponse> {
-    try {
-      // Reuse your existing DTO & service
-      const dto = new UpdateProfileDto();
-      if (data.email) dto.email = data.email;
-      if (data.newPassword) dto.newPassword = data.newPassword;
-      if (data.currentPassword) dto.currentPassword = data.currentPassword;
-
-      const updated = await this.userService.updateProfile(data.id, dto);
-
-      return {
-        id: updated.id,
-        email: updated.email ?? '',
-        role: updated.role,
-      };
-    } catch (err: any) {
-      if (err instanceof ForbiddenException) {
-        throw new RpcException({ code: 7, message: 'Permission denied' });
-      }
-      throw err.getStatus && err.getStatus() === 400
-        ? new RpcException({ code: 3, message: err.message })
-        : new RpcException(err.message);
-    }
-  }
-
+  // ------------------------------------------------------
+  // FindUser  (by id / email / phone)
+  // ------------------------------------------------------
   @GrpcMethod('UserService', 'FindUser')
-  async findUser(data: { email?: string; phone?: string }): Promise<UserResponse> {
-    const user = data.email
-  ? await this.userService.getUserByEmail(data.email)
-  : await this.userService.getUserByPhone(data.phone!);
+  async findUser(
+    data: userv1.FindUserRequest,
+  ): Promise<userv1.UserResponse> {
+    let u = null;
+    if (data.email) u = await this.users.getUserByEmail(data.email);
+    else if (data.phone) u = await this.users.getUserByPhone(data.phone);
 
-    if (!user) throw new RpcException({ code: 5, message: 'User not found' });
-    return { id: user.id, email: user.email ?? '', role: user.role };
+    if (!u) {
+      return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
+    }
+    return userv1.UserResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+    });
+  }
+
+  // ------------------------------------------------------
+  // UpdateProfile
+  // ------------------------------------------------------
+  @GrpcMethod('UserService', 'UpdateProfile')
+  async updateProfile(
+    data: userv1.UpdateProfileRequest,
+  ): Promise<userv1.UserResponse> {
+    const updated = await this.users.updateProfile(data.id, {
+      email:           data.email           || undefined,
+      currentPassword: data.currentPassword || undefined,
+      newPassword:     data.newPassword     || undefined,
+    });
+    return userv1.UserResponse.create({
+      id: updated.id,
+      email: updated.email ?? '',
+      role: updated.role,
+    });
+  }
+
+  // ------------------------------------------------------
+  // CreateUser  (called by auth-service.register)
+  // ------------------------------------------------------
+  @Public()
+  @GrpcMethod('UserService', 'CreateUser')
+  async createUser(
+    data: userv1.CreateUserRequest,
+  ): Promise<userv1.UserResponse> {
+    console.log('[UserService] CreateUser RPC received', data.email);
+    const u = await this.users.createUserWithHash(
+      data.email,
+      data.password,              // already hashed
+      data.role || 'user',
+    );
+    return userv1.UserResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+    });
+  }
+
+  // ------------------------------------------------------
+  // FindUserWithHash  (auth-service.login / refreshTokens)
+  // ------------------------------------------------------
+  @Public()
+  @GrpcMethod('UserService', 'FindUserWithHash')
+  async findUserWithHash(
+    data: userv1.FindUserWithHashRequest,
+  ): Promise<userv1.FindUserWithHashResponse> {
+    const u = data.email
+      ? await this.users.getUserByEmail(data.email)
+      : data.phone
+      ? await this.users.getUserByPhone(data.phone)
+      : null;
+
+    if (!u) {
+      return userv1.FindUserWithHashResponse.create({
+        id: '', email: '', role: 'user', passwordHash: '', refreshToken: '',
+      });
+    }
+    return userv1.FindUserWithHashResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+      // Prisma column is 'password'
+      passwordHash: u.password,
+      refreshToken: (u as any).refreshToken ?? '',
+    });
+  }
+
+  // ------------------------------------------------------
+  // SetRefreshToken  (auth-service rotates RT)
+  // ------------------------------------------------------
+  @Public()
+  @GrpcMethod('UserService', 'SetRefreshToken')
+  async setRefreshToken(
+    data: userv1.SetRefreshTokenRequest,
+  ): Promise<userv1.UserResponse> {
+    const u = await this.users.setRefreshToken(data.userId, data.refreshToken);
+    return userv1.UserResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+    });
   }
 }

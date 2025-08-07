@@ -1,14 +1,18 @@
 {
   "name": "@nebula/protos",
   "version": "0.0.1",
-  "main": "generated/index.js",
-  "types": "generated/index.d.ts",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "generated",
+    "dist",
     "*.proto"
   ],
   "scripts": {
-    "proto:gen": "protoc --ts_proto_out=generated --ts_proto_opt=esModuleInterop=true,outputServices=grpc-js,useOptionals=messages --proto_path=. *.proto"
+    "proto:gen": "protoc --ts_proto_out=generated --ts_proto_opt=esModuleInterop=true,outputServices=grpc-js,useOptionals=messages --proto_path=. *.proto",
+    "prebuild": "pnpm -w proto:gen",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist"
   },
   "devDependencies": {
     "ts-proto": "^2.7.5"
