@@ -19,7 +19,7 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      package: 'user',
+      package: 'user', 
       protoPath: USER_PROTO,
       url: '0.0.0.0:50051',
     },
@@ -29,7 +29,7 @@ async function bootstrap() {
   const port = app.get(ConfigService).get<number>('PORT') ?? 3000;
   await app.listen(port);                     
   console.log(
-    `HTTP listening on http://localhost:${port}  |  gRPC on 0.0.0.0:50051`,
+    `HTTP listening on http://127.0.0.1:${port}  |  gRPC on 0.0.0.0:50051`,
   );
 }
 bootstrap();

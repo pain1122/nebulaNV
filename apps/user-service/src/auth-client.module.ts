@@ -9,23 +9,27 @@ const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
 @Global()
 @Module({
   imports: [
-    ConfigModule,                         // gives us ConfigService
+    ConfigModule, // gives us ConfigService
     ClientsModule.registerAsync([
       {
         name: AUTH_SERVICE,
         inject: [ConfigService],
-        useFactory: (cfg: ConfigService) => ({
-          transport: Transport.GRPC,
-          options: {
-            package: 'auth',
-            protoPath: AUTH_PROTO,
-            url: cfg.get<string>('AUTH_GRPC_URL') ?? 'localhost:50052',
-          },
-        }),
+        useFactory: (cfg: ConfigService) => {
+          const url = cfg.get<string>('AUTH_GRPC_URL') ?? '127.0.0.1:50052';
+          console.log(`[GRPC CLIENT] AUTH_SERVICE url=${url} package=auth`);
+          return {
+            transport: Transport.GRPC,
+            options: {
+              package: 'auth',
+              protoPath: AUTH_PROTO,
+              url: cfg.get<string>('AUTH_GRPC_URL') ?? '127.0.0.1:50052',
+            },
+          };
+        },
       },
     ]),
   ],
   //  ⬇️  *do NOT* provide Reflector here – Nest supplies it automatically
-  exports: [ClientsModule],               // exports AUTH_SERVICE
+  exports: [ClientsModule], // exports AUTH_SERVICE
 })
 export class AuthClientModule {}

@@ -8,7 +8,6 @@ import { AuthController } from './auth.controller';
 import { AuthGrpcController } from './grpc/grpc-auth.controller';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
 
-
 @Module({
   imports: [
     // Load .env globally
@@ -34,13 +33,20 @@ import { GrpcAuthService } from './grpc/grpc-auth.service';
         useFactory: (cfg: ConfigService) => ({
           transport: Transport.GRPC,
           options: {
-            package: 'user',
-            protoPath: USER_PROTO,
-            url: cfg.get<string>('USER_GRPC_URL') || 'localhost:50051',
+            package: 'user',                              // must match protobufPackage
+            protoPath: USER_PROTO,                        // same proto the server uses
+            url: cfg.get('USER_GRPC_URL') ?? '127.0.0.1:50051',
+            // 👇 ensure grpc-js gets a ClientOptions object
+            channelOptions: {
+              // you can leave it empty, or add safe defaults:
+              'grpc.keepalive_time_ms': 10000,
+              'grpc.max_receive_message_length': -1,
+              'grpc.max_send_message_length': -1,
+            },
           },
         }),
       },
-    ]),
+    ]),    
   ],
   controllers: [AuthController, AuthGrpcController],
   providers: [AuthService, GrpcAuthService],

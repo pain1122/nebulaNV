@@ -9,6 +9,7 @@ import {
   Get,
   Put,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -34,31 +35,45 @@ declare module 'express' {
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   /** Register a new user */
   @Public()
-  @HttpCode(HttpStatus.CREATED) // 201
+  @HttpCode(HttpStatus.CREATED)
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
-    // returns the newly created user record (sans password)
-    return this.authService.register(dto.email, dto.password);
+    this.logger.log(`register() start email=${dto.email}`);
+    const res = await this.authService.register(dto.email, dto.password);
+    this.logger.log(`register() end -> id=${(res as any)?.id ?? 'n/a'}`);
+    return res; // already JSON-safe
   }
 
   /** Login with email or phone */
   @Public()
-  @HttpCode(HttpStatus.OK) // 200
+  @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginUserDto) {
+    this.logger.log(`login() start identifier=${dto.identifier}`);
+    console.time('login.validateUser');
     const user = await this.authService.validateUser(
       dto.identifier,
       dto.password,
     );
+    console.timeEnd('login.validateUser');
+
     if (!user) {
+      this.logger.warn(`login() failed for identifier=${dto.identifier}`);
       throw new UnauthorizedException('Invalid credentials');
     }
-    // returns { access_token, refresh_token }
-    return this.authService.login(user);
+
+    console.time('login.issueTokens');
+    const res = await this.authService.login(user);
+    console.timeEnd('login.issueTokens');
+
+    this.logger.log(`login() success for id=${user.id}`);
+    return res;
   }
 
   /** Rotate a refresh token */
@@ -66,9 +81,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK) // 200
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto) {
+    this.logger.log(`refresh() start`);
     try {
-      return await this.authService.refreshTokens(dto.refreshToken);
+      const res = await this.authService.refreshTokens(dto.refreshToken);
+      this.logger.log(`refresh() success`);
+      return res;
     } catch {
+      this.logger.warn(`refresh() failed`);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -79,6 +98,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Get('me')
   getProfile(@Req() req: Request) {
+    this.logger.log(`getProfile() for id=${req.user?.userId}`);
     return this.authService.getProfile(req.user!.userId);
   }
 
@@ -87,29 +107,23 @@ export class AuthController {
   @Roles('user', 'admin', 'root-admin')
   @HttpCode(HttpStatus.OK)
   @Put('me')
-  updateProfile(
-    @Req() req: Request,
-    @Body() dto: UpdateProfileDto,
-  ) {
-    // pull the raw JWT out of the Authorization header
+  updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
+    this.logger.log(`updateProfile() for id=${req.user?.userId}`);
     const authHeader = req.headers.authorization || '';
-    const token =
-      authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : authHeader;
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : authHeader;
 
-    return this.authService.updateProfile(
-      req.user!.userId,
-      dto,
-      token,
-    );
+    return this.authService.updateProfile(req.user!.userId, dto, token);
   }
-  /** Example admin‑only route */
+
+  /** Example admin-only route */
   @UseGuards(JwtAuthGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
   @Get('admin-only')
   adminRoute(@Req() req: Request) {
+    this.logger.log(`adminRoute() accessed by id=${req.user?.userId}`);
     return { message: 'Admin access granted', user: req.user };
   }
 }
