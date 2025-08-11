@@ -1,0 +1,82 @@
+NebulaNV — Auth & gRPC Debugging Update (since 26-07-2025)
+🆕 Key Changes After Last Report
+1. gRPC Client Refactor in AuthService
+File: apps/auth-service/src/auth/grpc/grpc-auth.service.ts
+
+Switched from direct ClientGrpc + .pipe() approach on Promise return types (which caused TS errors) to:
+
+Using firstValueFrom() on Observable responses from Nest gRPC client.
+
+Adding .pipe(timeout(5000)) for each RPC call to prevent indefinite hangs.
+
+Implemented buildMeta(token) to attach lowercase authorization: Bearer … metadata for all secured RPCs.
+
+2. Expanded Debug Logging
+Files:
+
+apps/auth-service/src/main.ts (HTTP middleware logging)
+
+apps/auth-service/src/auth/grpc/grpc-auth.service.ts (per-RPC timing logs)
+
+Added timestamps and labels for:
+
+HTTP request start/end
+
+gRPC call start/finish/error
+
+bcrypt hashing duration
+
+Helps pinpoint where calls stall (we confirmed stalls happen inside createUser RPC call).
+
+3. Manual grpcurl Testing
+Began testing user-service directly with grpcurl to confirm service responds.
+
+Verified that direct gRPC to user-service works for CreateUser.
+
+Confirms the problem is between auth-service and user-service, not inside user-service itself.
+
+❌ Where We Started Getting Stuck
+1. TypeScript / NestJS Observable vs Promise Mismatch
+Initial implementation called .pipe() on a Promise<UserResponse> instead of an Observable<UserResponse>.
+
+This threw TS2339 errors until we explicitly returned an Observable from ClientGrpc and converted via firstValueFrom().
+
+2. Metadata Parameter Type Errors
+Attempted to pass Metadata directly where Nest expected (err, resp) => void callback, causing:
+
+python
+Copy
+Edit
+Argument of type 'Metadata' is not assignable...
+Fixed by ensuring metadata is the second argument in the gRPC call (client.method(request, metadata)).
+
+3. Persistent Timeout Issue
+Even after fixing typing:
+
+HTTP /auth/register → gRPC createUser → always times out after 5000ms.
+
+Logs confirm GrpcAuthService starts the call but never gets a response before timeout.
+
+Direct grpcurl call to user-service succeeds instantly.
+
+Strongly suggests an in-process connectivity issue (likely auth-service not actually reaching 50051).
+
+4. Possible Culprit
+In dev:
+
+auth-service is not in docker-compose, so it may be trying to reach 127.0.0.1:50051 but actually needs to reach host.docker.internal or user-service:50051 (if running in container).
+
+Env var USER_GRPC_URL exists but might be:
+
+Misconfigured in .env
+
+Not picked up by ClientsModule.registerAsync()
+
+Or overridden by default value.
+
+📌 Current State
+All HTTP endpoints in auth-service work up to the point of calling GrpcAuthService.
+
+user-service is healthy — responds to grpcurl locally.
+
+The only failing path is auth-service gRPC client → user-service.
