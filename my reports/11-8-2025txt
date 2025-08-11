@@ -1,82 +1,68 @@
-NebulaNV — Auth & gRPC Debugging Update (since 26-07-2025)
-🆕 Key Changes After Last Report
-1. gRPC Client Refactor in AuthService
-File: apps/auth-service/src/auth/grpc/grpc-auth.service.ts
+NebulaNV — Update Report (2025-08-11)
+Scope covered today
+Package: apps/user-service
+Focus: Build a reliable, fast test suite (no external deps) + tidy test inventory.
 
-Switched from direct ClientGrpc + .pipe() approach on Promise return types (which caused TS errors) to:
+What’s done
+Unit tests (green)
+user.service.spec.ts — create/validate/read/update profile, token helpers.
 
-Using firstValueFrom() on Observable responses from Nest gRPC client.
+user.controller.spec.ts — route behaviors and role checks.
 
-Adding .pipe(timeout(5000)) for each RPC call to prevent indefinite hangs.
+prisma.service.spec.ts — $connect/$disconnect lifecycle.
 
-Implemented buildMeta(token) to attach lowercase authorization: Bearer … metadata for all secured RPCs.
+app.service.spec.ts — deterministic greeting via mocked ConfigService.
 
-2. Expanded Debug Logging
-Files:
+app.controller.spec.ts — delegates to service.
 
-apps/auth-service/src/main.ts (HTTP middleware logging)
+req-user.decorator.spec.ts — HTTP/RPC/fallback via exported reqUserFactory.
 
-apps/auth-service/src/auth/grpc/grpc-auth.service.ts (per-RPC timing logs)
+E2E (green, minimal)
+app.e2e.spec.ts — exercises /users over HTTP with:
 
-Added timestamps and labels for:
+in-memory Prisma stub (no DB),
 
-HTTP request start/end
+fake auth guard injecting req.user (no external auth),
 
-gRPC call start/finish/error
+bcrypt mocked for password change flow.
 
-bcrypt hashing duration
+Housekeeping
+Removed unused specs tied to non-existent/external guards/decorators.
 
-Helps pinpoint where calls stall (we confirmed stalls happen inside createUser RPC call).
+Deleted redundant globals.d.ts and the old “Jest globals” canary.
 
-3. Manual grpcurl Testing
-Began testing user-service directly with grpcurl to confirm service responds.
+Tiny source tweak: export reqUserFactory to enable direct unit testing.
 
-Verified that direct gRPC to user-service works for CreateUser.
+Why this is stable
+Tests don’t hit real gRPC, protos, or a database → deterministic and fast.
 
-Confirms the problem is between auth-service and user-service, not inside user-service itself.
+Wide, async jest.fn mocks avoid TS “never” pitfalls.
 
-❌ Where We Started Getting Stuck
-1. TypeScript / NestJS Observable vs Promise Mismatch
-Initial implementation called .pipe() on a Promise<UserResponse> instead of an Observable<UserResponse>.
+E2E validates the actual /users HTTP surface without infra coupling.
 
-This threw TS2339 errors until we explicitly returned an Observable from ClientGrpc and converted via firstValueFrom().
+Outstanding items (outside user-service)
+Auth-service ⇄ user-service gRPC timeout (carried over from 2025-07-26):
 
-2. Metadata Parameter Type Errors
-Attempted to pass Metadata directly where Nest expected (err, resp) => void callback, causing:
+App calls time out after 5s, while grpcurl to user-service succeeds.
 
-python
-Copy
-Edit
-Argument of type 'Metadata' is not assignable...
-Fixed by ensuring metadata is the second argument in the gRPC call (client.method(request, metadata)).
+Likely endpoint/env wiring mismatch (localhost vs container hostname, or env not injected).
 
-3. Persistent Timeout Issue
-Even after fixing typing:
+Suggested remediation (unchanged):
 
-HTTP /auth/register → gRPC createUser → always times out after 5000ms.
+Standardize on USER_GRPC_URL in auth-service client; log and assert at boot.
 
-Logs confirm GrpcAuthService starts the call but never gets a response before timeout.
+Use user-service:50051 inside Compose, 127.0.0.1:50051 only when port is published.
 
-Direct grpcurl call to user-service succeeds instantly.
+Verify ClientsModule.registerAsync reads ConfigService and the var is present.
 
-Strongly suggests an in-process connectivity issue (likely auth-service not actually reaching 50051).
+Add a one-shot connectivity probe/log around getService().
 
-4. Possible Culprit
-In dev:
+Risks / notes
+None blocking in user-service.
 
-auth-service is not in docker-compose, so it may be trying to reach 127.0.0.1:50051 but actually needs to reach host.docker.internal or user-service:50051 (if running in container).
+Auth-service gRPC wiring remains the only cross-service risk to auth flows.
 
-Env var USER_GRPC_URL exists but might be:
+Next steps
+(Optional) Enable coverage thresholds in jest.config.ts for user-service.
 
-Misconfigured in .env
-
-Not picked up by ClientsModule.registerAsync()
-
-Or overridden by default value.
-
-📌 Current State
-All HTTP endpoints in auth-service work up to the point of calling GrpcAuthService.
-
-user-service is healthy — responds to grpcurl locally.
-
-The only failing path is auth-service gRPC client → user-service.
+(Auth) Apply the USER_GRPC_URL cleanup + boot assertion; re-test from process.
