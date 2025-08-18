@@ -15,8 +15,7 @@ type SetRefreshTokenRequest = user.SetRefreshTokenRequest;
 type UserResponse = user.UserResponse;
 type FindUserWithHashResponse = user.FindUserWithHashResponse;
 
-// This is the *Nest proxy* interface shape: methods return Observables.
-// (We don't rely on the ts-proto callback client here.)
+// Nest proxy interface (Observable-returning)
 interface UserServiceProxy {
   createUser(req: CreateUserRequest, md?: Metadata): import('rxjs').Observable<UserResponse>;
   findUserWithHash(req: FindUserWithHashRequest, md?: Metadata): import('rxjs').Observable<FindUserWithHashResponse>;
@@ -24,21 +23,23 @@ interface UserServiceProxy {
   getUser(req: GetUserRequest, md?: Metadata): import('rxjs').Observable<UserResponse>;
   findUser(req: FindUserRequest, md?: Metadata): import('rxjs').Observable<UserResponse>;
   setRefreshToken(req: SetRefreshTokenRequest, md?: Metadata): import('rxjs').Observable<UserResponse>;
+  getUserWithHash(req: user.GetUserWithHashRequest, md?: Metadata): import('rxjs').Observable<user.GetUserWithHashResponse>; // ← add this
 }
 
 @Injectable()
 export class GrpcAuthService implements OnModuleInit {
   private svc!: UserServiceProxy;
+  private userClient!: user.UserServiceClient;
   private readonly logger = new Logger(GrpcAuthService.name);
 
   constructor(@Inject('USER_SERVICE') private readonly grpc: ClientGrpc) {}
 
   onModuleInit() {
-    // service name must match proto: "user.UserService" => "UserService" here
     this.svc = this.grpc.getService<UserServiceProxy>('UserService');
+    this.userClient = this.grpc.getService<user.UserServiceClient>('UserService');
     this.logger.log(
       `UserClient methods: ` +
-        ['createUser','findUserWithHash','updateProfile','getUser','findUser','setRefreshToken']
+        ['createUser','findUserWithHash','updateProfile','getUser','findUser','setRefreshToken','getUserWithHash']
           .map(m => `${m}=${typeof (this.svc as any)[m]}`)
           .join(', ')
     );
@@ -66,36 +67,55 @@ export class GrpcAuthService implements OnModuleInit {
   async createUser(req: CreateUserRequest): Promise<UserResponse> {
     this.logger.debug('gRPC → createUser');
     const msg = user.CreateUserRequest.create(req as any);
-    return this.await$(this.svc.createUser(msg, this.md()), 'grpc.client::createUser');
+    const md = this.md(); // none at register time
+    const obs = md ? this.svc.createUser(msg, md) : this.svc.createUser(msg);
+    return this.await$(obs, 'grpc.client::createUser');
   }
 
   async findUserWithHash(req: FindUserWithHashRequest): Promise<FindUserWithHashResponse> {
     this.logger.debug('gRPC → findUserWithHash');
     const msg = user.FindUserWithHashRequest.create(req as any);
-    return this.await$(this.svc.findUserWithHash(msg, this.md()), 'grpc.client::findUserWithHash');
+    const md = this.md(); // likely none for login pre-JWT
+    const obs = md ? this.svc.findUserWithHash(msg, md) : this.svc.findUserWithHash(msg);
+    return this.await$(obs, 'grpc.client::findUserWithHash');
   }
 
   async updateProfile(req: UpdateProfileRequest, token: string): Promise<UserResponse> {
     this.logger.debug('gRPC → updateProfile');
     const msg = user.UpdateProfileRequest.create(req as any);
-    return this.await$(this.svc.updateProfile(msg, this.md(token)), 'grpc.client::updateProfile');
+    const md = this.md(token); // required
+    return this.await$(this.svc.updateProfile(msg, md), 'grpc.client::updateProfile');
   }
 
   async getUser(id: string, token?: string): Promise<UserResponse> {
     this.logger.debug('gRPC → getUser');
     const msg: GetUserRequest = user.GetUserRequest.create({ id });
-    return this.await$(this.svc.getUser(msg, this.md(token)), 'grpc.client::getUser');
+    const md = this.md(token);
+    const obs = md ? this.svc.getUser(msg, md) : this.svc.getUser(msg);
+    return this.await$(obs, 'grpc.client::getUser');
   }
 
   async findUser(obj: FindUserRequest, token?: string): Promise<UserResponse> {
     this.logger.debug('gRPC → findUser');
     const msg = user.FindUserRequest.create(obj as any);
-    return this.await$(this.svc.findUser(msg, this.md(token)), 'grpc.client::findUser');
+    const md = this.md(token);
+    const obs = md ? this.svc.findUser(msg, md) : this.svc.findUser(msg);
+    return this.await$(obs, 'grpc.client::findUser');
   }
 
   async setRefreshToken(req: SetRefreshTokenRequest): Promise<UserResponse> {
     this.logger.debug('gRPC → setRefreshToken');
     const msg = user.SetRefreshTokenRequest.create(req as any);
-    return this.await$(this.svc.setRefreshToken(msg, this.md()), 'grpc.client::setRefreshToken');
+    const md = this.md(); // none during issuance
+    const obs = md ? this.svc.setRefreshToken(msg, md) : this.svc.setRefreshToken(msg);
+    return this.await$(obs, 'grpc.client::setRefreshToken');
+  }
+
+  async getUserWithHash(req: user.GetUserWithHashRequest): Promise<user.GetUserWithHashResponse> {
+    this.logger.debug('gRPC → getUserWithHash');
+    const msg = user.GetUserWithHashRequest.create(req as any);
+    const md = this.md();
+    const obs = md ? this.svc.getUserWithHash(msg, md) : this.svc.getUserWithHash(msg);
+    return this.await$(obs, 'grpc.client::getUserWithHash');
   }
 }

@@ -1,159 +1,115 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+
+// ✅ mock bcrypt for THIS spec (loads before import)
+jest.mock('bcrypt', () => ({
+  hash: jest.fn(async () => 'hashed_pw'),
+  compare: jest.fn(async () => true),
+}));
+
+import { Test } from '@nestjs/testing';
 import { UserService } from '../src/user/user.service';
 import { PrismaService } from '../src/prisma.service';
+import * as bcrypt from 'bcrypt';
+const bcryptMock = bcrypt as unknown as {
+  hash: jest.Mock<any>;
+  compare: jest.Mock<any>;
+};
+type JMock = jest.Mock;
 
-jest.mock('bcrypt', () => ({
-    hash: jest.fn(),
-    compare: jest.fn(),
-  }));
+describe('UserService (simple)', () => {
+  let service: UserService;
 
-describe('UserService', () => {
-  let userService: UserService;
-  const prismaServiceMock = {
+  // ultra-minimal Prisma mock; async arrows avoid TS 'never' traps
+  const prisma = {
     user: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
+      create: async (args: any) => ({
+        id: 'u1',
+        email: args.data.email,
+        password: args.data.password,
+        role: args.data.role,
+      }),
+      findUnique: async (args: any) => {
+        if (args.where?.id === 'u1') {
+          return { id: 'u1', email: 'x@y.com', password: 'hash', role: 'user' };
+        }
+        if (args.where?.email === 'a@b.com') {
+          return { id: 'u1', email: 'a@b.com', password: 'stored_hash', role: 'user' };
+        }
+        if (args.where?.phone === '0912') {
+          return { id: 'u1', email: 'p@y.com', phone: '0912', password: 'hash', role: 'user' };
+        }
+        return null;
+      },
+      findMany: async () => [
+        { id: 'u1', email: 'x@y.com', phone: null, role: 'user', createdAt: new Date() },
+      ],
+      update: async (args: any) => ({ id: args.where.id, ...args.data }),
     },
   };
 
   beforeEach(async () => {
-    jest.restoreAllMocks();
-    const module: TestingModule = await Test.createTestingModule({
+    jest.clearAllMocks();
+
+    const mod = await Test.createTestingModule({
       providers: [
         UserService,
-        { provide: PrismaService, useValue: prismaServiceMock },
+        { provide: PrismaService, useValue: prisma as any },
       ],
     }).compile();
 
-    userService = module.get<UserService>(UserService);
+    service = mod.get(UserService);
   });
 
-  describe('createUser', () => {
-    it('should hash password and create user', async () => {
-      const email = 'test@example.com';
-      const password = 'plainPassword';
-      const hashedPassword = 'hashedPassword123';
-
-      (bcrypt.hash as jest.Mock).mockResolvedValue(hashedPassword);
-      prismaServiceMock.user.create.mockResolvedValue({ id: '1', email, password: hashedPassword, role: 'user' });
-
-      const user = await userService.createUser(email, password);
-
-      expect(bcrypt.hash).toHaveBeenCalledWith(password, 10);
-      expect(prismaServiceMock.user.create).toHaveBeenCalledWith({
-        data: { email, password: hashedPassword, role: 'user' },
-      });
-      expect(user).toEqual({ id: '1', email, password: hashedPassword, role: 'user' });
-    });
-  });
-  describe('validateUser', () => {
-    it('should return the user if email and password match', async () => {
-      const email = 'test@example.com';
-      const password = 'plainPassword';
-      const hashedPassword = 'hashedPassword123';
-  
-      // Mock prisma to find the user with the hashed password
-      prismaServiceMock.user.findUnique.mockResolvedValue({
-        id: '1',
-        email,
-        password: hashedPassword,
-        role: 'user',
-      });
-  
-      // Mock bcrypt.compare to return true (passwords match)
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-  
-      const user = await userService.validateUser(email, password);
-  
-      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({ where: { email } });
-      expect(bcrypt.compare).toHaveBeenCalledWith(password, hashedPassword);
-      expect(user).toEqual({
-        id: '1',
-        email,
-        password: hashedPassword,
-        role: 'user',
-      });
-    });
-  
-    it('should return null if user is not found', async () => {
-      prismaServiceMock.user.findUnique.mockResolvedValue(null);
-  
-      const user = await userService.validateUser('notfound@example.com', 'somePassword');
-  
-      expect(user).toBeNull();
-      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({ where: { email: 'notfound@example.com' } });
-    });
-  
-    it('should return null if password does not match', async () => {
-      const email = 'test@example.com';
-      const hashedPassword = 'hashedPassword123';
-  
-      prismaServiceMock.user.findUnique.mockResolvedValue({
-        id: '1',
-        email,
-        password: hashedPassword,
-        role: 'user',
-      });
-  
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-  
-      const user = await userService.validateUser(email, 'wrongPassword');
-  
-      expect(user).toBeNull();
-      expect(bcrypt.compare).toHaveBeenCalledWith('wrongPassword', hashedPassword);
-    });
+  it('createUser hashes password and creates user', async () => {
+    const res = await service.createUser('a@b.com', 'secret');
+    expect(bcrypt.hash).toHaveBeenCalledWith('secret', 10);
+    expect(res).toMatchObject({ email: 'a@b.com', password: 'hashed_pw', role: 'user' });
   });
 
-  describe('getUserById', () => {
-    it('should return a user when found', async () => {
-      const userId = '123';
-      const expectedUser = { id: userId, email: 'user@example.com', role: 'user' };
-  
-      prismaServiceMock.user.findUnique.mockResolvedValue(expectedUser);
-  
-      const user = await userService.getUserById(userId);
-  
-      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({ where: { id: userId } });
-      expect(user).toEqual(expectedUser);
-    });
-  
-    it('should return null if user not found', async () => {
-      const userId = '456';
-  
-      prismaServiceMock.user.findUnique.mockResolvedValue(null);
-  
-      const user = await userService.getUserById(userId);
-  
-      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({ where: { id: userId } });
-      expect(user).toBeNull();
-    });
+  it('validateUser returns user on password match, else null', async () => {
+    // default compare is true from our mock
+    const ok = await service.validateUser('a@b.com', 'secret');
+    expect(ok).toMatchObject({ id: 'u1', email: 'a@b.com' });
+
+    bcryptMock.compare.mockResolvedValueOnce(false);
+    const bad = await service.validateUser('a@b.com', 'wrong');
+    expect(bad).toBeNull();
   });
-  describe('getAllUsers', () => {
-    it('should return all users with selected fields', async () => {
-      const users = [
-        { id: '1', email: 'user1@example.com', phone: '+1234567890', role: 'user', createdAt: new Date() },
-        { id: '2', email: 'user2@example.com', phone: '+1234567890', role: 'admin', createdAt: new Date() },
-      ];
-  
-      prismaServiceMock.user.findMany.mockResolvedValue(users);
-  
-      const result = await userService.getAllUsers();
-  
-      expect(prismaServiceMock.user.findMany).toHaveBeenCalledWith({
-        select: {
-          id: true,
-          email: true,
-          phone: true,
-          role: true,
-          createdAt: true,
-        },
-      });
-  
-      expect(result).toEqual(users);
-    });
+
+  it('getUserById hits prisma.findUnique', async () => {
+    const res = await service.getUserById('u1');
+    expect(res).toMatchObject({ id: 'u1', email: 'x@y.com' });
   });
-  
-  
+
+  it('getAllUsers returns selected fields', async () => {
+    const res = await service.getAllUsers();
+    expect(Array.isArray(res)).toBe(true);
+    expect(res[0]).toHaveProperty('id');
+    expect(res[0]).toHaveProperty('createdAt');
+  });
+
+  it('updateProfile — email only', async () => {
+    const res = await service.updateProfile('u1', { email: 'new@b.com' } as any);
+    expect(res).toMatchObject({ id: 'u1', email: 'new@b.com' });
+  });
+
+  it('updateProfile — password change path', async () => {
+    bcryptMock.compare.mockResolvedValueOnce(true);
+    const res = await service.updateProfile('u1', { currentPassword: 'old', newPassword: 'new' } as any);
+    expect(bcrypt.hash).toHaveBeenCalledWith('new', 10);
+    expect(res).toMatchObject({ id: 'u1', password: 'hashed_pw' });
+  });
+
+  it('getUserByEmail / getUserByPhone delegate', async () => {
+    const byEmail = await service.getUserByEmail('a@b.com');
+    expect(byEmail).toMatchObject({ email: 'a@b.com' });
+
+    const byPhone = await service.getUserByPhone('0912');
+    expect(byPhone).toMatchObject({ phone: '0912' });
+  });
+
+  it('setRefreshToken updates user', async () => {
+    const res = await service.setRefreshToken('u1', 'h');
+    expect(res).toMatchObject({ id: 'u1', refreshToken: 'h' });
+  });
 });

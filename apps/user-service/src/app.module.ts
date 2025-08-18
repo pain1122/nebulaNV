@@ -7,8 +7,6 @@ import { AuthClientModule } from './auth-client.module';
 import { GrpcTokenAuthGuard } from '@nebula/grpc-auth';
 
 import { UserModule } from './user/user.module';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { PrismaService } from './prisma.service';
 
 
@@ -25,10 +23,8 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
     AuthClientModule,         // <— brings AUTH_SERVICE *and* Reflector
     UserModule,
   ],
-  controllers: [AppController],
   providers: [
     Reflector,
-    AppService,
     PrismaService,
     { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },   // global guard
   ],

@@ -14,9 +14,7 @@ export class UserGrpcController {
   // GetUser
   // ------------------------------------------------------
   @GrpcMethod('UserService', 'GetUser')
-  async getUser(
-    data: userv1.GetUserRequest,
-  ): Promise<userv1.UserResponse> {
+  async getUser(data: userv1.GetUserRequest): Promise<userv1.UserResponse> {
     const u = await this.users.getUserById(data.id);
     if (!u) {
       return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
@@ -32,9 +30,7 @@ export class UserGrpcController {
   // FindUser  (by id / email / phone)
   // ------------------------------------------------------
   @GrpcMethod('UserService', 'FindUser')
-  async findUser(
-    data: userv1.FindUserRequest,
-  ): Promise<userv1.UserResponse> {
+  async findUser(data: userv1.FindUserRequest): Promise<userv1.UserResponse> {
     let u = null;
     if (data.email) u = await this.users.getUserByEmail(data.email);
     else if (data.phone) u = await this.users.getUserByPhone(data.phone);
@@ -57,9 +53,9 @@ export class UserGrpcController {
     data: userv1.UpdateProfileRequest,
   ): Promise<userv1.UserResponse> {
     const updated = await this.users.updateProfile(data.id, {
-      email:           data.email           || undefined,
+      email: data.email || undefined,
       currentPassword: data.currentPassword || undefined,
-      newPassword:     data.newPassword     || undefined,
+      newPassword: data.newPassword || undefined,
     });
     return userv1.UserResponse.create({
       id: updated.id,
@@ -79,7 +75,7 @@ export class UserGrpcController {
     console.log('[UserService] CreateUser RPC received', data.email);
     const u = await this.users.createUserWithHash(
       data.email,
-      data.password,              // already hashed
+      data.password, // already hashed
       data.role || 'user',
     );
     return userv1.UserResponse.create({
@@ -100,12 +96,16 @@ export class UserGrpcController {
     const u = data.email
       ? await this.users.getUserByEmail(data.email)
       : data.phone
-      ? await this.users.getUserByPhone(data.phone)
-      : null;
+        ? await this.users.getUserByPhone(data.phone)
+        : null;
 
     if (!u) {
       return userv1.FindUserWithHashResponse.create({
-        id: '', email: '', role: 'user', passwordHash: '', refreshToken: '',
+        id: '',
+        email: '',
+        role: 'user',
+        passwordHash: '',
+        refreshToken: '',
       });
     }
     return userv1.FindUserWithHashResponse.create({
@@ -131,6 +131,29 @@ export class UserGrpcController {
       id: u.id,
       email: u.email ?? '',
       role: u.role,
+    });
+  }
+
+  @GrpcMethod('UserService', 'GetUserWithHash')
+  async getUserWithHash(
+    data: userv1.GetUserWithHashRequest,
+  ): Promise<userv1.GetUserWithHashResponse> {
+    const u = await this.users.getUserById(data.id);
+    if (!u) {
+      return userv1.GetUserWithHashResponse.create({
+        id: '',
+        email: '',
+        role: 'user',
+        passwordHash: '',
+        refreshToken: '',
+      });
+    }
+    return userv1.GetUserWithHashResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+      passwordHash: u.password, // Prisma column is "password"
+      refreshToken: u.refreshToken ?? '',
     });
   }
 }

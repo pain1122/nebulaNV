@@ -93,6 +93,20 @@ export interface SetRefreshTokenRequest {
   refreshToken: string;
 }
 
+export interface GetUserWithHashRequest {
+  $type: "user.GetUserWithHashRequest";
+  id: string;
+}
+
+export interface GetUserWithHashResponse {
+  $type: "user.GetUserWithHashResponse";
+  id: string;
+  email: string;
+  role: string;
+  passwordHash: string;
+  refreshToken: string;
+}
+
 function createBaseFindUserRequest(): FindUserRequest {
   return { $type: "user.FindUserRequest", email: undefined, phone: undefined };
 }
@@ -834,6 +848,197 @@ export const SetRefreshTokenRequest: MessageFns<SetRefreshTokenRequest, "user.Se
 
 messageTypeRegistry.set(SetRefreshTokenRequest.$type, SetRefreshTokenRequest);
 
+function createBaseGetUserWithHashRequest(): GetUserWithHashRequest {
+  return { $type: "user.GetUserWithHashRequest", id: "" };
+}
+
+export const GetUserWithHashRequest: MessageFns<GetUserWithHashRequest, "user.GetUserWithHashRequest"> = {
+  $type: "user.GetUserWithHashRequest" as const,
+
+  encode(message: GetUserWithHashRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetUserWithHashRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetUserWithHashRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetUserWithHashRequest {
+    return { $type: GetUserWithHashRequest.$type, id: isSet(object.id) ? globalThis.String(object.id) : "" };
+  },
+
+  toJSON(message: GetUserWithHashRequest): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetUserWithHashRequest>, I>>(base?: I): GetUserWithHashRequest {
+    return GetUserWithHashRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetUserWithHashRequest>, I>>(object: I): GetUserWithHashRequest {
+    const message = createBaseGetUserWithHashRequest();
+    message.id = object.id ?? "";
+    return message;
+  },
+};
+
+messageTypeRegistry.set(GetUserWithHashRequest.$type, GetUserWithHashRequest);
+
+function createBaseGetUserWithHashResponse(): GetUserWithHashResponse {
+  return { $type: "user.GetUserWithHashResponse", id: "", email: "", role: "", passwordHash: "", refreshToken: "" };
+}
+
+export const GetUserWithHashResponse: MessageFns<GetUserWithHashResponse, "user.GetUserWithHashResponse"> = {
+  $type: "user.GetUserWithHashResponse" as const,
+
+  encode(message: GetUserWithHashResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.email !== "") {
+      writer.uint32(18).string(message.email);
+    }
+    if (message.role !== "") {
+      writer.uint32(26).string(message.role);
+    }
+    if (message.passwordHash !== "") {
+      writer.uint32(34).string(message.passwordHash);
+    }
+    if (message.refreshToken !== "") {
+      writer.uint32(42).string(message.refreshToken);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetUserWithHashResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetUserWithHashResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.email = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.role = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.passwordHash = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.refreshToken = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetUserWithHashResponse {
+    return {
+      $type: GetUserWithHashResponse.$type,
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      email: isSet(object.email) ? globalThis.String(object.email) : "",
+      role: isSet(object.role) ? globalThis.String(object.role) : "",
+      passwordHash: isSet(object.passwordHash) ? globalThis.String(object.passwordHash) : "",
+      refreshToken: isSet(object.refreshToken) ? globalThis.String(object.refreshToken) : "",
+    };
+  },
+
+  toJSON(message: GetUserWithHashResponse): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.email !== "") {
+      obj.email = message.email;
+    }
+    if (message.role !== "") {
+      obj.role = message.role;
+    }
+    if (message.passwordHash !== "") {
+      obj.passwordHash = message.passwordHash;
+    }
+    if (message.refreshToken !== "") {
+      obj.refreshToken = message.refreshToken;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetUserWithHashResponse>, I>>(base?: I): GetUserWithHashResponse {
+    return GetUserWithHashResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetUserWithHashResponse>, I>>(object: I): GetUserWithHashResponse {
+    const message = createBaseGetUserWithHashResponse();
+    message.id = object.id ?? "";
+    message.email = object.email ?? "";
+    message.role = object.role ?? "";
+    message.passwordHash = object.passwordHash ?? "";
+    message.refreshToken = object.refreshToken ?? "";
+    return message;
+  },
+};
+
+messageTypeRegistry.set(GetUserWithHashResponse.$type, GetUserWithHashResponse);
+
 export type UserServiceService = typeof UserServiceService;
 export const UserServiceService = {
   findUser: {
@@ -893,6 +1098,17 @@ export const UserServiceService = {
     responseSerialize: (value: UserResponse): Buffer => Buffer.from(UserResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): UserResponse => UserResponse.decode(value),
   },
+  getUserWithHash: {
+    path: "/user.UserService/GetUserWithHash",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetUserWithHashRequest): Buffer =>
+      Buffer.from(GetUserWithHashRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetUserWithHashRequest => GetUserWithHashRequest.decode(value),
+    responseSerialize: (value: GetUserWithHashResponse): Buffer =>
+      Buffer.from(GetUserWithHashResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetUserWithHashResponse => GetUserWithHashResponse.decode(value),
+  },
 } as const;
 
 export interface UserServiceServer extends UntypedServiceImplementation {
@@ -902,6 +1118,7 @@ export interface UserServiceServer extends UntypedServiceImplementation {
   createUser: handleUnaryCall<CreateUserRequest, UserResponse>;
   findUserWithHash: handleUnaryCall<FindUserWithHashRequest, FindUserWithHashResponse>;
   setRefreshToken: handleUnaryCall<SetRefreshTokenRequest, UserResponse>;
+  getUserWithHash: handleUnaryCall<GetUserWithHashRequest, GetUserWithHashResponse>;
 }
 
 export interface UserServiceClient extends Client {
@@ -994,6 +1211,21 @@ export interface UserServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: UserResponse) => void,
+  ): ClientUnaryCall;
+  getUserWithHash(
+    request: GetUserWithHashRequest,
+    callback: (error: ServiceError | null, response: GetUserWithHashResponse) => void,
+  ): ClientUnaryCall;
+  getUserWithHash(
+    request: GetUserWithHashRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetUserWithHashResponse) => void,
+  ): ClientUnaryCall;
+  getUserWithHash(
+    request: GetUserWithHashRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetUserWithHashResponse) => void,
   ): ClientUnaryCall;
 }
 

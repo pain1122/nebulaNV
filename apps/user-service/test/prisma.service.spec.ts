@@ -1,32 +1,44 @@
+import { describe, it, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../src/prisma.service';
 
 describe('PrismaService', () => {
+  let moduleRef: TestingModule;
   let service: PrismaService;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+  beforeAll(async () => {
+    moduleRef = await Test.createTestingModule({
       providers: [PrismaService],
     }).compile();
 
-    service = module.get<PrismaService>(PrismaService);
-    jest.spyOn(service, '$connect').mockResolvedValue();
-    jest.spyOn(service, '$disconnect').mockResolvedValue();
+    service = moduleRef.get(PrismaService);
+  });
+
+  afterAll(async () => {
+    await moduleRef?.close();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  it('should call $connect on module init', async () => {
-    const connectSpy = jest.spyOn(service, '$connect');
+  it('calls $connect on module init', async () => {
+    const connectSpy = jest
+      .spyOn(service, '$connect')
+      .mockResolvedValue(undefined as unknown as void);
+
     await service.onModuleInit();
+
     expect(connectSpy).toHaveBeenCalled();
   });
 
-  it('should call $disconnect on module destroy', async () => {
-    const disconnectSpy = jest.spyOn(service, '$disconnect');
+  it('calls $disconnect on module destroy', async () => {
+    const disconnectSpy = jest
+      .spyOn(service, '$disconnect')
+      .mockResolvedValue(undefined as unknown as void);
+
     await service.onModuleDestroy();
+
     expect(disconnectSpy).toHaveBeenCalled();
   });
 });
