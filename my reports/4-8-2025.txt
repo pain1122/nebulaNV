@@ -1,0 +1,178 @@
+NebulaNV — Auth & gRPC Integration Update (4-08-2025)
+🧩 New & Updated Modules
+Auth Service (HTTP & gRPC)
+
+GrpcAuthService
+apps/auth-service/src/auth/grpc/grpc-auth.service.ts
+– Centralizes all outgoing gRPC calls to UserService: createUser, findUserWithHash, updateProfile, getUser, findUser, setRefreshToken, getUserWithHash.
+– Now uses shared bearer(token) helper from @nebula/grpc-auth for metadata injection.
+– Public RPCs (createUser, findUserWithHash, setRefreshToken) are called without metadata.
+
+AuthService
+apps/auth-service/src/auth/auth.service.ts
+– Consolidates JWT logic (signing, expiration config, refresh rotation).
+– Implements register, validateUser, login, refreshTokens, updateProfile, and getProfile.
+– Fixed expiresIn bug by normalizing env config (15m, 7d).
+
+AuthController
+apps/auth-service/src/auth/auth.controller.ts
+– Provides REST endpoints:
+
+POST /auth/register
+
+POST /auth/login
+
+POST /auth/refresh
+
+GET /auth/me
+
+PUT /auth/me
+
+GET /auth/admin-only
+– Fixed missing grpcAuth injection and async in /auth/me.
+– Guarded routes with JwtAuthGuard + @Roles() as appropriate.
+
+User Service (HTTP & gRPC)
+
+GrpcJwtAuthGuard
+apps/user-service/src/user/grpc/grpc-jwt-auth.guard.ts
+– Validates JWT from gRPC metadata.
+– Returns proper gRPC error codes: UNAUTHENTICATED or PERMISSION_DENIED.
+
+UserGrpcController
+apps/user-service/src/user/grpc/user-grpc.controller.ts
+– Implements proto-defined RPCs: FindUser, GetUser, UpdateProfile, etc.
+– Public RPCs (CreateUser, FindUserWithHash, SetRefreshToken) bypass guard via @Public().
+– Guarded RPCs require JWT and enforce roles.
+
+UserController
+apps/user-service/src/user/user.controller.ts
+– REST endpoints:
+
+GET /users/me
+
+PUT /users/me
+– Both secured with JwtAuthGuard + @Roles().
+
+Shared Packages
+
+@nebula/grpc-auth
+packages/grpc-auth
+– Centralized helpers and decorators:
+
+@Public()
+
+@Roles() + ROLES_KEY
+
+bearer(token) for gRPC metadata injection
+– Removed duplicate local decorators from services.
+– Fixed build artifacts (dist/ only, no .js/.d.ts polluting src).
+
+Bootstrap & Config
+
+Hybrid Bootstrapping
+– Each service now runs HTTP + gRPC in parallel via NestFactory.create(AppModule) + .connectMicroservice().
+– Port mapping:
+
+Auth Service: HTTP :3001, gRPC :50052
+
+User Service: HTTP :3100, gRPC :50051
+
+Product Service: HTTP :3003, gRPC :50053
+
+Prisma Standardization
+– Normalized package.json scripts across services:
+
+prisma:generate
+
+prisma:migrate
+
+prisma:studio
+
+postinstall → runs prisma generate
+– Restored original .env files (kept under source control for local dev, Docker override later).
+– Fixed product-service DB connectivity (consistent with user-service).
+
+✅ What Was Done
+
+Health checks → All services expose /health (public, no JWT required). DB ping included for user- and product-service.
+
+Shared decorators → Unified @Public, @Roles, and bearer() in @nebula/grpc-auth.
+
+Auth pipeline fixed:
+
+Register → creates user via gRPC.
+
+Login → password verified, tokens issued.
+
+Refresh → refresh token rotates correctly.
+
+/auth/me → profile retrieval via gRPC getUser.
+
+Bug fixes:
+
+Missing Bearer in health routes → fixed with @Public().
+
+expiresIn misconfig → fixed with proper env format.
+
+grpc interceptors undefined → resolved by using svc proxy methods only.
+
+/auth/me crash → fixed by adding grpcAuth injection and making it async.
+
+Cleaner code: removed duplicate public.decorator.ts and inline md(token) functions; all now use shared helpers.
+
+🧪 Feature Verification
+
+AuthService (HTTP)
+
+POST /auth/register → 201 + new user
+
+POST /auth/login → { access_token, refresh_token }
+
+POST /auth/refresh → rotated tokens returned
+
+GET /auth/me → returns profile {id,email,role} via gRPC
+
+PUT /auth/me → updates email/password
+
+GET /auth/admin-only → requires admin role
+
+AuthService (gRPC)
+
+CreateUser, FindUserWithHash, SetRefreshToken → public, used by register/login flows
+
+GetUser, FindUser, UpdateProfile, GetUserWithHash → protected, require metadata
+
+UserService (HTTP)
+
+GET /users/me, PUT /users/me → secured via JWT
+
+UserService (gRPC)
+
+Public RPCs work without token (registration, login flows).
+
+Protected RPCs enforce JWT metadata and roles correctly.
+
+ProductService
+
+Compiles and runs; health check returns DB status.
+
+Product RPCs/REST not fully exercised yet, but proto + controller are wired.
+
+⏭️ Next Steps
+
+Postman Test Plan
+– Validate end-to-end: register → login → me → update → refresh → product CRUD.
+
+Codegen Automation
+– Add root script pnpm proto:gen → CI friendly.
+
+Error Mapping
+– Improve RPC error translation (e.g., NotFoundException → gRPC NOT_FOUND).
+
+Consolidation
+– Decide on /auth/me vs /users/me duplication → possibly unify into /profile.
+
+Phase 3
+– Begin scaffolding media-service (file uploads, deduplication, watermarking).
+– Reuse gRPC guards and metadata helpers.

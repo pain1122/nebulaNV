@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@nebula/protos": ["packages/protos/dist/index"],
+            "@nebula/grpc-auth": ["packages/grpc-auth/dist/index"],
+            "@apps/*": ["apps/*/src"],
+            "@packages/*": ["packages/*/dist"]
+        },
+        "typeRoots": ["./node_modules/@types"],
+        "lib": [
+            "ES2021"
+        ],
+        "rootDir": ".",
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "target": "ES2021",
+        "module": "CommonJS",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": true,
+        "outDir": "dist"
+    },
+    "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
+}

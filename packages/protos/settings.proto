@@ -1,0 +1,11 @@
+syntax = "proto3";
+package settings;
+
+message GetRequest { string namespace = 1; string environment = 2; string key = 3; }
+message StringValue { string value = 1; }
+message SetStringRequest { string namespace = 1; string environment = 2; string key = 3; string value = 4; }
+
+service SettingsService {
+  rpc GetString (GetRequest) returns (StringValue);
+  rpc SetString (SetStringRequest) returns (StringValue);
+}

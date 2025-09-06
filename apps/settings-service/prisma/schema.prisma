@@ -1,0 +1,30 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Setting {
+  id           String   @id @default(uuid()) @db.Uuid
+  namespace    String   @default("core")
+  environment  String   @default("default")
+  key          String
+
+  valueJson    Json?
+  valueString  String?
+  valueNumber  Float?
+  valueBool    Boolean?
+
+  meta         Json?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@unique([namespace, environment, key], map: "ux_settings_ns_env_key")
+  @@index([namespace, key], map: "ix_settings_ns_key")
+  @@map("app_settings")
+}

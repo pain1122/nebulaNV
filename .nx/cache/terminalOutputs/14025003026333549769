@@ -1,0 +1,65 @@
+
+> @nebula/user-service@0.0.1 build
+> nest build
+
+[96msrc/auth/auth.controller.ts[0m:[93m48[0m:[93m58[0m - [91merror[0m[90m TS2339: [0mProperty 'email' does not exist on type 'LoginUserDto'.
+
+[7m48[0m     const user = await this.authService.validateUser(dto.email, dto.password);
+[7m  [0m [91m                                                         ~~~~~[0m
+[96msrc/auth/auth.service.ts[0m:[93m54[0m:[93m38[0m - [91merror[0m[90m TS2554: [0mExpected 2 arguments, but got 1.
+
+[7m54[0m     const user = await this.grpcAuth.findUser(
+[7m  [0m [91m                                     ~~~~~~~~[0m
+
+  [96msrc/auth/grpc/grpc-auth.service.ts[0m:[93m42[0m:[93m52[0m
+    [7m42[0m   findUser(id: { email?: string; phone?: string }, jwt: string) {
+    [7m  [0m [96m                                                   ~~~~~~~~~~~[0m
+    An argument for 'jwt' was not provided.
+[96msrc/auth/auth.service.ts[0m:[93m58[0m:[93m55[0m - [91merror[0m[90m TS2339: [0mProperty 'password' does not exist on type '{}'.
+
+[7m58[0m     const pwdOk = await bcrypt.compare(password, user.password);
+[7m  [0m [91m                                                      ~~~~~~~~[0m
+[96msrc/auth/dto/login-user.dto.ts[0m:[93m5[0m:[93m3[0m - [91merror[0m[90m TS2564: [0mProperty 'identifier' has no initializer and is not definitely assigned in the constructor.
+
+[7m5[0m   identifier: string;   // email OR phone
+[7m [0m [91m  ~~~~~~~~~~[0m
+[96msrc/auth/dto/login-user.dto.ts[0m:[93m7[0m:[93m3[0m - [91merror[0m[90m TS2564: [0mProperty 'password' has no initializer and is not definitely assigned in the constructor.
+
+[7m7[0m   password: string;
+[7m [0m [91m  ~~~~~~~~[0m
+[96msrc/auth/grpc/grpc-auth.service.ts[0m:[93m44[0m:[93m23[0m - [91merror[0m[90m TS2339: [0mProperty 'FindUser' does not exist on type 'UserServiceClient'.
+
+[7m44[0m       this.clientStub.FindUser(id, this.buildMeta(jwt)),
+[7m  [0m [91m                      ~~~~~~~~[0m
+[96msrc/auth/user.ts[0m:[93m8[0m:[93m44[0m - [91merror[0m[90m TS2307: [0mCannot find module '@bufbuild/protobuf/wire' or its corresponding type declarations.
+
+[7m8[0m import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+[7m [0m [91m                                           ~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/user/grpc/user-grpc.controller.ts[0m:[93m37[0m:[93m29[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m37[0m       return { id: user.id, email: user.email, role: user.role };
+[7m  [0m [91m                            ~~~~~[0m
+
+  [96msrc/user/grpc/user-grpc.controller.ts[0m:[93m13[0m:[93m3[0m
+    [7m13[0m   email: string;
+    [7m  [0m [96m  ~~~~~[0m
+    The expected type comes from property 'email' which is declared here on type 'UserResponse'
+[96msrc/user/grpc/user-grpc.controller.ts[0m:[93m59[0m:[93m9[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+[7m59[0m         email: updated.email,
+[7m  [0m [91m        ~~~~~[0m
+
+  [96msrc/user/grpc/user-grpc.controller.ts[0m:[93m13[0m:[93m3[0m
+    [7m13[0m   email: string;
+    [7m  [0m [96m  ~~~~~[0m
+    The expected type comes from property 'email' which is declared here on type 'UserResponse'
+[96msrc/user/grpc/user-grpc.controller.ts[0m:[93m76[0m:[93m47[0m - [91merror[0m[90m TS2345: [0mArgument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+[7m76[0m       : await this.userService.getUserByPhone(data.phone);
+[7m  [0m [91m                                              ~~~~~~~~~~[0m
+
+Found 10 error(s).
+
