@@ -1,23 +1,37 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 
 @Injectable()
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
-  async getString(ns: string, key: string, env = 'default'): Promise<string | null> {
+  async getString(namespace: string, key: string, environment = 'default') {
     const row = await this.prisma.setting.findUnique({
-      where: { namespace_environment_key: { namespace: ns, environment: env, key } },
+      where: { namespace_environment_key: { namespace, environment, key } },
+      select: { valueString: true },
     });
-    return row?.valueString ?? null;
+    // 'found' should reflect record existence, not non-empty string
+    return { value: row?.valueString ?? '', found: !!row };
   }
 
-  async setString(ns: string, key: string, value: string, env = 'default') {
+  async setString(namespace: string, key: string, value: string, environment = 'default') {
     const row = await this.prisma.setting.upsert({
-      where: { namespace_environment_key: { namespace: ns, environment: env, key } },
-      update: { valueString: value, valueJson: null, valueNumber: null, valueBool: null },
-      create: { namespace: ns, environment: env, key, valueString: value },
+      where: { namespace_environment_key: { namespace, environment, key } },
+      update: {
+        valueString: value,
+        valueNumber: null,
+        valueBool: null,
+        valueJson: Prisma.DbNull,
+      },
+      create: {
+        namespace,
+        environment,
+        key,
+        valueString: value,
+      },
+      select: { valueString: true },
     });
-    return row.valueString!;
+    return { value: row.valueString ?? '' };
   }
 }

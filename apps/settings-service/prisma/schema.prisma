@@ -8,23 +8,18 @@ generator client {
 }
 
 model Setting {
-  id           String   @id @default(uuid()) @db.Uuid
-  namespace    String   @default("core")
+  id           String   @id @default(cuid())
+  namespace    String
   environment  String   @default("default")
   key          String
-
-  valueJson    Json?
   valueString  String?
   valueNumber  Float?
   valueBool    Boolean?
-
-  meta         Json?
-
+  valueJson    Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
-  @@unique([namespace, environment, key], map: "ux_settings_ns_env_key")
-  @@index([namespace, key], map: "ix_settings_ns_key")
+  @@unique([namespace, environment, key], map: "app_settings_namespace_env_key_uq")
   @@map("app_settings")
 }

@@ -1,11 +1,30 @@
 syntax = "proto3";
 package settings;
 
-message GetRequest { string namespace = 1; string environment = 2; string key = 3; }
-message StringValue { string value = 1; }
-message SetStringRequest { string namespace = 1; string environment = 2; string key = 3; string value = 4; }
-
 service SettingsService {
-  rpc GetString (GetRequest) returns (StringValue);
-  rpc SetString (SetStringRequest) returns (StringValue);
+  rpc GetString (GetReq) returns (GetStringRes);
+  rpc SetString (SetStringReq) returns (SetStringRes);
+  // (future) GetJson/SetJson, GetNumber/SetNumber, Delete, List...
+}
+
+message GetReq {
+  string namespace   = 1;
+  string environment = 2; // optional, default "default"
+  string key         = 3;
+}
+
+message GetStringRes {
+  string value = 1;
+  bool   found = 2;
+}
+
+message SetStringReq {
+  string namespace   = 1;
+  string environment = 2;
+  string key         = 3;
+  string value       = 4;
+}
+
+message SetStringRes {
+  string value = 1;
 }

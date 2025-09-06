@@ -1,12 +1,34 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 const prisma = new PrismaClient();
 
-async function main() {
+async function upsertJson(ns: string, key: string, value: any, env = 'default') {
   await prisma.setting.upsert({
-    where: { namespace_environment_key: { namespace: 'i18n', environment: 'default', key: 'supported_locales' } },
-    update: { valueJson: ['en','de','fa'], valueString: null, valueNumber: null, valueBool: null },
-    create: { namespace: 'i18n', environment: 'default', key: 'supported_locales', valueJson: ['en','de','fa'] }
+    where: { namespace_environment_key: { namespace: ns, environment: env, key } },
+    update: { valueJson: value, valueString: null, valueNumber: null, valueBool: null },
+    create: { namespace: ns, environment: env, key, valueJson: value },
   });
 }
 
-main().catch(e => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
+// NEW: seed a string setting
+async function upsertString(ns: string, key: string, value: string, env = 'default') {
+  await prisma.setting.upsert({
+    where: { namespace_environment_key: { namespace: ns, environment: env, key } },
+    update: {
+      valueString: value,
+      valueNumber: null,
+      valueBool: null,
+      valueJson: Prisma.DbNull, // clear JSON column explicitly
+    },
+    create: { namespace: ns, environment: env, key, valueString: value },
+  });
+}
+
+async function main() {
+  await upsertJson('i18n', 'supported_locales', ['en', 'de', 'fa']);
+
+  // Default product category (slug-based). We'll resolve this to an ID at runtime.
+  await upsertString('product', 'default_category_slug', 'undefined');
+  // (We still intentionally do NOT set 'product.default_category_id' here.)
+}
+
+main().finally(() => prisma.$disconnect());

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put, Query, Post } from '@nestjs/common';
 import { CategoryService } from './category.service';
 
 @Controller('categories')
@@ -12,12 +12,17 @@ export class CategoryController {
 
   @Get('default')
   getDefault() {
-    return this.svc.getDefault();
+    return this.svc.getDefault(); // returns { id: '<uuid>' }
+  }
+
+  @Post('default/ensure')                // ⬅️ add this
+  ensureDefault() {
+    return this.svc.ensureDefaultCategory();
   }
 
   @Put('default')
   setDefault(@Body() body: { categoryId: string }) {
-    return this.svc.setDefault(body.categoryId);
+    return this.svc.setDefault(body.categoryId); // writes ID to settings
   }
 
   @Put(':id')

@@ -1,6 +1,14 @@
-import {Injectable, NotFoundException, BadRequestException} from "@nestjs/common"
+import {Inject, Injectable, NotFoundException, BadRequestException} from "@nestjs/common"
 import {PrismaService} from "../prisma.service"
+import { ClientGrpc } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
 import {Prisma, ProductStatus} from "@prisma/client"
+import { SETTINGS_SERVICE } from '../settings-client.module';
+
+interface SettingsProxy {
+  GetString(req: { namespace: string; environment?: string; key: string }):
+    import('rxjs').Observable<{ value: string }>;
+}
 
 function computeEffectivePrice(base: number, type?: string, value?: number, active?: boolean) {
   if (!active || !type || value == null) return base
@@ -31,7 +39,14 @@ const asStatus = (v: any): ProductStatus | undefined => (v && Object.values(Prod
 
 @Injectable()
 export class ProductServiceImpl {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(SETTINGS_SERVICE) private readonly settingsClient: ClientGrpc,
+  ) {}
+
+  private settings(): SettingsProxy {
+    return this.settingsClient.getService<SettingsProxy>('SettingsService');
+  }
 
   private toDto = (p: any) => {
     const base = Number(p.price)
@@ -89,6 +104,22 @@ export class ProductServiceImpl {
     }
   }
 
+  private async getDefaultCategoryId(): Promise<string> {
+    const res = await firstValueFrom(
+      this.settings().GetString({
+        namespace: 'product',
+        environment: 'default',
+        key: 'default_product_category',
+      })
+    );
+    if (!res?.value) {
+      throw new BadRequestException(
+        'Default category not configured. Initialize it via /categories/default/ensure or PUT /categories/default.'
+      );
+    }
+    return res.value;
+  }
+
   private async ensureUniqueSlug(base: string) {
     let slug = basicSlugify(base)
     let n = 1
@@ -121,10 +152,10 @@ export class ProductServiceImpl {
   private async resolveCategoryId(provided?: string) {
     if (provided) return provided;
   
-    const c = await this.prisma.category.findUnique({ where: { slug: 'undefined' } });
+    const c = await this.prisma.productCategory.findUnique({ where: { slug: 'undefined' } });
     if (c) return c.id;
   
-    const created = await this.prisma.category.create({
+    const created = await this.prisma.productCategory.create({
       data: { slug: 'undefined', title: 'Undefined' },
     });
     return created.id;
@@ -136,16 +167,6 @@ export class ProductServiceImpl {
     if (missing.length) throw new BadRequestException(`Missing required fields: ${missing.join(", ")}`);
   }
 
-  private async getDefaultCategoryId(): Promise<string> {
-    const rows = await this.prisma.$queryRawUnsafe<{ default_category: string }[]>(
-      'SELECT default_category FROM app_settings LIMIT 1',
-    );
-    if (!rows.length) {
-      throw new Error('app_settings not initialized; run the migration SQL');
-    }
-    return rows[0].default_category;
-  }
-
   // ---- Create ----
   async create(input: any) {
     this.assertCreate(input);
@@ -154,7 +175,7 @@ export class ProductServiceImpl {
     const title = input.title;
     const slug = input.slug ? basicSlugify(input.slug) : await this.ensureUniqueSlug(title);
     const sku  = await this.ensureUniqueSku(input.sku ?? null);
-    const categoryId = input.category_id ?? (await this.getDefaultCategoryId());
+    const categoryId = input.category_id ?? (await this.getDefaultCategoryId()); 
   
     const data = await this.prisma.product.create({
       data: {
