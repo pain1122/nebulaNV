@@ -2,9 +2,9 @@ import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { SettingsService } from '../settings.service';
 
-type GetReq = { namespace: string; environment?: string; key: string };
+type GetReq = { namespace: string; key: string; environment?: string; };
 type GetStringRes = { value: string; found: boolean };
-type SetStringReq = { namespace: string; environment?: string; key: string; value: string };
+type SetStringReq = { namespace: string; key: string; value: string; environment?: string;};
 type SetStringRes = { value: string };
 
 @Controller()

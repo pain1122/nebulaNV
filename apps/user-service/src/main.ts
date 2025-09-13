@@ -3,7 +3,6 @@ import { AppModule, USER_PROTO } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

@@ -115,7 +115,7 @@ export class CategoryService {
   /**
    * Delete a category.
    * If substituteId provided, reassign products to it first (explicit).
-   * Else rely on FK ON DELETE SET DEFAULT (auto-reassign to current default).
+   * Else rely on FK onDelete: Restrict (auto-reassign to current default).
    * If deleting the current default, you MUST call setDefault() to another category BEFORE or provide substitute here.
    */
   async deleteCategory(id: string, substituteId?: string) {
