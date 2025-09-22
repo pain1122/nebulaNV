@@ -1,8 +1,9 @@
-import { Controller, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
-import { Public, Roles } from '@nebula/grpc-auth';
+import { Public } from '@nebula/grpc-auth';
 import { SettingsService } from '../settings.service';
 import { settings } from '@nebula/protos';
+import { S2SGuard } from '@nebula/grpc-auth';
 
 const Pipe = new ValidationPipe({
   whitelist: true,
@@ -17,6 +18,7 @@ export class SettingsGrpcController {
   constructor(private readonly svc: SettingsService) {}
 
   @Public()
+  @UseGuards(S2SGuard)
   @GrpcMethod('SettingsService', 'GetString')
   async getString(req: settings.GetReq): Promise<settings.GetStringRes> {
     const env = req.environment?.trim() ? req.environment : 'default';
@@ -25,7 +27,8 @@ export class SettingsGrpcController {
     // or: return settings.GetStringRes.fromPartial({ value: value ?? '', found });
   }
 
-  @Roles('admin')
+  @Public()
+  @UseGuards(S2SGuard)
   @GrpcMethod('SettingsService', 'SetString')
   async setString(req: settings.SetStringReq): Promise<settings.SetStringRes> {
     const env = req.environment?.trim() ? req.environment : 'default';
@@ -33,7 +36,8 @@ export class SettingsGrpcController {
     return settings.SetStringRes.create({ value });
   }
 
-  @Roles('admin')
+  @Public()
+  @UseGuards(S2SGuard)
   @GrpcMethod('SettingsService', 'DeleteString')
   async deleteString(req: settings.DeleteReq): Promise<settings.DeleteRes> {
     const env = req.environment?.trim() ? req.environment : 'default';

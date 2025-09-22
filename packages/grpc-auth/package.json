@@ -12,15 +12,19 @@
     "build": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
+    "@grpc/grpc-js": "^1.13.4",
     "@nebula/protos": "workspace:*",
     "@nestjs/common": "11.1.5",
     "@nestjs/core": "11.1.5",
     "@nestjs/microservices": "11.1.5",
     "@nestjs/platform-express": "11.1.5",
-    "rxjs": "^7.8.2",
-    "@grpc/grpc-js": "^1.13.4"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2"
   }
 }

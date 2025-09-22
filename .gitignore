@@ -1,49 +1,31 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# Dependencies
-node_modules
-.pnp
-.pnp.js
-
-# Local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Testing
-coverage
-
-# Turbo
-.turbo
-
-# Vercel
-.vercel
-
-# Build Outputs
-generated
-migrations
+# Build outputs
+**/dist/
+**/build/
 .next/
 out/
-build
-dist
 
+# Node
+node_modules/
 
-# Debug
+# Env
+.env
+.env.*.local
+
+# Coverage / debug
+coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Misc
+# OS / misc
 .DS_Store
 *.pem
+.turbo/
+.vercel/
 
+# Prisma
+**/prisma/generated/
+**/prisma/migrations/
 
-# Prisma artifacts
-prisma/*.db
-prisma/*.sqlite
-
-# IDE configs
-.idea/
-.vscode/
+# ts-proto or other generated code (if you want ALL generated dirs ignored)
+**/generated/

@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { SETTINGS_SERVICE } from '../settings-client.module';
 
 const NS = 'product';
-const KEY = 'default_product_category_id';
+const KEY = 'defaultProductCategoryId';
 
 interface SettingsGrpc {
   GetString(req: { namespace: string; key: string; environment?: string }): import('rxjs').Observable<{ value: string; found: boolean }>;

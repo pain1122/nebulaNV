@@ -5,14 +5,14 @@ import { ProductStatusDto } from './product-input.dto';
 export class ListProductsDto {
   @IsOptional() @IsString() q?: string;
 
-  @Expose({ name: 'category_id' })
-  @IsOptional() @IsUUID() categoryId?: string;
+  @Expose({ name: 'categoryId' })
+  @IsOptional() @IsUUID('4') categoryId?: string;
 
   @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto;
 
   @IsOptional() @IsNumber() @Min(1) page?: number;
   @IsOptional() @IsNumber() @Min(1) @Max(100) limit?: number;
 
-  @Expose({ name: 'include_deleted' })
+  @Expose({ name: 'includeDeleted' })
   @IsOptional() @IsBoolean() includeDeleted?: boolean;
 }

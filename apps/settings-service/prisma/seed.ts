@@ -28,7 +28,7 @@ async function main() {
 
   // Default product category (slug-based). We'll resolve this to an ID at runtime.
   await upsertString('product', 'default_category_slug', 'undefined');
-  // (We still intentionally do NOT set 'product.default_product_category_id' here.)
+  // (We still intentionally do NOT set 'product.defaultProductCategoryId' here.)
 }
 
 main().finally(() => prisma.$disconnect());

@@ -1,54 +1,70 @@
-// apps/product-service/src/product/product.controller.ts
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ProductServiceImpl } from './product.service';
-import { productv1 } from '@nebula/protos';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UsePipes,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from "@nestjs/common"
+import { ProductServiceImpl } from "./product.service"
+import { Public, Roles } from "@nebula/grpc-auth"
+import { Throttle } from "@nestjs/throttler"
+import {
+  CreateProductRequestDto,
+  UpdateProductRequestDto,
+  ListProductsRequestDto,
+} from "./dto/product-input.dto"
 
-type ListQuery = {
-  page?: string;        // accept strings from query
-  limit?: string;
-  q?: string;
-  category_id?: string;
-  status?: string;
-  include_deleted?: string;
-};
+const Pipe = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transform: true,
+  transformOptions: { enableImplicitConversion: true },
+})
 
-@Controller('products')
+@Controller("products")
+@UsePipes(Pipe)
 export class ProductController {
   constructor(private readonly svc: ProductServiceImpl) {}
 
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get()
-  list(@Query() q: ListQuery) {
-    // Build a proto-shaped request (good typing), then adapt to your service
-    const req: productv1.ListProductsRequest = {
-      page: q.page ? parseInt(q.page, 10) : 1,
-      limit: q.limit ? parseInt(q.limit, 10) : 20,
-      q: q.q ?? '',
-      categoryId: q.category_id ?? '',       // NOTE: depends on ts-proto naming (see tip below)
-      status: q.status ?? '',
-      includeDeleted: q.include_deleted === 'true',
-    } as any;
-
-    // If your service takes an object filter:
-    return this.svc.list(req);
-
-    // If your service takes separate args instead, adapt here:
-    // return this.svc.list(req.page, req.limit, req.q, req.categoryId, req.status, req.includeDeleted);
+  list(@Query() q: ListProductsRequestDto) {
+    // q is sanitized/coerced by ValidationPipe + DTO transforms
+    return this.svc.list({
+      q: q.q ?? "",
+      categoryId: q.categoryId ?? "",
+      status: q.status ?? "",
+      page: q.page ?? 1,
+      limit: q.limit ?? 20,
+      includeDeleted: !!q.includeDeleted,
+    })
   }
 
-  @Get(':id')
-  get(@Param('id') id: string) {
-    return this.svc.get(id);                 // your service: (id: string)
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @Get(":id")
+  get(@Param("id", new ParseUUIDPipe({ version: "4" })) id: string) {
+    return this.svc.get(id)
   }
 
+  @Roles("admin")
   @Post()
-  create(@Body() body: productv1.CreateProductRequest) {
-    return this.svc.create(body.data);       // your service likely expects the inner data
+  create(@Body() body: CreateProductRequestDto) {
+    return this.svc.create(body.data)
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() body: productv1.UpdateProductRequest) {
-    // proto: { id, data }, service: update(id, patch)
-    const patch = body?.data ?? (body as any); // tolerate both shapes while migrating
-    return this.svc.update(id, patch);
+  @Roles("admin")
+  @Patch(":id")
+  update(
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() body: UpdateProductRequestDto,
+  ) {
+    return this.svc.update(id, body.patch)
   }
 }

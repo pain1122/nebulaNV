@@ -1,7 +1,7 @@
 ✅ What We Have Done Since 13-09-2025
 1. Product Service Debugging
 
-Root Cause Analysis: Found that getDefaultCategoryId() in category.service.ts was fetching default_product_category instead of default_product_category_id.
+Root Cause Analysis: Found that getDefaultCategoryId() in category.service.ts was fetching default_product_category instead of defaultProductCategoryId.
 
 Fix: Updated it to use the correct key and ensured ensureDefaultCategory() writes the correct ID to settings-service.
 

@@ -19,10 +19,13 @@ export const SETTINGS_SERVICE = 'SETTINGS_SERVICE';
             package: 'settings',
             protoPath: SETTINGS_PROTO,
             url: cfg.get<string>('SETTINGS_GRPC_URL') ?? '127.0.0.1:55123',
-            // (optional) client options:
-            // 'grpc.keepalive_time_ms': 10_000,
-            // 'grpc.max_receive_message_length': -1,
-            // 'grpc.max_send_message_length': -1,
+            channelOptions: {
+              'grpc.keepalive_time_ms': 60_000,
+              'grpc.keepalive_timeout_ms': 20_000,
+              'grpc.keepalive_permit_without_calls': 1,
+              'grpc.max_receive_message_length': -1,
+              'grpc.max_send_message_length': -1,
+            },
           },
         }),
       },

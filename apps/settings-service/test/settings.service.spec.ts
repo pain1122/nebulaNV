@@ -108,7 +108,7 @@ describe('SettingsService', () => {
 
       const res = await service.setString(
         'product',
-        'default_product_category_id',
+        'defaultProductCategoryId',
         'abc-123',
         'default',
       );
@@ -119,7 +119,7 @@ describe('SettingsService', () => {
             namespace_environment_key: {
               namespace: 'product',
               environment: 'default',
-              key: 'default_product_category_id',
+              key: 'defaultProductCategoryId',
             },
           },
           // assert the UPDATE completely (you probably DO clear there)
@@ -133,7 +133,7 @@ describe('SettingsService', () => {
           create: expect.objectContaining({
             namespace: 'product',
             environment: 'default',
-            key: 'default_product_category_id',
+            key: 'defaultProductCategoryId',
             valueString: 'abc-123',
           }),
           select: { valueString: true },

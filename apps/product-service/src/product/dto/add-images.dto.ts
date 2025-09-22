@@ -8,8 +8,8 @@ class NewImageDto {
 }
 
 export class AddImagesDto {
-  @Expose({ name: 'product_id' })
-  @IsUUID() productId!: string;
+  @Expose({ name: 'productId' })
+  @IsUUID('4') productId!: string;
 
   @IsArray() @ArrayMaxSize(50)
   @Type(() => NewImageDto)

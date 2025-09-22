@@ -3,7 +3,7 @@ import {Reflector} from "@nestjs/core"
 import {ClientGrpc} from "@nestjs/microservices"
 import {firstValueFrom, Observable} from "rxjs"
 import type {Metadata} from "@grpc/grpc-js"
-
+import * as jwt from "jsonwebtoken"
 import {ROLES_KEY, Role} from "./roles.decorator"
 import {AUTH_SERVICE, AUTH_SERVICE_NAME} from "./tokens"
 import {authv1} from "@nebula/protos"
@@ -31,6 +31,16 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
   private async attachUserFromToken(ctx: ExecutionContext, token: string) {
     const res = await firstValueFrom(this.auth.validateToken(authv1.ValidateTokenRequest.create({token})))
     if (!res.isValid) throw new UnauthorizedException("Invalid or expired token")
+
+    const payload = jwt.decode(token) as jwt.JwtPayload | null
+    if (payload?.exp) {
+      const now = Math.floor(Date.now() / 1000)
+      const SKEW_SEC = 30
+      if (payload.exp + SKEW_SEC < now) {
+        throw new UnauthorizedException("token_expired")
+      }
+    }
+
     const user = {userId: res.userId, email: res.email, role: res.role}
     const httpReq = ctx.switchToHttp().getRequest?.()
     if (httpReq) (httpReq as any).user = user

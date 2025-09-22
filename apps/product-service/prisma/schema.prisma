@@ -69,7 +69,7 @@ model Product {
   thumbnailUrl String?
 
   // category (FK inside service only)
-  categoryId      String   @db.Uuid            @map("category_id")
+  categoryId      String   @db.Uuid            @map("categoryId")
   category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   // per-product discount

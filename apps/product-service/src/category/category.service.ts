@@ -81,7 +81,7 @@ export class CategoryService {
       this.settings().SetString({
         namespace: "product",
         environment: "default",
-        key: "default_product_category_id",
+        key: "defaultProductCategoryId",
         value: undef.id,
       })
     )
@@ -94,10 +94,10 @@ export class CategoryService {
       this.settings().GetString({
         namespace: "product",
         environment: "default",
-        key: "default_product_category_id",
+        key: "defaultProductCategoryId",
       })
     )
-    if (!res?.value) throw new NotFoundException("default_product_category_id not set")
+    if (!res?.value) throw new NotFoundException("defaultProductCategoryId not set")
     return {id: res.value} // ID-only, no DB join
   }
 
@@ -119,11 +119,11 @@ export class CategoryService {
       this.settings().SetString({
         namespace: "product",
         environment: "default",
-        key: "default_product_category_id",
+        key: "defaultProductCategoryId",
         value: categoryId,
       })
     )
-    return {default_product_category_id: categoryId}
+    return {defaultProductCategoryId: categoryId}
   }
 
   async updateCategory(id: string, dto: {title?: string; slug?: string; isHidden?: boolean}) {
@@ -165,7 +165,7 @@ export class CategoryService {
         this.settings().GetString({
           namespace: "product",
           environment: "default",
-          key: "default_product_category_id",
+          key: "defaultProductCategoryId",
         })
       )
       if (def?.value === id) {

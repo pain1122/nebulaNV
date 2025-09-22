@@ -12,69 +12,68 @@ message Product {
   string description = 4;
   string excerpt = 5;
   string sku = 6;
-  string status = 7;      // DRAFT|ACTIVE|ARCHIVED
+  string status = 7; // DRAFT|ACTIVE|ARCHIVED
 
   double price = 8;
   string currency = 9;
 
-  string category_id = 10;
+  string categoryId = 10;
 
   // thumbnail (primary image)
-  string thumbnail_url = 11;
+  string thumbnailUrl = 11;
 
   // 3D
-  string model3d_url = 12;
-  string model3d_format = 13;
-  bool   model3d_live_view = 14;
-  string model3d_poster_url = 15;
+  string model3dUrl = 12;
+  string model3dFormat = 13;
+  bool   model3dLiveView = 14;
+  string model3dPosterUrl = 15;
 
   // VR plan
-  bool   vr_enabled = 16;
-  string vr_plan_image_url = 17;
+  bool   vrEnabled = 16;
+  string vrPlanImageUrl = 17;
 
   // SEO
-  string meta_title = 18;
-  string meta_description = 19;
-  string meta_keywords = 20;
-  string custom_schema = 21;
+  string metaTitle = 18;
+  string metaDescription = 19;
+  string metaKeywords = 20;
+  string customSchema = 21;
   bool   noindex = 22;
 
   // presentation / promos
-  bool   is_featured = 23;
-  int32  feature_sort = 24;
-  string promo_title = 25;
-  string promo_badge = 26;
-  bool   promo_active = 27;
+  bool   isFeatured = 23;
+  int32  featureSort = 24;
+  string promoTitle = 25;
+  string promoBadge = 26;
+  bool   promoActive = 27;
 
   // discount
-  string discount_type = 28;  // "PERCENTAGE" | "FIXED" | ""
-  double discount_value = 29;
-  bool   discount_active = 30;
-  string discount_start = 31; // ISO8601 or ""
-  string discount_end = 32;   // ISO8601 or ""
-  double effective_price = 33;
+  string discountType = 28; // "PERCENTAGE" | "FIXED" | ""
+  double discountValue = 29;
+  bool   discountActive = 30;
+  string discountStart = 31; // ISO8601 or ""
+  string discountEnd = 32;   // ISO8601 or ""
+  double effectivePrice = 33;
 
   // flat arrays to avoid heavy joins
   repeated string tags = 34;
-  repeated string complementary_ids = 35;
+  repeated string complementaryIds = 35;
 
-  string created_at = 36;
-  string updated_at = 37;
-  string deleted_at = 38; // "" if not soft-deleted
+  string createdAt = 36;
+  string updatedAt = 37;
+  string deletedAt = 38; // "" if not soft-deleted
 }
 
 // -----------------------------------------
 // Lean inputs
 // -----------------------------------------
 
-// Minimal create input: keep required small
 message ProductInput {
-  // required (server validates presence):
+  // required:
   string title = 1;
   string slug = 2;
   string sku = 3;
   double price = 4;
-  string category_id = 5;
+  string categoryId = 5;
 
   // optional:
   string description = 10;
@@ -82,81 +81,80 @@ message ProductInput {
   string currency = 12;
   string status = 13; // default ACTIVE
 
-  string thumbnail_url = 20;
+  string thumbnailUrl = 20;
 
-  string model3d_url = 30;
-  string model3d_format = 31;
-  bool   model3d_live_view = 32;
-  string model3d_poster_url = 33;
+  string model3dUrl = 30;
+  string model3dFormat = 31;
+  bool   model3dLiveView = 32;
+  string model3dPosterUrl = 33;
 
-  bool   vr_enabled = 40;
-  string vr_plan_image_url = 41;
+  bool   vrEnabled = 40;
+  string vrPlanImageUrl = 41;
 
-  string meta_title = 50;
-  string meta_description = 51;
-  string meta_keywords = 52;
-  string custom_schema = 53;
+  string metaTitle = 50;
+  string metaDescription = 51;
+  string metaKeywords = 52;
+  string customSchema = 53;
   bool   noindex = 54;
 
-  bool   is_featured = 60;
-  int32  feature_sort = 61;
-  string promo_title = 62;
-  string promo_badge = 63;
-  bool   promo_active = 64;
+  bool   isFeatured = 60;
+  int32  featureSort = 61;
+  string promoTitle = 62;
+  string promoBadge = 63;
+  bool   promoActive = 64;
 
-  string discount_type = 70;  // optional
-  double discount_value = 71;
-  bool   discount_active = 72;
-  string discount_start = 73;
-  string discount_end = 74;
+  string discountType = 70;  // optional
+  double discountValue = 71;
+  bool   discountActive = 72;
+  string discountStart = 73;
+  string discountEnd = 74;
 
   repeated string tags = 80;
-  repeated string complementary_ids = 81;
+  repeated string complementaryIds = 81;
 }
 
 message ProductPatch {
-  // id provided in UpdateProductRequest; everything below is optional
   string title = 1;
   string slug = 2;
   string sku = 3;
   double price = 4;
-  string category_id = 5;
+  string categoryId = 5;
 
   string description = 10;
   string excerpt = 11;
   string currency = 12;
   string status = 13;
 
-  string thumbnail_url = 20;
+  string thumbnailUrl = 20;
 
-  string model3d_url = 30;
-  string model3d_format = 31;
-  bool   model3d_live_view = 32;
-  string model3d_poster_url = 33;
+  string model3dUrl = 30;
+  string model3dFormat = 31;
+  bool   model3dLiveView = 32;
+  string model3dPosterUrl = 33;
 
-  bool   vr_enabled = 40;
-  string vr_plan_image_url = 41;
+  bool   vrEnabled = 40;
+  string vrPlanImageUrl = 41;
 
-  string meta_title = 50;
-  string meta_description = 51;
-  string meta_keywords = 52;
-  string custom_schema = 53;
+  string metaTitle = 50;
+  string metaDescription = 51;
+  string metaKeywords = 52;
+  string customSchema = 53;
   bool   noindex = 54;
 
-  bool   is_featured = 60;
-  int32  feature_sort = 61;
-  string promo_title = 62;
-  string promo_badge = 63;
-  bool   promo_active = 64;
+  bool   isFeatured = 60;
+  int32  featureSort = 61;
+  string promoTitle = 62;
+  string promoBadge = 63;
+  bool   promoActive = 64;
 
-  string discount_type = 70;
-  double discount_value = 71;
-  bool   discount_active = 72;
-  string discount_start = 73;
-  string discount_end = 74;
+  string discountType = 70;
+  double discountValue = 71;
+  bool   discountActive = 72;
+  string discountStart = 73;
+  string discountEnd = 74;
 
   repeated string tags = 80;
-  repeated string complementary_ids = 81;
+  repeated string complementaryIds = 81;
 }
 
 // -----------------------------------------
@@ -170,33 +168,32 @@ message ListProductsRequest {
   int32 page = 1;
   int32 limit = 2;
   string q = 3;
-  string category_id = 4;
+  string categoryId = 4;
   string status = 5;
-  bool   include_deleted = 6; // default false
+  bool   includeDeleted = 6; // default false
 }
 
-message DeleteProductRequest { string id = 1; }       // soft delete
-message RestoreProductRequest { string id = 1; }      // undo soft delete
-message HardDeleteProductRequest { string id = 1; }   // irreversible
+message DeleteProductRequest { string id = 1; }
+message RestoreProductRequest { string id = 1; }
+message HardDeleteProductRequest { string id = 1; }
 
 message ProductResponse { Product data = 1; }
 message ListProductsResponse { repeated Product data = 1; int32 total = 2; }
 
 message ApplyDiscountBulkRequest {
   repeated string ids = 1; // specific targets (optional)
-  string category_id = 2;  // or select by category
+  string categoryId = 2;   // or select by category
   string status = 3;       // optional filter
   string q = 4;            // search title/sku
 
-  string discount_type = 10; // "PERCENTAGE"|"FIXED"|"NONE"
-  double discount_value = 11; // ignored if NONE
-  bool   discount_active = 12;
-  string discount_start = 13;
-  string discount_end = 14;
+  string discountType = 10;  // "PERCENTAGE"|"FIXED"|"NONE"
+  double discountValue = 11; // ignored if NONE
+  bool   discountActive = 12;
+  string discountStart = 13;
+  string discountEnd = 14;
 }
 
 message BulkResult { int32 updated = 1; }
-
 
 message GalleryImage {
   string id   = 1;
@@ -206,42 +203,41 @@ message GalleryImage {
 }
 
 message NewImage {
-  string url = 1;
-  string alt = 2;
+  string url  = 1;
+  string alt  = 2;
   int32  sort = 3; // optional; if missing we append
 }
 
 message AddImagesRequest {
-  string product_id = 1;
+  string productId = 1;
   repeated NewImage images = 2;
 }
 
 message ListGalleryRequest {
-  string product_id = 1;
-  bool   include_deleted = 2; // default false
+  string productId = 1;
+  bool   includeDeleted = 2; // default false
 }
 
 message ImageOrder {
-  string id  = 1;
+  string id   = 1;
   int32  sort = 2;
 }
 
 message ReorderImagesRequest {
-  string product_id = 1;
+  string productId = 1;
   repeated ImageOrder orders = 2; // set new sort values
 }
 
 message RemoveImageRequest {
-  string product_id = 1;
-  string image_id   = 2;
-  bool   hard_delete = 3; // default false => soft delete
+  string productId = 1;
+  string imageId   = 2;
+  bool   hardDelete = 3; // default false => soft delete
 }
 
 message GalleryResponse {
-  string product_id = 1;
+  string productId = 1;
   repeated GalleryImage images = 2;
 }
-
 
 // -----------------------------------------
 // Service
