@@ -1,0 +1,139 @@
+NebulaNV — Auth & gRPC Integration Update (2-8-2025)
+🧩 New & Updated Modules
+Auth Service (HTTP & gRPC)
+GrpcAuthService
+apps/user-service/src/auth/grpc/grpc-auth.service.ts
+– Centralizes all outgoing gRPC calls to UserService: getUser, updateProfile, findUser, createUser, findUserWithHash, setRefreshToken.
+– Builds and forwards JWT-Bearer metadata on each call.
+
+AuthGrpcController
+apps/auth-service/src/auth/grpc/grpc-auth.controller.ts
+– Exposes new gRPC RPCs: ValidateUser, GetTokens, RefreshTokens, and newly added ValidateToken.
+– Uses JwtAuthGuard + @Roles() on protected RPCs (GetProfile, RefreshTokens, ValidateToken).
+
+AuthService
+apps/auth-service/src/auth/auth.service.ts
+– Moved all token-logic (hashing, storing, rotating) into this shared service.
+– Implements register, validateUser, login, refreshTokens, getProfile, and updateProfile over gRPC.
+
+AuthController
+apps/auth-service/src/auth/auth.controller.ts
+– HTTP REST endpoints for /auth/register, /auth/login, /auth/refresh, /auth/me, /auth/me [PUT], /auth/admin-only.
+
+User Service (HTTP & gRPC)
+GrpcJwtAuthGuard
+apps/user-service/src/user/grpc/grpc-jwt-auth.guard.ts
+– Extracts and validates JWT from gRPC metadata on all UserService RPCs.
+– Throws proper RPC errors (UNAUTHENTICATED, PERMISSION_DENIED) if invalid.
+
+UserGrpcController
+apps/user-service/src/user/grpc/user-grpc.controller.ts
+– Mirrors the UserService proto with RPC handlers: FindUser, GetUser, UpdateProfile.
+– Applies GrpcJwtAuthGuard to each method.
+
+UserService (HTTP)
+apps/user-service/src/user/user.service.ts
+– Internal logic unchanged, now called by both HTTP and gRPC layers.
+
+UserController
+apps/user-service/src/user/user.controller.ts
+– HTTP endpoints: GET /users/me, PUT /users/me, with JwtAuthGuard + @Roles().
+
+Bootstrap & Config
+Hybrid Server Bootstrapping
+apps/user-service/src/main.ts and apps/auth-service/src/main.ts
+– Switched to NestFactory.create(AppModule) + app.connectMicroservice({ transport: GRPC, … }).
+– Runs HTTP and gRPC servers side-by-side:
+
+UserService HTTP on :3100, gRPC on :50051
+
+AuthService HTTP on :3001, gRPC on :50052
+
+Module Wiring
+
+Registered both USER_SERVICE and AUTH_SERVICE gRPC clients via ClientsModule.registerAsync(), pulling proto paths from the shared packages/protos directory.
+
+Configured ConfigModule and JwtModule globally so both HTTP & gRPC controllers can inject JWT settings.
+
+✅ What Was Done
+gRPC ↔ HTTP Split
+
+HTTP controllers now handle REST DTOs, validation, guards, and express routes.
+
+gRPC controllers expose pure RPC handlers with metadata-based JWT guard.
+
+New ValidateToken RPC
+
+Allows any service to offload raw token checks to AuthService.
+
+Returns { isValid, userId, email, role }.
+
+Token Flow Centralization
+
+All JWT issuance, hashing, refresh-token persistence delegated to AuthService.
+
+UserService simply trusts GrpcJwtAuthGuard and uses forwarded metadata.
+
+Path & Codegen Fixes
+
+Unified all .proto codegen under packages/protos/generated/* with properly configured ts-proto.
+
+Updated TS path mappings (@nebula/protos/*) in root tsconfig.base.json.
+
+Testing Augmentation
+
+Unit tests for both services: mocking gRPC clients, Prisma, bcrypt, JwtService.
+
+E2E tests now fully exercise /auth/* and /users/me.
+
+Manual smoke tests passed for all gRPC methods.
+
+🧪 Feature Verification
+AuthService HTTP
+
+POST /auth/register → 201 + new user
+
+POST /auth/login → { access_token, refresh_token }
+
+POST /auth/refresh → rotated tokens
+
+GET /auth/me → profile via gRPC GetProfile
+
+PUT /auth/me → email/password update
+
+AuthService gRPC
+
+ValidateUser, GetTokens, RefreshTokens, ValidateToken all work and enforce roles
+
+UserService HTTP
+
+GET /users/me & PUT /users/me secured via JWT
+
+UserService gRPC
+
+FindUser, GetUser, UpdateProfile secured via GrpcJwtAuthGuard
+
+Correct RPC error codes on not-found and permission-denied
+
+All tests are green, and smoke tests have been manually confirmed.
+
+⏭️ Next Steps
+Automate Codegen
+
+Script pnpm proto:gen in root, CI integration, Windows path fixes.
+
+Global Guard
+
+Extract GrpcTokenAuthGuard into a shared module/library for reuse across other services.
+
+RPC Error Coverage
+
+Unit tests for RPC error mapping (e.g. translate Nest NotFoundException → gRPC NOT_FOUND).
+
+Consolidate Profile Endpoints
+
+Decide on single /profile vs split across /auth and /users.
+
+Phase 3 Kickoff
+
+Begin scaffold for next microservice (e.g. media-service) and integrate gRPC auth guard.

@@ -1,0 +1,31 @@
+# Build outputs
+**/dist/
+**/build/
+.next/
+out/
+
+# Node
+node_modules/
+
+# Env
+.env
+.env.*.local
+
+# Coverage / debug
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / misc
+.DS_Store
+*.pem
+.turbo/
+.vercel/
+
+# Prisma
+**/prisma/generated/
+**/prisma/migrations/
+
+# ts-proto or other generated code (if you want ALL generated dirs ignored)
+**/generated/

@@ -1,0 +1,48 @@
+syntax = "proto3";
+package auth;
+
+service AuthService {
+  // Validate credentials against user‑service
+  rpc ValidateUser (ValidateUserRequest) returns (ValidateUserResponse);
+  // Given a valid userId, issue JWT + refresh token
+  rpc GetTokens     (GetTokensRequest)     returns (GetTokensResponse);
+  // Rotate refresh token
+  rpc RefreshTokens (RefreshTokensRequest) returns (GetTokensResponse);
+  // Validate token
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+}
+
+message ValidateUserRequest {
+  string identifier = 1; // email or phone
+  string password   = 2;
+}
+
+message ValidateUserResponse {
+  bool   isValid = 1;
+  string userId  = 2;
+}
+
+message GetTokensRequest {
+  string userId = 1;
+}
+
+message RefreshTokensRequest {
+  string refreshToken = 1;
+}
+
+message GetTokensResponse {
+  string accessToken  = 1;
+  string refreshToken = 2;
+}
+
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+message ValidateTokenResponse {
+  bool   isValid = 1;
+  string userId  = 2;
+  string email   = 3;
+  string role    = 4;
+}

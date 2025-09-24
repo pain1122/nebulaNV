@@ -1,0 +1,388 @@
+{
+  "version": "6.0",
+  "nxVersion": "21.3.2",
+  "pathMappings": {
+    "@packages/*": [
+      "packages/*/dist"
+    ],
+    "@apps/*": [
+      "apps/*/src"
+    ]
+  },
+  "nxJsonPlugins": [],
+  "fileMap": {
+    "projectFileMap": {
+      "@nebula/user-service": [
+        {
+          "file": "apps/user-service/.dockerignore",
+          "hash": "642030109175431332"
+        },
+        {
+          "file": "apps/user-service/.gitignore",
+          "hash": "3266969605870961323"
+        },
+        {
+          "file": "apps/user-service/.prettierrc",
+          "hash": "5008776440579340246"
+        },
+        {
+          "file": "apps/user-service/Dockerfile",
+          "hash": "5125826138694730562"
+        },
+        {
+          "file": "apps/user-service/README.md",
+          "hash": "12752545219937347845"
+        },
+        {
+          "file": "apps/user-service/eslint.config.mjs",
+          "hash": "11482672230086606977"
+        },
+        {
+          "file": "apps/user-service/nest-cli.json",
+          "hash": "18272654682417215031"
+        },
+        {
+          "file": "apps/user-service/package.json",
+          "hash": "7152358964145173336",
+          "deps": [
+            "npm:@eslint/eslintrc",
+            "npm:@eslint/js",
+            "npm:@nestjs/cli",
+            "npm:@nestjs/schematics",
+            "npm:@nestjs/testing",
+            "npm:@swc/cli",
+            "npm:@swc/core",
+            "npm:@types/express",
+            "npm:@types/jest",
+            "npm:@types/jsonwebtoken@9.0.10",
+            "npm:@types/mocha",
+            "npm:@types/node",
+            "npm:@types/supertest",
+            "npm:eslint",
+            "npm:eslint-config-prettier",
+            "npm:eslint-plugin-prettier",
+            "npm:globals@16.3.0",
+            "npm:jest",
+            "npm:prettier",
+            "npm:prisma",
+            "npm:source-map-support@0.5.21",
+            "npm:supertest",
+            "npm:ts-jest",
+            "npm:ts-loader",
+            "npm:ts-node",
+            "npm:ts-proto",
+            "npm:tsconfig-paths",
+            "npm:typescript@5.8.3",
+            "npm:typescript-eslint",
+            "npm:wait-port",
+            "npm:@grpc/grpc-js",
+            "npm:@grpc/proto-loader",
+            "npm:@nestjs/common",
+            "npm:@nestjs/config",
+            "npm:@nestjs/core",
+            "npm:@nestjs/jwt",
+            "npm:@nestjs/microservices",
+            "npm:@nestjs/passport",
+            "npm:@nestjs/platform-express",
+            "npm:@prisma/client",
+            "npm:@types/passport-jwt",
+            "npm:class-transformer",
+            "npm:class-validator",
+            "npm:jsonwebtoken",
+            "npm:passport",
+            "npm:passport-jwt",
+            "npm:reflect-metadata",
+            "npm:rxjs@7.8.2"
+          ]
+        },
+        {
+          "file": "apps/user-service/prisma/migrations/20250715100442_init/migration.sql",
+          "hash": "8561854045465644385"
+        },
+        {
+          "file": "apps/user-service/prisma/migrations/20250721072341_add_refresh_token_to_user/migration.sql",
+          "hash": "10433617982209391784"
+        },
+        {
+          "file": "apps/user-service/prisma/migrations/20250723115349_add_phone_to_user/migration.sql",
+          "hash": "15610589840687075912"
+        },
+        {
+          "file": "apps/user-service/prisma/migrations/migration_lock.toml",
+          "hash": "872437952673290735"
+        },
+        {
+          "file": "apps/user-service/prisma/schema.prisma",
+          "hash": "5836448279041755711"
+        },
+        {
+          "file": "apps/user-service/proto/grpcurl.exe",
+          "hash": "15946067205468015244"
+        },
+        {
+          "file": "apps/user-service/proto/test-grpc.js",
+          "hash": "10580217689237092510"
+        },
+        {
+          "file": "apps/user-service/proto/user.proto",
+          "hash": "10400391657847342988"
+        },
+        {
+          "file": "apps/user-service/src/app.controller.ts",
+          "hash": "1345450293891055440"
+        },
+        {
+          "file": "apps/user-service/src/app.module.ts",
+          "hash": "8508405854491970775"
+        },
+        {
+          "file": "apps/user-service/src/app.service.ts",
+          "hash": "7318783726704191171"
+        },
+        {
+          "file": "apps/user-service/src/auth/auth.controller.ts",
+          "hash": "15136132897887779234"
+        },
+        {
+          "file": "apps/user-service/src/auth/auth.module.ts",
+          "hash": "11489642579183474295"
+        },
+        {
+          "file": "apps/user-service/src/auth/auth.service.ts",
+          "hash": "1820866750412516822"
+        },
+        {
+          "file": "apps/user-service/src/auth/dto/create-user.dto.ts",
+          "hash": "1366142693261141919"
+        },
+        {
+          "file": "apps/user-service/src/auth/dto/login-user.dto.ts",
+          "hash": "8220302273213002224"
+        },
+        {
+          "file": "apps/user-service/src/auth/dto/refresh-token.dto.ts",
+          "hash": "5274860210706836749"
+        },
+        {
+          "file": "apps/user-service/src/auth/dto/update-profile.dto.ts",
+          "hash": "11216716327962229940"
+        },
+        {
+          "file": "apps/user-service/src/auth/grpc/grpc-auth.controller.ts",
+          "hash": "17564271873908122826"
+        },
+        {
+          "file": "apps/user-service/src/auth/grpc/grpc-auth.service.ts",
+          "hash": "11877553855145366473"
+        },
+        {
+          "file": "apps/user-service/src/auth/jwt/jwt-and-roles.ts",
+          "hash": "7885994878196448051"
+        },
+        {
+          "file": "apps/user-service/src/auth/jwt/jwt-auth.guard.ts",
+          "hash": "12907724048518590633"
+        },
+        {
+          "file": "apps/user-service/src/auth/jwt/jwt.strategy.ts",
+          "hash": "7765369504499503938"
+        },
+        {
+          "file": "apps/user-service/src/auth/user-service-client.interface.ts",
+          "hash": "11970423962743703004"
+        },
+        {
+          "file": "apps/user-service/src/auth/user.ts",
+          "hash": "13814545922794487105"
+        },
+        {
+          "file": "apps/user-service/src/common/decorators/public.decorator.ts",
+          "hash": "10376415826596655091"
+        },
+        {
+          "file": "apps/user-service/src/common/decorators/roles.decorator.ts",
+          "hash": "5293917905643579840"
+        },
+        {
+          "file": "apps/user-service/src/common/guards/jwt-auth.guard.ts",
+          "hash": "3740320164964518411"
+        },
+        {
+          "file": "apps/user-service/src/common/guards/roles.guard.ts",
+          "hash": "11195812820903613371"
+        },
+        {
+          "file": "apps/user-service/src/main.ts",
+          "hash": "5189499367214805522"
+        },
+        {
+          "file": "apps/user-service/src/prisma.service.ts",
+          "hash": "3194041772698725051"
+        },
+        {
+          "file": "apps/user-service/src/user/grpc/grpc-jwt-auth.guard.ts",
+          "hash": "2725286481702874192"
+        },
+        {
+          "file": "apps/user-service/src/user/grpc/user-grpc.controller.ts",
+          "hash": "8601975930580824993"
+        },
+        {
+          "file": "apps/user-service/src/user/user.controller.ts",
+          "hash": "15362458472255336561"
+        },
+        {
+          "file": "apps/user-service/src/user/user.module.ts",
+          "hash": "5223317268512663551"
+        },
+        {
+          "file": "apps/user-service/src/user/user.service.ts",
+          "hash": "16271668397791838514"
+        },
+        {
+          "file": "apps/user-service/test/app.e2e.spec.ts",
+          "hash": "13389465024553192535"
+        },
+        {
+          "file": "apps/user-service/test/app.service.spec.ts",
+          "hash": "8042632097600608027"
+        },
+        {
+          "file": "apps/user-service/test/auth.service.spec.ts",
+          "hash": "8953013323855805597"
+        },
+        {
+          "file": "apps/user-service/test/jest-globals.spec.ts",
+          "hash": "4486736173861945500"
+        },
+        {
+          "file": "apps/user-service/test/jwt-auth.guard.spec.ts",
+          "hash": "7743206919646275"
+        },
+        {
+          "file": "apps/user-service/test/prisma.service.spec.ts",
+          "hash": "11643905860317409906"
+        },
+        {
+          "file": "apps/user-service/test/roles.decorator.spec.ts",
+          "hash": "8859930353039675817"
+        },
+        {
+          "file": "apps/user-service/test/roles.guard.spec.ts",
+          "hash": "10283098580694929312"
+        },
+        {
+          "file": "apps/user-service/test/user.controller.spec.ts",
+          "hash": "15342670571379127092"
+        },
+        {
+          "file": "apps/user-service/test/user.service.spec.ts",
+          "hash": "1514265597812559796"
+        },
+        {
+          "file": "apps/user-service/tsconfig.build.json",
+          "hash": "5222655316004978554"
+        },
+        {
+          "file": "apps/user-service/tsconfig.json",
+          "hash": "5524495692119162545"
+        }
+      ],
+      "@packages/config": [
+        {
+          "file": "packages/config/package.json",
+          "hash": "4878088149434079955",
+          "deps": [
+            "npm:@types/node",
+            "npm:typescript@5.8.3",
+            "npm:@nestjs/common",
+            "npm:@nestjs/config",
+            "npm:joi"
+          ]
+        },
+        {
+          "file": "packages/config/src/config.module.ts",
+          "hash": "1690164463641819735"
+        },
+        {
+          "file": "packages/config/src/index.ts",
+          "hash": "14823577604806543525"
+        },
+        {
+          "file": "packages/config/tsconfig.json",
+          "hash": "4636589175149536933"
+        }
+      ]
+    },
+    "nonProjectFiles": [
+      {
+        "file": ".dockerignore",
+        "hash": "8793562423102108506"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "11686763406958944468"
+      },
+      {
+        "file": ".npmrc",
+        "hash": "3244421341483603138"
+      },
+      {
+        "file": ".vscode/settings.json",
+        "hash": "1409024233119639755"
+      },
+      {
+        "file": "README.md",
+        "hash": "18243470648104499844"
+      },
+      {
+        "file": "docker-compose.yml",
+        "hash": "14750707008430891231"
+      },
+      {
+        "file": "my reports/15-7-2025.txt",
+        "hash": "5927474863970187342"
+      },
+      {
+        "file": "my reports/16-7-2025.txt",
+        "hash": "9373548087942184159"
+      },
+      {
+        "file": "my reports/20-7-2025.txt",
+        "hash": "11059606554272773971"
+      },
+      {
+        "file": "my reports/21-7-2025.txt",
+        "hash": "11336087256150333999"
+      },
+      {
+        "file": "my reports/22-7-2025.txt",
+        "hash": "8816381435809282178"
+      },
+      {
+        "file": "package.json",
+        "hash": "16535920490214413781"
+      },
+      {
+        "file": "pnpm-lock.yaml",
+        "hash": "6898261908626510489"
+      },
+      {
+        "file": "pnpm-workspace.yaml",
+        "hash": "9750177317466281158"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "12161174568037044805"
+      },
+      {
+        "file": "turbo.json",
+        "hash": "631592950408502577"
+      },
+      {
+        "file": "wait-for-postgres.sh",
+        "hash": "15382117616965815338"
+      }
+    ]
+  }
+}

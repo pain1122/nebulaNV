@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+  output        = "./generated"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -------- Enums
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DiscountType {
+  PERCENTAGE   // 10 => 10%
+  FIXED        // 5 => fixed amount in currency
+}
+
+enum AttributeValueType {
+  STRING
+  INT
+  BOOL
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// -------- Category
+model ProductCategory {
+  id         String   @id @default(uuid()) @db.Uuid
+  slug       String   @unique
+  title      String
+  isHidden   Boolean  @default(false)
+  isSystem   Boolean  @default(false)      // ← protect “Undefined”
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  // Backref from Product
+  products   Product[]
+
+  @@map("product_category")
+}
+
+// -------- Product
+model Product {
+  id          String        @id @default(uuid())
+  slug        String        @unique
+  title       String
+  description String        @db.Text
+  excerpt     String?       @db.Text
+  sku         String        @unique
+  status      ProductStatus @default(ACTIVE)
+
+  // pricing
+  price       Decimal       @db.Decimal(18, 2)
+  currency    String        @default("EUR")
+
+  // thumbnail (primary visual)
+  thumbnailUrl String?
+
+  // category (FK inside service only)
+  categoryId      String   @db.Uuid            @map("categoryId")
+  category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  // per-product discount
+  discountType   DiscountType?
+  discountValue  Decimal?      @db.Decimal(18, 2)
+  discountActive Boolean       @default(false)
+  discountStart  DateTime?
+  discountEnd    DateTime?
+
+  // 3D
+  model3dUrl      String?
+  model3dFormat   String?      // glb|gltf|usdz...
+  model3dLiveView Boolean      @default(false)
+  model3dPosterUrl String?
+
+  // VR/360: plan + hotspots (no link to gallery)
+  vrPlanImageUrl String?
+  vrEnabled      Boolean      @default(false)
+
+  // SEO
+  metaTitle        String?
+  metaDescription  String?     @db.Text
+  metaKeywords     String?
+  customSchema     String?     @db.Text
+  noindex          Boolean     @default(false)
+
+  // presentation / promos
+  isFeatured   Boolean  @default(false)
+  featureSort  Int      @default(0)
+  promoTitle   String?
+  promoBadge   String?
+  promoActive  Boolean  @default(false)
+  promoStart   DateTime?
+  promoEnd     DateTime?
+
+  // denormalized helpers to avoid join mesh
+  tags         String[]        // text[] in Postgres
+  complementaryIds String[]    // product ids completing a set (uni- or bi-directional as you choose)
+
+  // relations kept simple
+  gallery      ProductGalleryImage[]
+  vrHotspots   ProductVrHotspot[]
+  comments     ProductComment[]
+  attributes   ProductAttribute[]
+
+  // soft delete
+  deletedAt    DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([isFeatured, featureSort])
+}
+
+// -------- Media: ordered gallery
+model ProductGalleryImage {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+
+  url         String
+  alt         String?
+  sortOrder   Int      @default(0)
+
+  // soft delete
+  deletedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId, sortOrder])
+  @@index([deletedAt])
+}
+
+// -------- VR hotspots on plan image
+model ProductVrHotspot {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+
+  // normalized coordinates (0..1 recommended in UI)
+  x           Float
+  y           Float
+
+  // pano image for this camera position
+  panoImageUrl String
+
+  title       String?
+  body        String?  @db.Text
+
+  // Optional viewing params if your viewer uses them
+  yaw         Float?   // degrees
+  pitch       Float?
+  fov         Float?
+
+  // soft delete
+  deletedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([deletedAt])
+}
+
+// -------- Attributes: key + typed value
+model ProductAttribute {
+  id            String             @id @default(uuid())
+  productId     String
+  product       Product            @relation(fields: [productId], references: [id])
+
+  key           String
+  valueType     AttributeValueType
+  valueString   String?
+  valueInt      Int?
+  valueBool     Boolean?
+
+  // soft delete
+  deletedAt     DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Note: no unique constraint due to soft delete; enforce “one active per key” in service
+  @@index([productId])
+  @@index([productId, key])
+  @@index([deletedAt])
+}
+
+// -------- Comments
+model ProductComment {
+  id          String         @id @default(uuid())
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id])
+
+  userId      String?        // external user-service id (no FK)
+  authorName  String?
+  authorEmail String?
+
+  rating      Int?           // 1..5
+  body        String         @db.Text
+  status      CommentStatus  @default(PENDING)
+
+  // flat or threaded: keep simple; optional parentId with no enforced FK
+  parentId    String?
+
+  // soft delete
+  deletedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId, status])
+  @@index([deletedAt])
+}
+
+// -------- Product sets & events
+model ProductSet {
+  id           String      @id @default(uuid())
+  slug         String      @unique
+  title        String
+  description  String?     @db.Text
+
+  active       Boolean     @default(false)
+
+  // set-level discount (does not mutate product.price)
+  discountType  DiscountType?
+  discountValue Decimal?   @db.Decimal(18, 2)
+
+  // no join table: keep it light
+  productIds   String[]    // array of product ids
+
+  // soft delete
+  deletedAt    DateTime?
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([active])
+  @@index([deletedAt])
+}

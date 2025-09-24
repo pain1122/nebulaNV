@@ -1,0 +1,27 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output        = "./generated"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+model Setting {
+  id           String   @id @default(cuid())
+  namespace    String
+  environment  String   @default("default")
+  key          String
+  valueString  String?
+  valueNumber  Float?
+  valueBool    Boolean?
+  valueJson    Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@unique([namespace, environment, key], map: "app_settings_namespace_env_key_uq")
+  @@map("app_settings")
+}

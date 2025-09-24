@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nebula
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  user-service:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+    container_name: user-service
+    depends_on:
+      - postgres
+    env_file:
+      - apps/user-service/.env
+    environment:
+      PORT: "3100"
+      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/nebula"
+      JWT_SECRET: "${JWT_SECRET}"
+    ports:
+      - "3100:3100"
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: auth-service
+    depends_on:
+      - postgres
+      - user-service
+    env_file:
+      - apps/auth-service/.env
+    environment:
+      PORT: "3001"
+      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/nebula"
+      JWT_ACCESS_SECRET: "${JWT_ACCESS_SECRET}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
+      GRPC_USER_URL: "user-service:50051"
+    ports:
+      - "3001:3001"
+
+  product-service:
+    build:
+      context: .
+      dockerfile: apps/product-service/Dockerfile
+    container_name: product-service
+    depends_on:
+      - postgres
+      - auth-service
+    env_file:
+      - apps/product-service/.env
+    environment:
+      PORT: "3003"
+      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/nebula"
+      GRPC_AUTH_URL: "auth-service:50052"
+    ports:
+      - "3003:3003"
+
+volumes:
+  pgdata:
