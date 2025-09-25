@@ -6,6 +6,7 @@ out/
 
 # Node
 node_modules/
+.nx/
 
 # Env
 .env
