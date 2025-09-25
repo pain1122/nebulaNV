@@ -4,6 +4,7 @@
 node_modules
 .pnp
 .pnp.js
+*.tsbuildinfo
 
 # Local env files
 .env
