@@ -1,8 +1,0 @@
-{
-    "extends": "./tsconfig.json",
-    "compilerOptions": {
-      "sourceMap": false
-    },
-    "exclude": ["test", "**/*.spec.ts", "src/**/*.grpc.ts.snap"]
-  }
-  
