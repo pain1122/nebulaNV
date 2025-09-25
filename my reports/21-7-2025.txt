@@ -1,0 +1,113 @@
+NebulaNV — Refresh Token Implementation & Testing (21‑07‑2025)
+🧩 Module
+apps/user-service/src/auth
+
+✅ What Was Done
+• Refresh Token Flow Added
+– AuthService.login() now issues both an access token (module‑configured secret) and a refresh token (refresh‑only secret), hashes + stores the refresh token in the DB.
+– New refreshTokens() method: verifies incoming refresh token, checks against stored hash, rotates (new pair + DB update), returns fresh tokens.
+• Controller Endpoint
+– Exposed POST /auth/refresh accepting a RefreshTokenDto.
+– ValidationPipe enforces the DTO and returns 401 on invalid or expired tokens.
+• JWT Configuration Aligned
+– Switched JwtModule to registerAsync() pulling in JWT_ACCESS_SECRET / _EXPIRATION from Config.
+– Updated JwtStrategy to use JWT_ACCESS_SECRET.
+– Simplified login() to use module’s default signing for access tokens.
+• Testing Coverage
+– Unit tests in auth.service.spec.ts for error cases (invalid signature, hash mismatch) and happy path (rotation + DB update).
+– E2E tests in app.e2e.spec.ts for full flow: register → login → /auth/me → /auth/refresh → /auth/me with new token.
+
+🗂️ Files & Directories Affected
+
+csharp
+Copy
+Edit
+apps/user-service/
+├── src/
+│   ├── auth/
+│   │   ├── auth.service.ts           ⬅️ Added refreshTokens(), updated login()
+│   │   ├── auth.controller.ts        ⬅️ Added POST /auth/refresh
+│   │   ├── auth.module.ts            ⬅️ JwtModule.registerAsync()
+│   │   └── jwt/
+│   │       └── jwt.strategy.ts       ⬅️ Uses JWT_ACCESS_SECRET
+├── test/
+│   ├── auth.service.spec.ts          ⬅️ Unit tests for refreshTokens()
+│   └── app.e2e.spec.ts               ⬅️ E2E refresh‑token flow
+🧪 Feature Verification
+✅ Unit tests for AuthService.refreshTokens() — all cases pass.
+✅ E2E tests:
+
+Register → Login → GET /auth/me returns 200
+
+POST /auth/refresh returns new tokens (201)
+
+New access token works on GET /auth/me (200)
+
+⏭️ Next Steps (Future Phases)
+
+Write unit tests for UserController.updateProfile, covering email‑only and password‑change flows.
+
+Begin gRPC integration, propagating JWT metadata from AuthService → UserService.
+
+Scaffold the Product‑Service MVP with DTOs, guards, Prisma schema, controllers, and tests.
+
+NebulaNV — gRPC Integration Kickoff (21‑07‑2025)
+🧩 Module
+apps/user-service/src
+
+✅ What Was Done
+• gRPC Server Bootstrapped
+  – Added main.ts to launch a GRPC microservice on 0.0.0.0:50051 alongside HTTP.
+  – Imported @nestjs/microservices, defined Transport.GRPC options (package user, protos/user.proto).
+  – Hooked in global ValidationPipe for both REST and gRPC payloads.
+
+• Protobuf Definition & Controller Scaffold
+  – Created protos/user.proto with GetUser & UpdateProfile RPCs under service UserService.
+  – Implemented UserGrpcController using @GrpcMethod('UserService', 'GetUser') and @GrpcMethod('UserService', 'UpdateProfile'), re‑using UserService methods and mapping Nest exceptions to RpcException.
+
+• gRPC Client in AuthService
+  – Registered a named gRPC client (USER_SERVICE) in AuthModule via ClientsModule.registerAsync(), pulling USER_SERVICE_URL from ConfigService.
+  – Defined a UserServiceClient interface (GetUser, UpdateProfile) to type the client.
+  – Injected ClientGrpc in AuthService, initialized the typed client in onModuleInit().
+  – Added imports of Metadata and firstValueFrom (rxjs) to prepare for metadata‑driven calls.
+
+🗂️ Files & Directories Affected
+
+pgsql
+Copy
+Edit
+apps/user-service/  
+├── src/  
+│   ├── auth/  
+│   │   ├── auth.module.ts             ⬅️ Registered GRPC client via ClientsModule  
+│   │   ├── auth.service.ts            ⬅️ Injected ClientGrpc + onModuleInit scaffolding  
+│   │   └── user-service-client.interface.ts  🆕 Typed GRPC client interface  
+│   ├── auth/  
+│   │   └── grpc/  
+│   │       └── user-grpc.controller.ts 🆕 gRPC controller for GetUser & UpdateProfile  
+│   ├── protos/  
+│   │   └── user.proto                  🆕 Protobuf definitions  
+│   └── main.ts                         ⬅️ Bootstraps HTTP + GRPC transports  
+└── test/  
+    └── (no changes yet)                ➖ gRPC tests pending  
+🧪 What Has Been Verifed
+
+Application starts with both REST (port 3100) and gRPC (port 50051) listeners—no runtime errors.
+
+Protobuf compiles and Nest recognizes @GrpcMethod handlers.
+
+gRPC client can be injected in AuthService without TypeScript errors.
+
+⏭️ Next Steps
+
+Wire up actual calls in AuthService
+   • Swap a direct DB lookup (e.g. getUserById) for a gRPC this.userClient.GetUser(...) call, propagating the JWT in Metadata.
+
+Write unit + E2E tests for gRPC paths
+   • Mock ClientGrpc in Auth‑unit tests; spin up a lightweight gRPC client in E2E to hit UserGrpcController.
+
+Propagate metadata
+   • Ensure incoming REST JWTs are forwarded as gRPC metadata and validated by JwtAuthGuard on the gRPC side.
+
+Phase 3: Full migration
+   • Gradually move all PrismaService user‑fetches in AuthService → gRPC, deprecating direct DB calls.
