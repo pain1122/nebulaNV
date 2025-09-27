@@ -11,7 +11,4 @@ export const envSchema = Joi.object({
   GATEWAY_HEADER:  Joi.string().default('x-gateway-sign'),
   
   DATABASE_URL:    Joi.string().uri().required(),
-  
-  // If the guard validates tokens locally:
-  JWT_ACCESS_SECRET:  Joi.string().min(32).required()
 });

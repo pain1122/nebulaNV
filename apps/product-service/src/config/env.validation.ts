@@ -12,10 +12,6 @@ export const envSchema = Joi.object({
 
   DATABASE_URL:    Joi.string().uri().required(),
 
-  // Only if this service validates tokens in its guard:
-  JWT_ACCESS_SECRET:  Joi.string().min(32).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(32).optional(), // not needed unless it issues refreshes
-
   // Peer URLs (use consistent names):
   SETTINGS_GRPC_URL: Joi.string().default('localhost:4004'),
   AUTH_GRPC_URL:     Joi.string().default('localhost:4001')
