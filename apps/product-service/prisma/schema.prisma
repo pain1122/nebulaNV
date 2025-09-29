@@ -1,12 +1,13 @@
 generator client {
   provider = "prisma-client-js"
   output        = "./generated"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "linux-musl"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 // -------- Enums
@@ -69,7 +70,7 @@ model Product {
   thumbnailUrl String?
 
   // category (FK inside service only)
-  categoryId      String   @db.Uuid            @map("categoryId")
+  categoryId      String   @db.Uuid            @map("category_id")
   category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   // per-product discount

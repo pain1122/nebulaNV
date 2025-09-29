@@ -78,22 +78,26 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
   }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    /** ---------- 0) Skip completely if @Public() ---------- */
-    const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [ctx.getHandler?.(), ctx.getClass?.()])
-
+    /** ---------- 0) Global OPEN bypass ---------- */
+    if (this.publicMode === "OPEN") {
+      this.attachAnonymous(ctx) // optional, gives you req.user = {userId: null, role: 'guest'}
+      return true
+    }
+  
+    /** ---------- 1) Route-level @Public() handling ---------- */
+    const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [
+      ctx.getHandler?.(),
+      ctx.getClass?.(),
+    ])
+  
     if (isPublic) {
-      if (this.publicMode === "OPEN") {
-        // current behavior
-        return true
-      }
-
       if (this.publicMode === "OPTIONAL_AUTH") {
         const token = this.extractToken(ctx)
         if (token) await this.attachUserFromToken(ctx, token)
         else this.attachAnonymous(ctx)
-        return true // <-- important
+        return true
       }
-
+  
       if (this.publicMode === "GATEWAY_ONLY") {
         if (this.verifyGateway(ctx)) {
           this.attachAnonymous(ctx)
@@ -104,23 +108,30 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
           await this.attachUserFromToken(ctx, token)
           return true
         }
-        // No gateway & no token → reject
         throw new UnauthorizedException("Public endpoint requires gateway or token")
       }
     }
-
+  
+    /** ---------- 2) Standard token enforcement ---------- */
     const token = this.extractToken(ctx)
     if (!token) throw new UnauthorizedException("Missing Bearer token")
-
+  
     await this.attachUserFromToken(ctx, token)
-
-    const user = (ctx.switchToHttp().getRequest?.() as any)?.user ?? (ctx.switchToRpc().getContext() as any)?.user
-
-    const required = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [ctx.getHandler?.(), ctx.getClass?.()]) ?? []
+  
+    const user =
+      (ctx.switchToHttp().getRequest?.() as any)?.user ??
+      (ctx.switchToRpc().getContext() as any)?.user
+  
+    const required =
+      this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+        ctx.getHandler?.(),
+        ctx.getClass?.(),
+      ]) ?? []
+  
     if (required.length && !required.includes(user.role as Role)) {
       throw new ForbiddenException("Insufficient role")
     }
-
+  
     return true
   }
 

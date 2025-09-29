@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
-    "typescript": "^5.8.2"
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "jsonwebtoken": "^9.0.2"

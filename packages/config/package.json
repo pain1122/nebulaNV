@@ -11,15 +11,15 @@
   "license": "ISC",
   "dependencies": {
     "@nebula/protos": "workspace:*",
-    "@nestjs/common": "11.1.5",
-    "@nestjs/core": "11.1.5",
-    "@nestjs/microservices": "11.1.5",
-    "@nestjs/platform-express": "11.1.5",
+    "@nestjs/common": "11.1.6",
     "@nestjs/config": "^4.0.2",
-    "joi": "^17.13.3"
+    "@nestjs/core": "11.1.6",
+    "@nestjs/microservices": "11.1.6",
+    "@nestjs/platform-express": "11.1.6",
+    "joi": "^18.0.1"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3",
-    "typescript": "^5.8.3"
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
   }
 }

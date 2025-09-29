@@ -21,7 +21,6 @@ export class SettingsService {
     const ns = norm(namespace), k = norm(key), env = norm(environment);
     assertSafe('namespace', ns); assertSafe('key', k); assertSafe('environment', env);
 
-    // No `select` so TS won't complain even if VALUE_FIELD differs
     const row = await this.prisma.setting.findUnique({
       where: { namespace_environment_key: { namespace: ns, environment: env, key: k } },
     });

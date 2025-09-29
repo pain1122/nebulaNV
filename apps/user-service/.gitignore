@@ -1,11 +1,13 @@
 # compiled output
-/dist
-/node_modules
-/build
+**/node_modules
+**/dist
+**/.turbo
+**/build
 
 # Logs
 logs
 *.log
+.git
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
@@ -42,6 +44,9 @@ generated/
 .env.test.local
 .env.production.local
 .env.local
+Dockerfile
+docker-compose.yml
+
 
 # temp directory
 .temp

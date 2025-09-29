@@ -52,6 +52,6 @@ async function bootstrap() {
   const httpPort = Number(process.env.AUTH_HTTP_PORT ?? process.env.PORT ?? 3001);
   await app.listen(httpPort);
 
-  logger.log(`HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`);
+  logger.log(`[auth-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`);
 }
 bootstrap();

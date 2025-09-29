@@ -42,8 +42,7 @@ export class CategoryService {
     try {
       const nextSlug = await (async () => {
         const s = dto.slug ? slugify(dto.slug) : slugify(dto.title)
-        let slug = s,
-          n = 1
+        let slug = s, n = 1
         while (true) {
           const dup = await this.prisma.productCategory.findFirst({where: {slug}, select: {id: true}})
           if (!dup) return slug
@@ -66,6 +65,7 @@ export class CategoryService {
   }
 
   async ensureDefaultCategory(): Promise<{id: string}> {
+    // 1) Ensure local 'undefined' category exists
     const undef = await this.prisma.productCategory.upsert({
       where: {slug: "undefined"},
       update: {title: "Undefined", isHidden: true, isSystem: true},
@@ -73,22 +73,32 @@ export class CategoryService {
       select: {id: true},
     })
 
-    await firstValueFrom(
-      this.settings().SetString({
+    // 2) Read current value; only write if different (idempotent & race-safe with unique index)
+    const current = await firstValueFrom(
+      this.settings().GetString({
         namespace: "product",
         environment: "default",
         key: "defaultProductCategoryId",
-        value: undef.id,
       })
-    )
+    ).catch(() => ({ value: "", found: false } as { value: string; found: boolean }))
+
+    if (!current?.found || current.value !== undef.id) {
+      await firstValueFrom(
+        this.settings().SetString({
+          namespace: "product",
+          environment: "default",
+          key: "defaultProductCategoryId",
+          value: undef.id,
+        })
+      )
+    }
 
     return {id: undef.id}
   }
 
   async getDefault() {
     const res = await firstValueFrom(
-      this.settings().GetString(
-        {
+      this.settings().GetString({
           namespace: "product",
           environment: "default",
           key: "defaultProductCategoryId",
@@ -113,41 +123,53 @@ export class CategoryService {
     })
     if (!exists) throw new NotFoundException("Category not found")
 
-    await firstValueFrom(
-      this.settings().SetString({
+    // Read current; skip write if unchanged
+    const current = await firstValueFrom(
+      this.settings().GetString({
         namespace: "product",
         environment: "default",
         key: "defaultProductCategoryId",
-        value: categoryId,
       })
-    )
+    ).catch(() => ({ value: "", found: false } as { value: string; found: boolean }))
+
+    if (current?.value !== categoryId) {
+      await firstValueFrom(
+        this.settings().SetString({
+          namespace: "product",
+          environment: "default",
+          key: "defaultProductCategoryId",
+          value: categoryId,
+        })
+      )
+    }
+
     return {defaultProductCategoryId: categoryId}
   }
 
-  async updateCategory(id: string, dto: {title?: string; slug?: string; isHidden?: boolean}) {
+  async updateCategory(id: string, dto: { title?: string; slug?: string; isHidden?: boolean }) {
     try {
-      let nextSlug = dto.slug ? slugify(dto.slug) : undefined
-      if (!nextSlug && dto.title) nextSlug = slugify(dto.title)
+      let nextSlug = dto.slug ? slugify(dto.slug) : undefined;
+      if (!nextSlug && dto.title) nextSlug = slugify(dto.title);
 
       if (nextSlug) {
         const dup = await this.prisma.productCategory.findFirst({
-          where: {slug: nextSlug, id: {not: id}},
-          select: {id: true},
-        })
-        if (dup) throw new BadRequestException("Slug already in use")
+          where: { slug: nextSlug, id: { not: id } },
+          select: { id: true },
+        });
+        if (dup) throw new BadRequestException("Slug already in use");
       }
 
       const updated = await this.prisma.productCategory.update({
-        where: {id},
+        where: { id },
         data: {
           title: dto.title ?? undefined,
           slug: nextSlug ?? undefined,
           isHidden: typeof dto.isHidden === "boolean" ? dto.isHidden : undefined,
         },
-      })
-      return updated
+      });
+      return updated;
     } catch (e) {
-      throw mapPrisma(e)
+      throw mapPrisma(e);
     }
   }
 

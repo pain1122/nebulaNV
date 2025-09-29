@@ -1,14 +1,10 @@
 {
-  "$schema": "https://turborepo.com/schema.json",
-  "ui": "tui",
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [".env", ".env.*"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [
-        "apps/**/dist/**",
-        "packages/**/dist/**"
-      ]
+      "outputs": ["dist/**", "apps/**/dist/**", "packages/**/dist/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -19,6 +15,10 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"]
     }
   }
 }

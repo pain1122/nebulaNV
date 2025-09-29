@@ -1,4 +1,5 @@
 services:
+  # 🐘 PostgreSQL (shared across services)
   postgres:
     image: postgres:17
     container_name: postgres
@@ -6,63 +7,80 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: nebula
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
+  # 👤 User Service
   user-service:
     build:
       context: .
       dockerfile: apps/user-service/Dockerfile
     container_name: user-service
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     env_file:
+      - .env
       - apps/user-service/.env
-    environment:
-      PORT: "3100"
-      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/nebula"
-      JWT_SECRET: "${JWT_SECRET}"
     ports:
       - "3100:3100"
 
+  # 🔐 Auth Service
   auth-service:
     build:
       context: .
       dockerfile: apps/auth-service/Dockerfile
     container_name: auth-service
     depends_on:
-      - postgres
-      - user-service
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
     env_file:
+      - .env
       - apps/auth-service/.env
-    environment:
-      PORT: "3001"
-      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/nebula"
-      JWT_ACCESS_SECRET: "${JWT_ACCESS_SECRET}"
-      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
-      GRPC_USER_URL: "user-service:50051"
     ports:
       - "3001:3001"
 
+  # 🛒 Product Service
   product-service:
     build:
       context: .
       dockerfile: apps/product-service/Dockerfile
     container_name: product-service
     depends_on:
-      - postgres
-      - auth-service
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
     env_file:
+      - .env
       - apps/product-service/.env
-    environment:
-      PORT: "3003"
-      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/nebula"
-      GRPC_AUTH_URL: "auth-service:50052"
     ports:
       - "3003:3003"
+
+  # ⚙️ Settings Service
+  settings-service:
+    build:
+      context: .
+      dockerfile: apps/settings-service/Dockerfile
+    container_name: settings-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+      - apps/settings-service/.env
+    ports:
+      - "3010:3010"
 
 volumes:
   pgdata:

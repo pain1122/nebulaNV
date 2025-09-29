@@ -21,5 +21,6 @@ async function bootstrap() {
 
   // (you already have a global ValidationPipe via @UsePipes or providers)
   await app.listen(process.env.PRODUCT_HTTP_PORT ?? 3000);
+  console.log(`[product-service] HTTP http://127.0.0.1:${process.env.PRODUCT_HTTP_PORT} | gRPC ${process.env.PRODUCT_GRPC_URL}`);
 }
 bootstrap();

@@ -28,7 +28,7 @@ async function bootstrap() {
   const port = app.get(ConfigService).get<number>('AUTH_HTTP_PORT') ?? 3000;
   await app.listen(port);                     
   console.log(
-    `HTTP listening on http://127.0.0.1:${port}  |  gRPC on 0.0.0.0:50051`,
+    `[user-service] HTTP listening on http://127.0.0.1:${port}  |  gRPC on 0.0.0.0:50051`,
   );
 }
 bootstrap();

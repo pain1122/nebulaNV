@@ -1,279 +1,197 @@
-NebulaNV — Local Development (Windows + VS Code)
+# ⚙️ NebulaNV — Local Development & Docker Setup
 
-Monorepo with pnpm workspaces, NestJS microservices (auth, user, settings, product), local PostgreSQL, Prisma, and shared packages imported via @nebula/* aliases.
+![OS](https://img.shields.io/badge/Platform-Windows%2011%20%7C%20WSL2-blue?style=flat-square)
+![Toolchain](https://img.shields.io/badge/Toolchain-Node.js%2022%20%7C%20pnpm%209%20%7C%20Docker%20BuildKit-green?style=flat-square)
+![Editor](https://img.shields.io/badge/Editor-VS%20Code-blueviolet?style=flat-square)
+![Database](https://img.shields.io/badge/Database-PostgreSQL%2017-lightblue?style=flat-square)
 
-Prerequisites
+**Author:** Salar Abbasi  
+**Project:** NebulaNV Monorepo  
+**Stack:** NestJS microservices • PostgreSQL • Prisma ORM • TurboRepo • pnpm • Docker
 
-Node.js 22.x
+---
 
-pnpm v9+
+## 🧩 1. Prerequisites
 
-corepack enable
-corepack prepare pnpm@latest --activate
+| Tool | Version | Notes |
+|------|----------|-------|
+| **Node.js** | ≥ 22.x (LTS) | Install via `nvm` or Node installer |
+| **pnpm** | ≥ 9.0 | `corepack enable && corepack prepare pnpm@latest --activate` |
+| **Docker Desktop** | Latest | Enable **WSL2 backend** |
+| **PostgreSQL** | via Docker | Auto-managed via `docker-compose.yml` |
+| **VS Code** | Latest | Recommended editor with workspace configs |
 
+---
 
-Docker Desktop (WSL2 backend enabled)
+## ⚙️ 2. Environment Configuration
 
-VS Code (recommended)
+NebulaNV uses two layers of environment configuration:
 
-Path aliases: This repo already uses @nebula/* (e.g., @nebula/clients, @nebula/logger, @nebula/proto, @nebula/config, @nebula/shared-types).
-Jest configs for user-service and settings-service and the root tsconfig.base.json are already wired — you don’t need to change them here.
+1. **Root `.env`** → Shared variables for all services (ports, secrets, gRPC registry).  
+2. **Per-service `.env`** → Database URLs & unique gateway secrets.
 
-1) Install dependencies
-pnpm install
+### 🏠 Root `.env`
+Located at project root:
 
-2) Environment setup
+```ini
+# ⚙️ Docker & Build
+COMPOSE_BAKE=true
+DOCKER_BUILDKIT=1
+COMPOSE_DOCKER_CLI_BUILD=1
 
-Copy example envs and customize:
-
-Copy-Item apps\auth-service\.env.example apps\auth-service\.env -Force
-Copy-Item apps\user-service\.env.example apps\user-service\.env -Force
-Copy-Item apps\settings-service\.env.example apps\settings-service\.env -Force
-Copy-Item apps\product-service\.env.example apps\product-service\.env -Force
-
-2.1 Generate secrets
-
-Create one shared S2S secret (same for all services) and random JWT secrets where applicable:
-
-Open each .env you just created:
-
-Use the same $S2S for the gateway/server-to-server signing secret (e.g., S2S_SECRET or GATEWAY_SIGN_SECRET) in all services.
-
-auth-service: set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET
-
-Ensure the PORT matches your expectations:
-
-auth-service → 3001
-
-user-service → 3100
-
-settings-service → 3005 (if your repo uses a different port, keep that)
-
-product-service → 3003
-
-Set a local DATABASE_URL (next section).
-
-Typical variables (names may vary based on your .env.example):
-
+# 🌍 Environment
 NODE_ENV=development
-PORT=3001|3100|3005|3003
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nebula?schema=public
+PUBLIC_MODE=OPEN
 
-# S2S (same across ALL services)
-S2S_SECRET=<paste $S2S>
-
-# Auth-only
-JWT_ACCESS_SECRET=<random>
-JWT_REFRESH_SECRET=<random>
-
-# Optional
+# 🔐 Security
+S2S_SECRET=:9T>X1R<_@_Dq*Tz@7l6Z?=&p75h£P~l
 GATEWAY_HEADER=x-gateway-sign
-SVC_NAME=<service-name>
 
-3) Database (Docker) + Prisma
-3.1 Start Postgres
+# 🧩 gRPC Registry
+USER_GRPC_URL=127.0.0.1:50051
+AUTH_GRPC_URL=127.0.0.1:50052
+PRODUCT_GRPC_URL=127.0.0.1:50053
+SETTINGS_GRPC_URL=127.0.0.1:55123
 
-From the repo root (where docker-compose.yml is):
+# 🌐 HTTP Ports
+USER_HTTP_PORT=3100
+AUTH_HTTP_PORT=3001
+PRODUCT_HTTP_PORT=3003
+SETTINGS_HTTP_PORT=3010
 
+# 🔑 JWT Tokens
+JWT_ACCESS_EXPIRATION=15m
+JWT_REFRESH_EXPIRATION=7d
+JWT_ACCESS_SECRET=FqjGH02`9X<c@u9@?AN0+YL>.AWZ7Iq3
+JWT_REFRESH_SECRET=PwBeMgs!+lbL9|Cl2n357KZu?</v^bs9
+```
+
+### 🧱 Service `.env` (example)
+`apps/user-service/.env`
+```ini
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nebula_users?schema=public
+SHADOW_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres?schema=shadow_user"
+GATEWAY_SECRET=L*vqvwy7R1>*$5\pc£AxYr,2aN3Atf<!
+SVC_NAME=user-service
+```
+
+Repeat for each service (`auth`, `product`, `settings`) using unique `GATEWAY_SECRET`s.
+
+---
+
+## 📦 3. Install Dependencies
+
+```bash
+pnpm install
+```
+
+This installs workspace packages for all microservices and shared modules under `/packages`.
+
+---
+
+## 🐘 4. Database Setup
+
+### 4.1 Start PostgreSQL
+
+```bash
 docker compose up -d postgres
+```
 
+### 4.2 Apply Prisma Migrations
 
-Confirm it’s running:
+Run migrations for each service:
 
-docker ps
+```powershell
+docker compose run --rm `
+  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/nebula_settings?schema=public" `
+  settings-service `
+  npx prisma migrate dev --name init --schema apps/settings-service/prisma/schema.prisma
+```
 
-3.2 Set DATABASE_URL
+Repeat for `user-service` and `product-service`.
 
-Use one database for all services, Prisma will isolate via schema:
+---
 
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nebula?schema=public
+## 🏗️ 5. Build All Services
 
-3.3 Generate Prisma client + run migrations
-# Generate Prisma clients
-pnpm -C apps\user-service prisma:gen
-pnpm -C apps\product-service prisma:gen
-pnpm -C apps\settings-service prisma:gen
+```bash
+docker compose build --no-cache
+```
 
-# Apply migrations (pick one approach consistently)
-pnpm -C apps\user-service prisma:migrate:dev
-pnpm -C apps\product-service prisma:migrate:dev
-pnpm -C apps\settings-service prisma:migrate:dev
+💡 Tip:  
+If you see `load local bake definitions`, reset your builder:
 
+```powershell
+docker buildx rm default --force
+docker buildx create --use --name default
+```
 
-Prefer immutable apply in CI/CD:
+---
 
-pnpm -C apps\user-service prisma:migrate:deploy
-pnpm -C apps\product-service prisma:migrate:deploy
-pnpm -C apps\settings-service prisma:migrate:deploy
+## 🚀 6. Run the Stack
 
-4) Build shared packages (in order)
+```bash
+docker compose up -d
+```
 
-Your services import internal packages via @nebula/*. Build them first so runtime imports resolve cleanly.
+All services will start automatically after PostgreSQL passes its health check.
 
-Common order:
+---
 
-# If you use turbo, this will chain everything correctly:
-pnpm build
+## 🧠 7. Local Dev (Hot Reload)
 
-# Or explicitly:
-pnpm -C packages\protos build
-pnpm -C packages\clients build
-pnpm -C packages\config build
-pnpm -C packages\logger build
-pnpm -C packages\shared-types build
+Run each service with watch mode:
 
-# If you have protobuf codegen at root:
-pnpm run proto:gen
+```bash
+pnpm -C apps/auth-service start:dev
+pnpm -C apps/user-service start:dev
+pnpm -C apps/settings-service start:dev
+pnpm -C apps/product-service start:dev
+```
 
+---
 
-If a service complains about missing @nebula/..., re-run pnpm install (root) and pnpm build to refresh package outputs.
+## 🔍 8. Health Checks
 
-5) Start services
+| Service | Port | URL |
+|----------|------|-----|
+| **Auth** | 3001 | [http://localhost:3001/health](http://localhost:3001/health) |
+| **User** | 3100 | [http://localhost:3100/health](http://localhost:3100/health) |
+| **Product** | 3003 | [http://localhost:3003/health](http://localhost:3003/health) |
+| **Settings** | 3010 | [http://localhost:3010/health](http://localhost:3010/health) |
 
-You can run with Docker (where Dockerfiles exist) or locally (watch mode).
+---
 
-Option A — Docker
-# Build images (first run or after changes)
-docker compose build user-service auth-service product-service
-# (Add settings-service here if you’ve added it to compose)
+## 🔐 9. Security Notes
 
-# Start containers
-docker compose up -d user-service
-docker compose up -d auth-service
-docker compose up -d product-service
-# docker compose up -d settings-service   # once added to compose
+- `.env` files are git-ignored by default.  
+- Use **same S2S_SECRET** across all services for inter-service auth.  
+- Generate fresh JWT secrets for production.  
+- Never expose `.env` files in CI/CD logs.
 
+---
 
-If settings-service isn’t in docker-compose.yml yet, run it in local mode for now.
+## ⚡ 10. Optimization Tips
 
-Option B — Local dev (watch mode)
+| Action | Purpose |
+|---------|----------|
+| `COMPOSE_BAKE=true` | Enables parallel, incremental Docker builds |
+| `pnpm fetch` | Pre-caches dependencies faster |
+| `--mount=type=cache,id=pnpm-store` | Persists pnpm store across builds |
+| `pnpm prune --prod` | Trims final image size |
 
-Open 4 terminals in VS Code:
+---
 
-pnpm -C apps\auth-service start:dev
-pnpm -C apps\user-service start:dev
-pnpm -C apps\settings-service start:dev
-pnpm -C apps\product-service start:dev
+## 🧱 11. Troubleshooting
 
+| Issue | Fix |
+|-------|-----|
+| Prisma errors | Check DB URL or rebuild Prisma client |
+| Module not found | Run `pnpm build` |
+| Port conflict | Edit `.env` ports |
+| Missing `dist` folder | Ensure `nest build` completed before Docker copy |
 
-Because you already have @nebula/* aliases wired, start:dev should include -r tsconfig-paths/register in each service’s script.
+---
 
-6) Health checks
-
-GET http://localhost:3001/health (auth-service)
-
-GET http://localhost:3100/health (user-service)
-
-GET http://localhost:3005/health (settings-service)
-
-GET http://localhost:3003/health (product-service)
-
-7) Basic auth flow (Postman)
-
-Register
-POST http://localhost:3001/auth/register
-
-{ "email": "me@example.com", "password": "StrongPass!23" }
-
-
-Login
-POST http://localhost:3001/auth/login → copy access_token.
-
-Authenticated requests
-Add header Authorization: Bearer <access_token> and call:
-
-GET http://localhost:3001/auth/me
-
-GET http://localhost:3100/users
-
-POST http://localhost:3003/products (may require admin/role seeds)
-
-Logout
-POST http://localhost:3001/auth/logout
-
-{ "allDevices": false }
-
-
-or target a specific session:
-
-{ "refreshToken": "<refresh-token>" }
-
-8) Troubleshooting
-
-Cannot find module @nebula/...
-Build packages and restart service:
-
-pnpm build
-pnpm -C apps\<service> start:dev
-
-
-Prisma connection errors
-
-Ensure Postgres is running: docker ps
-
-Check DATABASE_URL in each .env
-
-Re-run prisma:gen + prisma:migrate:dev
-
-Port in use
-Change PORT in the service .env and update your Postman targets.
-
-Container logs
-
-docker logs -f auth-service
-docker logs -f user-service
-docker logs -f product-service
-# docker logs -f settings-service
-
-9) (Optional) Add settings-service to Docker Compose
-
-If not present yet, add a stanza:
-
-  settings-service:
-    build:
-      context: .
-      dockerfile: apps/settings-service/Dockerfile
-    env_file:
-      - apps/settings-service/.env
-    ports:
-      - "3005:3005"
-    depends_on:
-      - postgres
-
-
-Use a standard NestJS Dockerfile (Node 22, build to dist, run start:prod).
-
-10) Script reference
-
-Root (Turbo-aware):
-
-pnpm dev           # if configured to run all services
-pnpm build         # builds packages and services in topo order
-pnpm lint
-pnpm proto:gen     # protobuf codegen if applicable
-
-
-Per service (example user-service):
-
-pnpm -C apps\user-service start:dev
-pnpm -C apps\user-service build
-pnpm -C apps\user-service test
-pnpm -C apps\user-service prisma:migrate:dev
-
-11) Security
-
-S2S secret: one shared value across all services.
-
-JWT secrets: strong randoms; do not commit .env.
-
-Rotate secrets when promoting to staging/production.
-
-12) Next steps
-
-Add/verify role seeding (admin) for protected endpoints.
-
-Tighten CI (lint → typecheck → build → prisma migrate deploy).
-
-Add service healthchecks in Compose.
-
-Add observability (OpenTelemetry, Prometheus) when ready.
+**© 2025 Salar Abbasi – NebulaNV Project**  
+Built with ❤️ using NestJS, TypeScript, Prisma, and Docker.
