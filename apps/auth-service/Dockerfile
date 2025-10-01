@@ -9,7 +9,7 @@ FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 
 # -------------------------------------------------
 # 🧩 deps: prefetch workspace dependencies (cached)
@@ -30,24 +30,21 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM base AS build
 WORKDIR /app
 
-# Copy dependency metadata
 COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json ./
-
-# Copy workspace source
 COPY . .
 
 # Install only auth-service deps (offline, cached)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-pnpm install --frozen-lockfile --workspace-concurrency=1 --filter=@nebula/auth-service...
+    pnpm install --frozen-lockfile --filter=@nebula/auth-service...
 
 # Generate Prisma client for this service
 RUN pnpm --filter=@nebula/auth-service prisma generate --schema apps/auth-service/prisma/schema.prisma
 
-# Build the service only AND its dependencies (grpc-auth, protos, etc.)
-RUN pnpm -w turbo build --filter=@nebula/auth-service^...
+# Build the service (includes its dependent internal packages)
+RUN pnpm turbo run build --filter=@nebula/auth-service^...
 
-# Prune to production deps for smaller image
-RUN pnpm prune --prod --filter=@nebula/auth-service...
+# ✅ Prune inside its own folder (pnpm v9 compatible)
+RUN pnpm deploy --filter=@nebula/user-service --prod /app/deploy
 
 # -------------------------------------------------
 # 🚀 runtime: minimal production image
@@ -56,10 +53,8 @@ FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy built output and required runtime deps
-COPY --from=build /app/apps/auth-service/dist ./dist
-COPY --from=build /app/apps/auth-service/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
+# Copy only what's needed at runtime
+COPY --from=build /app/deploy/. /app/
 
 EXPOSE 3001 50052
 

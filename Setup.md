@@ -16,7 +16,7 @@
 | Tool | Version | Notes |
 |------|----------|-------|
 | **Node.js** | ≥ 22.x (LTS) | Install via `nvm` or Node installer |
-| **pnpm** | ≥ 9.0 | `corepack enable && corepack prepare pnpm@latest --activate` |
+| **pnpm** | ≥ 9.0 | `corepack enable && corepack prepare pnpm@10.17.1 --activate` |
 | **Docker Desktop** | Latest | Enable **WSL2 backend** |
 | **PostgreSQL** | via Docker | Auto-managed via `docker-compose.yml` |
 | **VS Code** | Latest | Recommended editor with workspace configs |
@@ -70,7 +70,7 @@ JWT_REFRESH_SECRET=PwBeMgs!+lbL9|Cl2n357KZu?</v^bs9
 `apps/user-service/.env`
 ```ini
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nebula_users?schema=public
-SHADOW_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres?schema=shadow_user"
+SHADOW_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres?schema=shadow_users"
 GATEWAY_SECRET=L*vqvwy7R1>*$5\pc£AxYr,2aN3Atf<!
 SVC_NAME=user-service
 ```
@@ -103,7 +103,7 @@ Run migrations for each service:
 
 ```powershell
 docker compose run --rm `
-  -e DATABASE_URL="postgresql://postgres:postgres@postgres:5432/nebula_settings?schema=public" `
+  -e DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nebula_settings?schema=public" `
   settings-service `
   npx prisma migrate dev --name init --schema apps/settings-service/prisma/schema.prisma
 ```

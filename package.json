@@ -1,17 +1,29 @@
 {
   "name": "nebula-nv",
   "private": true,
-  "scripts": {
+"scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json}\"",
+
     "proto:gen": "node ./scripts/proto-gen.mjs",
     "proto:check": "node ./scripts/proto-gen.mjs --check",
-    "prisma:gen:services": "pnpm -r -F @nebula/settings-service -F @nebula/product-service -F @nebula/user-service exec prisma generate -- --schema ./prisma/schema.prisma",
-    "prisma:migrate:services": "pnpm -r --workspace-concurrency=1 -F @nebula/settings-service -F @nebula/product-service -F @nebula/user-service exec prisma migrate dev -- --schema ./prisma/schema.prisma",
-    "db:deploy": "pnpm -F @nebula/auth-service prisma:migrate:deploy && pnpm -F @nebula/user-service prisma:migrate:deploy && pnpm -F @nebula/product-service prisma:migrate:deploy && pnpm -F @nebula/settings-service prisma:migrate:deploy"
+
+    "prisma:gen": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma generate -- --schema ./prisma/schema.prisma",
+    "prisma:migrate:dev": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma migrate dev -- --schema ./prisma/schema.prisma",
+    "prisma:migrate:deploy": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma migrate deploy -- --schema ./prisma/schema.prisma",
+    "db:push": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma db push -- --schema ./prisma/schema.prisma",
+
+    "studio:user": "pnpm -C apps/user-service prisma studio --schema ./prisma/schema.prisma",
+    "studio:product": "pnpm -C apps/product-service prisma studio --schema ./prisma/schema.prisma",
+    "studio:settings": "pnpm -C apps/settings-service prisma studio --schema ./prisma/schema.prisma",
+
+    "dev:auth": "pnpm -C apps/auth-service start:dev",
+    "dev:user": "pnpm -C apps/user-service start:dev",
+    "dev:product": "pnpm -C apps/product-service start:dev",
+    "dev:settings": "pnpm -C apps/settings-service start:dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -53,9 +65,9 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.17.1",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "pnpm": {
     "overrides": {

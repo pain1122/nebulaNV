@@ -1,63 +1,48 @@
 # syntax=docker/dockerfile:1.4
 
 #############################################
-#  ⚙️  NebulaNV Optimized Build (User-Service)
+# ⚙️ NebulaNV Optimized Build (User-Service)
 #############################################
 
-# --- base tools
 FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# -------------------------------------------------
-# 🧩 deps: fetch workspace dependencies (cached)
-# -------------------------------------------------
+# ------------ deps ------------
 FROM base AS deps
 WORKDIR /app
-
-# copy only the workspace metadata to leverage Docker cache
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-# prefetch dependencies into the pnpm store (no install yet)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm fetch --frozen-lockfile
 
-# -------------------------------------------------
-# 🏗 build: install filtered deps + build service
-# -------------------------------------------------
+# ------------ build ------------
 FROM base AS build
 WORKDIR /app
-# Copy dependency metadata
 COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json ./
-
-# copy source (this invalidates only when files change)
 COPY . .
 
-# install only user-service deps (offline, cached)
+# Install only what user-service (and its deps) needs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-pnpm install --frozen-lockfile --workspace-concurrency=1 --filter=@nebula/user-service...
+    pnpm install --frozen-lockfile --filter=@nebula/user-service...
 
-# generate Prisma client for this service explicitly
+# Generate Prisma client for user-service
 RUN pnpm --filter=@nebula/user-service prisma generate --schema apps/user-service/prisma/schema.prisma
 
-# build the service AND its dependencies (grpc-auth, protos, etc.)
-RUN pnpm -w turbo build --filter=@nebula/user-service^...
+# Build user-service AND its upstream packages (protos, grpc-auth, config)
+RUN pnpm turbo run build --filter=@nebula/user-service^...
 
-# prune to production deps only (for smaller final image)
-RUN pnpm prune --prod --filter=@nebula/user-service...
+# Prune production deps in the app folder (keeps dist)
+RUN pnpm deploy --filter=@nebula/user-service --prod /app/deploy
 
-# -------------------------------------------------
-# 🚀 runtime: minimal production image
-# -------------------------------------------------
+
+# ------------ runtime ------------
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
-ENV NODE_ENV=production
 
-# copy only what's necessary
-COPY --from=build /app/apps/user-service/dist ./dist
-COPY --from=build /app/apps/user-service/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
+# Copy compiled output & pruned deps
+COPY --from=build /app/deploy/. /app/
 
 EXPOSE 3100 50051
 

@@ -8,7 +8,7 @@ FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
 
 # -------------------------------------------------
 # 🧩 deps: fetch workspace dependencies (cached)
@@ -30,18 +30,17 @@ COPY . .
 
 # 🧩 Install dependencies for this service only (sequential postinstall = safe on Windows)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-pnpm install --frozen-lockfile --workspace-concurrency=1 --filter=@nebula/settings-service...
+pnpm install --frozen-lockfile --filter=@nebula/settings-service...
 
 # 🔧 Generate Prisma client
 RUN pnpm --filter=@nebula/settings-service prisma generate --schema apps/settings-service/prisma/schema.prisma
 
 # Build this service and its dependencies
-RUN pnpm -w turbo run build --filter=@nebula/settings-service^... --no-cache
+RUN pnpm turbo run build --filter=@nebula/settings-service^...
 
 # ✅ Prune for production (pnpm 9 compatible)
-RUN ls -R apps/settings-service || (echo "❌ dist not found" && exit 1)
-RUN find /app -type d -name dist
-RUN pnpm prune --prod
+RUN pnpm deploy --filter=@nebula/user-service --prod /app/deploy
+
 
 # -------------------------------------------------
 # 🚀 runtime: minimal production image
@@ -49,9 +48,7 @@ RUN pnpm prune --prod
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/apps/settings-service/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/deploy/. /app/
 
 EXPOSE 3005
 HEALTHCHECK --interval=30s --timeout=3s \
