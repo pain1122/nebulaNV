@@ -1,0 +1,93 @@
+NebulaNV — Settings Service & Testing Update (13-09-2025 Report)
+🧩 New & Updated Modules
+Settings Service (HTTP & gRPC)
+
+SettingsModule: added global ConfigModule import to allow .env usage.
+
+SettingsGrpcController (apps/settings-service/src/grpc/settings-grpc.controller.ts):
+– Implements GetString and SetString RPCs.
+– Normalizes environment to "default" if omitted.
+– Passes arguments to SettingsService in order (namespace, key, value, environment).
+
+SettingsService (apps/settings-service/src/settings.service.ts):
+– Implements getString (returns { value, found } with empty string fallback).
+– Implements setString (upserts row, clears other type columns, defaults environment).
+– Uses Prisma client connected to nebula_settings database.
+
+Environment & Bootstrap
+
+.env Standardization:
+– Moved to distinct files per service (PORT, *_GRPC_URL variables separated).
+– Removed cross-service leakage where settings-service accidentally picked product-service’s .env.
+
+main.ts Synchronization:
+– Product-service, auth-service, and settings-service main.ts updated to consistently use env-based ports.
+– gRPC URL/port collisions resolved (50060 reserved for settings-service).
+– Clear startup logging added for both HTTP & gRPC servers.
+
+🧪 Testing Setup & Coverage
+Jest Installation & Config
+
+Installed and configured jest, ts-jest, @types/jest.
+
+Updated package.json to include:
+
+test, test:watch, test:cov, test:debug, test:e2e.
+
+Postinstall still runs prisma generate to keep clients in sync.
+
+Unit Tests — SettingsGrpcController
+
+Created apps/settings-service/test/settings-grpc.controller.spec.ts.
+
+Built tests step-by-step:
+
+Used Test.createTestingModule to inject mocked SettingsService.
+
+Tests Implemented:
+
+✅ GetString — ensures call argument order and verifies returned object { value, found }.
+
+✅ SetString — checks correct argument order (namespace, key, value, env) and return value.
+
+✅ Rejection scenario — verifies error propagation if service rejects.
+
+✅ Negative scenario — tests behavior when found is false (empty value returned).
+
+Unit Tests — SettingsService
+
+Created apps/settings-service/test/settings.service.spec.ts.
+
+Mocked PrismaService with findFirst and upsert stubs.
+
+Tests Implemented:
+
+✅ getString — returns correct value, defaults environment, returns empty string when row missing.
+
+✅ setString — upserts row, clears all other value types, respects environment default.
+
+✅ Results
+
+All 12 tests passed across both test suites.
+
+Verified that:
+
+gRPC controller passes arguments in correct order.
+
+Environment defaults work consistently in both controller and service.
+
+Prisma calls are made with correct where and create/update objects.
+
+⚠️ Warnings & Next Steps
+
+Warnings:
+– ts-jest globals key deprecated — should move to transform section.
+– isolatedModules option needs to be set in tsconfig.json to remove future deprecation warning.
+
+Recommended Next Steps:
+
+Add E2E gRPC tests to validate full serialization/deserialization (optional but valuable).
+
+Expand tests for trimming behavior (whitespace handling in namespace/key).
+
+Integration: use product-service to set default_product_category at runtime and verify retrieval through settings-service.

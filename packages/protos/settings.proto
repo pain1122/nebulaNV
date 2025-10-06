@@ -1,0 +1,41 @@
+syntax = "proto3";
+package settings;
+
+service SettingsService {
+  rpc GetString   (GetReq)      returns (GetStringRes);
+  rpc SetString   (SetStringReq) returns (SetStringRes);
+  rpc DeleteString(DeleteReq)   returns (DeleteRes);
+}
+
+message GetReq {
+  string namespace   = 1;
+  string environment = 2; // optional, default "default"
+  string key         = 3;
+}
+
+message GetStringRes {
+  string value = 1;
+  bool   found = 2;
+}
+
+message SetStringReq {
+  string namespace   = 1;
+  string environment = 2;
+  string key         = 3;
+  string value       = 4;
+}
+
+message SetStringRes {
+  string value = 1;
+}
+
+
+message DeleteReq {       
+  string namespace   = 1;
+  string environment = 2;
+  string key         = 3;
+}
+
+message DeleteRes {                
+  bool deleted = 1;
+}

@@ -1,0 +1,155 @@
+ NebulaNV — Auth Module Progress Report (17-07-2025)
+🧩 Module
+apps/user-service/src/auth
+
+✅ What Was Done
+Role-Based Access Control (RBAC) System Introduced
+
+Implemented a custom @Roles(...roles: string[]) decorator.
+
+Created a RolesGuard to enforce required roles at route level.
+
+Registered both JwtAuthGuard and RolesGuard as global guards via APP_GUARD.
+
+Express Request Typings Extended
+
+Augmented express.Request and express.User interfaces to support type-safe req.user access across controllers.
+
+Controller Role Enforcement
+
+Updated AuthController to include:
+
+@Roles('admin') on a sample /auth/admin-only route.
+
+@UseGuards(JwtAuthGuard) on all protected routes.
+
+🗂️ Files & Directories Affected
+yaml
+Copy
+Edit
+apps/user-service/
+├── src/
+│   ├── auth/
+│   │   ├── auth.controller.ts               ⬅️ Updated: added role-protected route
+│   │   └── jwt/jwt-auth.guard.ts            ✅ Already in use
+│   ├── common/
+│   │   ├── decorators/
+│   │   │   └── roles.decorator.ts           🆕 Added: @Roles decorator
+│   │   └── guards/
+│   │       └── roles.guard.ts               🆕 Added: RolesGuard
+│   └── app.module.ts                        ⬅️ Updated: registered global guards
+🧪 Feature Verification
+✅ POST /auth/register — Public route
+
+✅ POST /auth/login — Public route
+
+✅ GET /auth/me — JWT-protected route
+
+✅ GET /auth/admin-only — JWT + Role protected (admin only)
+
+⏭️ Next Steps (Future Phases)
+Add support for supervisor, moderator, and other roles.
+
+Integrate role checking into gRPC metadata for inter-service access control.
+
+Implement permission-based RBAC (if needed) with scoped policies.
+
+
+
+NebulaNV — Profile Update & RBAC Refinement (20-07-2025)
+Today, we completed the full user‐profile update flow in the user‐service, including secure password verification and role‐based guards tuned per endpoint. We ironed out guard order issues, DTO validation rules, and manual database fixes, arriving at a stable, production-ready update profile feature.
+
+📝 What We Built
+PUT /users/me — Update Profile Endpoint
+
+Controller: Added @Roles('user') to require an authenticated “user” role.
+
+DTO: UpdateProfileDto uses @ValidateIf to require currentPassword only when changing password.
+
+Service: updateProfile() now:
+
+Fetches the user by ID.
+
+Verifies currentPassword via bcrypt.
+
+Updates email and/or hashes and updates newPassword.
+
+Guard Improvements
+
+Composite Guard (JwtAndRolesGuard) respects @Public(), runs JwtAuthGuard first, then RolesGuard.
+
+RolesGuard now throws clear errors when:
+
+No @Roles() metadata is present.
+
+User’s role doesn’t match the required roles.
+
+Environment & DB Fixes
+
+Fixed local PostgreSQL connection (moved off Docker) and updated DATABASE_URL to point at native Postgres on port 5432.
+
+Manually verified and corrected user roles in the nebula database with psql.
+
+🐞 Key Challenges & Solutions
+Challenge	Solution
+Guard blocking public and user-only routes	Introduced JwtAndRolesGuard with a @Public() bypass and re-scoped @Roles() per route instead of applying RolesGuard globally.
+DTO always requiring currentPassword even for email-only updates	Switched to @ValidateIf(dto => dto.newPassword !== undefined) so currentPassword is only validated when changing passwords.
+Profile update failing due to stale placeholder password in tests	Added debug logging in updateProfile(), discovered placeholder "oldPassword123" was never changed, then corrected test payload.
+
+📁 Directory Summary
+pgsql
+Copy
+Edit
+apps/user-service/src/
+├── auth/
+│   ├── dto/
+│   │   └── update-profile.dto.ts   (✓ Conditional password validation)
+│   ├── jwt/
+│   │   └── jwt-and-roles.ts        (✓ Composite guard: Public → JWT → Roles)
+│   ├── auth.controller.ts          (✓ @Public + protected admin route)
+│   └── auth.module.ts              (✓ JWT setup)
+├── common/
+│   └── guards/
+│       └── roles.guard.ts          (✓ Throws on missing metadata or mismatched role)
+├── user/
+│   ├── user.controller.ts          (✓ GET /users, PUT /users/me, GET /users/:id)
+│   └── user.service.ts             (✓ createUser, validateUser, updateProfile)
+├── prisma.service.ts               (✓ Prisma client init)
+└── app.module.ts                   (✓ Composite global guard registration)
+🧪 Manual Testing
+Registration & Login: ✔️ New “user” accounts created and authenticated.
+
+GET /users/me: ✔️ Returns correct userId, email, role.
+
+PUT /users/me:
+
+Email‐only update ✔️
+
+Password change with correct currentPassword ✔️
+
+Error on incorrect currentPassword ✔️
+
+GET /users (admin only) ✔️ Returns list; 403 for non-admin.
+
+GET /users/:id ✔️ Admin or self only; 403 otherwise.
+
+🗂 Cleanup & Configuration
+Env: DATABASE_URL set to postgres://postgres:postgres@localhost:5432/nebula.
+
+Logging: Temporary debug logs in updateProfile() removed.
+
+🚀 Current Status
+UserService: Fully supports profile updates with robust validation and RBAC.
+
+AuthService: Stable JWT issuance and /auth/me.
+
+Guards: Composite guard in place, correctly honoring @Public() and @Roles().
+
+⏭ Next Steps
+Write Unit & e2e Tests for UserController.updateProfile, covering email-only and password flows.
+
+Implement Refresh Tokens in AuthService (Phase 2 requirement).
+
+Begin gRPC Integration for Auth → UserService calls.
+
+Scaffold Product-Service MVP, following the same pattern: DTOs, guards, PRISMA schemas, controllers, and tests.

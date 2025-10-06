@@ -1,0 +1,123 @@
+✅ What We Have Done Since 13-09-2025
+1. Product Service Debugging
+
+Root Cause Analysis: Found that getDefaultCategoryId() in category.service.ts was fetching default_product_category instead of defaultProductCategoryId.
+
+Fix: Updated it to use the correct key and ensured ensureDefaultCategory() writes the correct ID to settings-service.
+
+Successful Test: Verified that createProduct now uses the right default category and behaves correctly in gRPC calls.
+
+2. Category Module Hardening
+
+Created category.controller.ts with full HTTP CRUD endpoints:
+
+GET /categories (public list)
+
+GET /categories/default
+
+POST /categories/default/ensure
+
+PUT /categories/default
+
+PUT /categories/:id
+
+DELETE /categories/:id
+
+Added DTO validation (using class-validator + ValidationPipe) to all category endpoints.
+
+Marked read endpoints as @Public() and write endpoints with @Roles('admin').
+
+3. Authentication Guard Refactor
+
+Reworked GrpcTokenAuthGuard:
+
+Introduced PublicMode (OPEN, OPTIONAL_AUTH, GATEWAY_ONLY).
+
+Added gateway signature verification (HMAC-SHA256 with rotating minute bucket).
+
+Added anonymous user attachment for optional-auth cases.
+
+Centralized token extraction + validation logic (extractToken(), attachUserFromToken()).
+
+Confirmed it’s used as APP_GUARD in product-service AppModule (covers all gRPC & HTTP endpoints automatically).
+
+4. Auth Service Improvements
+
+Added logout support with multiple strategies:
+
+Single token revocation (if matches stored hash).
+
+All device revocation (clear stored hash).
+
+Default case falls back to clearing stored hash.
+
+Normalized login() and refreshTokens() to use consistent camelCase (accessToken, refreshToken).
+
+5. User Service Cleanup
+
+Normalized email handling:
+
+Lowercase + trim on create, validate, find.
+
+Simplified setRefreshToken() to treat empty string as a “clear”.
+
+Fixed UserGrpcController to consistently use .create(...) for proto responses (avoiding $type errors).
+
+6. Settings Service Enhancements
+
+Added DeleteString RPC, controller method, and Prisma service method.
+
+Fixed missing export from @nebula/protos/index.ts (re-exported settings).
+
+Rebuilt protos — ensured settings.*.create(...) is used in gRPC controller to avoid $type TypeScript errors.
+
+7. Code Style & Consistency
+
+Started camelCase normalization project-wide:
+
+Product DTOs, User Service, Auth Service outputs now consistently camelCase.
+
+Removed leftover snake_case keys from service calls (except DB column names which Prisma handles internally).
+
+Identified that normalizeProductInput is no longer needed — scheduled for removal to avoid hidden renames.
+
+📌 What Still Needs to Be Done
+1. Remove Legacy normalizeProductInput
+
+Search & remove any calls to normalizeProductInput in product-service.
+
+Verify no accidental renaming from snake_case → camelCase happens at runtime.
+
+2. Full CamelCase Audit
+
+Run a project-wide check to ensure:
+
+DTOs, gRPC contracts, and REST responses all use camelCase.
+
+Remove any manual conversions that double-convert (e.g., toSnakeCase utilities).
+
+Confirm Prisma mappings use @map() only at DB layer (not leaking into API).
+
+3. Token Expiration Enforcement
+
+Confirm expired access tokens are rejected by GrpcTokenAuthGuard by testing with a past token.
+
+Optionally add JWT clock skew allowance (±30s) if necessary.
+
+4. End-to-End (E2E) Tests
+
+Product-service:
+
+CreateProduct, UpdateProduct, ListProducts, Delete/RestoreProduct.
+
+Category creation and default category reassignment.
+
+Settings-service:
+
+GetString, SetString, DeleteString full round-trip test.
+
+5. Optional Security Hardening
+
+Rate-limit public endpoints (especially product listing).
+
+Consider signature-based auth for internal service-to-service gRPC calls (beyond bearer tokens).

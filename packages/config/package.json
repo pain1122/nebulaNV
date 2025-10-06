@@ -1,0 +1,28 @@
+{
+  "name": "@packages/config",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\" --fix",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf dist"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@nebula/protos": "workspace:*",
+    "@nestjs/common": "11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "11.1.6",
+    "@nestjs/microservices": "11.1.6",
+    "@nestjs/platform-express": "11.1.6",
+    "joi": "^18.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
+  }
+}

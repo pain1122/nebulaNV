@@ -1,0 +1,118 @@
+NebulaNV — Auth & gRPC Integration Update (26‑07‑2025)
+
+🧩 Modules Updated
+
+AuthService
+apps/user-service/src/auth/auth.service.ts
+
+AuthModule
+apps/user-service/src/auth/auth.module.ts
+
+AuthController
+apps/user-service/src/auth/auth.controller.ts
+
+GrpcAuthService (gRPC client wrapper)
+apps/user-service/src/auth/grpc/grpc-auth.service.ts
+
+AuthGrpcController (RPC endpoints)
+apps/user-service/src/auth/grpc/grpc-auth.controller.ts
+
+UserController (HTTP “/users/me”)
+apps/user-service/src/user/user.controller.ts
+
+UserService
+apps/user-service/src/user/user.service.ts
+
+UserGrpcController (gRPC “UserService”)
+apps/user-service/src/user/grpc/user-grpc.controller.ts
+
+GrpcJwtAuthGuard (extracts JWT from Metadata)
+apps/user-service/src/user/grpc/grpc-jwt-auth.guard.ts
+
+Main bootstrap (hybrid HTTP + gRPC)
+apps/user-service/src/main.ts
+
+✅ What Was Done
+
+gRPC client in AuthService
+– Extracted all RPC calls (GetUser, UpdateProfile, FindUser) into a dedicated GrpcAuthService.
+– Centralized JWT‑Bearer metadata via a buildJwtMeta(token) helper.
+
+HTTP ↔ gRPC split
+– HTTP controllers (AuthController, UserController) now handle DTOs, guards, and route definitions.
+– gRPC controllers (AuthGrpcController, UserGrpcController) expose @GrpcMethod() handlers and apply GrpcJwtAuthGuard.
+
+DTOs & Validation
+– Re‑enabled LoginUserDto with identifier (email or phone).
+– Kept UpdateProfileDto for both HTTP and gRPC update flows, with conditional validators.
+
+AuthModule enhancements
+– Registered USER_SERVICE gRPC client via ClientsModule.registerAsync().
+– Lifted ConfigModule and JwtModule to top‐level imports for both HTTP and gRPC.
+
+Hybrid application bootstrap
+– Switched to NestFactory.create(AppModule) + app.connectMicroservice({ transport: GRPC, … }).
+– Called app.startAllMicroservices() alongside app.listen(port).
+
+TypeScript & path fixes
+– Corrected all protoPath references to join(__dirname, '..','proto','user.proto').
+– Generated user-service-client.interface.ts via ts‑proto to mirror .proto messages/services.
+– Added non‐null assertions (req.user!) and aligned Nest/Microservices versions to eliminate addRpcTarget errors.
+
+Mappers
+– Introduced dtoToProtoUpdate(id, dto) to translate HTTP DTO → gRPC request shape.
+
+Testing
+– Expanded unit tests for AuthService and UserService (Jest mocks for Prisma, bcrypt, JwtService).
+– Wrote test-grpc.js to smoke‑test gRPC calls.
+– Adjusted and extended E2E tests (app.e2e-spec.ts) to cover /auth/* and /users/me flows.
+
+🧪 Feature Verification
+
+HTTP endpoints
+
+POST /auth/register → 201 Created
+
+POST /auth/login with { identifier, password } → { access_token, refresh_token }
+
+GET /auth/me → proxies to gRPC GetProfile → returns { id, email, role }
+
+POST /auth/refresh → rotates tokens (201)
+
+PUT /users/me → updates email and/or password (200)
+
+gRPC service
+
+UserService.GetUser & UpdateProfile
+
+JWT guard enforces metadata; returns proper NOT_FOUND or PERMISSION_DENIED codes
+
+Tests
+
+All unit tests passing (services, guards, controllers)
+
+Manual gRPC smoke tests succeed
+
+E2E tests now exercise full HTTP→gRPC path
+
+⏭️ Next Steps
+
+Fix remaining E2E route mismatches
+
+Consolidate profile‑update under one controller (/auth/profile vs /users/me).
+
+Enable full JWT metadata forwarding
+
+Wire buildJwtMeta into GrpcAuthService calls so gRPC side can re‑validate tokens.
+
+Automate proto→TS codegen
+
+Smooth out protoc/ts‑proto invocations on Windows & CI.
+
+UserGrpcController tests
+
+Add unit tests for RPC error mapping (e.g. 5 = NOT_FOUND, 7 = PERMISSION_DENIED).
+
+Phase 3 kickoff
+
+Scaffold media-service UI integration and file‑manager per roadmap.
