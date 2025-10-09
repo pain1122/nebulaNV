@@ -1,5 +1,60 @@
-node_modules
-dist
-.git
+# ==============================
+# ✅ FORCE INCLUDE WORKSPACE STRUCTURE
+# ==============================
+!apps/
+!apps/**
+
+!packages/
+!packages/**
+
+# ==============================
+# 🚫 IGNORE build outputs and caches
+# ==============================
+**/node_modules
+**/dist
+**/.turbo
+**/.nx
+**/.vercel
+**/.pnpm-store
+**/.tsbuildinfo
+coverage
+.cache
+deploy
+.buildx-cache
+
+# ==============================
+# 🧹 LOCAL/IDE junk
+# ==============================
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# ==============================
+# 🔒 ENV and secrets
+# ==============================
 .env
-generated/
+.env.*
+!*.env.example
+!**/.env.example
+
+# ==============================
+# 🪵 Logs
+# ==============================
+*.log
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==============================
+# 🪶 VCS metadata
+# ==============================
+.git
+.gitignore
+.gitattributes
+
+# ==============================
+# 🐘 Prisma
+# ==============================
+**/prisma/generated

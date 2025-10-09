@@ -139,6 +139,7 @@ export class AuthService {
       userId: user.id,
       refreshToken: hash,
     });
+
     await this.grpc.setRefreshToken(setReq);
 
     // camelCase keys for API consistency

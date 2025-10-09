@@ -3,12 +3,12 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SettingsModule, SETTINGS_PROTO } from './settings.module';
 
 function getGrpcBind(): string {
-  // service-specific → legacy (your old name) → generic → default
-  return (
-    process.env.SETTINGS_GRPC_URL ??
-    process.env.GRPC_URL ??
-    '127.0.0.1:55123'
-  );
+  // Prefer an explicit port (bind to 0.0.0.0 for container reachability)
+  const port = process.env.GRPC_PORT ?? process.env.SETTINGS_GRPC_PORT;
+  if (port) return `0.0.0.0:${port}`;
+
+  // Fallback: listen on 0.0.0.0:55123 (not 127.0.0.1)
+  return '0.0.0.0:55123';
 }
 
 function getHttpPort(): number {

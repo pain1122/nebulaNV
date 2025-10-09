@@ -1,3 +1,10 @@
+# --- FORCE include workspace packages for pnpm/turbo ---
+!packages/
+!packages/**
+!apps/
+!apps/**
+
+
 # -------------------------------------------
 # Dependencies & build outputs (shrink context)
 # -------------------------------------------

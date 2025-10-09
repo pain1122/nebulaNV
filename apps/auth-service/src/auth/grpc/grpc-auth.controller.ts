@@ -64,6 +64,7 @@ export class AuthGrpcController {
   async getTokens(data: GetTokensRequest): Promise<GetTokensResponse> {
     try {
       const u = await this.authService.getProfile(data.userId); // or a dedicated getUser()
+
       const { accessToken, refreshToken } = await this.authService.login({
         id: u.id,
         email: u.email,

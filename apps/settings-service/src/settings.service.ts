@@ -38,6 +38,17 @@ export class SettingsService {
     return { value, found: true };
   }
 
+  async debugInsert() {
+    return this.prisma.setting.create({
+      data: {
+        namespace: 'test',
+        environment: 'default',
+        key: 'ping',
+        valueString: 'pong',
+      },
+    });
+  }
+
   async setString(namespace: string, key: string, value: string, environment = 'default') {
     const ns = norm(namespace), k = norm(key), env = norm(environment);
     assertSafe('namespace', ns); assertSafe('key', k); assertSafe('environment', env);

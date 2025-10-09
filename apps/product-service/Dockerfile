@@ -8,7 +8,9 @@ FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
+RUN corepack enable && corepack prepare pnpm@10.17.1 --activate \
+ && apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 
 # ---------------- deps ----------------
 FROM base AS deps
@@ -17,10 +19,10 @@ WORKDIR /app
 # Root manifests + pnpm config
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 
-# Expose workspace package manifests so `pnpm fetch` can resolve them
-COPY packages/*/package.json packages/*/package.json
-COPY apps/*/package.json     apps/*/package.json
-
+# 👇 Copy all workspace directories so pnpm can resolve them
+COPY packages ./packages
+COPY apps/*/package.json apps/*/package.json
+RUN mkdir -p packages/clients
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm fetch --frozen-lockfile
 
@@ -30,12 +32,14 @@ WORKDIR /app
 
 # Bring lockfile + workspace + npmrc
 COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json /app/.npmrc ./
-# Now the full source
+# Copy full source
 COPY . .
 
 # Install only deps needed for this service
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter=@nebula/product-service...
+  pnpm install --frozen-lockfile \
+  --filter=@nebula/grpc-auth... \
+  --filter=@nebula/product-service...
 
 # Generate Prisma client
 RUN pnpm --filter=@nebula/product-service prisma generate --schema apps/product-service/prisma/schema.prisma

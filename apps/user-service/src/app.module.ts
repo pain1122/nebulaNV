@@ -8,6 +8,7 @@ import { UserModule } from './user/user.module';
 import { PrismaService } from './prisma.service';
 import { HealthController } from './health.controller';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import * as path from 'path';
 
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
 export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
@@ -16,9 +17,12 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validationSchema: envSchema,
-      envFilePath: ['apps/user-service/.env', '.env'],
       expandVariables: true,
+      validationSchema: envSchema,
+      envFilePath: [
+        path.resolve(__dirname, '../.env'),                     // app-specific .env
+        path.resolve(__dirname, '../../..', '.env'),            // root-level .env (three levels up)
+      ],
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
 

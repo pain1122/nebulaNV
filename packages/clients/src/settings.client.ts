@@ -4,8 +4,8 @@ import type { Observable } from 'rxjs';
 import type { SettingsProxy, GetStringReq, SetStringReq, GetStringRes } from './settings.types';
 
 type Raw = {
-  GetString(req: GetStringReq): Observable<{ value: string; found?: boolean }>;
   GetString(req: GetStringReq): Observable<GetStringRes>;
+  SetString(req: SetStringReq): Observable<unknown>;
   DeleteString(req: { namespace: string; environment?: string; key: string }): Observable<unknown>;
 };
 

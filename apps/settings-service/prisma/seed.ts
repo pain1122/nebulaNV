@@ -25,10 +25,6 @@ async function upsertString(ns: string, key: string, value: string, env = 'defau
 
 async function main() {
   await upsertJson('i18n', 'supported_locales', ['en', 'de', 'fa']);
-
-  // Default product category (slug-based). We'll resolve this to an ID at runtime.
-  await upsertString('product', 'default_category_slug', 'undefined');
-  // (We still intentionally do NOT set 'product.defaultProductCategoryId' here.)
 }
 
 main()

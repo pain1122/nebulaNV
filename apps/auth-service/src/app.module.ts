@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { join } from 'path';
+import * as path from 'path';
 import { envSchema } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
@@ -11,14 +11,20 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
 export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
-
+console.log('[Config] loaded env paths:', [
+  path.resolve(process.cwd(), 'apps', 'auth-service', '.env'),
+  path.resolve(process.cwd(), '.env'),
+]);
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validationSchema: envSchema,
-      envFilePath: ['apps/auth-service/.env', '.env'],
       expandVariables: true,
+      validationSchema: envSchema,
+      envFilePath: [
+        path.resolve(__dirname, '../.env'),                     // app-specific .env
+        path.resolve(__dirname, '../../..', '.env'),            // root-level .env (three levels up)
+      ],
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
 
