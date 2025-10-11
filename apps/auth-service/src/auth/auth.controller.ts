@@ -1,3 +1,4 @@
+// apps/auth-service/src/auth/auth.controller.ts
 import {
   Body,
   Controller,
@@ -5,7 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
-  UseGuards,
   Get,
   Put,
   Req,
@@ -13,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './jwt/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -21,7 +20,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { Public, Roles } from '@nebula/grpc-auth';
 
-// Extend Express Request with our User payload
+// Express typing for req.user (populated by GrpcTokenAuthGuard)
 declare module 'express' {
   interface User {
     userId: string;
@@ -39,7 +38,7 @@ export class AuthController {
 
   constructor(private readonly authService: AuthService) {}
 
-  /** Register a new user */
+  // ---------- PUBLIC ----------
   @Public()
   @HttpCode(HttpStatus.CREATED)
   @Post('register')
@@ -47,20 +46,17 @@ export class AuthController {
     this.logger.log(`register() start email=${dto.email}`);
     const res = await this.authService.register(dto.email, dto.password);
     this.logger.log(`register() end -> id=${(res as any)?.id ?? 'n/a'}`);
-    return res; // already JSON-safe
+    return res;
   }
 
-  /** Login with email or phone */
+  // ---------- PUBLIC ----------
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginUserDto) {
     this.logger.log(`login() start identifier=${dto.identifier}`);
     console.time('login.validateUser');
-    const user = await this.authService.validateUser(
-      dto.identifier,
-      dto.password,
-    );
+    const user = await this.authService.validateUser(dto.identifier, dto.password);
     console.timeEnd('login.validateUser');
 
     if (!user) {
@@ -76,26 +72,9 @@ export class AuthController {
     return res;
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Roles('user', 'admin', 'root-admin')
-  @HttpCode(HttpStatus.OK)
-  @Post('logout')
-  async logout(@Req() req: Request, @Body() dto: LogoutDto) {
-    // If a refreshToken is provided → revoke that session
-    // Else if allDevices → revoke all of the user's sessions
-    // Else (default) → revoke all of the user's sessions on this device if you track deviceId,
-    //     or just no-op with success for simplicity.
-    await this.authService.logout({
-      userId: req.user!.userId,
-      refreshToken: dto.refreshToken,
-      allDevices: !!dto.allDevices,
-    });
-    return { success: true };
-  }
-
-  /** Rotate a refresh token */
+  // ---------- PUBLIC ----------
   @Public()
-  @HttpCode(HttpStatus.OK) // 200
+  @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto) {
     this.logger.log(`refresh() start`);
@@ -109,8 +88,19 @@ export class AuthController {
     }
   }
 
-  /** Fetch the current user's profile */
-  @UseGuards(JwtAuthGuard)
+  // ---------- AUTHENTICATED ----------
+  @Roles('user', 'admin', 'root-admin')
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  async logout(@Req() req: Request, @Body() dto: LogoutDto) {
+    await this.authService.logout({
+      userId: req.user!.userId,
+      refreshToken: dto.refreshToken,
+      allDevices: !!dto.allDevices,
+    });
+    return { success: true };
+  }
+
   @Roles('user', 'admin', 'root-admin')
   @HttpCode(HttpStatus.OK)
   @Get('me')
@@ -119,23 +109,17 @@ export class AuthController {
     return this.authService.getProfile(req.user!.userId);
   }
 
-  /** Update current user's email/password */
-  @UseGuards(JwtAuthGuard)
   @Roles('user', 'admin', 'root-admin')
   @HttpCode(HttpStatus.OK)
   @Put('me')
   updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
     this.logger.log(`updateProfile() for id=${req.user?.userId}`);
+    // Temporary: still pass AT for downstream gRPC until all callers use authAndS2S()
     const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : authHeader;
-
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
     return this.authService.updateProfile(req.user!.userId, dto, token);
   }
 
-  /** Example admin-only route */
-  @UseGuards(JwtAuthGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
   @Get('admin-only')

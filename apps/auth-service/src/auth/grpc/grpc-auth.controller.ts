@@ -2,11 +2,13 @@
 import { Controller, UseGuards, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
+import { Metadata } from '@grpc/grpc-js';
+
 import { AuthService } from '../auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { authv1, userv1 } from '@nebula/protos';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
-import { Roles } from '@nebula/grpc-auth';
+import { Public, Roles } from '@nebula/grpc-auth';
 
 type ValidateUserRequest = authv1.ValidateUserRequest;
 type ValidateUserResponse = authv1.ValidateUserResponse;
@@ -28,13 +30,28 @@ export class AuthGrpcController {
     private readonly cfg: ConfigService,
   ) {}
 
-  // -------- Protected example (requires Access Token in gRPC metadata) --------
+  /** Utility: read Bearer from gRPC metadata */
+  private tokenFromMeta(meta?: Metadata): string | undefined {
+    if (!meta) return undefined;
+    const raw = meta.get('authorization')?.[0] as string | undefined;
+    if (!raw) return undefined;
+    const [type, val] = raw.split(' ');
+    if (type?.toLowerCase() === 'bearer' && val) return val;
+    return undefined;
+    }
+
+  // -------- Protected (requires Access Token in gRPC metadata) --------
   @Roles('user', 'admin', 'root-admin')
   @UseGuards(JwtAuthGuard)
   @GrpcMethod('AuthService', 'GetProfile')
-  async getProfile(data: { userId: string }): Promise<UserResponse> {
+  async getProfile(
+    data: { userId: string },
+    meta: Metadata,
+  ): Promise<UserResponse> {
     try {
-      return await this.authService.getProfile(data.userId);
+      // Forward JWT to user-service (plus S2S + x-user-id handled by client)
+      const token = this.tokenFromMeta(meta);
+      return await this.authService.getProfile(data.userId, token);
     } catch (err: any) {
       throw err instanceof RpcException
         ? err
@@ -43,6 +60,7 @@ export class AuthGrpcController {
   }
 
   // ---------------------- PUBLIC ----------------------
+  @Public()
   @GrpcMethod('AuthService', 'ValidateUser')
   async validateUser(data: ValidateUserRequest): Promise<ValidateUserResponse> {
     try {
@@ -60,41 +78,37 @@ export class AuthGrpcController {
   }
 
   // PUBLIC: client only has userId here, no AT required
+  @Public()
   @GrpcMethod('AuthService', 'GetTokens')
   async getTokens(data: GetTokensRequest): Promise<GetTokensResponse> {
     try {
-      const u = await this.authService.getProfile(data.userId); // or a dedicated getUser()
-
+      const u = await this.authService.getProfile(data.userId); // service handles downstream fetch
       const { accessToken, refreshToken } = await this.authService.login({
         id: u.id,
         email: u.email,
         role: u.role,
       });
-      return authv1.GetTokensResponse.create({
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-      });
+      return authv1.GetTokensResponse.create({ accessToken, refreshToken });
     } catch (err: any) {
       throw new RpcException(err.message);
     }
   }
 
-  // ❗ PUBLIC: do NOT guard refresh; it’s authenticated by the refresh token itself
+  // PUBLIC: refresh is authenticated by the refresh token itself
+  @Public()
   @GrpcMethod('AuthService', 'RefreshTokens')
   async refreshTokens(data: RefreshTokensRequest): Promise<GetTokensResponse> {
     try {
       const { accessToken, refreshToken } =
         await this.authService.refreshTokens(data.refreshToken);
-      return authv1.GetTokensResponse.create({
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-      });
+      return authv1.GetTokensResponse.create({ accessToken, refreshToken });
     } catch (err: any) {
       throw new RpcException({ code: 16, message: err.message });
     }
   }
 
-  // PUBLIC
+  // PUBLIC: used by guards/services to validate either AT or RT
+  @Public()
   @GrpcMethod('AuthService', 'ValidateToken')
   async validateToken(
     data: ValidateTokenRequest,
@@ -103,19 +117,19 @@ export class AuthGrpcController {
       const accessSecret =
         this.cfg.get<string>('JWT_ACCESS_SECRET') ??
         this.cfg.get<string>('JWT_SECRET');
-      const payload: any = this.jwtService.verify(data.token, {
-        secret: accessSecret,
-      });
-
-      return authv1.ValidateTokenResponse.create({
-        isValid: true,
-        userId: payload.sub,
-        email: payload.email,
-        role: payload.role,
-      });
-    } catch {
-      const refreshSecret = this.cfg.get<string>('JWT_REFRESH_SECRET');
       try {
+        const payload: any = this.jwtService.verify(data.token, {
+          secret: accessSecret,
+        });
+        return authv1.ValidateTokenResponse.create({
+          isValid: true,
+          userId: payload.sub,
+          email: payload.email,
+          role: payload.role,
+        });
+      } catch {
+        // try refresh secret
+        const refreshSecret = this.cfg.get<string>('JWT_REFRESH_SECRET');
         const payload: any = this.jwtService.verify(data.token, {
           secret: refreshSecret,
         });
@@ -125,7 +139,8 @@ export class AuthGrpcController {
           email: payload.email,
           role: payload.role,
         });
-      } catch {}
+      }
+    } catch {
       return authv1.ValidateTokenResponse.create({
         isValid: false,
         userId: '',

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
@@ -20,6 +21,21 @@ function mapPrisma(e: any) {
 export class UserService {
   constructor(private prisma: PrismaService) {}
 
+  // -------------------------------------------------------------------
+  // Helper: validate user ownership or role
+  // -------------------------------------------------------------------
+  private assertSelfOrAdmin(ctxUser: any, targetId: string) {
+    if (!ctxUser)
+      throw new ForbiddenException('Unauthorized user context');
+    const isSelf = ctxUser.userId === targetId;
+    const isAdmin = ['admin', 'root-admin'].includes(ctxUser.role);
+    if (!isSelf && !isAdmin)
+      throw new ForbiddenException('Access denied');
+  }
+
+  // -------------------------------------------------------------------
+  // Create user (frontend register)
+  // -------------------------------------------------------------------
   async createUser(email: string, password: string): Promise<User> {
     const e = email.trim().toLowerCase();
     const rounds = Number(process.env.BCRYPT_ROUNDS || 10);
@@ -33,6 +49,9 @@ export class UserService {
     }
   }
 
+  // -------------------------------------------------------------------
+  // Login validation
+  // -------------------------------------------------------------------
   async validateUser(email: string, password: string): Promise<User | null> {
     const e = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email: e } });
@@ -42,11 +61,21 @@ export class UserService {
     return isMatch ? user : null;
   }
 
-  async getUserById(id: string): Promise<User | null> {
+  // -------------------------------------------------------------------
+  // Get user by ID (self or admin)
+  // -------------------------------------------------------------------
+  async getUserById(id: string, ctxUser?: { userId: string; role: string }): Promise<User | null> {
+    if (ctxUser) this.assertSelfOrAdmin(ctxUser, id);
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async getAllUsers() {
+  // -------------------------------------------------------------------
+  // Get all users (admin only)
+  // -------------------------------------------------------------------
+  async getAllUsers(ctxUser?: { role: string }) {
+    if (!ctxUser || !['admin', 'root-admin'].includes(ctxUser.role))
+      throw new ForbiddenException('Admin access required');
+
     return this.prisma.user.findMany({
       select: {
         id: true,
@@ -58,7 +87,16 @@ export class UserService {
     });
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
+  // -------------------------------------------------------------------
+  // Update profile (self or admin)
+  // -------------------------------------------------------------------
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+    ctxUser?: { userId: string; role: string },
+  ): Promise<User> {
+    if (ctxUser) this.assertSelfOrAdmin(ctxUser, userId);
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
@@ -66,20 +104,15 @@ export class UserService {
     try {
       // Handle password change if requested
       if (dto.newPassword) {
-        if (!dto.currentPassword) {
-          throw new BadRequestException(
-            'Current password is required to change password',
-          );
-        }
-        // **capture** currentPassword into a local const
-        const currentPassword = dto.currentPassword;
+        if (!dto.currentPassword)
+          throw new BadRequestException('Current password is required');
         const passwordMatches = await bcrypt.compare(
-          currentPassword,
+          dto.currentPassword,
           user.password,
         );
-        if (!passwordMatches) {
+        if (!passwordMatches)
           throw new BadRequestException('Current password is incorrect');
-        }
+
         dataToUpdate.password = await bcrypt.hash(dto.newPassword, 10);
       }
 
@@ -87,7 +120,6 @@ export class UserService {
       if (dto.email) {
         const nextEmail = dto.email.trim().toLowerCase();
         if (nextEmail !== user.email) {
-          // optional: ensure not taken
           const dup = await this.prisma.user.findUnique({
             where: { email: nextEmail },
             select: { id: true },
@@ -111,15 +143,22 @@ export class UserService {
     }
   }
 
+  // -------------------------------------------------------------------
+  // Lookup helpers
+  // -------------------------------------------------------------------
   async getUserByEmail(email: string) {
     const e = email.trim().toLowerCase();
     return this.prisma.user.findUnique({ where: { email: e } });
   }
+
   async getUserByPhone(phone: string) {
     const p = phone.replace(/\D+/g, '');
     return this.prisma.user.findUnique({ where: { phone: p } });
   }
 
+  // -------------------------------------------------------------------
+  // Create with pre-hashed password (used by auth-service)
+  // -------------------------------------------------------------------
   async createUserWithHash(email: string, passwordHash: string, role: string) {
     const e = email.trim().toLowerCase();
     try {
@@ -131,6 +170,9 @@ export class UserService {
     }
   }
 
+  // -------------------------------------------------------------------
+  // Refresh token management
+  // -------------------------------------------------------------------
   async setRefreshToken(userId: string, refreshToken: string | null) {
     const next =
       refreshToken && refreshToken.trim().length > 0 ? refreshToken : null;

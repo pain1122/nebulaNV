@@ -1,22 +1,38 @@
-import { Controller } from '@nestjs/common';
+import { Controller, UsePipes, ValidationPipe } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { userv1 } from '@nebula/protos';
 import { UserService } from '../user.service';
-import { Public } from '@nebula/grpc-auth';
+import { Public, Roles } from '@nebula/grpc-auth';
+
+const Pipe = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transform: true,
+  transformOptions: { enableImplicitConversion: true },
+});
 
 @Controller()
 export class UserGrpcController {
   constructor(private readonly users: UserService) {}
 
   // ------------------------------------------------------
-  // GetUser
+  // CreateUser (admin-only)
   // ------------------------------------------------------
-  @GrpcMethod('UserService', 'GetUser')
-  async getUser(data: userv1.GetUserRequest): Promise<userv1.UserResponse> {
-    const u = await this.users.getUserById(data.id);
-    if (!u) {
-      return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
-    }
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
+  @GrpcMethod('UserService', 'CreateUser')
+  async createUser(
+    data: userv1.CreateUserRequest,
+  ): Promise<userv1.UserResponse> {
+    console.log('[UserService] CreateUser RPC received', data.email);
+    const allowedRoles = ['user', 'admin', 'root-admin'];
+    const role = allowedRoles.includes(data.role) ? data.role : 'user';
+
+    const u = await this.users.createUserWithHash(
+      data.email,
+      data.password, // already hashed
+      role,
+    );
     return userv1.UserResponse.create({
       id: u.id,
       email: u.email ?? '',
@@ -25,17 +41,40 @@ export class UserGrpcController {
   }
 
   // ------------------------------------------------------
-  // FindUser  (by id / email / phone)
+  // GetUser (admin-only)
   // ------------------------------------------------------
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
+  @GrpcMethod('UserService', 'GetUser')
+  async getUser(
+    data: userv1.GetUserRequest,
+  ): Promise<userv1.UserResponse> {
+    const u = await this.users.getUserById(data.id);
+    if (!u)
+      return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
+    return userv1.UserResponse.create({
+      id: u.id,
+      email: u.email ?? '',
+      role: u.role,
+    });
+  }
+
+  // ------------------------------------------------------
+  // FindUser (admin-only)
+  // ------------------------------------------------------
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
   @GrpcMethod('UserService', 'FindUser')
-  async findUser(data: userv1.FindUserRequest): Promise<userv1.UserResponse> {
+  async findUser(
+    data: userv1.FindUserRequest,
+  ): Promise<userv1.UserResponse> {
     let u = null;
     if (data.email) u = await this.users.getUserByEmail(data.email);
     else if (data.phone) u = await this.users.getUserByPhone(data.phone);
 
-    if (!u) {
+    if (!u)
       return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
-    }
+
     return userv1.UserResponse.create({
       id: u.id,
       email: u.email ?? '',
@@ -44,8 +83,10 @@ export class UserGrpcController {
   }
 
   // ------------------------------------------------------
-  // UpdateProfile
+  // UpdateProfile (admin-only)
   // ------------------------------------------------------
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
   @GrpcMethod('UserService', 'UpdateProfile')
   async updateProfile(
     data: userv1.UpdateProfileRequest,
@@ -63,30 +104,33 @@ export class UserGrpcController {
   }
 
   // ------------------------------------------------------
-  // CreateUser  (called by auth-service.register)
+  // GetUserWithHash (admin-only)
   // ------------------------------------------------------
-  @Public()
-  @GrpcMethod('UserService', 'CreateUser')
-  async createUser(
-    data: userv1.CreateUserRequest,
-  ): Promise<userv1.UserResponse> {
-    console.log('[UserService] CreateUser RPC received', data.email);
-    const u = await this.users.createUserWithHash(
-      data.email,
-      data.password, // already hashed
-      data.role || 'user',
-    );
-    return userv1.UserResponse.create({
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
+  @GrpcMethod('UserService', 'GetUserWithHash')
+  async getUserWithHash(
+    data: userv1.GetUserWithHashRequest,
+  ): Promise<userv1.GetUserWithHashResponse> {
+    const u = await this.users.getUserById(data.id);
+    if (!u)
+      return userv1.GetUserWithHashResponse.create({
+        id: '', email: '', role: 'user', passwordHash: '', refreshToken: '',
+      });
+    return userv1.GetUserWithHashResponse.create({
       id: u.id,
       email: u.email ?? '',
       role: u.role,
+      passwordHash: u.password,
+      refreshToken: u.refreshToken ?? '',
     });
   }
 
   // ------------------------------------------------------
-  // FindUserWithHash  (auth-service.login / refreshTokens)
+  // Internal (auth-service only)
   // ------------------------------------------------------
-  @Public()
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
   @GrpcMethod('UserService', 'FindUserWithHash')
   async findUserWithHash(
     data: userv1.FindUserWithHashRequest,
@@ -94,32 +138,25 @@ export class UserGrpcController {
     const u = data.email
       ? await this.users.getUserByEmail(data.email)
       : data.phone
-        ? await this.users.getUserByPhone(data.phone)
-        : null;
+      ? await this.users.getUserByPhone(data.phone)
+      : null;
 
-    if (!u) {
+    if (!u)
       return userv1.FindUserWithHashResponse.create({
-        id: '',
-        email: '',
-        role: 'user',
-        passwordHash: '',
-        refreshToken: '',
+        id: '', email: '', role: 'user', passwordHash: '', refreshToken: '',
       });
-    }
+
     return userv1.FindUserWithHashResponse.create({
       id: u.id,
       email: u.email ?? '',
       role: u.role,
-      // Prisma column is 'password'
       passwordHash: u.password,
       refreshToken: u.refreshToken ?? '',
     });
   }
 
-  // ------------------------------------------------------
-  // SetRefreshToken  (auth-service rotates RT)
-  // ------------------------------------------------------
-  @Public()
+  @UsePipes(Pipe)
+  @Roles('admin', 'root-admin')
   @GrpcMethod('UserService', 'SetRefreshToken')
   async setRefreshToken(
     data: userv1.SetRefreshTokenRequest,
@@ -129,29 +166,6 @@ export class UserGrpcController {
       id: u.id,
       email: u.email ?? '',
       role: u.role,
-    });
-  }
-
-  @GrpcMethod('UserService', 'GetUserWithHash')
-  async getUserWithHash(
-    data: userv1.GetUserWithHashRequest,
-  ): Promise<userv1.GetUserWithHashResponse> {
-    const u = await this.users.getUserById(data.id);
-    if (!u) {
-      return userv1.GetUserWithHashResponse.create({
-        id: '',
-        email: '',
-        role: 'user',
-        passwordHash: '',
-        refreshToken: '',
-      });
-    }
-    return userv1.GetUserWithHashResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-      passwordHash: u.password, // Prisma column is "password"
-      refreshToken: u.refreshToken ?? '',
     });
   }
 }

@@ -19,15 +19,15 @@
     "jsonwebtoken": "^9.0.2"
   },
   "peerDependencies": {
-    "@grpc/grpc-js": "^1.13.4",
-    "@nestjs/common": "11.1.5",
-    "@nestjs/core": "11.1.5",
-    "@nestjs/microservices": "11.1.5",
-    "@nestjs/platform-express": "11.1.5",
+    "@grpc/grpc-js": "^1.14.0",
+    "@nestjs/common": "11.1.x",
+    "@nestjs/core": "11.1.x",
+    "@nestjs/microservices": "11.1.x",
+    "@nestjs/platform-express": "11.1.x",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
-    "typescript": "^5.9.2"
+    "typescript": "5.9.2"
   }
 }

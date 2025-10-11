@@ -1,3 +1,4 @@
+// apps/auth-service/src/auth/auth.service.ts
 import {
   Injectable,
   UnauthorizedException,
@@ -21,8 +22,8 @@ type GetUserWithHashResponse = userv1.GetUserWithHashResponse;
 
 type LogoutRequest = {
   userId: string;
-  refreshToken?: string; // if provided, revoke only if it matches stored hash (we store a single session)
-  allDevices?: boolean;  // if true, revoke all sessions for user (same as clearing stored hash)
+  refreshToken?: string;
+  allDevices?: boolean;
 };
 
 function normalizeEmail(s: string) {
@@ -61,7 +62,7 @@ export class AuthService {
     this.logger.debug('register() → gRPC createUser start');
     console.time('auth.register->grpc.createUser');
     try {
-      const res = await this.grpc.createUser(req);
+      const res = await this.grpc.createUser(req); // S2S only inside the client
       console.timeEnd('auth.register->grpc.createUser');
       this.logger.debug('register() → gRPC createUser done');
 
@@ -90,7 +91,7 @@ export class AuthService {
     console.time('grpc.findUserWithHash');
 
     try {
-      const u = await this.grpc.findUserWithHash(req);
+      const u = await this.grpc.findUserWithHash(req); // S2S only
       console.timeEnd('grpc.findUserWithHash');
 
       const hash: string | null =
@@ -140,16 +141,14 @@ export class AuthService {
       refreshToken: hash,
     });
 
-    await this.grpc.setRefreshToken(setReq);
+    await this.grpc.setRefreshToken(setReq); // S2S + x-user-id inside client
 
-    // camelCase keys for API consistency
     return { accessToken: at, refreshToken: rt };
   }
 
   async refreshTokens(oldRt: string) {
     this.logger.debug('refreshTokens() start');
 
-    // 1) Verify incoming refresh token
     let payload: any;
     try {
       payload = this.jwt.verify(oldRt, {
@@ -159,9 +158,6 @@ export class AuthService {
       this.logger.error(`refreshTokens() verify failed: ${e?.message || e}`);
       throw new UnauthorizedException('Invalid refresh token');
     }
-    this.logger.debug(
-      `refreshTokens() payload keys=${Object.keys(payload || {}).join(',')}`,
-    );
 
     const userId: string | undefined = payload?.sub;
     if (!userId) {
@@ -169,26 +165,21 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // 2) Load stored hash by userId (ID-only)
+    // S2S + x-user-id(userId) downstream
     const getReq = userv1.GetUserWithHashRequest.create({ id: userId });
-    const uw: GetUserWithHashResponse = await this.grpc.getUserWithHash(getReq);
-    this.logger.debug(
-      `refreshTokens() getUserWithHash -> id=${uw?.id || ''} email=${uw?.email || ''} hasHash=${uw?.refreshToken ? 'yes' : 'no'}`
-    );
+    const uw: GetUserWithHashResponse = await this.grpc.getUserWithHash(getReq, userId);
 
     if (!uw || !uw.refreshToken) {
       this.logger.error('refreshTokens() no stored refreshToken hash');
       throw new UnauthorizedException('No refresh token on record');
     }
 
-    // 3) Compare provided token with stored hash
     const ok = await bcrypt.compare(oldRt, uw.refreshToken);
     if (!ok) {
       this.logger.error('refreshTokens() bcrypt.compare failed (mismatch)');
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // 4) Re-issue & rotate
     const p = { sub: userId, email: uw.email, role: uw.role };
     const at = this.jwt.sign(p);
     const rt = this.jwt.sign(p, {
@@ -209,9 +200,10 @@ export class AuthService {
 
   // ---------------- Profile ----------------
 
-  async getProfile(id: string) {
+  async getProfile(id: string, token?: string) {
     try {
-      return this.grpc.getUser(id);
+      // Pass token (for @Roles on user-service) + x-user-id(id) via client
+      return this.grpc.getUser(id, token, id);
     } catch {
       throw new NotFoundException('User not found');
     }
@@ -228,17 +220,11 @@ export class AuthService {
       newPassword: dto.newPassword ?? '',
       currentPassword: dto.currentPassword ?? '',
     });
-    return this.grpc.updateProfile(req, token);
+    return this.grpc.updateProfile(req, token); // JWT + S2S + x-user-id
   }
 
   // ---------------- Logout / Revocation ----------------
 
-  /**
-   * Logout strategy (single-RT storage per user):
-   * - If refreshToken is provided: verify it matches the stored hash, then clear hash.
-   * - If allDevices=true: clear stored hash (revokes all sessions).
-   * - Otherwise: clear stored hash by default (reasonable fallback).
-   */
   async logout(req: LogoutRequest): Promise<void> {
     if (req.allDevices) {
       await this.clearStoredRefreshToken(req.userId);
@@ -270,18 +256,15 @@ export class AuthService {
 
   private async getUserWithHash(userId: string): Promise<GetUserWithHashResponse> {
     const getReq: GetUserWithHashRequest = userv1.GetUserWithHashRequest.create({ id: userId });
-    return this.grpc.getUserWithHash(getReq);
+    // Propagate userId for auditing/authorization downstream
+    return this.grpc.getUserWithHash(getReq, userId);
   }
 
-  /**
-   * Clear stored refresh token for a user.
-   * We reuse setRefreshToken with an empty string (user-service treats empty as "unset").
-   */
   private async clearStoredRefreshToken(userId: string): Promise<void> {
     const clearReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create({
       userId,
       refreshToken: '',
     });
-    await this.grpc.setRefreshToken(clearReq);
+    await this.grpc.setRefreshToken(clearReq); // S2S + x-user-id
   }
 }
