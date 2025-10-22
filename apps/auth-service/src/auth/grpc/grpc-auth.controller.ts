@@ -14,7 +14,6 @@ import {
   wrapGrpc,
   toRpc,
   resolveCtxUser,
-  InternalOnly,
   RequireUserId,
 } from '@nebula/grpc-auth';
 import * as jsonwebtoken from 'jsonwebtoken';
@@ -30,7 +29,6 @@ type ValidateTokenResponse = authv1.ValidateTokenResponse;
 type UserResponse = userv1.UserResponse;
 
 
-@InternalOnly()
 @Controller()
 export class AuthGrpcController {
   private readonly logger = new Logger(AuthGrpcController.name);
@@ -67,10 +65,17 @@ export class AuthGrpcController {
   async getProfile(
     data: { userId: string },
     meta: Metadata,
+    call: any,
   ): Promise<UserResponse> {
     try {
       const token = this.requireBearer(meta);
-      return await wrapGrpc(this.authService.getProfile(data.userId, token));
+      const ctx = resolveCtxUser(meta, call);
+      if (!ctx) throw toRpc(status.UNAUTHENTICATED, 'missing_user_context');
+      const isAdmin = ctx.role === 'admin' || ctx.role === 'root-admin';
+      if (!isAdmin && ctx.userId !== data.userId) {
+        throw toRpc(status.PERMISSION_DENIED, 'not_owner_or_admin');
+      }
+      return await wrapGrpc(this.authService.getProfile(data.userId, token, ctx.userId));
     } catch (err: any) {
       throw err instanceof RpcException
         ? err
@@ -82,7 +87,7 @@ export class AuthGrpcController {
   }
 
   // ---------------------- PUBLIC ----------------------
-  @Public()
+  @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'ValidateUser')
   async validateUser(data: ValidateUserRequest): Promise<ValidateUserResponse> {
     try {
@@ -102,7 +107,7 @@ export class AuthGrpcController {
     }
   }
 
-  // PUBLIC: client only has userId here, no AT required
+  @Public({ gatewayOnly: true })
   @RequireUserId()
   @GrpcMethod('AuthService', 'GetTokens')
   async getTokens(
@@ -132,8 +137,7 @@ export class AuthGrpcController {
     return authv1.GetTokensResponse.create({ accessToken, refreshToken });
   }
 
-  // PUBLIC: refresh is authenticated by the refresh token itself
-  @Public()
+  @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'RefreshTokens')
   async refreshTokens(data: RefreshTokensRequest): Promise<GetTokensResponse> {
     try {
@@ -149,7 +153,7 @@ export class AuthGrpcController {
   }
 
   // PUBLIC: used by guards/services to validate either AT or RT
-  @Public()
+  @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'ValidateToken')
   async validateToken(
     data: ValidateTokenRequest,

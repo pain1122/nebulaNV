@@ -93,7 +93,8 @@ export class GrpcAuthService implements OnModuleInit {
   async getUser(id: string, accessToken: string, initiatorId?: string): Promise<UserResponse> {
     this.logger.debug('gRPC → getUser');
     const msg: GetUserRequest = user.GetUserRequest.create({ id });
-    const md  = authAndS2S(accessToken, { userId: initiatorId ?? id });
+    const md  = authAndS2S(accessToken, { userId: initiatorId });
+    this.logger.debug(`gRPC → getUser for ${id}, initiatorId=${initiatorId}`);
     return this.await$(this.svc.getUser(msg, md), 'grpc.client::getUser');
   }
 

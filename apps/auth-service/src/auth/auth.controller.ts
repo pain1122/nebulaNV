@@ -50,7 +50,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   // ---------- PUBLIC ----------
-  @Public()
+  @Public({ optionalAuth: true })
   @HttpCode(HttpStatus.CREATED)
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
@@ -61,7 +61,7 @@ export class AuthController {
   }
 
   // ---------- PUBLIC ----------
-  @Public()
+  @Public({ optionalAuth: true })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginUserDto) {
@@ -87,7 +87,7 @@ export class AuthController {
   }
 
   // ---------- PUBLIC ----------
-  @Public()
+  @Public({ optionalAuth: true })
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto) {
@@ -121,7 +121,7 @@ export class AuthController {
   getProfile(@Req() req: Request) {
     const token = extractBearer(req.headers.authorization);
     if (!token) throw new UnauthorizedException('Missing access token');
-    return this.authService.getProfile(req.user!.userId, token);
+    return this.authService.getProfile(req.user!.userId, token, req.user!.userId);
   }
   
   @Put('me')

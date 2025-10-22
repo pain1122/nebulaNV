@@ -201,11 +201,11 @@ export class AuthService {
 
   // ---------------- Profile ----------------
 
-  async getProfile(id: string, token: string) {
+  async getProfile(id: string, token: string, initiatorId?: string) {
     try {
       if (!token) throw new UnauthorizedException('Missing access token');
       // Pass token (for @Roles on user-service) + x-user-id(id) via client
-      return this.grpc.getUser(id, token, id);
+      return this.grpc.getUser(id, token, initiatorId);
     } catch {
       throw new NotFoundException('User not found');
     }

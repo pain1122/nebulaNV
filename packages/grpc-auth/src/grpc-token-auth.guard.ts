@@ -162,13 +162,11 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
 
   // ---------------------------- Core policy ----------------------------
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    // ✅ Safe, conditional debug logging
+    // (optional debug)
     if (process.env.NODE_ENV !== 'production') {
       const meta = this.extractMeta(ctx);
       const keys = meta?.getMap ? Object.keys(meta.getMap()) : [];
-      if (keys.length > 0) {
-        console.debug('[GrpcTokenAuthGuard] Metadata keys:', keys);
-      }
+      if (keys.length > 0) console.debug('[GrpcTokenAuthGuard] Metadata keys:', keys);
     }
 
     // OPEN mode = allow everything as guest
@@ -192,7 +190,7 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     const meta = this.extractMeta(ctx);
     const token = this.extractToken(ctx);
 
-    // 1) JWT present → strict path
+    // 1) JWT present → strict path (optionally also require S2S if GATEWAY_ONLY)
     if (token) {
       await this.attachUserFromToken(ctx, token);
 
@@ -207,30 +205,27 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
       return true;
     }
 
-    // 2) No JWT → S2S path
-    const hasS2S = this.verifyS2S(meta);
-    const userId = this.extractUserId(meta);
-
-    if (hasS2S) {
-      if (requiredRoles.length) {
-        throw new UnauthorizedException('Bearer token required for role-protected endpoint');
-      }
-      this.setCtxUser(ctx, { userId: userId ?? null, role: undefined });
-      return true;
-    }
-
-    // 3) Public endpoints without JWT
+    // 2) No JWT → handle public endpoints according to mode
     if (isPublic) {
+      // 2a) Gateway-only public: allow if S2S is valid, attach propagated identity if any
+      if (this.publicMode === 'GATEWAY_ONLY') {
+        if (!this.verifyS2S(meta)) {
+          throw new UnauthorizedException('s2s_signature_required');
+        }
+        const propagatedId = this.extractUserId(meta);
+        // if a gateway propagated a user, attach it; else guest
+        this.setCtxUser(ctx, propagatedId ? { userId: propagatedId, role: 'user' } : { userId: null, role: 'guest' });
+        return true;
+      }
+
+      // 2b) Optional auth public: anonymous allowed
       if (this.publicMode === 'OPTIONAL_AUTH') {
         this.setCtxUser(ctx, { userId: null, role: 'guest' });
         return true;
       }
-      if (this.publicMode === 'GATEWAY_ONLY') {
-        throw new UnauthorizedException('s2s_signature_required');
-      }
     }
 
-    // 4) Otherwise, block
+    // 3) Otherwise block
     throw new UnauthorizedException('missing_token_or_signature');
   }
 }
