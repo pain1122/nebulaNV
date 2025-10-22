@@ -15,8 +15,7 @@
   },
   "dependencies": {
     "@nebula/grpc-auth": "workspace:*",
-    "@nebula/protos": "workspace:*",
-    "jsonwebtoken": "^9.0.2"
+    "@nebula/protos": "workspace:*"
   },
   "peerDependencies": {
     "@grpc/grpc-js": "^1.14.0",
@@ -27,7 +26,6 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
     "typescript": "5.9.2"
   }
 }

@@ -111,8 +111,16 @@ export function selectOutboundS2SSecret(kind: "interservice" | "gateway"): strin
 
 /** Resolve public mode (guard policy) with sane fallback. */
 export function resolvePublicMode(): PublicMode {
-  const raw = (process.env[ENV_PUBLIC_MODE] ?? "OPEN").toUpperCase();
-  return (PublicModes as readonly string[]).includes(raw) ? (raw as PublicMode) : "OPEN";
+    const raw = (process.env[ENV_PUBLIC_MODE] ?? "OPEN").toUpperCase();
+  switch (raw) {
+    case 'OPEN':
+      return 'OPEN';
+    case 'GATEWAY_ONLY':
+      return 'GATEWAY_ONLY';
+    case 'OPTIONAL_AUTH':
+    default:
+      return 'OPTIONAL_AUTH';
+  }
 }
 
 // ---------------------------------------------

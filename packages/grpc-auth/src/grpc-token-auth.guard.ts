@@ -88,11 +88,6 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     return v && typeof v === 'string' && v.length > 0 ? v : null;
   }
 
-  /** Accept HMACs signed with any inbound secret; payloads:
-   *  - `${svc}:${bucket}` (preferred)
-   *  - `${bucket}` (compat)
-   *  Check both current and previous bucket.
-   */
   private verifyS2S(meta?: Metadata): boolean {
     const header = resolveS2SSignHeader();
     const sig = meta?.get?.(header)?.[0] as string | undefined;
@@ -115,9 +110,13 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     return false;
   }
 
-  // --------------- Attach / get user on ctx (HTTP or RPC) ---------------
+  // ------------------------- Context utilities -------------------------
   private setCtxUser(ctx: ExecutionContext, user: any) {
     const type = ctx.getType<'rpc' | 'http'>();
+    console.debug(
+      '[GrpcTokenAuthGuard] Attaching user context:',
+      JSON.stringify(user)
+    );
     if (type === 'http') {
       const req = ctx.switchToHttp().getRequest?.();
       if (req) (req as any).user = user;
@@ -139,13 +138,16 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     );
   }
 
-  // ------------------------- JWT validation -------------------------
   private async attachUserFromToken(ctx: ExecutionContext, token: string) {
     const res = await firstValueFrom(
       this.auth.validateToken(authv1.ValidateTokenRequest.create({ token }))
     );
-    if (!res.isValid) throw new UnauthorizedException('token_invalid_or_expired');
-
+    if (!res.isValid){ 
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[GrpcTokenAuthGuard] ValidateToken -> isValid=false');
+      }
+      throw new UnauthorizedException('token_invalid_or_expired');
+    }
     const payload = jwt.decode(token) as jwt.JwtPayload | null;
     if (payload?.exp) {
       const nowSec = Math.floor(Date.now() / 1000);
@@ -160,6 +162,15 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
 
   // ---------------------------- Core policy ----------------------------
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    // ✅ Safe, conditional debug logging
+    if (process.env.NODE_ENV !== 'production') {
+      const meta = this.extractMeta(ctx);
+      const keys = meta?.getMap ? Object.keys(meta.getMap()) : [];
+      if (keys.length > 0) {
+        console.debug('[GrpcTokenAuthGuard] Metadata keys:', keys);
+      }
+    }
+
     // OPEN mode = allow everything as guest
     if (this.publicMode === 'OPEN') {
       this.setCtxUser(ctx, { userId: null, role: 'guest' });
@@ -181,33 +192,29 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     const meta = this.extractMeta(ctx);
     const token = this.extractToken(ctx);
 
-    // 1) JWT present → strict path: validate + enforce roles
+    // 1) JWT present → strict path
     if (token) {
       await this.attachUserFromToken(ctx, token);
 
-      // If public mode is GATEWAY_ONLY, you may choose to *also* require S2S; keep strict.
       if (this.publicMode === 'GATEWAY_ONLY' && !this.verifyS2S(meta)) {
         throw new UnauthorizedException('s2s_signature_required');
       }
 
-      // Enforce roles if declared
       const user = this.getCtxUser(ctx);
       if (requiredRoles.length && !requiredRoles.includes(user?.role as Role)) {
-        throw new ForbiddenException('Insufficient role');
+        throw new ForbiddenException('insufficient_role');
       }
       return true;
     }
 
-    // 2) No JWT → consider S2S (HMAC) path
+    // 2) No JWT → S2S path
     const hasS2S = this.verifyS2S(meta);
     const userId = this.extractUserId(meta);
 
     if (hasS2S) {
-      // Role-protected endpoints require JWT; HMAC alone is not enough
       if (requiredRoles.length) {
         throw new UnauthorizedException('Bearer token required for role-protected endpoint');
       }
-      // Attach propagated identity (may be null if not provided)
       this.setCtxUser(ctx, { userId: userId ?? null, role: undefined });
       return true;
     }
@@ -215,17 +222,15 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     // 3) Public endpoints without JWT
     if (isPublic) {
       if (this.publicMode === 'OPTIONAL_AUTH') {
-        // Allow as guest
         this.setCtxUser(ctx, { userId: null, role: 'guest' });
         return true;
       }
       if (this.publicMode === 'GATEWAY_ONLY') {
-        // Must have valid S2S even if public
         throw new UnauthorizedException('s2s_signature_required');
       }
     }
 
     // 4) Otherwise, block
-    throw new UnauthorizedException('Missing Bearer token or S2S signature');
+    throw new UnauthorizedException('missing_token_or_signature');
   }
 }

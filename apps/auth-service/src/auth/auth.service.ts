@@ -30,6 +30,7 @@ function normalizeEmail(s: string) {
   return s.trim().toLowerCase();
 }
 
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -200,8 +201,9 @@ export class AuthService {
 
   // ---------------- Profile ----------------
 
-  async getProfile(id: string, token?: string) {
+  async getProfile(id: string, token: string) {
     try {
+      if (!token) throw new UnauthorizedException('Missing access token');
       // Pass token (for @Roles on user-service) + x-user-id(id) via client
       return this.grpc.getUser(id, token, id);
     } catch {
@@ -209,17 +211,16 @@ export class AuthService {
     }
   }
 
-  async updateProfile(
-    userId: string,
-    dto: UpdateProfileDto,
-    token: string,
-  ): Promise<UserResponse> {
+  async updateProfile(userId: string, dto: UpdateProfileDto, token: string): Promise<UserResponse> {
+    if (!token) throw new UnauthorizedException('Missing access token');
+  
     const req: UpdateProfileRequest = userv1.UpdateProfileRequest.create({
       id: userId,
       email: dto.email ? normalizeEmail(dto.email) : '',
       newPassword: dto.newPassword ?? '',
       currentPassword: dto.currentPassword ?? '',
     });
+  
     return this.grpc.updateProfile(req, token); // JWT + S2S + x-user-id
   }
 

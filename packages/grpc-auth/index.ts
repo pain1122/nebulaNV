@@ -5,3 +5,4 @@ export * from './src/metadata';
 export * from './src/public.decorator';
 export * from './src/s2s';
 export * from './src/s2s.guard';
+export * from './src/grpc-error.util';

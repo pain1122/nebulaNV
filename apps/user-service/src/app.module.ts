@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { envSchema } from './config/env.validation';
-import { GrpcTokenAuthGuard, AUTH_SERVICE } from '@nebula/grpc-auth';
+import { GrpcTokenAuthGuard, AUTH_SERVICE, S2SGuard } from '@nebula/grpc-auth';
 import { UserModule } from './user/user.module';
 import { PrismaService } from './prisma.service';
 import { HealthController } from './health.controller';
@@ -11,7 +11,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import * as path from 'path';
 
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
-export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
+export const AUTH_PROTO  = require.resolve('@nebula/protos/auth.proto');
 
 @Module({
   imports: [
@@ -20,8 +20,8 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
       expandVariables: true,
       validationSchema: envSchema,
       envFilePath: [
-        path.resolve(__dirname, '../.env'),                     // app-specific .env
-        path.resolve(__dirname, '../../..', '.env'),            // root-level .env (three levels up)
+        path.resolve(__dirname, '../.env'),
+        path.resolve(__dirname, '../../..', '.env'),
       ],
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
@@ -48,6 +48,9 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
     Reflector,
     PrismaService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // ⬇️ Enforce signed internal traffic for ALL gRPC (unless @Public)
+    { provide: APP_GUARD, useClass: S2SGuard },
+    // ⬇️ Then attach/validate user from JWT when present; supports OPTIONAL_AUTH
     { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
   ],
 })

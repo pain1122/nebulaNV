@@ -9,6 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
   });
+  console.log('JWT_ACCESS_SECRET:', process.env.JWT_ACCESS_SECRET?.length);
   const logger = new Logger('AuthService');
 
   // basic request logging (mask passwords in /auth/* POSTs)

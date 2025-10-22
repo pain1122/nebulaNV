@@ -8,6 +8,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { Prisma } from '../../prisma/generated/client';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { toRpc, fromRpcToHttp, wrapGrpc } from '@nebula/grpc-auth';
+import { status } from '@grpc/grpc-js';
 
 type User = Prisma.UserGetPayload<{}>;
 
@@ -26,11 +28,11 @@ export class UserService {
   // -------------------------------------------------------------------
   private assertSelfOrAdmin(ctxUser: any, targetId: string) {
     if (!ctxUser)
-      throw new ForbiddenException('Unauthorized user context');
+      throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
     const isSelf = ctxUser.userId === targetId;
     const isAdmin = ['admin', 'root-admin'].includes(ctxUser.role);
     if (!isSelf && !isAdmin)
-      throw new ForbiddenException('Access denied');
+      throw toRpc(status.PERMISSION_DENIED, 'Access denied');
   }
 
   // -------------------------------------------------------------------

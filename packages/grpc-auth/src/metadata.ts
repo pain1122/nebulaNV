@@ -1,6 +1,7 @@
 // packages/grpc-auth/src/metadata.ts
 import { Metadata } from '@grpc/grpc-js';
 import { buildS2SMetadata, mergeMetadata, withUser } from './s2s';
+export type CtxUser = { userId: string; role?: string; email?: string };
 
 /** Build gRPC metadata with an Authorization: Bearer header. */
 export function bearer(token?: string | null): Metadata | undefined {
@@ -16,15 +17,28 @@ export function bearer(token?: string | null): Metadata | undefined {
  *  - S2S signature (always, when configured)
  *  - x-user-id (if provided)
  */
-export function authAndS2S(
-  token?: string | null,
-  opts?: { userId?: string | null }
-): Metadata {
-  const a = bearer(token);
-  const b = buildS2SMetadata();                 // S2S signature + x-svc
-  const both = mergeMetadata(a, b);             // tolerate undefined nicely
-  return withUser(both, opts?.userId ?? undefined);
+export function authAndS2S(token?: string | null, opts?: { userId?: string | null }): Metadata {
+  const md = new Metadata();
+
+  // Add Bearer token
+  if (token) {
+    md.set('authorization', `Bearer ${token}`);
+  }
+
+  // Add S2S signature
+  const s2s = buildS2SMetadata();
+  for (const key of s2s.getMap ? Object.keys(s2s.getMap()) : []) {
+    const vals = s2s.get(key);
+    if (vals) for (const v of vals) md.add(key, v);
+  }
+
+  // Add x-user-id
+  if (opts?.userId) md.set('x-user-id', String(opts.userId));
+
+  console.debug('[authAndS2S → metadata keys]', Array.from((md as any).getMap ? Object.keys((md as any).getMap()) : []));
+  return md;
 }
+
 
 /** Attach/overwrite a propagated user id onto existing metadata. */
 export function attachUserId(
@@ -33,4 +47,26 @@ export function attachUserId(
 ): Metadata | undefined {
   if (!md) return undefined;
   return withUser(md, userId ?? undefined);
+}
+
+
+export function tokenFromMeta(meta?: Metadata): string | undefined {
+  if (!meta) return undefined;
+  const raw = meta.get('authorization')?.[0] as string | undefined;
+  if (!raw) return undefined;
+  const [type, val] = raw.split(' ');
+  return type?.toLowerCase() === 'bearer' ? val : undefined;
+}
+
+/** Resolve caller user context from (call.user | meta.user | headers). */
+export function resolveCtxUser(meta?: Metadata, call?: any): CtxUser | null {
+  const u = call?.user ?? (meta as any)?.user;
+  if (u?.userId) return u as CtxUser;
+
+  const id = meta?.get?.('x-user-id')?.[0];
+  if (!id) return null;
+
+  const role = (meta.get?.('x-user-role')?.[0] as string | undefined) ?? 'user';
+  const email = meta.get?.('x-user-email')?.[0] as string | undefined;
+  return { userId: String(id), role, email };
 }

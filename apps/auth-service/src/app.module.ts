@@ -12,6 +12,7 @@ import { HealthController } from './health.controller';
 import { GrpcTokenAuthGuard, AUTH_SERVICE } from '@nebula/grpc-auth';
 
 export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
+export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
       expandVariables: true,
       validationSchema: envSchema,
       envFilePath: [
-        path.resolve(__dirname, '../.env'),          // apps/auth-service/.env
+        path.resolve(__dirname, '../.env'), // apps/auth-service/.env
         path.resolve(__dirname, '../../..', '.env'), // repo root .env
       ],
     }),
@@ -40,6 +41,18 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
             package: 'auth',
             protoPath: AUTH_PROTO,
             url: config.get<string>('AUTH_GRPC_URL') ?? '127.0.0.1:50052',
+          },
+        }),
+      },
+      {
+        name: 'USER_SERVICE',
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'user',
+            protoPath: USER_PROTO,
+            url: config.get<string>('USER_GRPC_URL') ?? '127.0.0.1:50051',
           },
         }),
       },

@@ -18,6 +18,8 @@ import { LoginUserDto } from './dto/login-user.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from './jwt/jwt-auth.guard';
 import { Public, Roles } from '@nebula/grpc-auth';
 
 // Express typing for req.user (populated by GrpcTokenAuthGuard)
@@ -30,6 +32,15 @@ declare module 'express' {
   interface Request {
     user?: User;
   }
+}
+
+function extractBearer(header?: string): string | undefined {
+  if (!header) return undefined;
+  const parts = header.split(' ');
+  if (parts.length === 2 && /^Bearer$/i.test(parts[0])) {
+    return parts[1];
+  }
+  return undefined;
 }
 
 @Controller('auth')
@@ -56,7 +67,10 @@ export class AuthController {
   async login(@Body() dto: LoginUserDto) {
     this.logger.log(`login() start identifier=${dto.identifier}`);
     console.time('login.validateUser');
-    const user = await this.authService.validateUser(dto.identifier, dto.password);
+    const user = await this.authService.validateUser(
+      dto.identifier,
+      dto.password,
+    );
     console.timeEnd('login.validateUser');
 
     if (!user) {
@@ -101,24 +115,24 @@ export class AuthController {
     return { success: true };
   }
 
-  @Roles('user', 'admin', 'root-admin')
-  @HttpCode(HttpStatus.OK)
   @Get('me')
+  @Roles('user','admin','root-admin')
+  @UseGuards(JwtAuthGuard)
   getProfile(@Req() req: Request) {
-    this.logger.log(`getProfile() for id=${req.user?.userId}`);
-    return this.authService.getProfile(req.user!.userId);
+    const token = extractBearer(req.headers.authorization);
+    if (!token) throw new UnauthorizedException('Missing access token');
+    return this.authService.getProfile(req.user!.userId, token);
   }
-
-  @Roles('user', 'admin', 'root-admin')
-  @HttpCode(HttpStatus.OK)
+  
   @Put('me')
+  @Roles('user','admin','root-admin')
+  @UseGuards(JwtAuthGuard)
   updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
-    this.logger.log(`updateProfile() for id=${req.user?.userId}`);
-    // Temporary: still pass AT for downstream gRPC until all callers use authAndS2S()
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    const token = extractBearer(req.headers.authorization);
+    if (!token) throw new UnauthorizedException('Missing access token');
     return this.authService.updateProfile(req.user!.userId, dto, token);
   }
+
 
   @Roles('admin')
   @HttpCode(HttpStatus.OK)

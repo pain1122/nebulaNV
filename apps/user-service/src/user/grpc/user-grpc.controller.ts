@@ -1,171 +1,104 @@
-import { Controller, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
+import { Metadata, status } from '@grpc/grpc-js';
 import { userv1 } from '@nebula/protos';
 import { UserService } from '../user.service';
-import { Public, Roles } from '@nebula/grpc-auth';
+import { Roles, InternalOnly, RequireUserId, toRpc, resolveCtxUser } from '@nebula/grpc-auth';
 
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
-
+@InternalOnly()
 @Controller()
 export class UserGrpcController {
   constructor(private readonly users: UserService) {}
 
-  // ------------------------------------------------------
-  // CreateUser (admin-only)
-  // ------------------------------------------------------
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
-  @GrpcMethod('UserService', 'CreateUser')
-  async createUser(
-    data: userv1.CreateUserRequest,
-  ): Promise<userv1.UserResponse> {
-    console.log('[UserService] CreateUser RPC received', data.email);
-    const allowedRoles = ['user', 'admin', 'root-admin'];
-    const role = allowedRoles.includes(data.role) ? data.role : 'user';
-
-    const u = await this.users.createUserWithHash(
-      data.email,
-      data.password, // already hashed
-      role,
-    );
-    return userv1.UserResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-    });
+  private assertSelfOrAdmin(ctxUser: any, targetId: string): void {
+    if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
+    const { userId, role } = ctxUser;
+    if (role === 'admin' || role === 'root-admin') return;
+    if (userId !== targetId) throw toRpc(status.PERMISSION_DENIED, 'Access denied: not owner or admin');
   }
 
-  // ------------------------------------------------------
-  // GetUser (admin-only)
-  // ------------------------------------------------------
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
+  // gRPC is **internal-only**; JWT roles still enforced when provided
+  @Roles('user', 'admin', 'root-admin')
   @GrpcMethod('UserService', 'GetUser')
-  async getUser(
-    data: userv1.GetUserRequest,
-  ): Promise<userv1.UserResponse> {
+  async getUser(data: userv1.GetUserRequest, meta: Metadata, call: any): Promise<userv1.UserResponse> {
+    const ctxUser = resolveCtxUser(meta, call);
+    if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
+    this.assertSelfOrAdmin(ctxUser, data.id);
     const u = await this.users.getUserById(data.id);
-    if (!u)
-      return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
-    return userv1.UserResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-    });
+    if (!u) throw toRpc(status.NOT_FOUND, 'User not found');
+    return userv1.UserResponse.create({ id: u.id, email: u.email ?? '', role: u.role });
   }
 
-  // ------------------------------------------------------
-  // FindUser (admin-only)
-  // ------------------------------------------------------
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
-  @GrpcMethod('UserService', 'FindUser')
-  async findUser(
-    data: userv1.FindUserRequest,
-  ): Promise<userv1.UserResponse> {
-    let u = null;
-    if (data.email) u = await this.users.getUserByEmail(data.email);
-    else if (data.phone) u = await this.users.getUserByPhone(data.phone);
-
-    if (!u)
-      return userv1.UserResponse.create({ id: '', email: '', role: 'user' });
-
-    return userv1.UserResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-    });
+  @Roles('admin','root-admin')
+  @GrpcMethod('UserService','FindUser')
+  async findUser(data: userv1.FindUserRequest, meta: Metadata, call: any) {
+    const role =
+      call?.user?.role ??
+      (meta as any)?.user?.role ??
+      (meta.get?.('x-user-role')?.[0] as string | undefined) ?? '';
+    const isAdmin = role === 'admin' || role === 'root-admin';
+    if (!isAdmin) throw toRpc(status.PERMISSION_DENIED, 'admin_only');
+  
+    const u = data.email
+      ? await this.users.getUserByEmail(data.email)
+      : data.phone ? await this.users.getUserByPhone(data.phone) : null;
+  
+    if (!u) throw toRpc(status.NOT_FOUND, 'User not found');
+    return userv1.UserResponse.create({ id: u.id, email: u.email ?? '', role: u.role });
   }
 
-  // ------------------------------------------------------
-  // UpdateProfile (admin-only)
-  // ------------------------------------------------------
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
+  @Roles('user', 'admin', 'root-admin')
   @GrpcMethod('UserService', 'UpdateProfile')
-  async updateProfile(
-    data: userv1.UpdateProfileRequest,
-  ): Promise<userv1.UserResponse> {
+  async updateProfile(data: userv1.UpdateProfileRequest, meta: Metadata, call: any): Promise<userv1.UserResponse> {
+    const ctxUser = resolveCtxUser(meta, call);
+    if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
+    this.assertSelfOrAdmin(ctxUser, data.id);
     const updated = await this.users.updateProfile(data.id, {
       email: data.email || undefined,
       currentPassword: data.currentPassword || undefined,
       newPassword: data.newPassword || undefined,
     });
-    return userv1.UserResponse.create({
-      id: updated.id,
-      email: updated.email ?? '',
-      role: updated.role,
-    });
+    return userv1.UserResponse.create({ id: updated.id, email: updated.email ?? '', role: updated.role });
   }
 
-  // ------------------------------------------------------
-  // GetUserWithHash (admin-only)
-  // ------------------------------------------------------
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
-  @GrpcMethod('UserService', 'GetUserWithHash')
-  async getUserWithHash(
-    data: userv1.GetUserWithHashRequest,
-  ): Promise<userv1.GetUserWithHashResponse> {
-    const u = await this.users.getUserById(data.id);
-    if (!u)
-      return userv1.GetUserWithHashResponse.create({
-        id: '', email: '', role: 'user', passwordHash: '', refreshToken: '',
-      });
-    return userv1.GetUserWithHashResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-      passwordHash: u.password,
-      refreshToken: u.refreshToken ?? '',
-    });
+  // Called by auth-service.register → must be internal + have a propagated user id
+  @GrpcMethod('UserService', 'CreateUser')
+  async createUser(data: userv1.CreateUserRequest, meta: Metadata, call: any) {
+    const ctxUser = resolveCtxUser(meta, call);
+    const isAdmin = ['admin','root-admin'].includes(ctxUser?.role ?? '');
+    const role = isAdmin && data.role ? data.role : 'user';
+    const u = await this.users.createUserWithHash(data.email, data.password, role);
+    return userv1.UserResponse.create({ id: u.id, email: u.email ?? '', role: u.role });
   }
 
-  // ------------------------------------------------------
-  // Internal (auth-service only)
-  // ------------------------------------------------------
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
+  // Internal auth flows (no JWT required; S2S is enough)
   @GrpcMethod('UserService', 'FindUserWithHash')
-  async findUserWithHash(
-    data: userv1.FindUserWithHashRequest,
-  ): Promise<userv1.FindUserWithHashResponse> {
+  async findUserWithHash(data: userv1.FindUserWithHashRequest): Promise<userv1.FindUserWithHashResponse> {
     const u = data.email
       ? await this.users.getUserByEmail(data.email)
       : data.phone
       ? await this.users.getUserByPhone(data.phone)
       : null;
-
-    if (!u)
-      return userv1.FindUserWithHashResponse.create({
-        id: '', email: '', role: 'user', passwordHash: '', refreshToken: '',
-      });
-
+    if (!u) return userv1.FindUserWithHashResponse.create({ id: '', email: '', role: 'user', passwordHash: '', refreshToken: '' });
     return userv1.FindUserWithHashResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-      passwordHash: u.password,
-      refreshToken: u.refreshToken ?? '',
+      id: u.id, email: u.email ?? '', role: u.role, passwordHash: u.password, refreshToken: u.refreshToken ?? '',
     });
   }
 
-  @UsePipes(Pipe)
-  @Roles('admin', 'root-admin')
+  @RequireUserId()
   @GrpcMethod('UserService', 'SetRefreshToken')
-  async setRefreshToken(
-    data: userv1.SetRefreshTokenRequest,
-  ): Promise<userv1.UserResponse> {
+  async setRefreshToken(data: userv1.SetRefreshTokenRequest): Promise<userv1.UserResponse> {
     const u = await this.users.setRefreshToken(data.userId, data.refreshToken);
-    return userv1.UserResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
+    return userv1.UserResponse.create({ id: u.id, email: u.email ?? '', role: u.role });
+  }
+
+  @RequireUserId()
+  @GrpcMethod('UserService', 'GetUserWithHash')
+  async getUserWithHash(data: userv1.GetUserWithHashRequest): Promise<userv1.GetUserWithHashResponse> {
+    const u = await this.users.getUserById(data.id);
+    if (!u) return userv1.GetUserWithHashResponse.create({ id: '', email: '', role: 'user', passwordHash: '', refreshToken: '' });
+    return userv1.GetUserWithHashResponse.create({
+      id: u.id, email: u.email ?? '', role: u.role, passwordHash: u.password, refreshToken: u.refreshToken ?? '',
     });
   }
 }
