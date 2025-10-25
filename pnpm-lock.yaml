@@ -80,6 +80,9 @@ importers:
       joi:
         specifier: ^18.0.1
         version: 18.0.1
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -96,6 +99,9 @@ importers:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/node':
         specifier: ^24.5.2
         version: 24.5.2
@@ -513,6 +519,9 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -550,6 +559,9 @@ importers:
       '@types/jest':
         specifier: ^29.5.14
         version: 29.5.14
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/mocha':
         specifier: ^10.0.10
         version: 10.0.10

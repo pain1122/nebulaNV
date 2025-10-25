@@ -39,6 +39,25 @@ export function authAndS2S(token?: string | null, opts?: { userId?: string | nul
   return md;
 }
 
+export function withAuth(opts: {
+  bearer?: string | null;
+  userId?: string | null;
+  s2s?: { svc?: string; secret?: string } | boolean;
+}): Metadata {
+  const md = new Metadata();
+  const a = bearer(opts.bearer);
+  const b =
+    opts.s2s
+      ? buildS2SMetadata(
+          typeof opts.s2s === 'object'
+            ? { serviceName: opts.s2s.svc, secret: opts.s2s.secret }
+            : undefined,
+        )
+      : undefined;
+  const userMd = withUser(new Metadata(), opts.userId ?? undefined);
+  return mergeMetadata(mergeMetadata(a, b), userMd);
+}
+
 
 /** Attach/overwrite a propagated user id onto existing metadata. */
 export function attachUserId(

@@ -2,11 +2,14 @@
 import * as crypto from 'crypto';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
+import * as jwt from 'jsonwebtoken';
 
 export const AUTHORIZATION_HEADER = 'authorization';
-export const X_SVC_HEADER = 'x-svc';
-export const X_USER_ID_HEADER = 'x-user-id';
-export const X_SIGN_HEADER = 'x-gateway-sign';
+export const X_SVC_HEADER        = 'x-svc';
+export const X_USER_ID_HEADER    = 'x-user-id';
+export const X_ROLE_HEADER       = 'x-role';
+export const X_USER_ROLE_HEADER  = 'x-user-role';
+export const X_SIGN_HEADER       = 'x-gateway-sign';
 
 export function minuteBucket(): number {
   return Math.floor(Date.now() / 60000);
@@ -32,9 +35,14 @@ export function mdS2S(opts?: { svc?: string; secret?: string }): grpc.Metadata {
   return md;
 }
 
-export function mdUser(userId?: string | null): grpc.Metadata {
+export function mdUser(userId?: string | null, role?: string | null): grpc.Metadata {
   const md = new grpc.Metadata();
   if (userId) md.set(X_USER_ID_HEADER, String(userId));
+  if (role) {
+    // set both, some code reads x-user-role, some reads x-role
+    md.set(X_USER_ROLE_HEADER, String(role));
+    md.set(X_ROLE_HEADER,      String(role));
+  }
   return md;
 }
 
@@ -53,10 +61,25 @@ export function mergeMd(
 export function mdAuth(params: {
   access?: string;
   userId?: string;
+  role?: 'user' | 'admin' | 'root-admin' | string;
   s2s?: boolean;
 } = {}): grpc.Metadata {
-  const { access, userId, s2s = true } = params;
-  return mergeMd(mdBearer(access), s2s ? mdS2S() : undefined, mdUser(userId));
+  const { access, userId, role, s2s = true } = params;
+
+  // infer role from JWT if not provided
+  let effectiveRole = role;
+  if (!effectiveRole && access) {
+    try {
+      const payload = jwt.decode(access) as any | null;
+      if (payload?.role) effectiveRole = String(payload.role);
+    } catch { /* ignore */ }
+  }
+
+  return mergeMd(
+    mdBearer(access),
+    s2s ? mdS2S() : undefined,
+    mdUser(userId, effectiveRole),
+  );
 }
 
 export function loadClient<TClient extends grpc.Client>(opts: {

@@ -4,6 +4,7 @@ import { Metadata } from '@grpc/grpc-js';
 import { firstValueFrom, timeout } from 'rxjs';
 import { userv1 as user } from '@nebula/protos';
 import { authAndS2S } from '@nebula/grpc-auth';
+import * as jwt from 'jsonwebtoken'; // 👈 add
 
 // ----- Types -----
 type GetUserRequest = user.GetUserRequest;
@@ -62,6 +63,22 @@ export class GrpcAuthService implements OnModuleInit {
     }
   }
 
+  /** 👇 Attach role from access token so user-service can authorize admin actions */
+  private withRole(md: Metadata, accessToken?: string): Metadata {
+    if (!accessToken) return md;
+    try {
+      const payload = jwt.decode(accessToken) as any | null;
+      const role = payload?.role;
+      if (role) {
+        md.set('x-user-role', String(role));
+        md.set('x-role', String(role)); // alias used in some places
+      }
+    } catch {
+      // ignore decode errors; still return md
+    }
+    return md;
+  }
+
   // ---------------- RPCs ----------------
 
   /** Registration path → internal-only & @RequireUserId; use a sentinel user id */
@@ -85,7 +102,8 @@ export class GrpcAuthService implements OnModuleInit {
   async updateProfile(req: UpdateProfileRequest, accessToken: string): Promise<UserResponse> {
     this.logger.debug('gRPC → updateProfile');
     const msg = user.UpdateProfileRequest.create(req as any);
-    const md  = authAndS2S(accessToken, { userId: req.id });
+    const base = authAndS2S(accessToken, { userId: req.id });
+    const md   = this.withRole(base, accessToken); // 👈 add role
     return this.await$(this.svc.updateProfile(msg, md), 'grpc.client::updateProfile');
   }
 
@@ -93,7 +111,8 @@ export class GrpcAuthService implements OnModuleInit {
   async getUser(id: string, accessToken: string, initiatorId?: string): Promise<UserResponse> {
     this.logger.debug('gRPC → getUser');
     const msg: GetUserRequest = user.GetUserRequest.create({ id });
-    const md  = authAndS2S(accessToken, { userId: initiatorId });
+    const base = authAndS2S(accessToken, { userId: initiatorId });
+    const md   = this.withRole(base, accessToken); // 👈 add role
     this.logger.debug(`gRPC → getUser for ${id}, initiatorId=${initiatorId}`);
     return this.await$(this.svc.getUser(msg, md), 'grpc.client::getUser');
   }
@@ -102,7 +121,8 @@ export class GrpcAuthService implements OnModuleInit {
   async findUser(obj: FindUserRequest, accessToken: string, adminId: string): Promise<UserResponse> {
     this.logger.debug('gRPC → findUser');
     const msg = user.FindUserRequest.create(obj as any);
-    const md  = authAndS2S(accessToken, { userId: adminId });
+    const base = authAndS2S(accessToken, { userId: adminId });
+    const md   = this.withRole(base, accessToken); // 👈 add role
     return this.await$(this.svc.findUser(msg, md), 'grpc.client::findUser');
   }
 

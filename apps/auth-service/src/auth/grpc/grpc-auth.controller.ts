@@ -1,4 +1,3 @@
-// apps/auth-service/src/auth/grpc/grpc-auth.controller.ts
 import { Controller, UseGuards, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
@@ -27,7 +26,6 @@ type ValidateTokenRequest = authv1.ValidateTokenRequest;
 type ValidateTokenResponse = authv1.ValidateTokenResponse;
 
 type UserResponse = userv1.UserResponse;
-
 
 @Controller()
 export class AuthGrpcController {
@@ -75,7 +73,9 @@ export class AuthGrpcController {
       if (!isAdmin && ctx.userId !== data.userId) {
         throw toRpc(status.PERMISSION_DENIED, 'not_owner_or_admin');
       }
-      return await wrapGrpc(this.authService.getProfile(data.userId, token, ctx.userId));
+      return await wrapGrpc(
+        this.authService.getProfile(data.userId, token, ctx.userId),
+      );
     } catch (err: any) {
       throw err instanceof RpcException
         ? err

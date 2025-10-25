@@ -1,18 +1,18 @@
 import type { Config } from 'jest';
 
 const config: Config = {
-  rootDir: '.',
+  preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/test/**/*.spec.ts'],
-  transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
-  },
+  roots: ['<rootDir>/test'],
+  // catch both unit and e2e specs
+  testRegex: '(/__tests__/.*|(\\.|/)(e2e-)?spec)\\.ts$',
   moduleFileExtensions: ['ts', 'js', 'json'],
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
+  transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
+  moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
+
+  // ✅ Load dotenv and our env defaults before tests
+  setupFiles: ['dotenv/config', '<rootDir>/test/jest.env.ts'],
   clearMocks: true,
-  roots: ['<rootDir>/src', '<rootDir>/test']
 };
 
 export default config;
