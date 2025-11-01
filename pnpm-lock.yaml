@@ -108,6 +108,9 @@ importers:
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
+      bcryptjs:
+        specifier: ^3.0.2
+        version: 3.0.2
       eslint:
         specifier: ^9.36.0
         version: 9.36.0(jiti@2.6.0)

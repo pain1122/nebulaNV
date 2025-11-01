@@ -1,0 +1,171 @@
+What changed since 23-09-2025
+1) User-service: security & behavior
+
+Owner-or-admin enforcement (gRPC)
+Restored/kept the stable UserGrpcController with assertSelfOrAdmin(ctxUser, targetId) enforcing:
+
+Self can read/update self.
+
+Admin/root can read/update any user.
+
+Non-owners get PERMISSION_DENIED (or NOT_FOUND if you prefer privacy).
+
+HTTP policy surfaced
+Tests revealed GET /users returned data for a normal user token. We captured this as a policy regression and wrote tests expecting 403 for user, 200 for admin. (Action item below to enforce on the HTTP controller/route or via guard.)
+
+Direct access hardening (baseline)
+Tests assert UNAUTHENTICATED when gRPC methods are called without a token, and validate the Internal/S2S-only flow when the S2S signature is present.
+
+2) User-service: tests & infra (HTTP + gRPC)
+
+HTTP E2E suite (apps/user-service/test/e2e/user.http.e2e-spec.ts)
+
+Covers: /users/me, /users/:id (self/other), /users list (forbidden to user), PATCH /users/:id, DELETE /users/:id.
+
+Uses real JWTs signed with JWT_ACCESS_SECRET so guards behave exactly like prod.
+
+Tolerates 404 when fixtures aren’t seeded yet, but still enforces policy status expectations.
+
+gRPC E2E suite (apps/user-service/test/grpc/user.grpc.e2e-spec.ts)
+
+Covers: GetUser(self/other), ListUsers (forbidden to user), UpdateUser(self/other), DeleteUser, unauthenticated rejection, and an optional INTERNAL_METHOD that requires S2S.
+
+Adds helpers for JWT in Metadata and S2S minute-bucket HMAC (matches your S2SGuard).
+
+Unit tests present (per your tree on 23–25 Oct):
+app.controller.spec.ts, prisma.service.spec.ts, req-user.decorator.spec.ts, user.controller.spec.ts, user.service.spec.ts plus scaffolds in test/e2e, test/grpc, test/utils.
+
+Jest config aligned with auth-service
+
+Switched to a single testRegex so *.spec.ts and *.e2e-spec.ts are discovered.
+
+Added setupFiles to mirror auth-service:
+
+dotenv/config without importing dotenv in code.
+
+test/jest.env.ts that sets URL/ID defaults and hard-fails if JWT_ACCESS_SECRET is missing.
+
+Test script updated (or run command documented) to point dotenv to the repo-root .env:
+
+cross-env DOTENV_CONFIG_PATH=../../.env jest --config ./jest.config.ts
+
+Deterministic IDs
+The suites accept SELF_USER_ID, OTHER_USER_ID, ADMIN_USER_ID via env for stable, seeded runs.
+
+3) Auth-service: investigations & parity
+
+GET /auth/me 500 with a valid token
+Reproduced and isolated as an error path triggered after token validation (invalid mapping/ctx or exception handling). Logged as a bug to fix (see action items).
+
+Cross-service calls focus
+Clarified that ValidateUser, ValidateToken, and RefreshTokens work, and that the primary instability sits in the auth⇄user interactions and the /auth/me HTTP path.
+
+Test harness parity
+Kept auth-service Jest setup as the reference pattern we replicated in user-service.
+
+4) S2S / Internal access guard
+
+S2SGuard (minute-bucket HMAC) exists and is used to protect internal calls.
+Tests now include a positive path (with x-svc + x-svc-sign) and a negative path (missing/invalid signature → PERMISSION_DENIED/UNAUTHENTICATED). This gives us executable proof the guard works as designed when applied.
+
+5) Repo hygiene & tooling (brief)
+
+Standardized how tests find .env (no ad-hoc imports, no per-shell exports).
+
+Windows-friendly instructions and fixes (PowerShell quirks, pathing).
+(Large-repo push cleanup/.gitignore tightening was discussed earlier; concrete changes are parked to a separate task to avoid disrupting ongoing work.)
+
+Timeline (selected highlights)
+
+2025-09-23 (baseline you provided): product/category/auth/settings refactors; camelCase normalization; guard centralization; to-do list defined.
+
+2025-10-13: stabilized UserGrpcController with owner-or-admin checks; reverted breaking change that impacted auth-grpc endpoints.
+
+2025-10-15: S2SGuard (minute-bucket HMAC) reviewed/iterated; tests later added to exercise it.
+
+2025-10-20: clarified security goals: users must not see/modify others; block direct gRPC except through trusted paths.
+
+2025-10-23: user-service unit test files present; test folders scaffolded (e2e, grpc, utils).
+
+2025-10-25 → 27: delivered HTTP + gRPC E2E suites; unified Jest config with auth-service; fixed “no tests found” and “missing JWT secret” by:
+
+using testRegex for discovery,
+
+adopting setupFiles: ['dotenv/config', 'test/jest.env.ts'],
+
+and setting DOTENV_CONFIG_PATH=../../.env.
+
+Test coverage (real-life scenarios)
+
+Authentication / identity
+
+Valid token → success; missing/invalid token → 401/UNAUTHENTICATED.
+
+User isolation
+
+User: can read/update self, cannot read/update/delete others.
+
+Admin: can read/list/update/delete as allowed by policy.
+
+HTTP list: user forbidden (403), admin allowed (200) — regression captured.
+
+S2S/Internal
+
+Valid x-svc + x-svc-sign permits internal call; missing/invalid signature rejects.
+
+Resilience
+
+Tests tolerate 404/NOT_FOUND in unseeded environments but still assert policy outcomes.
+
+Open issues & next steps (actionable)
+
+Lock down HTTP list/read/update/delete
+
+Add @Roles('admin') (or equivalent guard) to GET /users (and any other admin-only endpoints).
+
+Ensure GET /users/:id enforces self-or-admin at the HTTP layer (not just gRPC).
+
+Fix /auth/me 500 with valid access token
+
+Add structured error logging around the controller/guard boundary.
+
+Verify ctx user resolution (resolveCtxUser) and the exception mapping (avoid raw error -> 500).
+
+Add a focused spec reproducing the failure with a good token.
+
+Deterministic seeding for E2E
+
+Add a test-only seed (via HTTP or gRPC) that creates SELF_USER_ID, OTHER_USER_ID, and an ADMIN_USER_ID.
+
+Convert the E2E tolerance (404 fallback) into strict 200/403 assertions once seeded.
+
+Service-to-service policy
+
+Apply @InternalOnly/S2SGuard to any internal gRPC methods still publicly callable.
+
+Consider network-level gating (only gateway can reach internal ports) as a defense-in-depth.
+
+Finish the camelCase audit
+
+Confirm all REST/gRPC DTOs return camelCase only; DB mapping isolated via Prisma @map.
+
+Optional hardening
+
+Rate-limit public product/category listing.
+
+Add structured audit logs for cross-user access attempts.
+
+Artifacts to expect in the repo
+apps/user-service/
+  jest.config.ts                # unified with auth-service
+  test/
+    jest.env.ts                 # defaults + secret guard (no dotenv import)
+    e2e/user.http.e2e-spec.ts   # HTTP real-life flows, roles
+    grpc/user.grpc.e2e-spec.ts  # gRPC real-life flows, roles, S2S
+    utils/...                   # (helpers if any)
+
+apps/auth-service/
+  (unchanged jest pattern; reference for user-service)
+
+libs/grpc-auth/
+  (S2SGuard and role/public/internal decorators consumed by tests/services)
