@@ -1,0 +1,367 @@
+📈 NebulaNV Progress Report
+
+Period: 13 Sep 2025 → 09 Oct 2025
+Author: NebulaNV Core • Backend & Infra
+
+🔎 Executive Summary
+
+Over the past sprint, we took NebulaNV from “services boot, but wiring is brittle” to a repeatable, debuggable, and secure local stack:
+
+Builds stabilized: multi-stage Dockerfiles per service, sane context filtering, deterministic pnpm installs.
+
+gRPC + S2S security hardening: HMAC-signed internal calls; metadata signing helpers; global S2S guard in Settings.
+
+Config loading fixed: services now reliably read root + per-app .env (unblocked JWT issuance).
+
+Settings ↔ Product bootstrap: default category created and persisted through gRPC with signature (verified in logs & DB).
+
+Auth flow solid: login/refresh stable; logout clears stored RT hash; roadmap clarified for token version checks.
+
+Monorepo hygiene: @nebula/clients built & exported correctly; turbo/pnpm ordering and workspace manifests corrected.
+
+Roadmap & README: upgraded to cloud-native, polyglot, K8s/AWS plan with web phase moved earlier; delivered refreshed README.
+
+✅ Completed – Detailed Breakdown
+1) Product–Settings Initialization (fixed & verified)
+
+What changed
+
+DefaultCategoryInitializer now:
+
+Upserts undefined category (idempotent).
+
+Reads product.defaultProductCategoryId from settings-service.
+
+If empty, signs gRPC metadata and stores the new ID via SetString.
+
+Evidence
+
+Prisma INSERT+UPSERT logged with params for product_category.
+
+Success log:
+Set product.defaultProductCategoryId = <uuid> via settings-service
+
+Impact
+
+Product creation paths no longer race or rely on stale keys.
+
+Cross-service default configuration is deterministic and auditable.
+
+2) Settings-Service Enhancements
+
+What changed
+
+Added GetString / SetString / DeleteString RPCs & HTTP controller.
+
+Prisma model finalized with compound unique (namespace, environment, key).
+
+Read/write uses valueString as the canonical column (tolerant fallback internally).
+
+Input hardening: namespace/key/environment enforced via SAFE regex.
+
+Global guards: Throttler (HTTP) + S2SGuard (HMAC for internal/gRPC).
+
+Impact
+
+Settings become a reliable source of truth for configuration across services.
+
+Future-proof: tolerant to column rename, safe inputs, consistent unique keying.
+
+3) gRPC S2S Security (HMAC) — end-to-end
+
+What changed
+
+Implemented S2SGuard that validates:
+
+x-gateway-sign (configurable) signature using rotating minute buckets.
+
+x-svc service identity.
+
+Introduced @nebula/clients helper: getSignedMetadata(svcName) to stamp calls.
+
+Product→Settings calls now require a valid signature (and provide one).
+
+Impact
+
+Internal RPCs are no longer “open”; calls must be fresh, signed, and attributed.
+
+Uniform S2S pattern all services can follow.
+
+4) Auth & User Flows – unblocked & normalized
+
+What changed
+
+Fixed JWT issuance by correcting env loading (see Section 5).
+
+Login returns { accessToken, refreshToken } (camelCase).
+
+Logout strategies:
+
+Revoke a single session (if provided RT matches stored hash).
+
+Revoke all devices (clear hash).
+
+Default: clear stored hash when ambiguity exists.
+
+Email handling normalized (lowercase/trim).
+
+gRPC bridges: findUserWithHash, getUserWithHash, setRefreshToken, updateProfile all consistent.
+
+Evidence
+
+Timed logs:
+
+grpc.findUserWithHash: XXms
+
+login.validateUser: XXms
+
+After env fix, tokens are issued and refresh rotates hashes properly.
+
+Impact
+
+Auth is predictable and instrumented.
+
+Clear plan forward: enforce tokenVersion claim checks (short-term), move to state-service later.
+
+5) Configuration Loading – consistent and transparent
+
+What changed
+
+All services now call ConfigModule.forRoot with:
+
+isGlobal: true, expandVariables: true
+
+envFilePath: [ path.resolve(__dirname, '../.env'), path.resolve(process.cwd(), '.env') ]
+
+validationSchema: envSchema
+
+This reads both per-service .env and root .env reliably (works in dist too).
+
+Impact
+
+Resolved the “secretOrPrivateKey must have a value” error (JWT secrets now loaded).
+
+Fewer “it works in dev but not in dist” surprises.
+
+6) Docker & pnpm – deterministic builds
+
+What changed
+
+Per-service multi-stage Dockerfiles with:
+
+base layer installing pnpm & openssl (for Prisma).
+
+deps layer that copies root manifests and workspace package.json files only, then pnpm fetch.
+
+build layer with filtered pnpm install --filter=@nebula/<svc>..., turbo run build --filter=@nebula/<svc>^..., and pnpm deploy.
+
+runtime layer: tiny, copies /app/deploy.
+
+.dockerignore hardened to include only needed workspace files:
+
+Ensured packages/*/package.json and apps/*/package.json are in context for pnpm fetch.
+
+Solved ENOENT: scandir '/app/packages/clients' by including the clients package in context and building it.
+
+Ops guidance
+
+Large local cache (~20GB) was traced to image layers & buildx cache. We documented:
+
+docker image ls, docker system df, docker builder prune, docker system prune --volumes.
+
+Use build cache intentionally; only --no-cache for rare investigations.
+
+Impact
+
+Build failures due to missing workspace manifests are gone.
+
+Smaller, faster runtime images and repeatable builds.
+
+7) Monorepo Package Hygiene (@nebula/clients)
+
+What changed
+
+Added src/s2s-metadata.ts and exported it from index.ts.
+
+Verified dist/ contains src/*.js outputs and index.js references compiled paths.
+
+Ensured service builds depend on package builds (pnpm -w build ordering).
+
+Impact
+
+Eliminated Cannot find module './src/s2s-metadata'.
+
+Cleaner, publishable clients package for reuse.
+
+8) Observability & DevX
+
+What changed
+
+Added Prisma debug SQL logs in services.
+
+Scoped timing with console.time() / console.timeEnd() in auth and gRPC clients.
+
+Health checks per service (HTTP) and gRPC logs on boot for ports & URLs.
+
+Impact
+
+Faster root-cause isolation; we now see where time and failures occur.
+
+9) Documentation & Direction
+
+What changed
+
+Roadmap upgraded to v2.4 with 12 phases (K8s/AWS/Kafka/State-service/polyglot).
+
+README.md fully updated (badges, features, tech stack, getting started).
+
+Roadmap phases reshuffled: Web (Next.js) earlier; Mobile later; State-service earlier.
+
+Impact
+
+Team alignment + investor-ready narrative.
+
+Clear sequencing for infra, product, and frontends.
+
+🧪 Verified via Postman (sample runbook)
+
+Auth
+
+POST /auth/login → tokens issued (after env fix).
+
+POST /auth/refresh → rotates RT hash; returns new tokens.
+
+POST /auth/logout → returns { success: true } and clears RT hash.
+
+GET /auth/me with old AT after logout remains valid (by design); token-version check pending.
+
+Settings
+
+GetString/SetString/DeleteString → round-trip tested by product bootstrap & DB Studio.
+
+Product
+
+DefaultCategoryInitializer runs on boot → settings updated with signed gRPC call.
+
+Category CRUD endpoints available; DTO validation active.
+
+⚠️ Known Gaps / Open Items
+
+Token Version Claim
+
+Add tokenVersion (or iat > user.revokedAt) in AT claims.
+
+Update guards (gRPC & HTTP) to enforce version checks.
+
+CamelCase Audit
+
+Ensure DTOs, gRPC, REST consistently use camelCase (DB stays mapped with Prisma).
+
+Remove any legacy normalizeProductInput.
+
+E2E Tests
+
+Product: Create/Update/List/Delete/Restore, default category transitions.
+
+Settings: Get/Set/Delete string round-trip.
+
+Rate limiting & Abuse
+
+Tighten public endpoints (listing/search) with role-aware throttling.
+
+Compose & Health
+
+Add depends_on + health for startup ordering in Docker Compose.
+
+CI Ordering
+
+Ensure packages build before app builds in GitHub Actions.
+
+State-Service (short-term stubs)
+
+Proto + minimal gRPC for tokenVersion lookup and revocation (in-memory/Redis).
+
+📌 Concrete Next-Step Checklist (actionable)
+
+ Implement tokenVersion issuance on login/refresh; persist on user; check in guards.
+
+ Add guard shortcut for PublicMode.OPEN, preserve S2S checks for internal gRPC.
+
+ Write Postman/Newman tests for settings round-trip and product bootstrap.
+
+ Add pnpm -w build step in CI before service builds; cache ~/.pnpm-store.
+
+ Extend category HTTP tests (CRUD + default swap).
+
+ Introduce signed URL middleware in media-service (basic anti-hotlink).
+
+ Compose: healthchecks for settings/user/auth before product boots.
+
+ Roadmap housekeeping: create issues per Phase 3 milestones (admin UI slices).
+
+🧰 Reference Snippets
+
+Config loading (works in dist)
+
+ConfigModule.forRoot({
+  isGlobal: true,
+  expandVariables: true,
+  validationSchema: envSchema,
+  envFilePath: [
+    path.resolve(__dirname, '../.env'),  // service .env (dist-safe)
+    path.resolve(process.cwd(), '.env'), // root .env
+  ],
+});
+
+
+Signed gRPC metadata
+
+// @nebula/clients
+const md = getSignedMetadata('product-service'); // uses S2S_SECRET + x-svc
+svc.SetString({ namespace, key, value, environment: 'default' }, md);
+
+
+S2S guard (rotating HMAC, minute buckets)
+
+// Header names
+x-gateway-sign: <HMAC_SHA256(secret, `${svc}:${minuteBucket}`)>
+x-svc:          product-service
+
+
+Docker deps stage (pnpm fetch)
+
+# Only manifests for fetch
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/*/package.json packages/*/package.json
+COPY apps/*/package.json     apps/*/package.json
+
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm fetch --frozen-lockfile
+
+🧭 Roadmap Context (what changed)
+
+Web (Next.js) moved earlier (Phase 5) to enable demo.
+
+State-service/Polyglot/K8s/AWS still start at Phase 4 (foundation in place before big features).
+
+Mobile scheduled after VR & feature expansion (Phase 8).
+
+README updated and delivered alongside the full 12-phase roadmap.
+
+🧾 Appendix — Operational Tips
+
+Docker disk hygiene
+
+docker system df
+docker image ls
+docker builder prune -af
+docker system prune -af --volumes
+
+
+Common pitfalls we fixed
+
+Missing workspace manifests in the Docker context → pnpm fetch ENOENT.
+
+Service ENV not read in dist → JWT signing failed.
+
+Unsigned internal RPC → Settings refused writes until S2S metadata added.

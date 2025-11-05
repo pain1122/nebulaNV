@@ -1,0 +1,103 @@
+x-build-cache: &build-cache
+  cache_from:
+    - type=local,src=.buildx-cache
+  cache_to:
+    - type=local,dest=.buildx-cache,mode=max
+services:
+  # 🐘 PostgreSQL (shared across services)
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nebula
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # 👤 User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+      <<: *build-cache
+    container_name: user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+      - .env.docker
+      - apps/user-service/.env
+      - apps/user-service/.env.docker
+    ports:
+      - "3100:3100"
+
+  # 🔐 Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+      <<: *build-cache
+    container_name: auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    env_file:
+      - .env
+      - .env.docker
+      - apps/auth-service/.env
+    ports:
+      - "3001:3001"
+
+  # 🛒 Product Service
+  product-service:
+    build:
+      context: .
+      dockerfile: apps/product-service/Dockerfile
+      <<: *build-cache
+    container_name: product-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    env_file:
+      - .env
+      - .env.docker
+      - apps/product-service/.env
+      - apps/product-service/.env.docker
+    ports:
+      - "3003:3003"
+
+  # ⚙️ Settings Service
+  settings-service:
+    build:
+      context: .
+      dockerfile: apps/settings-service/Dockerfile
+      <<: *build-cache
+    container_name: settings-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+      - .env.docker
+      - apps/settings-service/.env
+      - apps/settings-service/.env.docker
+    ports:
+      - "3010:3010"
+
+volumes:
+  pgdata:

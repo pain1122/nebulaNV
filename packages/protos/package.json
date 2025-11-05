@@ -1,0 +1,19 @@
+{
+  "name": "@nebula/protos",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "*.proto"
+  ],
+  "scripts": {
+    "prebuild": "pnpm -w proto:gen",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "ts-proto": "^2.7.7"
+  }
+}

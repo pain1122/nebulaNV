@@ -1,0 +1,29 @@
+{
+  "monorepo": true,
+  "root": "apps/nebula-nv",
+  "sourceRoot": "apps/nebula-nv/src",
+  "compilerOptions": {
+    "webpack": true,
+    "tsConfigPath": "apps/nebula-nv/tsconfig.app.json"
+  },
+  "projects": {
+    "nebula-nv": {
+      "type": "application",
+      "root": "apps/nebula-nv",
+      "entryFile": "main",
+      "sourceRoot": "apps/nebula-nv/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/nebula-nv/tsconfig.app.json"
+      }
+    },
+    "settings-service": {
+      "type": "application",
+      "root": "apps/settings-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/settings-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/settings-service/tsconfig.json"
+      }
+    }
+  }
+}

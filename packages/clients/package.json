@@ -1,0 +1,31 @@
+{
+  "name": "@nebula/clients",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\" --fix",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@nebula/grpc-auth": "workspace:*",
+    "@nebula/protos": "workspace:*"
+  },
+  "peerDependencies": {
+    "@grpc/grpc-js": "^1.14.0",
+    "@nestjs/common": "11.1.6",
+    "@nestjs/core": "11.1.5",
+    "@nestjs/microservices": "11.1.6",
+    "@nestjs/platform-express": "11.1.6",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

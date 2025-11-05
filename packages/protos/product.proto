@@ -1,0 +1,261 @@
+syntax = "proto3";
+
+package product;
+
+// -----------------------------------------
+// Core DTO returned to clients
+// -----------------------------------------
+message Product {
+  string id = 1;
+  string slug = 2;
+  string title = 3;
+  string description = 4;
+  string excerpt = 5;
+  string sku = 6;
+  string status = 7; // DRAFT|ACTIVE|ARCHIVED
+
+  double price = 8;
+  string currency = 9;
+
+  string categoryId = 10;
+
+  // thumbnail (primary image)
+  string thumbnailUrl = 11;
+
+  // 3D
+  string model3dUrl = 12;
+  string model3dFormat = 13;
+  bool   model3dLiveView = 14;
+  string model3dPosterUrl = 15;
+
+  // VR plan
+  bool   vrEnabled = 16;
+  string vrPlanImageUrl = 17;
+
+  // SEO
+  string metaTitle = 18;
+  string metaDescription = 19;
+  string metaKeywords = 20;
+  string customSchema = 21;
+  bool   noindex = 22;
+
+  // presentation / promos
+  bool   isFeatured = 23;
+  int32  featureSort = 24;
+  string promoTitle = 25;
+  string promoBadge = 26;
+  bool   promoActive = 27;
+
+  // discount
+  string discountType = 28; // "PERCENTAGE" | "FIXED" | ""
+  double discountValue = 29;
+  bool   discountActive = 30;
+  string discountStart = 31; // ISO8601 or ""
+  string discountEnd = 32;   // ISO8601 or ""
+  double effectivePrice = 33;
+
+  // flat arrays to avoid heavy joins
+  repeated string tags = 34;
+  repeated string complementaryIds = 35;
+
+  string createdAt = 36;
+  string updatedAt = 37;
+  string deletedAt = 38; // "" if not soft-deleted
+}
+
+// -----------------------------------------
+// Lean inputs
+// -----------------------------------------
+
+message ProductInput {
+  // required:
+  string title = 1;
+  string slug = 2;
+  string sku = 3;
+  double price = 4;
+  string categoryId = 5;
+
+  // optional:
+  string description = 10;
+  string excerpt = 11;
+  string currency = 12;
+  string status = 13; // default ACTIVE
+
+  string thumbnailUrl = 20;
+
+  string model3dUrl = 30;
+  string model3dFormat = 31;
+  bool   model3dLiveView = 32;
+  string model3dPosterUrl = 33;
+
+  bool   vrEnabled = 40;
+  string vrPlanImageUrl = 41;
+
+  string metaTitle = 50;
+  string metaDescription = 51;
+  string metaKeywords = 52;
+  string customSchema = 53;
+  bool   noindex = 54;
+
+  bool   isFeatured = 60;
+  int32  featureSort = 61;
+  string promoTitle = 62;
+  string promoBadge = 63;
+  bool   promoActive = 64;
+
+  string discountType = 70;  // optional
+  double discountValue = 71;
+  bool   discountActive = 72;
+  string discountStart = 73;
+  string discountEnd = 74;
+
+  repeated string tags = 80;
+  repeated string complementaryIds = 81;
+}
+
+message ProductPatch {
+  string title = 1;
+  string slug = 2;
+  string sku = 3;
+  double price = 4;
+  string categoryId = 5;
+
+  string description = 10;
+  string excerpt = 11;
+  string currency = 12;
+  string status = 13;
+
+  string thumbnailUrl = 20;
+
+  string model3dUrl = 30;
+  string model3dFormat = 31;
+  bool   model3dLiveView = 32;
+  string model3dPosterUrl = 33;
+
+  bool   vrEnabled = 40;
+  string vrPlanImageUrl = 41;
+
+  string metaTitle = 50;
+  string metaDescription = 51;
+  string metaKeywords = 52;
+  string customSchema = 53;
+  bool   noindex = 54;
+
+  bool   isFeatured = 60;
+  int32  featureSort = 61;
+  string promoTitle = 62;
+  string promoBadge = 63;
+  bool   promoActive = 64;
+
+  string discountType = 70;
+  double discountValue = 71;
+  bool   discountActive = 72;
+  string discountStart = 73;
+  string discountEnd = 74;
+
+  repeated string tags = 80;
+  repeated string complementaryIds = 81;
+}
+
+// -----------------------------------------
+// Requests / Responses
+// -----------------------------------------
+message CreateProductRequest { ProductInput data = 1; }
+message UpdateProductRequest { string id = 1; ProductPatch data = 2; }
+message GetProductRequest { string id = 1; }
+
+message ListProductsRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string q = 3;
+  string categoryId = 4;
+  string status = 5;
+  bool   includeDeleted = 6; // default false
+}
+
+message DeleteProductRequest { string id = 1; }
+message RestoreProductRequest { string id = 1; }
+message HardDeleteProductRequest { string id = 1; }
+
+message ProductResponse { Product data = 1; }
+message ListProductsResponse { repeated Product data = 1; int32 total = 2; }
+
+message ApplyDiscountBulkRequest {
+  repeated string ids = 1; // specific targets (optional)
+  string categoryId = 2;   // or select by category
+  string status = 3;       // optional filter
+  string q = 4;            // search title/sku
+
+  string discountType = 10;  // "PERCENTAGE"|"FIXED"|"NONE"
+  double discountValue = 11; // ignored if NONE
+  bool   discountActive = 12;
+  string discountStart = 13;
+  string discountEnd = 14;
+}
+
+message BulkResult { int32 updated = 1; }
+
+message GalleryImage {
+  string id   = 1;
+  string url  = 2;
+  string alt  = 3;
+  int32  sort = 4; // maps to sortOrder
+}
+
+message NewImage {
+  string url  = 1;
+  string alt  = 2;
+  int32  sort = 3; // optional; if missing we append
+}
+
+message AddImagesRequest {
+  string productId = 1;
+  repeated NewImage images = 2;
+}
+
+message ListGalleryRequest {
+  string productId = 1;
+  bool   includeDeleted = 2; // default false
+}
+
+message ImageOrder {
+  string id   = 1;
+  int32  sort = 2;
+}
+
+message ReorderImagesRequest {
+  string productId = 1;
+  repeated ImageOrder orders = 2; // set new sort values
+}
+
+message RemoveImageRequest {
+  string productId = 1;
+  string imageId   = 2;
+  bool   hardDelete = 3; // default false => soft delete
+}
+
+message GalleryResponse {
+  string productId = 1;
+  repeated GalleryImage images = 2;
+}
+
+// -----------------------------------------
+// Service
+// -----------------------------------------
+service ProductService {
+  rpc CreateProduct (CreateProductRequest) returns (ProductResponse);
+  rpc UpdateProduct (UpdateProductRequest) returns (ProductResponse);
+  rpc GetProduct    (GetProductRequest)    returns (ProductResponse);
+  rpc ListProducts  (ListProductsRequest)  returns (ListProductsResponse);
+
+  rpc DeleteProduct      (DeleteProductRequest)      returns (ProductResponse); // soft
+  rpc RestoreProduct     (RestoreProductRequest)     returns (ProductResponse);
+  rpc HardDeleteProduct  (HardDeleteProductRequest)  returns (ProductResponse);
+
+  rpc ApplyDiscountBulk (ApplyDiscountBulkRequest) returns (BulkResult);
+
+  rpc AddImages     (AddImagesRequest)     returns (GalleryResponse);
+  rpc ListGallery   (ListGalleryRequest)   returns (GalleryResponse);
+  rpc ReorderImages (ReorderImagesRequest) returns (GalleryResponse);
+  rpc RemoveImage   (RemoveImageRequest)   returns (GalleryResponse);
+}

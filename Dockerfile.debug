@@ -1,0 +1,16 @@
+# 🧩 Minimal diagnostic Dockerfile
+FROM node:22-bookworm-slim
+
+WORKDIR /app
+
+# Copy the same files each service Dockerfile would copy
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+
+# Copy your packages and apps
+COPY packages ./packages
+COPY apps ./apps
+
+# Print what actually got included
+RUN echo "=== DIRECTORY TREE ===" && ls -R packages || true
+RUN echo "=== APPS TREE ===" && ls -R apps || true
+RUN echo "=== DONE ==="

@@ -1,0 +1,20 @@
+{
+    "rootDir": ".",
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/test"],
+    "testMatch": ["<rootDir>/test/user.grpc.e2e.spec.ts"],
+    "moduleFileExtensions": ["ts", "js", "json"],
+    "transform": {
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        { "tsconfig": "tsconfig.json" }
+      ]
+    },
+    "setupFiles": ["dotenv/config"],
+    "transformIgnorePatterns": [
+      "<rootDir>/../../packages/(grpc-auth|protos)/dist/.*",
+      "<rootDir>/prisma/generated/.*"
+    ]
+  }
+  

@@ -1,0 +1,189 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "./generated"
+  binaryTargets = ["native", "linux-musl"]
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model ProductCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  slug      String    @unique
+  title     String
+  isHidden  Boolean   @default(false)
+  isSystem  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  products  Product[]
+
+  @@map("product_category")
+}
+
+model Product {
+  id               String                @id @default(uuid())
+  slug             String                @unique
+  title            String
+  description      String
+  excerpt          String?
+  sku              String                @unique
+  status           ProductStatus         @default(ACTIVE)
+  price            Decimal               @db.Decimal(18, 2)
+  currency         String                @default("EUR")
+  thumbnailUrl     String?
+  categoryId       String                @map("category_id") @db.Uuid
+  discountType     DiscountType?
+  discountValue    Decimal?              @db.Decimal(18, 2)
+  discountActive   Boolean               @default(false)
+  discountStart    DateTime?
+  discountEnd      DateTime?
+  model3dUrl       String?
+  model3dFormat    String?
+  model3dLiveView  Boolean               @default(false)
+  model3dPosterUrl String?
+  vrPlanImageUrl   String?
+  vrEnabled        Boolean               @default(false)
+  metaTitle        String?
+  metaDescription  String?
+  metaKeywords     String?
+  customSchema     String?
+  noindex          Boolean               @default(false)
+  isFeatured       Boolean               @default(false)
+  featureSort      Int                   @default(0)
+  promoTitle       String?
+  promoBadge       String?
+  promoActive      Boolean               @default(false)
+  promoStart       DateTime?
+  promoEnd         DateTime?
+  tags             String[]
+  complementaryIds String[]
+  deletedAt        DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  category         ProductCategory       @relation(fields: [categoryId], references: [id])
+  attributes       ProductAttribute[]
+  comments         ProductComment[]
+  gallery          ProductGalleryImage[]
+  vrHotspots       ProductVrHotspot[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([isFeatured, featureSort])
+}
+
+model ProductGalleryImage {
+  id        String    @id @default(uuid())
+  productId String
+  url       String
+  alt       String?
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@index([productId, sortOrder])
+  @@index([deletedAt])
+}
+
+model ProductVrHotspot {
+  id           String    @id @default(uuid())
+  productId    String
+  x            Float
+  y            Float
+  panoImageUrl String
+  title        String?
+  body         String?
+  yaw          Float?
+  pitch        Float?
+  fov          Float?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  product      Product   @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([deletedAt])
+}
+
+model ProductAttribute {
+  id          String             @id @default(uuid())
+  productId   String
+  key         String
+  valueType   AttributeValueType
+  valueString String?
+  valueInt    Int?
+  valueBool   Boolean?
+  deletedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  product     Product            @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([productId, key])
+  @@index([deletedAt])
+}
+
+model ProductComment {
+  id          String        @id @default(uuid())
+  productId   String
+  userId      String?
+  authorName  String?
+  authorEmail String?
+  rating      Int?
+  body        String
+  status      CommentStatus @default(PENDING)
+  parentId    String?
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  product     Product       @relation(fields: [productId], references: [id])
+
+  @@index([productId, status])
+  @@index([deletedAt])
+}
+
+model ProductSet {
+  id            String        @id @default(uuid())
+  slug          String        @unique
+  title         String
+  description   String?
+  active        Boolean       @default(false)
+  discountType  DiscountType?
+  discountValue Decimal?      @db.Decimal(18, 2)
+  productIds    String[]
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum AttributeValueType {
+  STRING
+  INT
+  BOOL
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

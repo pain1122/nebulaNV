@@ -1,0 +1,69 @@
+# --- FORCE include workspace packages for pnpm/turbo ---
+!packages/
+!packages/**
+!apps/
+!apps/**
+
+
+# -------------------------------------------
+# Dependencies & build outputs (shrink context)
+# -------------------------------------------
+**/node_modules
+**/dist
+**/.turbo
+**/.nx
+**/.vercel
+**/.pnpm-store
+**/.tsbuildinfo
+coverage
+.cache
+deploy
+.buildx-cache
+
+# -------------------------------------------
+# Local & IDE
+# -------------------------------------------
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# -------------------------------------------
+# Environment & secrets
+# Do not send real envs to the build context
+# -------------------------------------------
+.env
+.env.*
+!*.env.example
+!**/.env.example
+
+# -------------------------------------------
+# Logs & temp
+# -------------------------------------------
+*.log
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -------------------------------------------
+# VCS metadata
+# -------------------------------------------
+.git
+.gitignore
+.gitattributes
+
+# -------------------------------------------
+# Docker files (optional to exclude from context)
+# (Docker still reads the specified Dockerfile path explicitly)
+# -------------------------------------------
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+
+# -------------------------------------------
+# Prisma artifacts
+# Keep migrations (needed for migrate deploy),
+# exclude only generated client
+# -------------------------------------------
+**/prisma/generated

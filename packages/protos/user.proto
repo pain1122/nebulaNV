@@ -1,0 +1,80 @@
+// user.proto - gRPC contract for UserService
+syntax = "proto3";
+package user;
+
+service UserService {
+  rpc FindUser            (FindUserRequest) returns (UserResponse);
+  rpc GetUser             (GetUserRequest)  returns (UserResponse);
+  rpc UpdateProfile       (UpdateProfileRequest)       returns (UserResponse);
+  rpc CreateUser          (CreateUserRequest)          returns (UserResponse);
+  rpc FindUserWithHash    (FindUserWithHashRequest)    returns (FindUserWithHashResponse);
+  rpc SetRefreshToken     (SetRefreshTokenRequest)     returns (UserResponse);
+  rpc GetUserWithHash     (GetUserWithHashRequest) returns (GetUserWithHashResponse);
+}
+
+message FindUserRequest {
+  oneof identifier {
+    string email = 1;
+    string phone = 2;   // E.164 format, e.g. "+994501234567"
+  }
+}
+
+// Request message for fetching a user by ID
+message GetUserRequest {
+string id = 1;        // The UUID of the user to fetch
+}
+
+// Response message representing a User
+message UserResponse {
+string id    = 1;     // Unique identifier of the user
+string email = 2;     // Email address
+string role  = 3;     // Role (e.g., "user", "admin")
+}
+
+// Request message for updating a profile
+message UpdateProfileRequest {
+string id              = 1; // The UUID of the user making the update
+// Only include fields if they should be updated
+string email           = 2;
+string newPassword     = 3;
+string currentPassword = 4;
+}
+// New messages below:
+message CreateUserRequest {
+  string email    = 1;
+  string password = 2; // hashed
+  string role     = 3;
+}
+
+message FindUserWithHashRequest {
+  oneof identifier {
+    string email = 1;
+    string phone = 2;
+  }
+}
+
+message FindUserWithHashResponse {
+  string id           = 1;
+  string email        = 2;
+  string role         = 3;
+  string passwordHash = 4;
+  string refreshToken = 5;  // the stored hash
+}
+
+message SetRefreshTokenRequest {
+  string userId       = 1;
+  string refreshToken = 2;
+}
+
+
+message GetUserWithHashRequest {
+  string id = 1;
+}
+
+message GetUserWithHashResponse {
+  string id = 1;
+  string email = 2;
+  string role = 3;
+  string passwordHash = 4;
+  string refreshToken = 5;
+}

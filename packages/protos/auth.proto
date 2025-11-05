@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package auth;
+
+import "user.proto";
+
+service AuthService {
+  rpc ValidateUser   (ValidateUserRequest)   returns (ValidateUserResponse);
+  rpc GetTokens      (GetTokensRequest)      returns (GetTokensResponse);
+  rpc RefreshTokens  (RefreshTokensRequest)  returns (GetTokensResponse);
+  rpc ValidateToken  (ValidateTokenRequest)  returns (ValidateTokenResponse);
+
+  rpc GetProfile (GetProfileRequest) returns (user.UserResponse);
+}
+
+message ValidateUserRequest {
+  string identifier = 1; // email or phone
+  string password   = 2;
+}
+
+message ValidateUserResponse {
+  bool   isValid = 1;
+  string userId  = 2;
+}
+
+message GetTokensRequest {
+  string userId = 1;
+}
+
+message RefreshTokensRequest {
+  string refreshToken = 1;
+}
+
+message GetTokensResponse {
+  string accessToken  = 1;
+  string refreshToken = 2;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool   isValid = 1;
+  string userId  = 2;
+  string email   = 3;
+  string role    = 4;
+}
+
+message GetProfileRequest {
+  string userId = 1;
+}
