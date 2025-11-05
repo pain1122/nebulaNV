@@ -3,7 +3,7 @@ import { minuteBucket, hmac } from '../grpc/helpers';
 
 const SETTINGS_HTTP  = process.env.SETTINGS_HTTP_URL ?? 'http://127.0.0.1:3010';
 const GATEWAY_HEADER = process.env.GATEWAY_HEADER ?? 'x-gateway-sign';
-const SVC            = process.env.SVC_NAME ?? 'gateway'; // how the caller identifies itself
+const SVC            = process.env.SVC_NAME ?? 'settings-service'; // how the caller identifies itself
 const SECRET         = process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? '';
 
 // build headers for S2S writes (svc:bucket)

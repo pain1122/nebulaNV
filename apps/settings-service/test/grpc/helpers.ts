@@ -15,7 +15,7 @@ export function hmac(secret: string, payload: string): string {
 
 export function mdS2S(opts?: {svc?: string; secret?: string}) {
   const md = new grpc.Metadata()
-  const svc = opts?.svc ?? process.env.SVC_NAME ?? "settings-e2e"
+  const svc = opts?.svc ?? process.env.SVC_NAME ?? "settings-service"
   const secret = opts?.secret ?? process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? ""
   if (!secret) return md
   const sig = hmac(secret, `${svc}:${minuteBucket()}`)

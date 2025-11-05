@@ -43,7 +43,7 @@ export const ENV_PUBLIC_MODE = "PUBLIC_MODE" as const;         // OPEN | OPTIONA
 // ---------------------------------------------
 // 🚦 Public mode (typed)
 // ---------------------------------------------
-export type PublicMode = "GATEWAY_ONLY";
+export type PublicMode = "OPEN" | "OPTIONAL_AUTH" | "GATEWAY_ONLY";
 export const PublicModes = Object.freeze<PublicMode[]>([
   "OPEN",
   "OPTIONAL_AUTH",
