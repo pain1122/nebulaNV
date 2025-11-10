@@ -1,10 +1,19 @@
 // Default envs for settings-service tests (won't override if already set)
-process.env.SETTINGS_HTTP_URL ||= 'http://127.0.0.1:3010';
-process.env.SETTINGS_GRPC_URL ||= '127.0.0.1:55123';
+process.env.AUTH_HTTP_URL      ||= 'http://127.0.0.1:3001';
+process.env.AUTH_GRPC_URL      ||= '127.0.0.1:50052';
+process.env.SETTINGS_HTTP_URL  ||= 'http://127.0.0.1:3010';
+process.env.SETTINGS_GRPC_URL  ||= '127.0.0.1:55123';
 
-// Signature header & secret (from your .env)
-process.env.GATEWAY_HEADER    ||= 'x-gateway-sign';
-process.env.GATEWAY_SECRET    ||= ")d'F(Zy.{8`,3w|+*\N6^bQ;C/>t+Kxi-f(";
+// Seeded accounts (from user-service seeder)
+process.env.SEED_ADMIN_EMAIL   ||= 'admin@example.com';
+process.env.SEED_ADMIN_PASS    ||= 'Admin123!';
+process.env.SEED_USER_EMAIL    ||= 'user@example.com';
+process.env.SEED_USER_PASS     ||= 'User123!';
 
-// Optional svc label (unused by bucket-only, harmless if present)
-process.env.SVC_NAME          ||= 'settings-service';
+// S2S / Gateway signing
+process.env.GATEWAY_HEADER     ||= 'x-gateway-sign';
+process.env.SVC_NAME           ||= 'gateway';
+
+// IMPORTANT: keep S2S secret distinct from GATEWAY secret.
+// Provide S2S_SECRET here because tests sign gRPC metadata directly.
+process.env.S2S_SECRET         ||= 'dev-secret-s2s-please-change-this-32chars-min';

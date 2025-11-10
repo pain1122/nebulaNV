@@ -1,7 +1,3 @@
-import * as jwt from 'jsonwebtoken';
-
-export type HttpOk<T> = T;
-
 export async function httpJson<T>(
   method: 'GET'|'POST'|'PUT'|'DELETE',
   url: string,
@@ -23,10 +19,4 @@ export async function httpJson<T>(
     throw new Error(msg);
   }
   return json as T;
-}
-
-export function decodeSub(token: string): string {
-  const p = jwt.decode(token) as jwt.JwtPayload | null;
-  if (!p?.sub) throw new Error('JWT missing sub');
-  return String(p.sub);
 }
