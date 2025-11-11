@@ -7,8 +7,8 @@ function getGrpcBind(): string {
   const port = process.env.GRPC_PORT ?? process.env.SETTINGS_GRPC_PORT;
   if (port) return `0.0.0.0:${port}`;
 
-  // Fallback: listen on 0.0.0.0:55123 (not 127.0.0.1)
-  return '0.0.0.0:55123';
+  // Fallback: listen on 0.0.0.0:50054 (not 127.0.0.1)
+  return '0.0.0.0:50054';
 }
 
 function getHttpPort(): number {

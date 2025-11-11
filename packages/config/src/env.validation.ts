@@ -19,7 +19,7 @@ export const rootEnvSchema = Joi.object({
   USER_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50051'),
   AUTH_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50052'),
   PRODUCT_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50053'),
-  SETTINGS_GRPC_URL: Joi.string().hostname().default('127.0.0.1:55123'),
+  SETTINGS_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50054'),
 
   USER_HTTP_PORT: Joi.number().default(3100),
   AUTH_HTTP_PORT: Joi.number().default(3001),

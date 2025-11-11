@@ -380,6 +380,9 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
+      wait-port:
+        specifier: ^1.1.0
+        version: 1.1.0
 
   apps/settings-service:
     dependencies:

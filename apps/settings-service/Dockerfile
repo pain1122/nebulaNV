@@ -67,7 +67,7 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 
 COPY --from=build /app/deploy/. /app/
 
-EXPOSE 3010 55123
+EXPOSE 3010 50054
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 

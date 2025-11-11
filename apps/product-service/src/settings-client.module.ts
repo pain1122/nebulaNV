@@ -18,7 +18,7 @@ export const SETTINGS_SERVICE = 'SETTINGS_SERVICE';
           options: {
             package: 'settings',
             protoPath: SETTINGS_PROTO,
-            url: cfg.get<string>('SETTINGS_GRPC_URL') ?? '127.0.0.1:55123',
+            url: cfg.get<string>('SETTINGS_GRPC_URL') ?? '127.0.0.1:50054',
             channelOptions: {
               'grpc.keepalive_time_ms': 60_000,
               'grpc.keepalive_timeout_ms': 20_000,
