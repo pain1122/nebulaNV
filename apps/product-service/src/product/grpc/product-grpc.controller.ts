@@ -3,11 +3,8 @@ import {
   Logger,
   UsePipes,
   ValidationPipe,
-  ForbiddenException,
 } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { Metadata } from "@grpc/grpc-js";
-import * as crypto from "crypto";
 
 import { ProductServiceImpl } from "../product.service";
 import { Public, Roles } from "@nebula/grpc-auth";
@@ -36,28 +33,6 @@ export class ProductGrpcController {
   constructor(private readonly svc: ProductServiceImpl) {}
 
   // ------------------------------------------------------
-  // Internal call validator
-  // ------------------------------------------------------
-  private isInternal(meta?: Metadata): boolean {
-    try {
-      const headerName = process.env.GATEWAY_HEADER ?? "x-gateway-sign";
-      const sig = meta?.get(headerName)?.[0] as string | undefined;
-      if (!sig || !process.env.GATEWAY_SECRET) return false;
-
-      // Time bucket (per minute)
-      const bucket = Math.floor(Date.now() / 60000);
-      const expected = crypto
-        .createHmac("sha256", process.env.GATEWAY_SECRET)
-        .update(String(bucket))
-        .digest("hex");
-
-      return sig === expected;
-    } catch {
-      return false;
-    }
-  }
-
-  // ------------------------------------------------------
   // CreateProduct (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
@@ -69,22 +44,12 @@ export class ProductGrpcController {
 
   // ------------------------------------------------------
   // UpdateProduct
-  // Admins normally; internal (order-service) bypass via HMAC
+  // Admin-only (guard handles user JWT or signed S2S with injected role)
   // ------------------------------------------------------
   @UsePipes(Pipe)
   @Roles("admin")
   @GrpcMethod("ProductService", "UpdateProduct")
-  async update(dto: UpdateProductDto, meta: Metadata) {
-    // Allow HMAC-signed internal calls (e.g., from order-service)
-    const isInternal = this.isInternal(meta);
-    if (!isInternal) {
-      // Non-internal path → handled by @Roles('admin')
-      // (GrpcTokenAuthGuard enforces role already)
-      // Just extra safeguard in case guard misfires
-      throw new ForbiddenException("Admin or internal service only");
-    }
-
-    this.log.debug(`[ProductService] UpdateProduct internal call`);
+  async update(dto: UpdateProductDto) {
     return this.svc.update(dto.id, dto.patch);
   }
 

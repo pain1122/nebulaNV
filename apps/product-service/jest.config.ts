@@ -6,11 +6,11 @@ const config: Config = {
   roots: ['<rootDir>/test'],
   testMatch: ['**/?(*.)+(spec|test).ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/**/*.spec.ts'],
+  clearMocks: true,
   watchPathIgnorePatterns: ['/dist/', '/node_modules/'],
   transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
-  globalSetup: '<rootDir>/test/setup/wait-for-services.ts',
   setupFiles: ['dotenv/config', '<rootDir>/test/jest.env.ts'],
-  clearMocks: true,
+  globalSetup: '<rootDir>/test/setup/wait-for-services.ts',
 };
+
 export default config;

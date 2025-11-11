@@ -1,6 +1,6 @@
 import {IsArray, ArrayMaxSize, IsBoolean, IsEnum, IsISO8601, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf, IsInt} from "class-validator"
 import {Expose, Transform, Type} from "class-transformer"
-
+import {ValidateNested} from "class-validator"
 const toBool = (v: any) => v === true || v === "true" || v === "1" || v === 1
 
 export enum ProductStatusDto {
@@ -177,12 +177,15 @@ export class ProductInputDto {
 }
 
 export class CreateProductRequestDto {
-  @Type(() => ProductInputDto) data!: ProductInputDto
+  @ValidateNested()
+  @Type(() => ProductInputDto)
+  data!: ProductInputDto
 }
 
 export class UpdateProductRequestDto {
-  @IsUUID("4") id!: string // ← drop redundant @IsString()
-  @Type(() => ProductInputDto) patch!: ProductInputDto
+  @ValidateNested()                      // 👈 accept nested patch
+  @Type(() => ProductInputDto)
+  patch!: Partial<ProductInputDto>;      // 👈 remove the `id` field here
 }
 
 export class IdRequestDto {

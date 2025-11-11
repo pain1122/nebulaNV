@@ -11,18 +11,16 @@ export function minuteBucket() {
   return Math.floor(Date.now() / 60_000);
 }
 
-// Gateway-style S2S metadata + user context
 export function mdS2S(opts?: { svc?: string; userId?: string; role?: 'user'|'admin'|'root-admin' }) {
-  const secret  = process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? 'dev-secret';
-  const svc     = opts?.svc ?? process.env.SVC_NAME ?? 'gateway';
+  const secret = process.env.GATEWAY_SECRET ?? process.env.S2S_SECRET ?? 'dev-secret';
+  const svc    = opts?.svc ?? process.env.SVC_NAME ?? 'gateway';
+
   const payload = `${minuteBucket()}:${svc}`;
-  const sig     = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
 
   const md = new grpc.Metadata();
   md.set(X_SIGN_HEADER, sig);
   md.set(X_SVC_HEADER, svc);
-
-  // Simulate gateway injecting initiator context (required by @Roles)
   md.set(X_USER_ID_HEADER, opts?.userId ?? 'e2e-user');
   if (opts?.role) md.set(X_USER_ROLE_HEADER, opts.role);
 
@@ -31,7 +29,6 @@ export function mdS2S(opts?: { svc?: string; userId?: string; role?: 'user'|'adm
 
 export function loadClient<T>(opts: { url: string; protoPath: string; pkg: string[]; svc: string; }): T {
   const loader = protoLoader.loadSync(opts.protoPath, {
-    keepCase: false,
     longs: String,
     enums: String,
     defaults: true,
