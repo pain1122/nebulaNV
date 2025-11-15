@@ -5,7 +5,7 @@ export const rootEnvSchema = Joi.object({
   // 🌍 Environment and Global Behavior
   // ------------------------------------------
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
-  PUBLIC_MODE: Joi.string().valid('OPEN', 'CLOSED').default('OPEN'),
+  PUBLIC_MODE: Joi.string().valid('OPEN', 'OPTIONAL_AUTH', 'GATEWAY_ONLY').default('OPEN'),
 
   // ------------------------------------------
   // 🔐 Gateway + S2S Security

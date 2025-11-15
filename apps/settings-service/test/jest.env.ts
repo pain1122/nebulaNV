@@ -12,8 +12,8 @@ process.env.SEED_USER_PASS     ||= 'User123!';
 
 // S2S / Gateway signing
 process.env.GATEWAY_HEADER     ||= 'x-gateway-sign';
-process.env.SVC_NAME           ||= 'gateway';
+process.env.SVC_NAME           ||= 'settings-service';
 
 // IMPORTANT: keep S2S secret distinct from GATEWAY secret.
 // Provide S2S_SECRET here because tests sign gRPC metadata directly.
-process.env.S2S_SECRET         ||= 'dev-secret-s2s-please-change-this-32chars-min';
+process.env.S2S_SECRET         ||= "n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";

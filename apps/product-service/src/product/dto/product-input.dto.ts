@@ -19,10 +19,11 @@ export class ProductInputDto {
   @IsOptional() @IsString() @MaxLength(120) slug?: string
   @IsOptional() @IsString() @MaxLength(120) sku?: string
 
+  @IsOptional()
   @Type(() => Number) // ← coerce "100" -> 100
   @IsNumber()
   @Min(0)
-  price!: number
+  price?: number
 
   @IsOptional() @IsString() @MaxLength(8) currency?: string
   @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto
@@ -183,9 +184,9 @@ export class CreateProductRequestDto {
 }
 
 export class UpdateProductRequestDto {
-  @ValidateNested()                      // 👈 accept nested patch
+  @ValidateNested() // 👈 accept nested patch
   @Type(() => ProductInputDto)
-  patch!: Partial<ProductInputDto>;      // 👈 remove the `id` field here
+  patch!: Partial<ProductInputDto> // 👈 remove the `id` field here
 }
 
 export class IdRequestDto {

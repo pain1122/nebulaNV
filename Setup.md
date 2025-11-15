@@ -44,7 +44,7 @@ NODE_ENV=development
 PUBLIC_MODE=OPEN
 
 # 🔐 Security
-S2S_SECRET=:9T>X1R<_@_Dq*Tz@7l6Z?=&p75h£P~l
+S2S_SECRET=":9T>X1R<_@_Dq*Tz@7l6Z?=&p75h£P~l"
 GATEWAY_HEADER=x-gateway-sign
 
 # 🧩 gRPC Registry

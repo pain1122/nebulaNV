@@ -11,10 +11,11 @@ process.env.SEED_ADMIN_EMAIL    ||= 'admin@example.com';
 process.env.SEED_ADMIN_PASS     ||= 'Admin123!';
 process.env.SEED_USER_EMAIL     ||= 'user@example.com';
 process.env.SEED_USER_PASS      ||= 'User123!';
+process.env.PUBLIC_MODE = 'OPTIONAL_AUTH';
 
 // S2S / Gateway signing
 process.env.GATEWAY_HEADER      ||= 'x-gateway-sign';
 process.env.SVC_NAME            ||= 'product-service'; // or 'gateway'—must match your signing expectation
 
 // IMPORTANT: tests sign gRPC metadata directly (gateway-style)
-process.env.S2S_SECRET          ||= "*$e1>e'ylIR7[*sitJ]_cO0P866KNVO]";
+process.env.S2S_SECRET          ||= "n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";

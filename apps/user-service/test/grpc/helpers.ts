@@ -27,7 +27,7 @@ export function minuteBucket(): number {
 
 export function mdS2S() {
   const svc    = process.env.SVC_NAME ?? 'user-service';
-  const secret = process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? 'dev-secret';
+  const secret = process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? "n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
   const sig = crypto.createHmac('sha256', secret)
     .update(`${minuteBucket()}:${svc}`)
     .digest('hex');
