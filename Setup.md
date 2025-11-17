@@ -75,7 +75,7 @@ GATEWAY_SECRET=L*vqvwy7R1>*$5\pc£AxYr,2aN3Atf<!
 SVC_NAME=user-service
 ```
 
-Repeat for each service (`auth`, `product`, `settings`) using unique `GATEWAY_SECRET`s.
+Repeat for each service (`auth`, `product`, `settings`, `blog`) using unique `GATEWAY_SECRET`s.
 
 ---
 
@@ -102,13 +102,27 @@ docker compose up -d postgres
 Run migrations for each service:
 
 ```powershell
+
+docker compose run --rm `
+  -e DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nebula_users?schema=public" `
+  user-service `
+  npx prisma migrate dev --name init --schema apps/user-service/prisma/schema.prisma
+
+docker compose run --rm `
+  -e DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nebula_products?schema=public" `
+  product-service `
+  npx prisma migrate dev --name init --schema apps/product-service/prisma/schema.prisma
+
+docker compose run --rm `
+  -e DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nebula_blog?schema=public" `
+  blog-service `
+  npx prisma migrate dev --name init --schema apps/blog-service/prisma/schema.prisma
+
 docker compose run --rm `
   -e DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nebula_settings?schema=public" `
   settings-service `
   npx prisma migrate dev --name init --schema apps/settings-service/prisma/schema.prisma
 ```
-
-Repeat for `user-service` and `product-service`.
 
 ---
 

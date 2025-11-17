@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package blog;
+
+message Post {
+  string id             = 1;
+  string slug           = 2;
+  string title          = 3;
+  string body           = 4;
+  string excerpt        = 5;
+  string coverImageUrl  = 6;
+
+
+  string status         = 7;
+
+  repeated string tags       = 8;
+  repeated string categories = 9;
+
+  string metaTitle       = 10;
+  string metaDescription = 11;
+  string metaKeywords    = 12;
+
+  string publishedAt = 13;
+  string createdAt   = 14;
+  string updatedAt   = 15;
+}
+
+message PostInput {
+  string title          = 1;
+  string slug           = 2;
+  string body           = 3;
+  string excerpt        = 4;
+  string coverImageUrl  = 5;
+  string status         = 6;
+  repeated string tags       = 7;
+  repeated string categories = 8;
+  string metaTitle       = 9;
+  string metaDescription = 10;
+  string metaKeywords    = 11;
+}
+
+message PostPatch {
+  string title          = 1;
+  string body           = 2;
+  string excerpt        = 3;
+  string coverImageUrl  = 4;
+  string status         = 5;
+  repeated string tags       = 6;
+  repeated string categories = 7;
+  string metaTitle       = 8;
+  string metaDescription = 9;
+  string metaKeywords    = 10;
+}
+
+message ListPostsRequest {
+  string q         = 1;
+  string tag       = 2;
+  string category  = 3;
+  int32  page      = 4;
+  int32  limit     = 5;
+}
+
+message ListPostsResponse {
+  repeated Post data = 1;
+  int32 page         = 2;
+  int32 limit        = 3;
+  int64 total        = 4;
+}
+
+message GetPostRequest {
+  string slug = 1;
+}
+
+message PostResponse {
+  Post data = 1;
+}
+
+message CreatePostRequest {
+  PostInput data = 1;
+}
+
+message UpdatePostRequest {
+  string   id    = 1;
+  PostPatch patch = 2;
+}
+
+message DeletePostRequest {
+  string id = 1;
+}
+
+message BasicResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+
+service BlogService {
+  rpc ListPosts (ListPostsRequest) returns (ListPostsResponse);
+  rpc GetPost   (GetPostRequest)   returns (PostResponse);
+
+  rpc CreatePost (CreatePostRequest)  returns (PostResponse);
+  rpc UpdatePost (UpdatePostRequest)  returns (PostResponse);
+  rpc DeletePost (DeletePostRequest)  returns (BasicResponse);
+}

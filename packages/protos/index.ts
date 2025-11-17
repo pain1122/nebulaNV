@@ -3,3 +3,4 @@ export * as authv1 from "./generated/auth";
 export * as userv1 from "./generated/user";
 export * as productv1 from "./generated/product";
 export * as settings from "./generated/settings";
+export * as blogv1 from "./generated/blog";

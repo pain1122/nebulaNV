@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from './generated';
+import { PrismaClient, Prisma } from './generated/client';
 const prisma = new PrismaClient();
 
 async function upsertJson(ns: string, key: string, value: any, env = 'default') {

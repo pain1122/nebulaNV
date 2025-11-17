@@ -36,9 +36,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.docker
       - apps/user-service/.env
-      - apps/user-service/.env.docker
     ports:
       - "3100:3100"
 
@@ -56,7 +54,6 @@ services:
         condition: service_started
     env_file:
       - .env
-      - .env.docker
       - apps/auth-service/.env
     ports:
       - "3001:3001"
@@ -75,9 +72,7 @@ services:
         condition: service_started
     env_file:
       - .env
-      - .env.docker
       - apps/product-service/.env
-      - apps/product-service/.env.docker
     ports:
       - "3003:3003"
 
@@ -93,9 +88,7 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.docker
       - apps/settings-service/.env
-      - apps/settings-service/.env.docker
     ports:
       - "3010:3010"
 

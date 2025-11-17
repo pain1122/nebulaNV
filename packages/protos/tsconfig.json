@@ -7,6 +7,6 @@
       "outDir": "dist",
       "emitDeclarationOnly": false
     },
-    "include": ["generated/**/*.ts", "index.ts"]
+    "include": ["generated/*.ts", "index.ts"]
   }
   

@@ -1,4 +1,4 @@
-export async function httpJson<T>(method: "GET" | "POST" | "PUT" | "DELETE", url: string, body?: any, headers?: Record<string, string>): Promise<T> {
+export async function httpJson<T>(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, body?: any, headers?: Record<string, string>): Promise<T> {
   const baseHeaders: Record<string, string> = {"content-type": "application/json"}
   const res = await fetch(url, {
     method,
