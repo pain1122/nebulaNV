@@ -19,6 +19,21 @@ function basicSlugify(s: string) {
 export class BlogService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async ensureUniqueSlug(base: string): Promise<string> {
+    const baseSlug = basicSlugify(base);
+    let slug = baseSlug;
+    let n = 1;
+
+    // loop until we find a free slug
+    // status filter is NOT needed here: slug is unique across all posts
+    // (including ARCHIVED / DRAFT)
+    while (await this.prisma.blogPost.findFirst({ where: { slug } })) {
+      slug = `${baseSlug}-${n++}`;
+    }
+
+    return slug;
+  }
+
   private toDto(p: any) {
     return {
       id: p.id,
@@ -76,7 +91,7 @@ export class BlogService {
   }
 
   async create(input: CreatePostDto) {
-    const slug = input.slug ? basicSlugify(input.slug) : basicSlugify(input.title);
+    const slug = await this.ensureUniqueSlug(input.slug ?? input.title);
     const data = await this.prisma.blogPost.create({
       data: {
         slug,

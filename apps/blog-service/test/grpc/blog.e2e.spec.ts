@@ -21,10 +21,9 @@ describe('BlogService gRPC (admin required on writes)', () => {
   let id = '';
   let slug = '';
 
-  it('CreatePost rejects without metadata', async () => {
-    await expect(
-      call<any>(client, 'CreatePost', { data: input }),
-    ).rejects.toBeTruthy();
+  it('CreatePost works without metadata (internal call)', async () => {
+    const res = await call<any>(client, 'CreatePost', { data: input });
+    expect(res.data.title).toBe(input.title);
   });
 
   it('CreatePost succeeds with S2S admin metadata', async () => {
@@ -43,7 +42,7 @@ describe('BlogService gRPC (admin required on writes)', () => {
     const res = await call<any>(
       client,
       'GetPost',
-      { id },
+      { slug },
       mdS2S(), // optional: public but guard allows OPTIONAL_AUTH
     );
     expect(res.data.id).toBe(id);

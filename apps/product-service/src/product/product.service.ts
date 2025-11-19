@@ -51,6 +51,30 @@ export class ProductServiceImpl {
     return getSettings(this.settingsClient);
   }
 
+  private defaultCurrencyCache: string | null = null;
+
+  private async getDefaultCurrency(): Promise<string> {
+    if (this.defaultCurrencyCache) return this.defaultCurrencyCache;
+
+    try {
+      const res = await firstValueFrom(
+        this.settings().GetString({
+          namespace: "pricing",
+          environment: "default",
+          key: "default_currency",
+        })
+      );
+
+      const cur = res?.value || "USD";
+      this.defaultCurrencyCache = cur;
+      return cur;
+    } catch {
+      this.defaultCurrencyCache = "USD";
+      return this.defaultCurrencyCache;
+    }
+  }
+
+
   private toDto = (p: any) => {
     return {
       id: p.id,
@@ -177,6 +201,7 @@ export class ProductServiceImpl {
     await this.assertCategoryExists(categoryId)
 
     // normalize window to Date|null for DB
+    const defaultCurrency = await this.getDefaultCurrency();
     const discountStart: Date | null = input.discountStart ? new Date(input.discountStart) : null
     const discountEnd: Date | null = input.discountEnd ? new Date(input.discountEnd) : null
     this.assertDiscountWindow(discountStart, discountEnd)
@@ -192,7 +217,7 @@ export class ProductServiceImpl {
           sku,
 
           price: new Prisma.Decimal(input.price ?? 0),
-          currency: input.currency ?? "EUR",
+          currency: input.currency ?? defaultCurrency,
           status: asStatus(input.status) ?? ProductStatus.DRAFT,
 
           category: {connect: {id: categoryId}},
