@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package order;
+
+message OrderItem {
+  string id        = 1;
+  string productId = 2;
+  string sku       = 3;
+  string name      = 4;
+  int32  quantity  = 5;
+  string unitPrice = 6; // decimal as string
+  string lineTotal = 7; // decimal as string
+  string meta      = 8; // JSON
+}
+
+message Order {
+  string id            = 1;
+  string orderNumber   = 2;
+  string userId        = 3;
+  string status        = 4;
+  string currency      = 5;
+  string subtotal      = 6;
+  string discountTotal = 7;
+  string taxTotal      = 8;
+  string total         = 9;
+  string shippingAddress = 10; // JSON
+  string billingAddress  = 11; // JSON
+  string meta            = 12; // JSON
+  string createdAt       = 13;
+  string updatedAt       = 14;
+
+  repeated OrderItem items = 15;
+}
+
+message CartItem {
+  string id        = 1;
+  string productId = 2;
+  string sku       = 3;
+  string name      = 4;
+  int32  quantity  = 5;
+  string unitPrice = 6; // decimal as string
+  string meta      = 7; // JSON
+}
+
+message Cart {
+  string id        = 1;
+  string userId    = 2;
+  string currency  = 3;
+  string expiresAt = 4;
+  repeated CartItem items = 5;
+}
+
+message Empty {}
+
+message GetCartRequest {
+  string userId = 1;
+}
+
+message CartResponse {
+  Cart data = 1;
+}
+
+message AddToCartRequest {
+  string userId    = 1;
+  string productId = 2;
+  int32  quantity  = 3;
+}
+
+message UpdateCartItemRequest {
+  string userId  = 1;
+  string itemId  = 2;
+  int32  quantity = 3;
+}
+
+message RemoveCartItemRequest {
+  string userId = 1;
+  string itemId = 2;
+}
+
+message CheckoutRequest {
+  string userId = 1;
+  string note   = 2;
+}
+
+message OrderResponse {
+  Order data = 1;
+}
+
+message GetOrderRequest {
+  string userId = 1;
+  string id     = 2;
+}
+
+message ListOrdersRequest {
+  string userId = 1;
+  string status = 2; // optional filter
+}
+
+message ListOrdersResponse {
+  repeated Order data = 1;
+}
+
+message UpdateOrderStatusRequest {
+  string id     = 1;
+  string status = 2;
+}
+
+service OrderService {
+  rpc GetCart          (GetCartRequest)          returns (CartResponse);
+  rpc AddToCart        (AddToCartRequest)        returns (CartResponse);
+  rpc UpdateCartItem   (UpdateCartItemRequest)   returns (CartResponse);
+  rpc RemoveCartItem   (RemoveCartItemRequest)   returns (CartResponse);
+  rpc Checkout         (CheckoutRequest)         returns (OrderResponse);
+
+  rpc GetOrder         (GetOrderRequest)         returns (OrderResponse);
+  rpc ListOrders       (ListOrdersRequest)       returns (ListOrdersResponse);
+  rpc UpdateOrderStatus(UpdateOrderStatusRequest)returns (OrderResponse);
+
+  rpc Ping             (Empty)                   returns (Empty);
+}

@@ -20,11 +20,13 @@ export const rootEnvSchema = Joi.object({
   AUTH_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50052'),
   PRODUCT_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50053'),
   SETTINGS_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50054'),
+  BLOG_GRPC_URL: Joi.string().hostname().default('127.0.0.1:50055'),
 
   USER_HTTP_PORT: Joi.number().default(3100),
   AUTH_HTTP_PORT: Joi.number().default(3001),
   PRODUCT_HTTP_PORT: Joi.number().default(3003),
   SETTINGS_HTTP_PORT: Joi.number().default(3010),
+  BLOG_HTTP_PORT: Joi.number().default(3004),
 
   // ------------------------------------------
   // 🔑 JWT Tokens (Shared by All Services)
