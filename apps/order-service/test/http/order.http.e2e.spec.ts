@@ -3,6 +3,7 @@ import { httpJson } from "../utils/http";
 import { randomUUID } from "crypto";
 
 const AUTH_HTTP = process.env.AUTH_HTTP_URL!;
+const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL!;
 const ORDER_HTTP = process.env.ORDER_HTTP_URL!;
 
 type LoginResp = { accessToken: string };
@@ -12,21 +13,31 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
   let adminToken: string;
   let cartItemId: string;
   let orderId: string;
+  let productId: string;
 
   beforeAll(async () => {
     // user
-    const u = await httpJson<LoginResp>( "POST", `${AUTH_HTTP}/auth/login`, {
+    const u = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
       password:   process.env.SEED_USER_PASS  ?? "User123!",
     });
     userToken = u.accessToken;
 
-    // admin (not strictly needed yet, but we'll keep it aligned)
-    const a = await httpJson<LoginResp>( "POST", `${AUTH_HTTP}/auth/login`, {
+    // admin
+    const a = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
       password:   process.env.SEED_ADMIN_PASS  ?? "Admin123!",
     });
     adminToken = a.accessToken;
+
+    // create a product we can add to the cart
+    const p = await httpJson<any>(
+      "POST",
+      `${PRODUCT_HTTP}/products`,
+      { data: { title: "OrderSvc HTTP Product", price: 199.99 } },
+      { authorization: `Bearer ${adminToken}` },
+    );
+    productId = p.data.id;
   });
 
   it("GET /orders/cart (user) returns a cart", async () => {
@@ -44,7 +55,6 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
   });
 
   it("POST /orders/cart/items creates a cart item", async () => {
-    const productId = randomUUID(); // order-service doesn't validate against product DB (yet)
 
     const res = await httpJson<any>(
       "POST",

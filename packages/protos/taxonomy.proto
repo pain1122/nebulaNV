@@ -1,0 +1,83 @@
+syntax = "proto3";
+package taxonomy;
+
+service TaxonomyService {
+  rpc ListTaxonomies (ListTaxonomiesRequest) returns (ListTaxonomiesResponse);
+  rpc GetTaxonomy (GetTaxonomyRequest) returns (TaxonomyResponse);
+  rpc GetBySlug (GetBySlugRequest) returns (TaxonomyResponse);
+
+  rpc CreateTaxonomy (CreateTaxonomyRequest) returns (TaxonomyResponse);
+  rpc UpdateTaxonomy (UpdateTaxonomyRequest) returns (TaxonomyResponse);
+  rpc DeleteTaxonomy (DeleteTaxonomyRequest) returns (BasicResponse);
+}
+
+message Taxonomy {
+  string id          = 1;
+  string scope       = 2;
+  string kind        = 3;
+  string slug        = 4;
+  string title       = 5;
+  string description = 6;
+  bool   isHidden    = 7;
+  bool   isSystem    = 8;
+  int32  sortOrder   = 9;
+  string createdAt   = 10;
+  string updatedAt   = 11;
+}
+
+message ListTaxonomiesRequest {
+  string scope = 1;
+  string kind  = 2;
+  string q     = 3;
+  int32  page  = 4;
+  int32  limit = 5;
+}
+
+message ListTaxonomiesResponse {
+  repeated Taxonomy data  = 1;
+  int32 page   = 2;
+  int32 limit  = 3;
+  int32 total  = 4;
+}
+
+message GetTaxonomyRequest {
+  string id = 1;
+}
+
+message GetBySlugRequest {
+  string scope = 1;
+  string kind  = 2;
+  string slug  = 3;
+}
+
+message TaxonomyInput {
+  string scope       = 1;
+  string kind        = 2;
+  string slug        = 3;
+  string title       = 4;
+  string description = 5;
+  bool   isHidden    = 6;
+  bool   isSystem    = 7;
+  int32  sortOrder   = 8;
+}
+
+message CreateTaxonomyRequest {
+  TaxonomyInput data = 1;
+}
+
+message UpdateTaxonomyRequest {
+  string id          = 1;
+  TaxonomyInput patch = 2;
+}
+
+message DeleteTaxonomyRequest {
+  string id = 1;
+}
+
+message TaxonomyResponse {
+  Taxonomy data = 1;
+}
+
+message BasicResponse {
+  bool success = 1;
+}

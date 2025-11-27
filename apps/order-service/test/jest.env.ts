@@ -1,11 +1,15 @@
 // apps/order-service/test/jest.env.ts
 
 // HTTP URLs
-process.env.AUTH_HTTP_URL  ||= "http://127.0.0.1:3001";
-process.env.ORDER_HTTP_URL ||= "http://127.0.0.1:3005";
+process.env.AUTH_HTTP_URL     ||= "http://127.0.0.1:3001";
+process.env.ORDER_HTTP_URL    ||= "http://127.0.0.1:3005";
+process.env.PRODUCT_HTTP_URL  ||= "http://127.0.0.1:3003";
+process.env.SETTINGS_HTTP_URL ||= "http://127.0.0.1:3010";
 
 // gRPC URLs
-process.env.ORDER_GRPC_URL ||= "127.0.0.1:50056";
+process.env.ORDER_GRPC_URL    ||= "127.0.0.1:50056";
+process.env.PRODUCT_GRPC_URL  ||= "127.0.0.1:50053";
+process.env.SETTINGS_GRPC_URL ||= "127.0.0.1:50054";
 
 // Seeded accounts (from user-service seeder)
 process.env.SEED_ADMIN_EMAIL ||= "admin@example.com";

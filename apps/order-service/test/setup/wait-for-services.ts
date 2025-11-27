@@ -16,33 +16,27 @@ function toTarget(raw: string): Target {
 function waitPort(target: Target, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
     const start = Date.now();
+    const socket = new net.Socket();
 
-    const attempt = () => {
-      const socket = new net.Socket();
-      socket
-        .setTimeout(2000)
-        .once("connect", () => {
-          socket.destroy();
-          resolve(true);
-        })
-        .once("timeout", () => {
-          socket.destroy();
-          retry();
-        })
-        .once("error", () => {
-          socket.destroy();
-          retry();
-        })
-        .connect(target.port, target.host);
-
-      const retry = () => {
-        const elapsed = Date.now() - start;
-        if (elapsed > timeoutMs) return resolve(false);
-        setTimeout(attempt, 250);
-      };
+    const onError = () => {
+      if (Date.now() - start >= timeoutMs) {
+        socket.destroy();
+        return resolve(false);
+      }
+      setTimeout(() => {
+        socket.connect(target.port, target.host);
+      }, 250);
     };
 
-    attempt();
+    socket.setTimeout(timeoutMs);
+    socket.on("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on("error", onError);
+    socket.on("timeout", onError);
+
+    socket.connect(target.port, target.host);
   });
 }
 
@@ -50,9 +44,13 @@ export default async function () {
   const timeoutMs = Number(process.env.WAIT_TIMEOUT_MS ?? 20_000);
 
   const targets = [
-    process.env.AUTH_HTTP_URL  ?? "http://127.0.0.1:3001",
-    process.env.ORDER_HTTP_URL ?? "http://127.0.0.1:3005",
-    process.env.ORDER_GRPC_URL ?? "127.0.0.1:50056",
+    process.env.AUTH_HTTP_URL      ?? "http://127.0.0.1:3001",
+    process.env.ORDER_HTTP_URL     ?? "http://127.0.0.1:3005",
+    process.env.ORDER_GRPC_URL     ?? "127.0.0.1:50056",
+    process.env.PRODUCT_HTTP_URL   ?? "http://127.0.0.1:3003",
+    process.env.PRODUCT_GRPC_URL   ?? "127.0.0.1:50053",
+    process.env.SETTINGS_HTTP_URL  ?? "http://127.0.0.1:3010",
+    process.env.SETTINGS_GRPC_URL  ?? "127.0.0.1:50054",
   ].map(toTarget);
 
   for (const t of targets) {
@@ -60,3 +58,4 @@ export default async function () {
     if (!ok) throw new Error(`Timed out waiting for ${t.label} (${t.host}:${t.port})`);
   }
 }
+
