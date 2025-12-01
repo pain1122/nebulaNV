@@ -5,7 +5,8 @@ import {firstValueFrom} from "rxjs"
 import {Prisma, ProductStatus} from "../../prisma/generated"
 import {SETTINGS_SERVICE} from "../settings-client.module"
 import {getSettings, type SettingsProxy} from "@nebula/clients"
-
+import { TAXONOMY_SERVICE } from "../taxonomy-client.module";
+import { getTaxonomy, type TaxonomyProxy } from "@nebula/clients";
 
 function mapPrisma(e: any) {
   // P2002 unique constraint failed (slug/sku)
@@ -44,17 +45,22 @@ const asStatus = (v: any): ProductStatus | undefined => (v && Object.values(Prod
 export class ProductServiceImpl {
   constructor(
     private prisma: PrismaService,
+    @Inject(TAXONOMY_SERVICE) private readonly taxonomyClient: ClientGrpc,
     @Inject(SETTINGS_SERVICE) private readonly settingsClient: ClientGrpc
   ) {}
 
   private settings(): SettingsProxy {
-    return getSettings(this.settingsClient);
+    return getSettings(this.settingsClient)
   }
 
-  private defaultCurrencyCache: string | null = null;
+  private taxonomy(): TaxonomyProxy {
+    return getTaxonomy(this.taxonomyClient)
+  }
+
+  private defaultCurrencyCache: string | null = null
 
   private async getDefaultCurrency(): Promise<string> {
-    if (this.defaultCurrencyCache) return this.defaultCurrencyCache;
+    if (this.defaultCurrencyCache) return this.defaultCurrencyCache
 
     try {
       const res = await firstValueFrom(
@@ -63,17 +69,16 @@ export class ProductServiceImpl {
           environment: "default",
           key: "default_currency",
         })
-      );
+      )
 
-      const cur = res?.value || "USD";
-      this.defaultCurrencyCache = cur;
-      return cur;
+      const cur = res?.value || "USD"
+      this.defaultCurrencyCache = cur
+      return cur
     } catch {
-      this.defaultCurrencyCache = "USD";
-      return this.defaultCurrencyCache;
+      this.defaultCurrencyCache = "USD"
+      return this.defaultCurrencyCache
     }
   }
-
 
   private toDto = (p: any) => {
     return {
@@ -121,17 +126,20 @@ export class ProductServiceImpl {
 
   private async getDefaultCategoryId(): Promise<string> {
     const res = await firstValueFrom(
-      this.settings().GetString(
-        {
-          namespace: "product",
-          environment: "default",
-          key: "defaultProductCategoryId",
-        }
-      )
+      this.settings().GetString({
+        namespace: "product",
+        environment: "default",
+        key: "defaultProductCategoryTaxonomyId",
+      })
     )
+
     if (!res?.value) {
-      throw new BadRequestException("Default category not configured. Initialize it via /categories/default/ensure or PUT /categories/default.")
+      throw new BadRequestException("Default category not configured. Set product/defaultProductCategoryTaxonomyId in settings-service.")
     }
+
+    // Validate that this ID actually points at a product category taxonomy
+    await this.assertCategoryExists(res.value)
+
     return res.value
   }
 
@@ -171,8 +179,24 @@ export class ProductServiceImpl {
   }
 
   private async assertCategoryExists(categoryId: string) {
-    const ok = await this.prisma.productCategory.findUnique({where: {id: categoryId}, select: {id: true}})
-    if (!ok) throw new BadRequestException(`Category ${categoryId} does not exist`)
+    try {
+      const res = await firstValueFrom(this.taxonomy().GetTaxonomy({id: categoryId}))
+
+      const t = res?.data
+      if (!t) {
+        throw new BadRequestException(`Category ${categoryId} does not exist`)
+      }
+
+      if (t.scope !== "product" || t.kind !== "category.default") {
+        throw new BadRequestException(`Category ${categoryId} is not a valid product.category.default taxonomy`)
+      }
+    } catch (e: any) {
+      // gRPC NOT_FOUND = 5 in @grpc/grpc-js
+      if (e?.code === 5 || e?.details === "taxonomy_not_found") {
+        throw new BadRequestException(`Category ${categoryId} does not exist`)
+      }
+      throw e
+    }
   }
 
   private assertDiscountWindow(start?: Date | null, end?: Date | null) {
@@ -201,7 +225,7 @@ export class ProductServiceImpl {
     await this.assertCategoryExists(categoryId)
 
     // normalize window to Date|null for DB
-    const defaultCurrency = await this.getDefaultCurrency();
+    const defaultCurrency = await this.getDefaultCurrency()
     const discountStart: Date | null = input.discountStart ? new Date(input.discountStart) : null
     const discountEnd: Date | null = input.discountEnd ? new Date(input.discountEnd) : null
     this.assertDiscountWindow(discountStart, discountEnd)
@@ -220,7 +244,7 @@ export class ProductServiceImpl {
           currency: input.currency ?? defaultCurrency,
           status: asStatus(input.status) ?? ProductStatus.DRAFT,
 
-          category: {connect: {id: categoryId}},
+          categoryId,
 
           // ✅ use normalized camelCase
           thumbnailUrl: input.thumbnailUrl,

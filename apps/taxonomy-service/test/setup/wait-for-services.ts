@@ -15,9 +15,8 @@ export default async function () {
   const targets = [
     process.env.AUTH_HTTP_URL      ?? 'http://127.0.0.1:3001',
     process.env.SETTINGS_HTTP_URL  ?? 'http://127.0.0.1:3010',
-    process.env.SETTINGS_GRPC_URL  ?? '127.0.0.1:55123',
-    process.env.PRODUCT_HTTP_URL   ?? 'http://127.0.0.1:3003',
-    process.env.PRODUCT_GRPC_URL   ?? '127.0.0.1:50053',
+    process.env.SETTINGS_GRPC_URL  ?? '127.0.0.1:50054',
+    // taxonomy-service itself is started by Jest, so we don't wait on its ports here
   ].map(toTarget);
 
   for (const t of targets) {

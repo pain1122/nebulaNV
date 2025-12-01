@@ -21,8 +21,29 @@ message Taxonomy {
   bool   isHidden    = 7;
   bool   isSystem    = 8;
   int32  sortOrder   = 9;
-  string createdAt   = 10;
-  string updatedAt   = 11;
+
+  bool   isTree      = 10;
+  string parentId    = 11;
+  int32  depth       = 12;
+  string path        = 13;
+  bool   hasChildren = 14;
+
+  string createdAt   = 20;
+  string updatedAt   = 21;
+}
+
+message TaxonomyInput {
+  string scope       = 1;
+  string kind        = 2;
+  string slug        = 3;
+  string title       = 4;
+  string description = 5;
+  bool   isHidden    = 6;
+  bool   isSystem    = 7;
+  int32  sortOrder   = 8;
+
+  bool   isTree      = 9;
+  string parentId    = 10;
 }
 
 message ListTaxonomiesRequest {
@@ -48,17 +69,6 @@ message GetBySlugRequest {
   string scope = 1;
   string kind  = 2;
   string slug  = 3;
-}
-
-message TaxonomyInput {
-  string scope       = 1;
-  string kind        = 2;
-  string slug        = 3;
-  string title       = 4;
-  string description = 5;
-  bool   isHidden    = 6;
-  bool   isSystem    = 7;
-  int32  sortOrder   = 8;
 }
 
 message CreateTaxonomyRequest {

@@ -9,6 +9,10 @@ CREATE TABLE "public"."Taxonomy" (
     "slug" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
+    "isTree" BOOLEAN NOT NULL DEFAULT false,
+    "parentId" UUID,
+    "depth" INTEGER NOT NULL DEFAULT 0,
+    "path" TEXT,
     "isHidden" BOOLEAN NOT NULL DEFAULT false,
     "isSystem" BOOLEAN NOT NULL DEFAULT false,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
@@ -23,4 +27,10 @@ CREATE TABLE "public"."Taxonomy" (
 CREATE INDEX "Taxonomy_scope_kind_idx" ON "public"."Taxonomy"("scope", "kind");
 
 -- CreateIndex
+CREATE INDEX "Taxonomy_scope_kind_parentId_idx" ON "public"."Taxonomy"("scope", "kind", "parentId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Taxonomy_scope_kind_slug_key" ON "public"."Taxonomy"("scope", "kind", "slug");
+
+-- AddForeignKey
+ALTER TABLE "public"."Taxonomy" ADD CONSTRAINT "Taxonomy_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "public"."Taxonomy"("id") ON DELETE SET NULL ON UPDATE CASCADE;

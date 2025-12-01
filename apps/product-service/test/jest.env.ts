@@ -1,7 +1,7 @@
 // Default envs for product-service tests (won't override if already set)
 process.env.AUTH_HTTP_URL       ||= 'http://127.0.0.1:3001';
 process.env.SETTINGS_HTTP_URL   ||= 'http://127.0.0.1:3010';
-process.env.SETTINGS_GRPC_URL   ||= '127.0.0.1:55123';
+process.env.SETTINGS_GRPC_URL   ||= '127.0.0.1:50054';
 
 process.env.PRODUCT_HTTP_URL    ||= 'http://127.0.0.1:3003';
 process.env.PRODUCT_GRPC_URL    ||= '127.0.0.1:50053';

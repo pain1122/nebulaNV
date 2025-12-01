@@ -7,6 +7,7 @@ import {envSchema} from "./config/env.validation"
 import {ProductModule} from "./product/product.module"
 import {CategoryModule} from "./category/category.module"
 import {SettingsClientModule} from "./settings-client.module"
+import {TaxonomyClientModule} from "./taxonomy-client.module"
 import {AuthClientModule} from "./auth-client.module"
 import {GrpcTokenAuthGuard} from "@nebula/grpc-auth"
 
@@ -27,12 +28,8 @@ export const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto")
     CategoryModule,
     SettingsClientModule,
     AuthClientModule,
+    TaxonomyClientModule,
   ],
-  providers: [
-    Reflector,
-    GrpcTokenAuthGuard,
-    {provide: APP_GUARD, useClass: GrpcTokenAuthGuard},
-    {provide: APP_GUARD, useClass: ThrottlerGuard},
-  ],
+  providers: [Reflector, GrpcTokenAuthGuard, {provide: APP_GUARD, useClass: GrpcTokenAuthGuard}, {provide: APP_GUARD, useClass: ThrottlerGuard}],
 })
 export class AppModule {}

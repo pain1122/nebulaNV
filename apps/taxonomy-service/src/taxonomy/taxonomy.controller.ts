@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from "@nestjs/common";
 import { TaxonomyService } from "./taxonomy.service";
+import { CreateTaxonomyDto } from "./dto/create-taxonomy.dto"
+import { UpdateTaxonomyDto } from "./dto/update-taxonomy.dto"
 
 @Controller("taxonomies")
 export class TaxonomyHttpController {
@@ -16,13 +18,13 @@ export class TaxonomyHttpController {
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.svc.create(body);
+  create(@Body() dto: CreateTaxonomyDto) {
+    return this.svc.create(dto)
   }
 
-  @Patch("/:id")
-  update(@Param("id") id: string, @Body() patch: any) {
-    return this.svc.update(id, patch);
+  @Patch(":id")
+  update(@Param("id") id: string, @Body() dto: UpdateTaxonomyDto) {
+    return this.svc.update(id, dto)
   }
 
   @Delete("/:id")

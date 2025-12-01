@@ -9,24 +9,32 @@ describe('product-service HTTP (admin writes, public reads)', () => {
   let admin = '';
   let user  = '';
   let id = '';
+  let categoryId = '';
 
   beforeAll(async () => {
+    // login normal user
     const ut = await httpJson<LoginResp>('POST', `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_USER_EMAIL ?? 'user@example.com',
       password:   process.env.SEED_USER_PASS  ?? 'User123!',
     });
     user = ut.accessToken;
 
+    // login admin
     const at = await httpJson<LoginResp>('POST', `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com',
       password:   process.env.SEED_ADMIN_PASS  ?? 'Admin123!',
     });
     admin = at.accessToken;
 
-    // ensure default category exists (idempotent)
-    await httpJson<any>('POST', `${PRODUCT_HTTP}/categories/default/ensure`, null, {
-      authorization: `Bearer ${admin}`,
-    });
+    // create a real product category in taxonomy via product-service
+    const slug = `e2e-http-category-${Date.now()}`;
+    const cat = await httpJson<any>(
+      'POST',
+      `${PRODUCT_HTTP}/categories`,
+      { slug, title: 'E2E HTTP Category' },
+      { authorization: `Bearer ${admin}` },
+    );
+    categoryId = cat.data.id;
   });
 
   it('GET /products is public', async () => {
@@ -37,16 +45,22 @@ describe('product-service HTTP (admin writes, public reads)', () => {
 
   it('POST /products requires admin', async () => {
     await expect(
-      httpJson<any>('POST', `${PRODUCT_HTTP}/products`,
-        { data: { title: 'E2E Widget', price: 199.99 } },
-        { authorization: `Bearer ${user}` })
+      httpJson<any>(
+        'POST',
+        `${PRODUCT_HTTP}/products`,
+        { data: { title: 'E2E Widget', price: 199.99, categoryId } },
+        { authorization: `Bearer ${user}` },
+      ),
     ).rejects.toBeTruthy();
   });
 
   it('POST /products (admin) creates', async () => {
-    const res = await httpJson<any>('POST', `${PRODUCT_HTTP}/products`,
-      { data: { title: 'E2E Widget', price: 199.99 } },
-      { authorization: `Bearer ${admin}` });
+    const res = await httpJson<any>(
+      'POST',
+      `${PRODUCT_HTTP}/products`,
+      { data: { title: 'E2E Widget', price: 199.99, categoryId } },
+      { authorization: `Bearer ${admin}` },
+    );
     id = res.data.id;
     expect(res.data.title).toBe('E2E Widget');
   });
@@ -57,9 +71,12 @@ describe('product-service HTTP (admin writes, public reads)', () => {
   });
 
   it('PATCH /products/:id (admin) updates', async () => {
-    const res = await httpJson<any>('PATCH', `${PRODUCT_HTTP}/products/${id}`,
+    const res = await httpJson<any>(
+      'PATCH',
+      `${PRODUCT_HTTP}/products/${id}`,
       { patch: { title: 'E2E Widget Pro' } },
-      { authorization: `Bearer ${admin}` });
+      { authorization: `Bearer ${admin}` },
+    );
     expect(res.data.title).toBe('E2E Widget Pro');
   });
 

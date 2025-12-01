@@ -11,9 +11,10 @@ export function minuteBucket() {
   return Math.floor(Date.now() / 60_000);
 }
 
+
 export function mdS2S(opts?: { svc?: string; userId?: string; role?: 'user'|'admin'|'root-admin' }) {
   const secret = process.env.GATEWAY_SECRET ?? process.env.S2S_SECRET ?? 'dev-secret';
-  const svc    = opts?.svc ?? process.env.SVC_NAME ?? 'gateway';
+  const svc    = opts?.svc ?? process.env.SVC_NAME ?? 'taxonomy-service';
 
   const payload = `${minuteBucket()}:${svc}`;
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -26,6 +27,7 @@ export function mdS2S(opts?: { svc?: string; userId?: string; role?: 'user'|'adm
 
   return md;
 }
+
 
 export function loadClient<T>(opts: { url: string; protoPath: string; pkg: string[]; svc: string; }): T {
   const loader = protoLoader.loadSync(opts.protoPath, {

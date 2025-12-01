@@ -10,20 +10,6 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-model ProductCategory {
-  id        String    @id @default(uuid()) @db.Uuid
-  slug      String    @unique
-  title     String
-  isHidden  Boolean   @default(false)
-  isSystem  Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  products  Product[]
-
-  @@map("product_category")
-}
-
 model Product {
   id               String                @id @default(uuid())
   slug             String                @unique
@@ -64,7 +50,6 @@ model Product {
   deletedAt        DateTime?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
-  category         ProductCategory       @relation(fields: [categoryId], references: [id])
   attributes       ProductAttribute[]
   comments         ProductComment[]
   gallery          ProductGalleryImage[]
