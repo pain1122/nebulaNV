@@ -4,7 +4,7 @@ export const rootEnvSchema = Joi.object({
   // ------------------------------------------
   // 🌍 Environment and Global Behavior
   // ------------------------------------------
-  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('default'),
   PUBLIC_MODE: Joi.string().valid('OPEN', 'OPTIONAL_AUTH', 'GATEWAY_ONLY').default('OPEN'),
 
   // ------------------------------------------

@@ -5,8 +5,8 @@ import {firstValueFrom} from "rxjs"
 import {Prisma, ProductStatus} from "../../prisma/generated"
 import {SETTINGS_SERVICE} from "../settings-client.module"
 import {getSettings, type SettingsProxy} from "@nebula/clients"
-import { TAXONOMY_SERVICE } from "../taxonomy-client.module";
-import { getTaxonomy, type TaxonomyProxy } from "@nebula/clients";
+import {TAXONOMY_SERVICE} from "../taxonomy-client.module"
+import {getTaxonomy, type TaxonomyProxy} from "@nebula/clients"
 
 function mapPrisma(e: any) {
   // P2002 unique constraint failed (slug/sku)
@@ -129,12 +129,12 @@ export class ProductServiceImpl {
       this.settings().GetString({
         namespace: "product",
         environment: "default",
-        key: "defaultProductCategoryTaxonomyId",
+        key: "default_product_category",
       })
     )
 
     if (!res?.value) {
-      throw new BadRequestException("Default category not configured. Set product/defaultProductCategoryTaxonomyId in settings-service.")
+      throw new BadRequestException("Default category not configured. Set product/default_product_category in settings-service.")
     }
 
     // Validate that this ID actually points at a product category taxonomy
@@ -290,8 +290,11 @@ export class ProductServiceImpl {
     if (patch.price != null) this.assertPrice(patch.price)
 
     let nextCategoryId: string | undefined
-    if ("categoryId" in patch) {
+
+    // ✅ Only change category if the client actually sent categoryId
+    if (patch.categoryId !== undefined) {
       if (patch.categoryId === "" || patch.categoryId == null) {
+        // Explicitly reset to default category
         nextCategoryId = await this.getDefaultCategoryId()
       } else {
         await this.assertCategoryExists(patch.categoryId)
@@ -316,7 +319,9 @@ export class ProductServiceImpl {
           currency: patch.currency ?? undefined,
           status: asStatus(patch.status),
 
+          // ✅ Only set when we actually decided a nextCategoryId
           categoryId: nextCategoryId,
+
           thumbnailUrl: patch.thumbnailUrl ?? undefined,
           model3dUrl: patch.model3dUrl ?? undefined,
           model3dFormat: patch.model3dFormat ?? undefined,

@@ -259,3 +259,88 @@ service ProductService {
   rpc ReorderImages (ReorderImagesRequest) returns (GalleryResponse);
   rpc RemoveImage   (RemoveImageRequest)   returns (GalleryResponse);
 }
+
+
+// -----------------------------------------
+// Product Taxonomy DTOs (proxying taxonomy-service)
+// -----------------------------------------
+message ProductTaxonomy {
+  string id          = 1;
+  string scope       = 2;
+  string kind        = 3;
+  string slug        = 4;
+  string title       = 5;
+  string description = 6;
+  string parentId    = 7;
+  string path        = 8;
+  bool   isHidden    = 9;
+  bool   isSystem    = 10;
+  int32  sortOrder   = 11;
+  bool   hasChildren = 12;
+
+  string createdAt   = 13;
+  string updatedAt   = 14;
+}
+
+message ProductTaxonomyResponse {
+  ProductTaxonomy data = 1;
+}
+
+message ListProductTaxonomiesRequest {
+  string kind     = 1; // e.g. "category.default", "brand", "tag"
+  int32  page     = 2;
+  int32  limit    = 3;
+  string q        = 4;
+  string parentId = 5; // optional: filter by parent
+}
+
+message ListProductTaxonomiesResponse {
+  repeated ProductTaxonomy data = 1;
+  int32 page                    = 2;
+  int32 limit                   = 3;
+  int32 total                   = 4;
+}
+
+message GetProductTaxonomyRequest {
+  string id = 1;
+}
+
+message CreateProductTaxonomyRequest {
+  string kind        = 1; // which taxonomy kind we are creating in
+  string slug        = 2;
+  string title       = 3;
+  string description = 4;
+  string parentId    = 5;
+  bool   isHidden    = 6;
+  int32  sortOrder   = 7;
+}
+
+message UpdateProductTaxonomyRequest {
+  string id          = 1;
+  string slug        = 2;
+  string title       = 3;
+  string description = 4;
+  string parentId    = 5;
+  bool   isHidden    = 6;
+  int32  sortOrder   = 7;
+}
+
+message DeleteProductTaxonomyRequest {
+  string id = 1;
+}
+
+message DeleteProductTaxonomyResponse {
+  bool success = 1;
+}
+
+// -----------------------------------------
+// ProductTaxonomyService – exposed by product-service
+// but backed by taxonomy-service
+// -----------------------------------------
+service ProductTaxonomyService {
+  rpc List   (ListProductTaxonomiesRequest)   returns (ListProductTaxonomiesResponse);
+  rpc Get    (GetProductTaxonomyRequest)      returns (ProductTaxonomyResponse);
+  rpc Create (CreateProductTaxonomyRequest)   returns (ProductTaxonomyResponse);
+  rpc Update (UpdateProductTaxonomyRequest)   returns (ProductTaxonomyResponse);
+  rpc Delete (DeleteProductTaxonomyRequest)   returns (DeleteProductTaxonomyResponse);
+}

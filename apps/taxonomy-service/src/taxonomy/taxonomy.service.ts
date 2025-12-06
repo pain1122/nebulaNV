@@ -1,12 +1,7 @@
 // apps/taxonomy-service/src/taxonomy/taxonomy.service.ts
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from "@nestjs/common"
-import { PrismaService } from "../prisma.service"
-import { Prisma } from "../../prisma/generated"
+import {Injectable, NotFoundException, BadRequestException, Logger} from "@nestjs/common"
+import {PrismaService} from "../prisma.service"
+import {Prisma} from "../../prisma/generated"
 
 const SAFE = /^[a-z0-9][a-z0-9._-]*$/
 const norm = (s: string | undefined | null) => (s ?? "").trim().toLowerCase()
@@ -53,8 +48,7 @@ export class TaxonomyService {
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
       // used by gRPC/proto
-      hasChildren:
-        typeof t._childCount === "number" ? t._childCount > 0 : false,
+      hasChildren: typeof t._childCount === "number" ? t._childCount > 0 : false,
     }
   }
 
@@ -69,11 +63,10 @@ export class TaxonomyService {
         throw new BadRequestException("invalid_parent_cycle")
       }
 
-      const node: { parentId: string | null } | null =
-        await this.prisma.taxonomy.findUnique({
-          where: { id: currentId },
-          select: { parentId: true },
-        })
+      const node: {parentId: string | null} | null = await this.prisma.taxonomy.findUnique({
+        where: {id: currentId},
+        select: {parentId: true},
+      })
 
       if (!node) break
       currentId = node.parentId
@@ -84,8 +77,13 @@ export class TaxonomyService {
   // List
   // ---------------------------
   async list(q: any) {
-    const page = Number(q.page ?? 1)
-    const limit = Math.min(Number(q.limit ?? 50), 100)
+    // handle 0 from gRPC as "unset"
+    const rawPage = Number(q.page ?? 0)
+    const rawLimit = Number(q.limit ?? 0)
+
+    const page = rawPage > 0 ? rawPage : 1
+    let limit = rawLimit > 0 ? rawLimit : 50
+    limit = Math.min(limit, 100)
 
     const scope = norm(q.scope)
     const kind = norm(q.kind)
@@ -97,32 +95,17 @@ export class TaxonomyService {
     const where: Prisma.TaxonomyWhereInput = {
       scope: scope || undefined,
       kind: kind || undefined,
-      OR: search
-        ? [
-            {
-              title: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
-            {
-              slug: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
-          ]
-        : undefined,
+      OR: search ? [{title: {contains: search, mode: "insensitive"}}, {slug: {contains: search, mode: "insensitive"}}] : undefined,
     }
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.taxonomy.findMany({
         where,
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        orderBy: [{sortOrder: "asc"}, {createdAt: "asc"}],
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.taxonomy.count({ where }),
+      this.prisma.taxonomy.count({where}),
     ])
 
     return {
@@ -137,16 +120,19 @@ export class TaxonomyService {
   // Get by ID
   // ---------------------------
   async get(id: string) {
+    const cleanId = (id ?? "").trim();
+    if (!cleanId) {
+      throw new NotFoundException("taxonomy_not_found");
+    }
     const t = await this.prisma.taxonomy.findUnique({
-      where: { id },
-      // include child count for hasChildren flag
+      where: { id: cleanId },
       include: {
         children: {
           select: { id: true },
           take: 1,
         },
       } as any,
-    })
+    });
 
     if (!t) throw new NotFoundException("taxonomy_not_found")
 
@@ -155,7 +141,7 @@ export class TaxonomyService {
       _childCount: (t as any).children?.length ?? 0,
     })
 
-    return { data: dto }
+    return {data: dto}
   }
 
   // ---------------------------
@@ -171,11 +157,11 @@ export class TaxonomyService {
     assertSafe("slug", slug)
 
     const t = await this.prisma.taxonomy.findFirst({
-      where: { scope, kind, slug },
+      where: {scope, kind, slug},
     })
 
     if (!t) throw new NotFoundException("taxonomy_not_found")
-    return { data: this.toDto(t) }
+    return {data: this.toDto(t)}
   }
 
   // ---------------------------
@@ -208,7 +194,7 @@ export class TaxonomyService {
 
     if (parentId) {
       const parent = await this.prisma.taxonomy.findUnique({
-        where: { id: parentId },
+        where: {id: parentId},
       })
       if (!parent) {
         throw new NotFoundException("taxonomy_parent_not_found")
@@ -241,7 +227,7 @@ export class TaxonomyService {
         },
       })
 
-      return { data: this.toDto(created) }
+      return {data: this.toDto(created)}
     } catch (e: any) {
       this.log.error("createTaxonomy failed", e?.meta ?? e)
 
@@ -257,7 +243,7 @@ export class TaxonomyService {
   // Update
   // ---------------------------
   async update(id: string, patch: any) {
-    const current = await this.prisma.taxonomy.findUnique({ where: { id } })
+    const current = await this.prisma.taxonomy.findUnique({where: {id}})
     if (!current) throw new NotFoundException("taxonomy_not_found")
 
     const scope = patch.scope ? norm(patch.scope) : current.scope
@@ -268,8 +254,7 @@ export class TaxonomyService {
     assertSafe("kind", kind)
     assertSafe("slug", slug)
 
-    const title =
-      patch.title !== undefined ? (patch.title ?? "").trim() : current.title
+    const title = patch.title !== undefined ? (patch.title ?? "").trim() : current.title
     if (!title) {
       throw new BadRequestException("title_required")
     }
@@ -282,11 +267,7 @@ export class TaxonomyService {
       parentId = current.parentId
     }
 
-    const isTree =
-      Object.prototype.hasOwnProperty.call(patch, "isTree") &&
-      patch.isTree !== undefined
-        ? patch.isTree
-        : current.isTree ?? !!parentId
+    const isTree = Object.prototype.hasOwnProperty.call(patch, "isTree") && patch.isTree !== undefined ? patch.isTree : (current.isTree ?? !!parentId)
 
     let depth = current.depth ?? 0
     let path = current.path ?? current.slug
@@ -299,7 +280,7 @@ export class TaxonomyService {
       await this.assertNoCycle(id, parentId)
 
       const parent = await this.prisma.taxonomy.findUnique({
-        where: { id: parentId },
+        where: {id: parentId},
       })
       if (!parent) {
         throw new BadRequestException("invalid_parent_not_found")
@@ -318,31 +299,25 @@ export class TaxonomyService {
 
     try {
       const updated = await this.prisma.taxonomy.update({
-        where: { id },
+        where: {id},
         data: {
           scope,
           kind,
           slug,
           title,
-          description:
-            patch.description !== undefined
-              ? patch.description
-              : current.description,
+          description: patch.description !== undefined ? patch.description : current.description,
           isTree,
           parentId,
           depth,
           path,
-          isHidden:
-            patch.isHidden !== undefined ? patch.isHidden : current.isHidden,
-          isSystem:
-            patch.isSystem !== undefined ? patch.isSystem : current.isSystem,
-          sortOrder:
-            patch.sortOrder !== undefined ? patch.sortOrder : current.sortOrder,
+          isHidden: patch.isHidden !== undefined ? patch.isHidden : current.isHidden,
+          isSystem: patch.isSystem !== undefined ? patch.isSystem : current.isSystem,
+          sortOrder: patch.sortOrder !== undefined ? patch.sortOrder : current.sortOrder,
           meta: patch.meta !== undefined ? patch.meta : current.meta,
         },
       })
 
-      return { data: this.toDto(updated) }
+      return {data: this.toDto(updated)}
     } catch (e: any) {
       this.log.error(`updateTaxonomy failed id=${id}`, e?.meta ?? e)
 
@@ -359,15 +334,23 @@ export class TaxonomyService {
   // ---------------------------
   async delete(id: string) {
     const childCount = await this.prisma.taxonomy.count({
-      where: { parentId: id },
+      where: {parentId: id},
     })
+
+    const existing = await this.prisma.taxonomy.findUnique({where: {id}})
+    if (!existing) throw new NotFoundException("taxonomy_not_found")
+
+    // Global rule: system taxonomies cannot be deleted
+    if (existing.isSystem) {
+      throw new BadRequestException("system_taxonomy_cannot_be_deleted")
+    }
 
     if (childCount > 0) {
       throw new BadRequestException("taxonomy_has_children")
     }
 
     try {
-      await this.prisma.taxonomy.delete({ where: { id } })
+      await this.prisma.taxonomy.delete({where: {id}})
       return true
     } catch (e: any) {
       // P2025 = record not found
