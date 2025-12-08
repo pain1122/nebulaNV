@@ -52,6 +52,7 @@ message ListTaxonomiesRequest {
   string q     = 3;
   int32  page  = 4;
   int32  limit = 5;
+  string parentId = 6;
 }
 
 message ListTaxonomiesResponse {

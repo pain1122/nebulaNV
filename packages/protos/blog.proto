@@ -102,3 +102,89 @@ service BlogService {
   rpc UpdatePost (UpdatePostRequest)  returns (PostResponse);
   rpc DeletePost (DeletePostRequest)  returns (BasicResponse);
 }
+
+
+// -----------------------------------------
+// Blog taxonomy – backed by taxonomy-service
+// scope will be hard-locked to "blog" in blog-service
+// -----------------------------------------
+message BlogTaxonomy {
+  string id          = 1;
+  string scope       = 2;
+  string kind        = 3;
+  string slug        = 4;
+  string title       = 5;
+  string description = 6;
+  string parentId    = 7;
+  string path        = 8;
+  bool   isHidden    = 9;
+  bool   isSystem    = 10;
+  int32  sortOrder   = 11;
+  bool   hasChildren = 12;
+
+  string createdAt   = 13;
+  string updatedAt   = 14;
+}
+
+message BlogTaxonomyResponse {
+  BlogTaxonomy data = 1;
+}
+
+message ListBlogTaxonomiesRequest {
+  string kind     = 1; // e.g. "category.default", "tag.default"
+  int32  page     = 2;
+  int32  limit    = 3;
+  string q        = 4;
+  string parentId = 5; // optional: filter by parent
+}
+
+message ListBlogTaxonomiesResponse {
+  repeated BlogTaxonomy data = 1;
+  int32 page                  = 2;
+  int32 limit                 = 3;
+  int32 total                 = 4;
+}
+
+message GetBlogTaxonomyRequest {
+  string id = 1;
+}
+
+message CreateBlogTaxonomyRequest {
+  string kind        = 1;
+  string slug        = 2;
+  string title       = 3;
+  string description = 4;
+  string parentId    = 5; // optional
+  bool   isHidden    = 6;
+  int32  sortOrder   = 7;
+}
+
+message UpdateBlogTaxonomyRequest {
+  string id          = 1;
+  string slug        = 2;
+  string title       = 3;
+  string description = 4;
+  string parentId    = 5;
+  bool   isHidden    = 6;
+  int32  sortOrder   = 7;
+}
+
+message DeleteBlogTaxonomyRequest {
+  string id = 1;
+}
+
+message DeleteBlogTaxonomyResponse {
+  bool success = 1;
+}
+
+// -----------------------------------------
+// BlogTaxonomyService – exposed by blog-service
+// but backed by taxonomy-service
+// -----------------------------------------
+service BlogTaxonomyService {
+  rpc List   (ListBlogTaxonomiesRequest)   returns (ListBlogTaxonomiesResponse);
+  rpc Get    (GetBlogTaxonomyRequest)      returns (BlogTaxonomyResponse);
+  rpc Create (CreateBlogTaxonomyRequest)   returns (BlogTaxonomyResponse);
+  rpc Update (UpdateBlogTaxonomyRequest)   returns (BlogTaxonomyResponse);
+  rpc Delete (DeleteBlogTaxonomyRequest)   returns (DeleteBlogTaxonomyResponse);
+}

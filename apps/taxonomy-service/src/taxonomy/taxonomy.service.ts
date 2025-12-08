@@ -77,7 +77,6 @@ export class TaxonomyService {
   // List
   // ---------------------------
   async list(q: any) {
-    // handle 0 from gRPC as "unset"
     const rawPage = Number(q.page ?? 0)
     const rawLimit = Number(q.limit ?? 0)
 
@@ -87,6 +86,7 @@ export class TaxonomyService {
 
     const scope = norm(q.scope)
     const kind = norm(q.kind)
+    const parentId = (q.parentId ?? "").trim()
     const search = (q.q ?? "").trim()
 
     if (scope) assertSafe("scope", scope)
@@ -95,9 +95,11 @@ export class TaxonomyService {
     const where: Prisma.TaxonomyWhereInput = {
       scope: scope || undefined,
       kind: kind || undefined,
+      parentId: parentId ? parentId : undefined,
       OR: search ? [{title: {contains: search, mode: "insensitive"}}, {slug: {contains: search, mode: "insensitive"}}] : undefined,
     }
 
+    // 1) Page results + total
     const [items, total] = await this.prisma.$transaction([
       this.prisma.taxonomy.findMany({
         where,
@@ -108,8 +110,33 @@ export class TaxonomyService {
       this.prisma.taxonomy.count({where}),
     ])
 
+    // 2) Compute child counts for these specific items
+    const ids = items.map((i) => i.id)
+    let childCountByParentId: Record<string, number> = {}
+
+    if (ids.length > 0) {
+      const grouped = await this.prisma.taxonomy.groupBy({
+        by: ["parentId"],
+        _count: {_all: true},
+        where: {
+          parentId: {in: ids},
+        },
+      })
+
+      childCountByParentId = Object.fromEntries(
+        grouped
+          .filter((g) => g.parentId) // ignore null parents
+          .map((g) => [g.parentId as string, g._count._all])
+      )
+    }
+
     return {
-      data: items.map((t) => this.toDto(t)),
+      data: items.map((t) =>
+        this.toDto({
+          ...t,
+          _childCount: childCountByParentId[t.id] ?? 0,
+        })
+      ),
       page,
       limit,
       total,
@@ -120,19 +147,19 @@ export class TaxonomyService {
   // Get by ID
   // ---------------------------
   async get(id: string) {
-    const cleanId = (id ?? "").trim();
+    const cleanId = (id ?? "").trim()
     if (!cleanId) {
-      throw new NotFoundException("taxonomy_not_found");
+      throw new NotFoundException("taxonomy_not_found")
     }
     const t = await this.prisma.taxonomy.findUnique({
-      where: { id: cleanId },
+      where: {id: cleanId},
       include: {
         children: {
-          select: { id: true },
+          select: {id: true},
           take: 1,
         },
       } as any,
-    });
+    })
 
     if (!t) throw new NotFoundException("taxonomy_not_found")
 

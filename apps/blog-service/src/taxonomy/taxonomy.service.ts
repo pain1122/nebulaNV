@@ -15,8 +15,8 @@ export type ListTaxonomyQuery = {
 
 @Injectable()
 export class TaxonomyService {
-  // hard-lock product scope
-  private readonly scope = "product"
+  // hard-lock blog scope
+  private readonly scope = "blog"
 
   constructor(@Inject(TAXONOMY_SERVICE) private readonly taxonomyClient: ClientGrpc) {}
 
@@ -59,7 +59,7 @@ export class TaxonomyService {
     const res = await firstValueFrom(this.taxonomy().GetTaxonomy({id}))
 
     if (!res.data || res.data.scope !== this.scope) {
-      throw new BadRequestException("taxonomy_not_in_product_scope")
+      throw new BadRequestException("taxonomy_not_in_blog_scope")
     }
 
     return {data: res.data}
@@ -99,10 +99,10 @@ export class TaxonomyService {
   // Update (by ID only)
   // ---------------------------
   async update(id: string, dto: UpdateTaxonomyDto) {
-    // First make sure this taxonomy belongs to product scope
+    // First make sure this taxonomy belongs to blog scope
     const existing = await firstValueFrom(this.taxonomy().GetTaxonomy({id}))
     if (!existing.data || existing.data.scope !== this.scope) {
-      throw new BadRequestException("taxonomy_not_in_product_scope")
+      throw new BadRequestException("taxonomy_not_in_blog_scope")
     }
 
     const patch: any = {
@@ -134,7 +134,7 @@ export class TaxonomyService {
   async remove(id: string) {
     const existing = await firstValueFrom(this.taxonomy().GetTaxonomy({id}))
     if (!existing.data || existing.data.scope !== this.scope) {
-      throw new BadRequestException("taxonomy_not_in_product_scope")
+      throw new BadRequestException("taxonomy_not_in_blog_scope")
     }
 
     await firstValueFrom(this.taxonomy().DeleteTaxonomy({id}))

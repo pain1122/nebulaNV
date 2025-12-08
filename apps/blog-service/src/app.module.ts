@@ -10,6 +10,8 @@ import { BlogModule } from "./blog/blog.module";
 import { SettingsClientModule } from "./settings-client.module";
 import { AuthClientModule } from "./auth-client.module";
 import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { TaxonomyModule } from "./taxonomy/taxonomy.module"
+import { TaxonomyClientModule } from "./taxonomy-client.module"
 
 export const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
 
@@ -35,6 +37,10 @@ export const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
     // gRPC clients
     SettingsClientModule,
     AuthClientModule,
+
+    TaxonomyClientModule,
+    // local taxonomy façade
+    TaxonomyModule,
   ],
   providers: [
     Reflector,

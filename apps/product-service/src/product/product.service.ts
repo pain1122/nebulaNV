@@ -134,7 +134,9 @@ export class ProductServiceImpl {
     )
 
     if (!res?.value) {
-      throw new BadRequestException("Default category not configured. Set product/default_product_category in settings-service.")
+      throw new BadRequestException(
+        "Default category not configured. Set product/default_product_category in settings-service.",
+      )
     }
 
     // Validate that this ID actually points at a product category taxonomy
