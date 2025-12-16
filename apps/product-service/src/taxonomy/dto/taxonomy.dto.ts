@@ -1,6 +1,6 @@
 // apps/product-service/src/taxonomy/dto/taxonomy.dto.ts
 
-import { IsOptional, IsString, IsUUID, IsBoolean, IsInt, IsObject } from "class-validator"
+import { IsOptional, IsString, IsUUID, IsBoolean, IsInt, IsObject, ValidateIf } from "class-validator"
 
 export class CreateTaxonomyDto {
   @IsString()
@@ -48,6 +48,7 @@ export class UpdateTaxonomyDto {
   description?: string
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsUUID()
   parentId?: string | null
 

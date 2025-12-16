@@ -5,3 +5,4 @@ export * as productv1 from "./generated/product";
 export * as settings from "./generated/settings";
 export * as blogv1 from "./generated/blog";
 export * as taxonomy from "./generated/taxonomy";
+export * as media from "./generated/media";

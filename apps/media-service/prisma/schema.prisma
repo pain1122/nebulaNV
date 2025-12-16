@@ -1,0 +1,42 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "./generated"
+  binaryTargets = ["native", "linux-musl"]
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Media {
+  id          String   @id @default(uuid()) @db.Uuid
+
+  // storage
+  storage     String   @default("local") // local|s3|minio|r2...
+  bucket      String?  // optional for object stores
+  path        String   // absolute or relative path to storage root
+  filename    String
+  mimeType    String
+  sizeBytes   BigInt
+
+  // image/video optional meta
+  width       Int?
+  height      Int?
+  durationSec Int?
+
+  // ownership + access
+  ownerId     String?  @db.Uuid
+  visibility  String   @default("private") // private|public
+  scope       String   @default("panel")   // panel|user|system (whatever you want)
+
+  // dedupe & integrity
+  sha256      String?  @unique
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([visibility])
+}

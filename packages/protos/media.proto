@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package media;
+
+message Empty {}
+
+message Pong {
+  string message = 1;
+}
+
+// ---- Core DTOs ----
+
+message Media {
+  string id = 1;
+
+  // storage
+  string storage = 2;   // local|s3|minio|r2...
+  string bucket = 3;    // optional
+  string path = 4;
+  string filename = 5;
+  string mimeType = 6;
+  string sizeBytes = 7; // BigInt -> string
+
+  // optional meta
+  int32 width = 8;
+  int32 height = 9;
+  int32 durationSec = 10;
+
+  // ownership + access
+  string ownerId = 11;     // uuid or empty
+  string visibility = 12;  // private|public
+  string scope = 13;       // panel|user|system
+
+  // integrity
+  string sha256 = 14;
+
+  string createdAt = 15; // ISO string
+  string updatedAt = 16; // ISO string
+}
+
+// ---- RPCs ----
+
+message CreateReq {
+  string storage = 1;
+  string bucket = 2;
+  string path = 3;
+  string filename = 4;
+  string mimeType = 5;
+  string sizeBytes = 6;
+
+  int32 width = 7;
+  int32 height = 8;
+  int32 durationSec = 9;
+
+  string ownerId = 10;
+  string visibility = 11;
+  string scope = 12;
+
+  string sha256 = 13;
+}
+
+message MediaRes {
+  Media media = 1;
+}
+
+message GetByIdReq {
+  string id = 1;
+}
+
+message ListReq {
+  string q = 1;
+  int32 take = 2;
+  int32 skip = 3;
+
+  // optional filtering (future-proof)
+  string ownerId = 4;
+  string visibility = 5;
+  string scope = 6;
+}
+
+message ListRes {
+  repeated Media items = 1;
+}
+
+message DeleteByIdReq {
+  string id = 1;
+}
+
+message DeleteRes {
+  bool deleted = 1;
+}
+
+service MediaService {
+  rpc Ping(Empty) returns (Pong);
+
+  rpc Create(CreateReq) returns (MediaRes);
+  rpc GetById(GetByIdReq) returns (MediaRes);
+  rpc List(ListReq) returns (ListRes);
+  rpc DeleteById(DeleteByIdReq) returns (DeleteRes);
+}
