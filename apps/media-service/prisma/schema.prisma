@@ -10,33 +10,60 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
+enum MediaStatus {
+  PENDING
+  READY
+  BLOCKED
+  DELETED
+}
+
+enum ScanStatus {
+  NONE
+  QUEUED
+  SCANNING
+  CLEAN
+  INFECTED
+  FAILED
+}
+
 model Media {
   id          String   @id @default(uuid()) @db.Uuid
 
-  // storage
-  storage     String   @default("local") // local|s3|minio|r2...
-  bucket      String?  // optional for object stores
-  path        String   // absolute or relative path to storage root
+  storage     String   @default("local")
+  bucket      String?
+  path        String
   filename    String
   mimeType    String
-  sizeBytes   BigInt
+  sizeBytes   Int
 
-  // image/video optional meta
   width       Int?
   height      Int?
   durationSec Int?
 
-  // ownership + access
   ownerId     String?  @db.Uuid
-  visibility  String   @default("private") // private|public
-  scope       String   @default("panel")   // panel|user|system (whatever you want)
+  visibility  String   @default("private")
+  scope       String   @default("panel")
 
-  // dedupe & integrity
   sha256      String?  @unique
+
+  // ✅ lifecycle + malware pipeline
+  status      MediaStatus @default(PENDING)
+  scanStatus  ScanStatus  @default(NONE)
+  scannedAt   DateTime?
+  scanError   String?
+
+  // ✅ requested fields
+  quarantineReason String?   // why blocked/quarantined
+  etag             String?   // storage metadata to lock integrity
+  promotedAt       DateTime? // when moved from pending -> ready path
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([ownerId])
   @@index([visibility])
+  @@index([scope])
+  @@index([status])
+  @@index([scanStatus])
+  @@index([promotedAt])
 }

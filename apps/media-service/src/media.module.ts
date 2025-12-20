@@ -14,7 +14,7 @@ import { envSchema } from "./config/env.validation"
 import { GrpcTokenAuthGuard } from "@nebula/grpc-auth"
 
 const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto")
-export const MEDIA_PROTO = require.resolve("@nebula/protos/auth.proto")
+export const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto")
 
 @Module({
   imports: [

@@ -31,4 +31,13 @@ export class ListMediaDto {
   @IsOptional()
   @IsIn(["panel", "user", "system"])
   scope?: string
+
+  // ✅ new lifecycle filters (DTO-only, no Prisma typing)
+  @IsOptional()
+  @IsIn(["PENDING", "READY", "BLOCKED", "DELETED"])
+  status?: string
+
+  @IsOptional()
+  @IsIn(["NONE", "QUEUED", "SCANNING", "CLEAN", "INFECTED", "FAILED"])
+  scanStatus?: string
 }

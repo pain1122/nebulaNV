@@ -1,53 +1,66 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Min } from "class-validator"
 import { Transform } from "class-transformer"
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Min, Max } from "class-validator"
 
 const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+const MAX_INT_32 = 2_147_483_647
+
+const trim = ({ value }: any) => (typeof value === "string" ? value.trim() : value)
 
 export class CreateMediaDto {
   @IsOptional()
   @IsString()
+  @Transform(trim)
+  @IsIn(["local", "s3", "minio", "r2"])
   storage?: string // default: "local"
 
   @IsOptional()
   @IsString()
-  bucket?: string
+  @Transform(trim)
+  bucket?: string | null
 
   @IsString()
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @Transform(trim)
   path!: string
 
   @IsString()
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @Transform(trim)
   @Matches(SAFE_FILENAME, { message: "filename is not safe" })
   filename!: string
 
   @IsString()
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @Transform(trim)
   mimeType!: string
 
-  // Prisma BigInt -> accept as string (e.g. "12345")
-  @IsString()
-  @Matches(/^\d+$/, { message: "sizeBytes must be a numeric string" })
-  sizeBytes!: string
-
-  @IsOptional()
+  // Keep as string for HTTP + gRPC parity, service converts via Number()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
+  sizeBytes!: number
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT_32)
   width?: number
 
   @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
+  @Max(MAX_INT_32)
   height?: number
 
   @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
+  @Max(MAX_INT_32)
   durationSec?: number
 
   @IsOptional()
   @IsUUID()
-  ownerId?: string
+  ownerId?: string | null
 
   @IsOptional()
   @IsIn(["private", "public"])
@@ -59,5 +72,6 @@ export class CreateMediaDto {
 
   @IsOptional()
   @IsString()
-  sha256?: string
+  @Transform(trim)
+  sha256?: string | null
 }
