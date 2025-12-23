@@ -19,7 +19,7 @@ message Media {
   string path = 4;
   string filename = 5;
   string mimeType = 6;
-  string sizeBytes = 7; // BigInt -> string
+  string sizeBytes = 7; // numeric string
 
   // optional meta
   int32 width = 8;
@@ -36,6 +36,20 @@ message Media {
 
   string createdAt = 15; // ISO string
   string updatedAt = 16; // ISO string
+
+  // ---- lifecycle / security ----
+  // PENDING|READY|QUARANTINED|DELETED (you decide exact enum-like strings)
+  string status = 17;
+
+  // PENDING|CLEAN|INFECTED|FAILED
+  string scanStatus = 18;
+
+  // optional details
+  string quarantineReason = 19;
+
+  // storage metadata (optional)
+  string etag = 20;
+  string promotedAt = 21; // ISO string (empty if not promoted)
 }
 
 // ---- RPCs ----
@@ -76,6 +90,10 @@ message ListReq {
   string ownerId = 4;
   string visibility = 5;
   string scope = 6;
+
+  // optional lifecycle filtering
+  string status = 7;
+  string scanStatus = 8;
 }
 
 message ListRes {
@@ -90,11 +108,56 @@ message DeleteRes {
   bool deleted = 1;
 }
 
+// ---- Presign / Finalize ----
+
+message PresignUploadReq {
+  string filename = 1;
+  string mimeType = 2;
+  string ownerId = 3;
+  string visibility = 4;
+  string scope = 5;
+}
+
+message PresignUploadRes {
+  string storage = 1;
+  string bucket = 2;
+  string path = 3;
+  string uploadUrl = 4;
+  int32 expiresIn = 5;
+
+  string filename = 6;
+  string mimeType = 7;
+  string visibility = 8;
+  string scope = 9;
+}
+
+message FinalizeUploadReq {
+  // must match what presign returned (pending path)
+  string storage = 1;   // usually "s3"
+  string bucket = 2;
+  string path = 3;
+
+  // client-provided metadata (not trusted; used as hints)
+  string filename = 4;
+  string mimeType = 5;
+  string visibility = 6;
+  string scope = 7;
+
+  // optional
+  string ownerId = 8;
+  string sha256 = 9; // if client computed; optional
+}
+
 service MediaService {
   rpc Ping(Empty) returns (Pong);
 
+  // legacy (we'll stop using it in tests later, but keep for compatibility)
   rpc Create(CreateReq) returns (MediaRes);
+
   rpc GetById(GetByIdReq) returns (MediaRes);
   rpc List(ListReq) returns (ListRes);
   rpc DeleteById(DeleteByIdReq) returns (DeleteRes);
+
+  rpc PresignUpload(PresignUploadReq) returns (PresignUploadRes);
+  rpc FinalizeUpload(FinalizeUploadReq) returns (MediaRes);
 }
