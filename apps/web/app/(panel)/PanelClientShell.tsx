@@ -2,6 +2,7 @@
 
 import {useEffect} from "react"
 import {usePathname} from "next/navigation"
+import { loadTokens } from "@/lib/auth/tokens"
 
 type Props = {
   children: React.ReactNode
@@ -33,6 +34,7 @@ export default function PanelClientShell({children}: Props) {
   const pathname = usePathname()
 
   useEffect(() => {
+    loadTokens()
     const root = document.documentElement
 
     // ---------- 1) Bootstrap defaultAttribute like original script ----------

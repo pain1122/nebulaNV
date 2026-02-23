@@ -2,6 +2,7 @@
 
 import React, {useEffect, useMemo, useState} from "react"
 import TagifyInput, {type TagItem} from "@/components/forms/TagifyInput"
+import {apiFetch} from "@/lib/api/apiFetch"
 
 type TaxonomyKind = "product_cat" | "product_tag" | "product_attribute" | "product_variable"
 
@@ -69,7 +70,7 @@ export default function AddTaxonomyOffcanvas({open, onClose, kind, titleLabel, p
     try {
       const parentId = showParent ? (parent?.[0]?.id ?? null) : null
 
-      const res = await fetch("/api/taxonomy/create", {
+      const res = await apiFetch("/api/taxonomy/create", {
         method: "POST",
         headers: {"content-type": "application/json"},
         body: JSON.stringify({

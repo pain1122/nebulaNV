@@ -5,7 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
 import helmet from "helmet";
 import compression from "compression";
-import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
 
 function getHttpPort(cfg: ConfigService): number {
   const p = cfg.get<string>("PORT") || cfg.get<string>("BLOG_HTTP_PORT") || "3004";
@@ -14,8 +14,8 @@ function getHttpPort(cfg: ConfigService): number {
 
 function getGrpcBind(cfg: ConfigService): string {
   const grpcPort = cfg.get<string>("GRPC_PORT");
-  if (grpcPort) return `127.0.0.1:${grpcPort}`;
-  return cfg.get<string>("BLOG_GRPC_URL") || "127.0.0.1:50055";
+  if (grpcPort) return `0.0.0.0:${grpcPort}`;
+  return cfg.get<string>("BLOG_GRPC_URL") || "0.0.0.0:50055";
 }
 
 async function bootstrap() {
@@ -43,7 +43,7 @@ async function bootstrap() {
     options: { package: "blog", protoPath: BLOG_PROTO, url: grpcUrl },
   });
 
-  micro.useGlobalGuards(app.get(GrpcTokenAuthGuard)); // for future gRPC endpoints
+  micro.useGlobalGuards(app.get(S2SGuard),app.get(GrpcTokenAuthGuard)); // for future gRPC endpoints
 
   await app.startAllMicroservices();
 

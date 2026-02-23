@@ -11,6 +11,7 @@ export const rootEnvSchema = Joi.object({
   // 🔐 Gateway + S2S Security
   // ------------------------------------------
   S2S_SECRET: Joi.string().min(32).required(),
+  S2S_SECRET_OLD: Joi.string().min(32).required(),
   GATEWAY_HEADER: Joi.string().default('x-gateway-sign'),
 
   // ------------------------------------------

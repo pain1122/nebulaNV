@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { Metadata, status } from '@grpc/grpc-js';
 import { GrpcAuthService } from './grpc-auth.service';
+import { AuthRedisService } from '../redis/auth-redis.service';
 import { AuthService } from '../auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { authv1, userv1 } from '@nebula/protos';
@@ -36,6 +37,7 @@ export class AuthGrpcController {
     private readonly jwtService: JwtService,
     private readonly cfg: ConfigService,
     private readonly grpc: GrpcAuthService,
+    private readonly authRedis: AuthRedisService,
   ) {}
 
   /** Utility: read Bearer from gRPC metadata */
@@ -152,7 +154,7 @@ export class AuthGrpcController {
     }
   }
 
-  // PUBLIC: used by guards/services to validate either AT or RT
+  // PUBLIC: used by guards/services to validate AT
   @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'ValidateToken')
   async validateToken(
@@ -161,9 +163,8 @@ export class AuthGrpcController {
     const accessSecret =
       this.cfg.get<string>('JWT_ACCESS_SECRET') ??
       this.cfg.get<string>('JWT_SECRET');
-    const refreshSecret = this.cfg.get<string>('JWT_REFRESH_SECRET');
 
-    if (!accessSecret || !refreshSecret) {
+    if (!accessSecret) {
       console.error('[ValidateToken] missing JWT secrets in environment');
       return authv1.ValidateTokenResponse.create({
         isValid: false,
@@ -178,29 +179,9 @@ export class AuthGrpcController {
         data.token,
         accessSecret as jsonwebtoken.Secret,
       );
-      return authv1.ValidateTokenResponse.create({
-        isValid: true,
-        userId: payload.sub,
-        email: payload.email,
-        role: payload.role,
-      });
-    } catch (err1: any) {
-      try {
-        const payload: any = jsonwebtoken.verify(
-          data.token,
-          refreshSecret as jsonwebtoken.Secret,
-        );
-        return authv1.ValidateTokenResponse.create({
-          isValid: true,
-          userId: payload.sub,
-          email: payload.email,
-          role: payload.role,
-        });
-      } catch (err2: any) {
-        console.error(
-          '[ValidateToken] failed:',
-          err1?.message || err2?.message || 'unknown',
-        );
+
+      // 🔒 Redis-based freshness checks (authoritative)
+      if (await this.authRedis.isUserDisabled(payload.sub)) {
         return authv1.ValidateTokenResponse.create({
           isValid: false,
           userId: '',
@@ -208,6 +189,32 @@ export class AuthGrpcController {
           role: '',
         });
       }
+
+      const currentVersion = await this.authRedis.getTokenVersion(payload.sub);
+
+      if (payload.tv !== currentVersion) {
+        return authv1.ValidateTokenResponse.create({
+          isValid: false,
+          userId: '',
+          email: '',
+          role: '',
+        });
+      }
+
+      return authv1.ValidateTokenResponse.create({
+        isValid: true,
+        userId: payload.sub,
+        email: payload.email,
+        role: payload.role,
+      });
+    } catch (err: any) {
+      console.error('[ValidateToken] failed:', err?.message || 'unknown');
+      return authv1.ValidateTokenResponse.create({
+        isValid: false,
+        userId: '',
+        email: '',
+        role: '',
+      });
     }
   }
 }

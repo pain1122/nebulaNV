@@ -1,69 +1,77 @@
-import { NextResponse } from "next/server"
+// apps/web/app/api/taxonomy/create/route.ts
+import { NextRequest, NextResponse } from "next/server";
 
-type UiKind = "product_cat" | "product_tag" | "product_attribute" | "product_variable"
+type UiKind = "product_cat" | "product_tag" | "product_attribute" | "product_variable" | "product_brand";
 
-// Map UI kinds to taxonomy-service kind strings
 const KIND_MAP: Record<UiKind, string> = {
   product_cat: "category.default",
   product_tag: "tag.default",
   product_attribute: "attribute.default",
   product_variable: "variable.default",
+  product_brand: "brand.default",
+};
+
+function getBase() {
+  const base = process.env.TAXONOMY_HTTP_URL || "http://127.0.0.1:3006";
+  return base.replace(/\/+$/, "");
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
-      kind: UiKind
-      name: string
-      slug: string
-      parentId?: string | null
-    }
+      kind: UiKind;
+      name: string;
+      slug: string;
+      parentId?: string | null;
+      sortOrder?: number;
+      isHidden?: boolean;
+    };
 
-    const base = process.env.TAXONOMY_HTTP_URL || "http://127.0.0.1:3006"
-    const url = `${base.replace(/\/+$/, "")}/taxonomies`
+    const kind = KIND_MAP[body.kind];
+    if (!kind) return NextResponse.json({ ok: false, error: "invalid_kind" }, { status: 400 });
 
-    const scope = "product"
-    const kind = KIND_MAP[body.kind]
+    const upstreamUrl = `${getBase()}/taxonomies`;
 
-    if (!kind) {
-      return NextResponse.json({ error: "invalid_kind" }, { status: 400 })
-    }
+    const headers = new Headers();
+    headers.set("content-type", "application/json");
 
-    // TODO: attach auth header from your panel session
-    // For now, if your taxonomy-service is admin-protected, this will 401 unless you add auth below.
-    const upstream = await fetch(url, {
+    // forward auth/cookies (same pattern as other proxies)
+    const auth = req.headers.get("authorization");
+    if (auth) headers.set("authorization", auth);
+
+    const cookie = req.headers.get("cookie");
+    if (cookie) headers.set("cookie", cookie);
+
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        // "authorization": `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({
-        scope,
+        scope: "product",
         kind,
         slug: body.slug,
         title: body.name,
         parentId: body.parentId ?? null,
-        isTree: body.parentId ? true : true, // OK; service sets isTree = parentId ? true : input.isTree
+        sortOrder: body.sortOrder ?? 0,
+        isHidden: body.isHidden ?? false,
+        isTree: true,
       }),
-    })
+      cache: "no-store",
+    });
 
-    const text = await upstream.text()
+    const text = await upstream.text();
 
-    if (!upstream.ok) {
-      // Return upstream message for fast debugging in browser
-      return new NextResponse(text || "upstream_error", { status: upstream.status })
-    }
-
-    const parsed = JSON.parse(text)
-    const t = parsed?.data ?? parsed
-
-    return NextResponse.json({
-      id: t.id,
-      name: t.title, // your dto uses "title"
-      slug: t.slug,
-    })
+    return new NextResponse(text, {
+      status: upstream.status,
+      headers: {
+        "content-type": upstream.headers.get("content-type") ?? "application/json",
+        "cache-control": "no-store",
+      },
+    });
   } catch (e: any) {
-    console.error("[/api/taxonomy/create]", e)
-    return NextResponse.json({ error: e?.message || "fetch_failed" }, { status: 500 })
+    console.error("[/api/taxonomy/create]", e);
+    return NextResponse.json(
+      { ok: false, error: "fetch_failed", message: e?.message || "Unknown error" },
+      { status: 500 }
+    );
   }
 }

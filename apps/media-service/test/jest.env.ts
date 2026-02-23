@@ -16,7 +16,8 @@ process.env.GATEWAY_HEADER ||= "x-gateway-sign"
 process.env.SVC_NAME       ||= "bucket"
 
 // IMPORTANT: S2S secret used by mdS2S() in gRPC tests
-process.env.S2S_SECRET ||= "n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"
+process.env.S2S_SECRET        ||=":n}T>QYq}G*m0_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"
+process.env.S2S_SECRET_OLD    ||=":n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"
 
 // Storage (Supabase Storage S3 gateway)
 process.env.MEDIA_STORAGE_DRIVER ||= "s3"

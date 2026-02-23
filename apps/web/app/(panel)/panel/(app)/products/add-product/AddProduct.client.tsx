@@ -1,7 +1,6 @@
 "use client"
-
-import {useState, useEffect} from "react"
-import TagifyInput, {type TagItem} from "@/components/forms/TagifyInput"
+import {useEffect, useMemo, useState} from "react"
+import {useRouter} from "next/navigation"
 import RichTextEditor from "@/components/editor/RichTextEditor"
 import ProductPickerField from "@/components/products/ProductPickerField"
 import {useTaxonomyModal} from "@/hooks/useTaxonomyModal"
@@ -9,8 +8,9 @@ import {useMediaRepeater} from "@/hooks/useMediaRepeater"
 import {useVariableRows} from "@/hooks/useVariableRows"
 import useSeoCounter from "@/hooks/useSeoCounter"
 import MediaRepeaterSection from "@/components/media/MediaRepeaterSection"
-
+import TagifyInput, {type TagItem} from "@/components/forms/TagifyInput"
 import AddTaxonomyOffcanvas from "@/components/taxonomy/AddTaxonomyOffcanvas"
+import {apiFetch} from "@/lib/api/apiFetch"
 
 import useProductPicker from "@/hooks/useProductPicker"
 type AttrOption = {id: string; title: string}
@@ -24,7 +24,21 @@ type AttributeRow = {
   loadingValues?: boolean
 }
 
-export default function AddProductClient() {
+type AddProductClientProps = {
+  productId?: string
+}
+
+export default function AddProductClient({productId}: AddProductClientProps) {
+  const isEdit = !!productId
+  const router = useRouter()
+
+  const [title, setTitle] = useState("")
+  const [slug, setSlug] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadingInitial, setLoadingInitial] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const [content, setContent] = useState("")
   const [excerpt, setExcerpt] = useState("")
 
@@ -85,7 +99,7 @@ export default function AddProductClient() {
   async function loadAttributeValues(parentAttrId: string): Promise<AttrValueOption[]> {
     if (!parentAttrId || parentAttrId === "delete") return []
     // TODO: replace with your real API route in panel that returns children for parentAttrId
-    // const res = await fetch(`/api/taxonomy/children?parentId=${encodeURIComponent(parentAttrId)}`)
+    // const res = await apiFetch(`/api/taxonomy/children?parentId=${encodeURIComponent(parentAttrId)}`)
     // const json = await res.json()
     // return json.data.map((x:any) => ({ id: x.id, title: x.title }))
 
@@ -137,19 +151,151 @@ export default function AddProductClient() {
     }
   }
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadTaxonomies() {
+      try {
+        const [catsRes, tagsRes, attrsRes, varsRes] = await Promise.all([apiFetch("/api/taxonomy?kind=product_cat", {cache: "no-store"}), apiFetch("/api/taxonomy?kind=product_tag", {cache: "no-store"}), apiFetch("/api/taxonomy?kind=product_attribute", {cache: "no-store"}), apiFetch("/api/taxonomy?kind=product_variable", {cache: "no-store"})])
+
+        const [catsJson, tagsJson, attrsJson, varsJson] = await Promise.all([catsRes.json(), tagsRes.json(), attrsRes.json(), varsRes.json()])
+
+        if (cancelled) return
+
+        setCategoryWhitelist(
+          (catsJson.data ?? []).map((t: any) => ({
+            id: t.id,
+            value: t.title,
+          }))
+        )
+
+        setTagWhitelist(
+          (tagsJson.data ?? []).map((t: any) => ({
+            id: t.id,
+            value: t.title,
+          }))
+        )
+
+        setAttributeWhitelist(
+          (attrsJson.data ?? []).map((t: any) => ({
+            id: t.id,
+            value: t.title,
+          }))
+        )
+
+        setVariableWhitelist(
+          (varsJson.data ?? []).map((t: any) => ({
+            id: t.id,
+            value: t.title,
+          }))
+        )
+      } catch (e) {
+        console.error("Failed to load taxonomies", e)
+      }
+    }
+
+    loadTaxonomies()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isEdit) return
+
+    let cancelled = false
+
+    ;(async () => {
+      setLoadingInitial(true)
+      setLoadError(null)
+
+      try {
+        const res = await apiFetch(`/api/products/${productId}`, {cache: "no-store"})
+        const json = await res.json().catch(() => ({}))
+
+        if (!res.ok) throw new Error(json?.message || `load failed (${res.status})`)
+
+        const p = json?.data ?? json
+
+        if (!cancelled) {
+          setTitle(p?.title ?? "")
+          setSlug(p?.slug ?? "")
+          setContent(p?.content ?? "")
+          setExcerpt(p?.excerpt ?? "")
+
+          // TODO later: map categories/tags/media/seo when APIs exist
+        }
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e?.message || "خطا در دریافت محصول")
+      } finally {
+        if (!cancelled) setLoadingInitial(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, productId])
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      const payload = {
+        title,
+        slug,
+        content,
+        excerpt,
+        // add more fields later
+      }
+
+      const res = await apiFetch(isEdit ? `/api/products/${productId}` : `/api/products`, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify(isEdit ? {patch: payload} : {data: payload}),
+      })
+
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.message || `Save failed (${res.status})`)
+
+      // go back to list after save (optional)
+      router.replace("/panel/products/list-products")
+    } catch (e: any) {
+      setError(e?.message || "خطا در ذخیره")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loadingInitial) {
+    return (
+      <div className="py-5 text-center">
+        <div className="spinner-border text-info" role="status" />
+        <div className="mt-3">در حال دریافت اطلاعات محصول...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return <div className="alert alert-danger">{loadError}</div>
+  }
+
   return (
     <>
-      <form action="" method="post" encType="multipart/form-data" className="row g-3">
+      <form onSubmit={onSubmit} method="post" encType="multipart/form-data" className="row g-3">
         <div className="col-12 col-lg-7">
           <div className="card mb-4">
             <div className="card-body">
               <div className="mb-3">
                 <label className="form-label">عنوان محصول</label>
-                <input type="text" name="post_title" defaultValue="" className="form-control" placeholder="عنوان محصول خود را وارد کنید" />
+                <input type="text" name="post_title" value={title} onChange={(e) => setTitle(e.target.value)} className="form-control" placeholder="عنوان محصول خود را وارد کنید" />{" "}
               </div>
               <div>
                 <label className="form-label">نامک</label>
-                <input type="text" name="post_guid" id="post_guid" defaultValue="" className="form-control" placeholder="نامک خود را وارد کنید" />
+                <input type="text" name="post_guid" id="post_guid" value={slug} onChange={(e) => setSlug(e.target.value)} className="form-control" placeholder="نامک خود را وارد کنید" />{" "}
               </div>
             </div>
           </div>
@@ -249,7 +395,7 @@ export default function AddProductClient() {
                   <div className="tab-pane fade" id="tab-stock" role="tabpanel">
                     <label className="form-label">وضعیت موجودی</label>
                     <div className="position-relative">
-                      <select className="select2 form-select form-select-lg" name="stock_status" data-allow-clear="true" defaultValue="instock">
+                      <select className="form-select form-select-lg" name="stock_status" data-allow-clear="true" defaultValue="instock">
                         <option value="instock">موجود</option>
                         <option value="outofstock">ناموجود</option>
                         <option value="call">تماس بگیرید</option>
@@ -332,7 +478,7 @@ export default function AddProductClient() {
                           <li className="row variable-attribute-container mt-4">
                             <div className="col-12 col-md-5 mb-3">
                               <div className="position-relative">
-                                <select name={`var[${row.id}][attr-name][]`} className="select2 form-select" id={`var${row.id}-name-0`}>
+                                <select name={`var[${row.id}][attr-name][]`} className="form-select" id={`var${row.id}-name-0`}>
                                   <option value="delete">حذف</option>
                                   <option value="874">رنگ دیزاین</option>
                                 </select>
@@ -341,7 +487,7 @@ export default function AddProductClient() {
 
                             <div className="col-12 col-md-5 mb-3">
                               <div className="position-relative">
-                                <select name={`var[${row.id}][attr-value][]`} className="select2 form-select" id={`var${row.id}-value-0`}>
+                                <select name={`var[${row.id}][attr-value][]`} className="form-select" id={`var${row.id}-value-0`}>
                                   <option value="delete">حذف</option>
                                 </select>
                               </div>
@@ -385,7 +531,7 @@ export default function AddProductClient() {
                                 <div className="col-12">
                                   <label className="form-label mt-3">موجودی : </label>
                                   <div className="position-relative">
-                                    <select name={`var[${row.id}][stock_status]`} className="select2 form-select form-select-lg" defaultValue="instock">
+                                    <select name={`var[${row.id}][stock_status]`} className="form-select form-select-lg" defaultValue="instock">
                                       <option value="instock">موجود</option>
                                       <option value="outofstock">ناموجود</option>
                                       <option value="call">تماس بگیرید</option>
@@ -507,8 +653,8 @@ export default function AddProductClient() {
               </div>
             </div>
             <div className="card-body d-flex justify-content-around">
-              <button type="submit" name="submit" className="btn btn-success p-2">
-                <i className="fa-regular fa-pen-to-square" /> انتشار
+              <button type="submit" className="btn btn-success p-2" disabled={saving}>
+                <i className="fa-regular fa-pen-to-square" /> {saving ? "در حال ذخیره..." : isEdit ? "ذخیره تغییرات" : "انتشار"}
               </button>
               <button type="submit" name="draft" className="btn btn-primary p-2">
                 <i className="fa-regular fa-square-pen" /> پیش نویس
@@ -521,7 +667,7 @@ export default function AddProductClient() {
             <div className="card-body">
               <label className="form-label">انتخاب دسته بندی</label>
 
-              <TagifyInput name="category_selection" placeholder="انتخاب دسته بندی" value={categories} onChange={setCategories} whitelist={categoryWhitelist} maxTags={1} enforceWhitelist={false} dropdownEnabled={1} />
+              <TagifyInput name="category_selection" placeholder="انتخاب دسته بندی" value={categories} onChange={setCategories} whitelist={categoryWhitelist} maxTags={1} enforceWhitelist={false} dropdownEnabled={0} />
 
               <button
                 type="button"
@@ -544,7 +690,7 @@ export default function AddProductClient() {
             <div className="card-body">
               <label className="form-label">انتخاب برچسب ها</label>
 
-              <TagifyInput name="tag_selection" placeholder="انتخاب برچسب ها" value={tags} onChange={setTags} whitelist={tagWhitelist} maxTags={30} dropdownEnabled={1} enforceWhitelist={false} />
+              <TagifyInput name="tag_selection" placeholder="انتخاب برچسب ها" value={tags} onChange={setTags} whitelist={tagWhitelist} maxTags={30} dropdownEnabled={0} enforceWhitelist={false} />
 
               <button
                 type="button"

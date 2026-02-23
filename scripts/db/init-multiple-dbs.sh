@@ -9,4 +9,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
   CREATE DATABASE nebula_products;
   CREATE DATABASE nebula_settings;
   CREATE DATABASE nebula_blog;
+  CREATE DATABASE nebula_order;
+  CREATE DATABASE nebula_taxonomy;
+  CREATE DATABASE nebula_media;
+
 EOSQL

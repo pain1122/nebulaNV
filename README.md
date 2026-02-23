@@ -75,13 +75,13 @@ cd nebulaNV
 pnpm install
 
 # Start local infrastructure
-docker-compose up -d
+docker compose up -d
 
 # Run backend service (example)
-pnpm run dev --filter @apps/auth-service
+pnpm run dev:auth
 
 # Run tests
-pnpm test
+pnpm -w turbo test
 ```
 
 ---
@@ -96,18 +96,15 @@ pnpm test
   ├── order-service       # Cart, checkout, invoices
   ├── blog-service        # Posts, SEO, metadata
   ├── settings-service    # KV store, app config
+  ├── taxonomy-service    # Manage grouping and labeling post types
   ├── media-service       # Upload, watermark, CDN
-  ├── gateway             # Proxy, S2S auth, API entry
   └── web                 # Next.js (admin + public)
   
 /packages
-  ├── proto               # .proto files + ts-proto outputs
+  ├── protos              # .proto files + ts-proto outputs
   ├── config              # Env & schema validation
-  ├── logger              # Winston + global format
-  ├── prisma              # Shared Prisma client
   ├── clients             # gRPC clients per service
-  ├── shared-types        # Common TypeScript models
-  └── media               # Shared media utilities
+  └── grpc-auth           # Cross service auth handling
 ```
 
 ---

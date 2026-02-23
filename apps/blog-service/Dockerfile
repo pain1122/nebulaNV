@@ -45,7 +45,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN pnpm --filter=@nebula/blog-service prisma generate --schema apps/blog-service/prisma/schema.prisma
 
 # Build this service and its internal deps
-RUN pnpm turbo run build --filter=@nebula/blog-service^...
+RUN pnpm turbo run build --filter=@nebula/blog-service...
 
 # Create minimal deploy dir
 RUN pnpm deploy --filter=@nebula/blog-service --prod /app/deploy
@@ -57,8 +57,8 @@ ENV NODE_ENV=production
 
 COPY --from=build /app/deploy/. /app/
 
-EXPOSE 3003 50053
+EXPOSE 3004 50055
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD node -e "require('http').get('http://localhost:3003/health', r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+  CMD node -e "require('http').get('http://localhost:3004/health', r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["node", "dist/main.js"]

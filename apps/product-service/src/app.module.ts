@@ -9,8 +9,9 @@ import {TaxonomyModule} from "./taxonomy/taxonomy.module"
 import {SettingsClientModule} from "./settings-client.module"
 import {TaxonomyClientModule} from "./taxonomy-client.module"
 import {AuthClientModule} from "./auth-client.module"
-import {GrpcTokenAuthGuard} from "@nebula/grpc-auth"
+import {GrpcTokenAuthGuard, S2SGuard} from "@nebula/grpc-auth"
 import {DefaultProductTaxonomyInitializer} from "./default-product-taxonomy.initializer"
+
 
 export const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto")
 
@@ -33,6 +34,7 @@ export const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto")
   ],
   providers: [
     Reflector,
+    S2SGuard,
     GrpcTokenAuthGuard,
     {provide: APP_GUARD, useClass: GrpcTokenAuthGuard},
     {provide: APP_GUARD, useClass: ThrottlerGuard},

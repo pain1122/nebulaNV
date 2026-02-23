@@ -33,7 +33,9 @@ export const X_USER_ID_HEADER = "x-user-id" as const;                // original
 // ---------------------------------------------
 // 🌱 Env var keys (centralized references)
 // ---------------------------------------------
-export const ENV_GATEWAY_SECRET = "GATEWAY_SECRET" as const;   // per-service secret (gateway→this service)
+export const ENV_GATEWAY_SECRET = "GATEWAY_SECRET" as const;  // per-service secret (gateway→this service)
+export const ENV_GATEWAY_SECRET_OLD = "GATEWAY_SECRET_OLD" as const;
+export const ENV_GATEWAY_SERVICES = "S2S_GATEWAY_SERVICES" as const;
 export const ENV_S2S_SECRET = "S2S_SECRET" as const;           // shared secret (service↔service)
 export const ENV_GATEWAY_HEADER = "GATEWAY_HEADER" as const;   // header name override
 export const ENV_SERVICE_NAME = "SERVICE_NAME" as const;       // preferred service name var
@@ -83,19 +85,34 @@ export function resolveGatewaySecret(): string | undefined {
   return process.env[ENV_GATEWAY_SECRET] ?? undefined;
 }
 
-/**
- * Inbound verification secrets (try ALL).
- * - S2S: verifies inter-service traffic
- * - Gateway: verifies gateway→service traffic
- */
-export function resolveInboundS2SSecrets(): string[] {
-  const arr: string[] = [];
-  const s2s = resolveS2SSecret();
-  const gw = resolveGatewaySecret();
-  if (s2s) arr.push(s2s);
-  if (gw) arr.push(gw);
-  return arr;
+export function resolveInboundInterserviceSecrets(): string[] {
+  return [
+    process.env.S2S_SECRET,
+    process.env.S2S_SECRET_OLD,
+  ].filter(Boolean) as string[];
 }
+
+export function resolveInboundGatewaySecrets(): string[] {
+  return [
+    process.env.GATEWAY_SECRET,
+    process.env.GATEWAY_SECRET_OLD,
+  ].filter(Boolean) as string[];
+}
+
+export function resolveGatewayServiceNames(): string[] {
+  return (process.env[ENV_GATEWAY_SERVICES] ?? "gateway,gateway-service")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function resolveAllowedServices(): string[] {
+  return (process.env.S2S_ALLOWED_SERVICES ?? "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 
 /**
  * Select the appropriate secret for OUTBOUND signing.

@@ -17,7 +17,7 @@ export const SETTINGS_SERVICE = SETTINGS_SERVICE_TOKEN;
         useFactory: (cfg: ConfigService) => {
           const url =
             cfg.get<string>("SETTINGS_GRPC_URL") ||
-            "127.0.0.1:50052";
+            "127.0.0.1:50054";
 
           return {
             transport: Transport.GRPC,

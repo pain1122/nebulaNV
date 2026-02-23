@@ -1,4 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from "react"
+import {apiFetch} from "@/lib/api/apiFetch"
+
 
 export type ProductSearchItem = {
   id: string
@@ -66,7 +68,7 @@ export default function useProductPicker(opts: UseProductPickerOpts) {
           endpointRef.current?.(q) ??
           `/api/search?q=${encodeURIComponent(q)}&type=product`
 
-        const res = await fetch(url)
+        const res = await apiFetch(url)
         const json = await res.json()
         setResults(Array.isArray(json?.data) ? json.data : [])
       } catch {

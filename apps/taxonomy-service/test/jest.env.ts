@@ -19,4 +19,5 @@ process.env.GATEWAY_HEADER      ||= 'x-gateway-sign';
 process.env.SVC_NAME            ||= 'taxonomy-service'; // must match svc name in mdS2S
 
 // IMPORTANT: tests sign gRPC metadata directly (gateway-style)
-process.env.S2S_SECRET          ||= "n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
+process.env.S2S_SECRET        ||=":n}T>QYq}G*m0_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"
+process.env.S2S_SECRET_OLD    ||=":n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"

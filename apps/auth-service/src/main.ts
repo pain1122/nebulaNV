@@ -26,17 +26,17 @@ async function bootstrap() {
       logger.debug(`  body: ${JSON.stringify(bodyPreview)}`);
     }
     res.on('finish', () => {
-      logger.log(`← ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`);
+      logger.log(
+        `← ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`,
+      );
     });
     next();
   });
 
   // --- gRPC server bind (service-specific → shared → legacy → default) ---
-  const grpcUrl =
-    process.env.AUTH_GRPC_URL ??
-    process.env.GRPC_URL ??
-    (process.env.GRPC_PORT ? `0.0.0.0:${process.env.GRPC_PORT}` : undefined) ??
-    '0.0.0.0:50052';
+  const grpcHost = process.env.GRPC_HOST ?? '0.0.0.0';
+  const grpcPort = process.env.GRPC_PORT ?? '50052';
+  const grpcUrl = `${grpcHost}:${grpcPort}`;
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
@@ -50,9 +50,13 @@ async function bootstrap() {
   await app.startAllMicroservices();
 
   // --- HTTP server bind (service-specific → shared → default) ---
-  const httpPort = Number(process.env.AUTH_HTTP_PORT ?? process.env.PORT ?? 3001);
+  const httpPort = Number(
+    process.env.AUTH_HTTP_PORT ?? process.env.PORT ?? 3001,
+  );
   await app.listen(httpPort);
 
-  logger.log(`[auth-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`);
+  logger.log(
+    `[auth-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
+  );
 }
 bootstrap();

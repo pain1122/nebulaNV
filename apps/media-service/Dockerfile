@@ -50,7 +50,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN pnpm --filter=@nebula/media-service prisma generate --schema apps/media-service/prisma/schema.prisma
 
 # Build this service and upstream internal packages
-RUN pnpm turbo run build --filter=@nebula/media-service^...
+RUN pnpm turbo run build --filter=@nebula/media-service...
 
 # Create a minimal deploy dir (uses injected workspaces via .npmrc)
 RUN pnpm deploy --filter=@nebula/media-service --prod /app/deploy
@@ -67,8 +67,8 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 
 COPY --from=build /app/deploy/. /app/
 
-EXPOSE 3010 50054
+EXPOSE 3007 50058
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD node -e "fetch('http://localhost:3010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://localhost:3007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "dist/main.js"]

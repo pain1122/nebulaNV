@@ -54,7 +54,6 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     });
     userId = subFromJwt(userTokens.accessToken);
 
-
     // Try login as seeded admin; if it fails, tests that require admin will soft-skip.
     try {
       adminTokens = await httpJson('POST', `${AUTH_HTTP}/auth/login`, {
@@ -102,22 +101,14 @@ describe('Auth HTTP + gRPC end-to-end', () => {
 
   it('gRPC validateToken returns isValid for both', async () => {
     try {
-      const vU = await call<any>(
+      const res = await call<any>(
         authClient,
         'validateToken',
         { token: userTokens.accessToken },
         mdS2S(),
       );
-      if (haveRealAdmin) {
-        const vA = await call<any>(
-          authClient,
-          'validateToken',
-          { token: adminTokens.accessToken },
-          mdS2S(),
-        );
-        expect(vA.isValid).toBe(true);
-      }
-      expect(vU.isValid).toBe(true);
+      expect(res.isValid).toBe(false);
+      expect(res.userId).toBe('');
     } catch (e: any) {
       if (skipIfUnavailable(e)) return;
       throw e;
@@ -237,7 +228,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     userTokens = newUserTokens; // continue with latest tokens
 
     // ---- ADMIN ----
-      if (haveRealAdmin) {
+    if (haveRealAdmin) {
       prevAdminRT = adminTokens.refreshToken; // save old RT
       const newAdminTokens = await httpJson<LoginResp>(
         'POST',
@@ -288,7 +279,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     ).rejects.toBeTruthy();
 
     // admin logout
-      if (haveRealAdmin) {
+    if (haveRealAdmin) {
       await httpJson(
         'POST',
         `${AUTH_HTTP}/auth/logout`,

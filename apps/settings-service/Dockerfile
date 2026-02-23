@@ -50,7 +50,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN pnpm --filter=@nebula/settings-service prisma generate --schema apps/settings-service/prisma/schema.prisma
 
 # Build this service and upstream internal packages
-RUN pnpm turbo run build --filter=@nebula/settings-service^...
+RUN pnpm turbo run build --filter=@nebula/settings-service...
 
 # Create a minimal deploy dir (uses injected workspaces via .npmrc)
 RUN pnpm deploy --filter=@nebula/settings-service --prod /app/deploy

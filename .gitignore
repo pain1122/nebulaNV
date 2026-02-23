@@ -68,3 +68,13 @@ Thumbs.db
 # Docker buildx cache (local)
 # ----------------------------
 .buildx-cache/
+
+
+# ----------------------------
+# Large Files
+# ----------------------------
+.zip
+.rar
+.tar
+.GZIP
+.BZIP2

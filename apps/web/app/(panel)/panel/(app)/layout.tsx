@@ -1,6 +1,7 @@
 import type {Metadata} from "next"
 import Header from "./Header"
 import Navbar from "./Navbar"
+import "@yaireo/tagify/dist/tagify.css"
 
 const YEAR = new Date().getFullYear()
 

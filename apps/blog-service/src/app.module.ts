@@ -9,7 +9,7 @@ import { envSchema } from "./config/env.validation";
 import { BlogModule } from "./blog/blog.module";
 import { SettingsClientModule } from "./settings-client.module";
 import { AuthClientModule } from "./auth-client.module";
-import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
 import { TaxonomyModule } from "./taxonomy/taxonomy.module"
 import { TaxonomyClientModule } from "./taxonomy-client.module"
 
@@ -44,6 +44,7 @@ export const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
   ],
   providers: [
     Reflector,
+    S2SGuard,
     GrpcTokenAuthGuard,
     // global guards: auth first, then throttler
     { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },

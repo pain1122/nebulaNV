@@ -18,7 +18,7 @@ export const TAXONOMY_SERVICE = "TAXONOMY_SERVICE"
           options: {
             package: ["taxonomy"],
             protoPath: [TAXONOMY_PROTO],
-            url: cfg.get<string>("TAXONOMY_GRPC_URL") ?? "127.0.0.1:50052",
+            url: cfg.get<string>("TAXONOMY_GRPC_URL") ?? "127.0.0.1:50057",
             loader: {
               keepCase: false,
               enums: String,

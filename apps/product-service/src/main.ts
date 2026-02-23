@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import helmet from 'helmet';
 import compression from 'compression';
-import { GrpcTokenAuthGuard } from '@nebula/grpc-auth';
+import { GrpcTokenAuthGuard, S2SGuard } from '@nebula/grpc-auth';
 
 function getHttpPort(cfg: ConfigService): number {
   const p = cfg.get<string>('PORT') || cfg.get<string>('PRODUCT_HTTP_PORT') || '3003';
@@ -48,7 +48,7 @@ async function bootstrap() {
   });
 
   // ✅ Attach DI-managed guard so @Roles() is enforced on gRPC
-  micro.useGlobalGuards(app.get(GrpcTokenAuthGuard));
+  micro.useGlobalGuards(app.get(S2SGuard),app.get(GrpcTokenAuthGuard));
 
   await app.startAllMicroservices();
 

@@ -1,3 +1,5 @@
+"use client"
+
 export default function NewPassword() {
   return (
     <div className="col-lg-6">

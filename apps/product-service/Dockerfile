@@ -45,7 +45,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN pnpm --filter=@nebula/product-service prisma generate --schema apps/product-service/prisma/schema.prisma
 
 # Build this service and its internal deps
-RUN pnpm turbo run build --filter=@nebula/product-service^...
+RUN pnpm turbo run build --filter=@nebula/product-service...
 
 # Create minimal deploy dir
 RUN pnpm deploy --filter=@nebula/product-service --prod /app/deploy

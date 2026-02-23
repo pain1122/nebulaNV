@@ -1,231 +1,313 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-  ForbiddenException,
-  Inject,
-  OnModuleInit,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { ClientGrpc } from '@nestjs/microservices';
-import { firstValueFrom, Observable } from 'rxjs';
-import type { Metadata } from '@grpc/grpc-js';
-import * as jwt from 'jsonwebtoken';
-import * as crypto from 'crypto';
+// -----------------------------------------------------------------------------
+// GrpcTokenAuthGuard
+//
+// Central authentication + authorization guard for both HTTP and gRPC calls.
+//
+// Responsibilities:
+//
+// 1. Validate JWT access tokens
+//    - Fast local signature check first
+//    - Always verify with auth-service (revocation + source of truth)
+//
+// 2. Enforce service-to-service (S2S) access
+//    - INTERNAL_ONLY endpoints require verified internal service identity
+//    - S2S verification happens in S2SGuard (this guard only checks presence)
+//
+// 3. Apply PUBLIC / INTERNAL / ROLE hierarchy
+//
+//    Priority order:
+//      OPEN mode → allow everything as guest
+//      INTERNAL_ONLY → require svc identity
+//      JWT present → enforce role policies
+//      PUBLIC endpoint → allow anonymous depending on PublicMode
+//      Otherwise → reject
+//
+// 4. Attach user context to request or RPC metadata
+//
+// NOTE:
+// verifyS2S() was removed because S2S validation must be centralized in
+// a dedicated guard to avoid duplicated logic and security drift.
+// This guard trusts svc identity only if upstream S2SGuard validated it.
+// -----------------------------------------------------------------------------
+// ROLE_MIN_KEY
+//   → user must have role >= required role
+//
+// ROLES_KEY
+//   → user must have one of allowed roles
+//
+// ROLES_ALL_KEY
+//   → reserved for multi-role users (future use)
+//   → currently checks user role is in allowed list
 
-import { ROLES_KEY, Role } from './roles.decorator';
-import { IS_PUBLIC_KEY } from './public.decorator';
+import {CanActivate, ExecutionContext, Injectable, UnauthorizedException, ForbiddenException, Inject, OnModuleInit} from "@nestjs/common"
+import {Reflector} from "@nestjs/core"
+import {ClientGrpc} from "@nestjs/microservices"
+import {firstValueFrom, Observable} from "rxjs"
+import type {Metadata} from "@grpc/grpc-js"
+import * as jwt from "jsonwebtoken"
 
-import {
-  AUTH_SERVICE,
-  AUTH_SERVICE_NAME,
-  AUTHORIZATION_HEADER,
-  X_USER_ID_HEADER,
-  X_SVC_HEADER,
-  resolveS2SSignHeader,
-  resolveInboundS2SSecrets,
-  resolvePublicMode,
-} from './tokens';
+import {ROLES_KEY, Role, ROLE_MIN_KEY, ROLES_ALL_KEY, hasRoleAtLeast} from "./roles.decorator"
+import {IS_PUBLIC_KEY, INTERNAL_ONLY_KEY, REQUIRE_USER_ID_KEY} from "./public.decorator"
 
-import { authv1 } from '@nebula/protos';
+import {AUTH_SERVICE, AUTH_SERVICE_NAME, AUTHORIZATION_HEADER, X_USER_ID_HEADER, resolvePublicMode} from "./tokens"
 
-type PublicMode = 'OPEN' | 'OPTIONAL_AUTH' | 'GATEWAY_ONLY';
+import {authv1} from "@nebula/protos"
+
+// PublicMode controls behavior of endpoints marked @Public()
+//
+// OPEN
+//   → Everything allowed, user becomes {guest}
+//
+// OPTIONAL_AUTH
+//   → Public endpoints allow anonymous access
+//   → Private endpoints still require JWT
+//
+// GATEWAY_ONLY
+//   → Public endpoints allowed only through trusted gateway
+//   → Requires valid S2S identity (svc present)
+type PublicMode = "OPEN" | "OPTIONAL_AUTH" | "GATEWAY_ONLY"
 
 interface AuthGrpc {
-  validateToken(
-    req: authv1.ValidateTokenRequest,
-    meta?: Metadata
-  ): Observable<authv1.ValidateTokenResponse>;
-}
-
-function hmac(secret: string, payload: string): string {
-  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
-}
-function minuteBucket(): number {
-  return Math.floor(Date.now() / 60000);
+  validateToken(req: authv1.ValidateTokenRequest, meta?: Metadata): Observable<authv1.ValidateTokenResponse>
 }
 
 @Injectable()
 export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
-  private auth!: AuthGrpc;
-  private readonly publicMode: PublicMode;
+  // svc is injected into request context by S2SGuard after
+  // validating service-to-service signature.
+  // This guard only checks its presence when required.
+  private auth!: AuthGrpc
+  private readonly publicMode: PublicMode
+  private getSvc(ctx: ExecutionContext): string | null {
+    const req = ctx.switchToHttp().getRequest?.() as any
+    if (req?.svc) return String(req.svc)
+
+    const call = ctx.switchToRpc().getContext?.() as any
+    if (call?.svc) return String(call.svc)
+
+    const meta = this.extractMeta(ctx) as any
+    if (meta?.svc) return String(meta.svc)
+
+    if ((ctx as any)?.svc) return String((ctx as any).svc)
+
+    return null
+  }
 
   constructor(
     @Inject(AUTH_SERVICE) private readonly client: ClientGrpc,
-    private readonly reflector: Reflector
+    private readonly reflector: Reflector,
   ) {
-    this.publicMode = resolvePublicMode();
+    this.publicMode = resolvePublicMode()
   }
 
   onModuleInit() {
-    this.auth = this.client.getService<AuthGrpc>(AUTH_SERVICE_NAME);
+    this.auth = this.client.getService<AuthGrpc>(AUTH_SERVICE_NAME)
   }
 
   // ---------------------------- Helpers ----------------------------
+  // Extract "Bearer <token>" safely
+  // Works for both HTTP headers and gRPC metadata.
+
   private parseBearer(h?: string | null): string | null {
-    if (!h) return null;
-    const [type, val] = h.split(' ');
-    return type?.toLowerCase() === 'bearer' && val ? val : null;
+    if (!h) return null
+    const [type, val] = h.split(" ")
+    return type?.toLowerCase() === "bearer" && val ? val : null
   }
+
+  // Extract gRPC metadata object from execution context.
+  // Used to read headers like Authorization in RPC calls.
 
   private extractMeta(ctx: ExecutionContext): Metadata | undefined {
-    return ctx.getArgByIndex?.(1) as Metadata | undefined;
+    return ctx.getArgByIndex?.(1) as Metadata | undefined
   }
+
+  // Extract Bearer token from HTTP headers or gRPC metadata.
+  // Returns null if no Authorization header is present.
 
   private extractToken(ctx: ExecutionContext): string | null {
-    const httpReq = ctx.switchToHttp().getRequest?.();
-    let token = this.parseBearer(httpReq?.headers?.[AUTHORIZATION_HEADER]);
+    const httpReq = ctx.switchToHttp().getRequest?.()
+    let token = this.parseBearer(httpReq?.headers?.[AUTHORIZATION_HEADER])
     if (!token) {
-      const meta = this.extractMeta(ctx);
-      token = this.parseBearer(meta?.get?.(AUTHORIZATION_HEADER)?.[0] as string);
+      const meta = this.extractMeta(ctx)
+      token = this.parseBearer(meta?.get?.(AUTHORIZATION_HEADER)?.[0] as string)
     }
-    return token;
-  }
-
-  private extractUserId(meta?: Metadata): string | null {
-    const v = meta?.get?.(X_USER_ID_HEADER)?.[0] as string | undefined;
-    return v && typeof v === 'string' && v.length > 0 ? v : null;
-  }
-
-  private verifyS2S(meta?: Metadata): boolean {
-    const header = resolveS2SSignHeader();
-    const sig = meta?.get?.(header)?.[0] as string | undefined;
-    if (!sig) return false;
-
-    const svc = (meta?.get?.(X_SVC_HEADER)?.[0] as string | undefined) ?? '';
-    const now = minuteBucket();
-    const secrets = resolveInboundS2SSecrets();
-    if (secrets.length === 0) return false;
-
-    for (const secret of secrets) {
-      const candidates = [
-        hmac(secret, `${svc}:${now}`),
-        hmac(secret, `${svc}:${now - 1}`),
-        hmac(secret, `${now}`),
-        hmac(secret, `${now - 1}`),
-      ];
-      if (candidates.includes(sig)) return true;
-    }
-    return false;
+    return token
   }
 
   // ------------------------- Context utilities -------------------------
+
   private setCtxUser(ctx: ExecutionContext, user: any) {
-    const type = ctx.getType<'rpc' | 'http'>();
-    console.debug(
-      '[GrpcTokenAuthGuard] Attaching user context:',
-      JSON.stringify(user)
-    );
-    if (type === 'http') {
-      const req = ctx.switchToHttp().getRequest?.();
-      if (req) (req as any).user = user;
-    } else if (type === 'rpc') {
-      const meta = this.extractMeta(ctx) as any;
-      if (meta && typeof meta.set === 'function') meta.user = user;
-      const call = ctx.switchToRpc().getContext?.();
-      if (call) (call as any).user = user;
-      (ctx as any).user = user;
+    const type = ctx.getType<"rpc" | "http">()
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[GrpcTokenAuthGuard] user attached", {
+        userId: user?.userId,
+        role: user?.role,
+      })
+    }
+    if (type === "http") {
+      const req = ctx.switchToHttp().getRequest?.()
+      if (req) (req as any).user = user
+    } else if (type === "rpc") {
+      const meta = this.extractMeta(ctx) as any
+      if (meta && typeof meta.set === "function") meta.user = user
+      const call = ctx.switchToRpc().getContext?.()
+      if (call) (call as any).user = user
+      ;(ctx as any).user = user
     }
   }
 
   private getCtxUser(ctx: ExecutionContext): any {
-    return (
-      (ctx.switchToHttp().getRequest?.() as any)?.user ??
-      (ctx.switchToRpc().getContext?.() as any)?.user ??
-      (this.extractMeta(ctx) as any)?.user ??
-      (ctx as any)?.user
-    );
+    return (ctx.switchToHttp().getRequest?.() as any)?.user ?? (ctx.switchToRpc().getContext?.() as any)?.user ?? (this.extractMeta(ctx) as any)?.user ?? (ctx as any)?.user
   }
 
+  // Validate token and attach authenticated user.
+  //
+  // Step 1: Optional local signature check
+  //   - Fast rejection if token is obviously invalid.
+  //
+  // Step 2: Always call auth-service
+  //   - Handles revocation
+  //   - Handles role changes
+  //   - Auth-service is the source of truth.
+
   private async attachUserFromToken(ctx: ExecutionContext, token: string) {
-    const res = await firstValueFrom(
-      this.auth.validateToken(authv1.ValidateTokenRequest.create({ token }))
-    );
-    if (!res.isValid){ 
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[GrpcTokenAuthGuard] ValidateToken -> isValid=false');
+    // 1️⃣ Try local verify first
+    try {
+      const secret = process.env.JWT_ACCESS_SECRET
+      if (secret) {
+        jwt.verify(token, secret)
       }
-      throw new UnauthorizedException('token_invalid_or_expired');
-    }
-    const payload = jwt.decode(token) as jwt.JwtPayload | null;
-    if (payload?.exp) {
-      const nowSec = Math.floor(Date.now() / 1000);
-      const SKEW_SEC = 30;
-      if (payload.exp + SKEW_SEC < nowSec) {
-        throw new UnauthorizedException('token_expired');
-      }
+    } catch {
+      throw new UnauthorizedException("token_invalid")
     }
 
-    this.setCtxUser(ctx, { userId: res.userId, email: res.email, role: res.role });
+    // 2️⃣ Always ask auth-service (source of truth)
+    const res = await firstValueFrom(this.auth.validateToken(authv1.ValidateTokenRequest.create({token})))
+
+    if (!res.isValid) {
+      throw new UnauthorizedException("token_invalid_or_expired")
+    }
+
+    this.setCtxUser(ctx, {
+      userId: res.userId,
+      role: res.role,
+    })
+  }
+
+  private resolveRequiredUserId(ctx: ExecutionContext): string | null {
+    const ctxUser = this.getCtxUser(ctx)
+    if (ctxUser?.userId) return String(ctxUser.userId)
+
+    const req = ctx.switchToHttp().getRequest?.()
+    const h = req?.headers?.[X_USER_ID_HEADER]
+    if (typeof h === "string" && h.trim()) return h.trim()
+    if (Array.isArray(h) && h[0]) return String(h[0])
+
+    const meta = this.extractMeta(ctx)
+    const m = meta?.get?.(X_USER_ID_HEADER)?.[0]
+    if (m) return String(m)
+
+    return null
+  }
+
+  private enforceRequireUserId(ctx: ExecutionContext, required: boolean): void {
+    if (!required) return
+
+    const userId = this.resolveRequiredUserId(ctx)
+    if (!userId) throw new UnauthorizedException("missing_user_id")
+
+    const user = this.getCtxUser(ctx)
+    if (!user?.userId) {
+      this.setCtxUser(ctx, {userId, role: user?.role ?? "user"})
+    }
   }
 
   // ---------------------------- Core policy ----------------------------
+  // Core Access Policy
+  // INTERNAL_ONLY endpoints must come from a trusted internal service.
+  // svc is injected by upstream S2SGuard after signature verification.
+  //
+  // Order matters:
+  //
+  // 1. OPEN mode → allow everything as guest
+  // 2. INTERNAL_ONLY → require verified internal service identity
+  // 3. JWT present → validate token + enforce role decorators
+  // 4. PUBLIC endpoint → allow anonymous depending on PublicMode
+  // 5. Otherwise → reject request
+
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     // (optional debug)
-    if (process.env.NODE_ENV !== 'production') {
-      const meta = this.extractMeta(ctx);
-      const keys = meta?.getMap ? Object.keys(meta.getMap()) : [];
-      if (keys.length > 0) console.debug('[GrpcTokenAuthGuard] Metadata keys:', keys);
+    if (process.env.NODE_ENV !== "production") {
+      const meta = this.extractMeta(ctx)
+      const keys = meta?.getMap ? Object.keys(meta.getMap()) : []
+      if (keys.length > 0) console.debug("[GrpcTokenAuthGuard] Metadata keys:", keys)
     }
+
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [ctx.getHandler?.(), ctx.getClass?.()]) || false
+    const internalOnly = this.reflector.getAllAndOverride<boolean>(INTERNAL_ONLY_KEY, [ctx.getHandler?.(), ctx.getClass?.()]) || false
+    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [ctx.getHandler?.(), ctx.getClass?.()]) || []
+    const requireUserId = this.reflector.getAllAndOverride<boolean>(REQUIRE_USER_ID_KEY, [ctx.getHandler?.(), ctx.getClass?.()]) || false
+
+    const token = this.extractToken(ctx)
+    const svc = this.getSvc(ctx)
 
     // OPEN mode = allow everything as guest
-    if (this.publicMode === 'OPEN') {
-      this.setCtxUser(ctx, { userId: null, role: 'guest' });
-      return true;
+    if (this.publicMode === "OPEN") {
+      this.setCtxUser(ctx, {userId: null, role: "guest"})
+      this.enforceRequireUserId(ctx, requireUserId)
+      return true
     }
 
-    const isPublic =
-      this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-        ctx.getHandler?.(),
-        ctx.getClass?.(),
-      ]) || false;
+    if (internalOnly && !svc) {
+      throw new UnauthorizedException("internal_only")
+    }
 
-    const requiredRoles =
-      this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
-        ctx.getHandler?.(),
-        ctx.getClass?.(),
-      ]) || [];
-
-    const meta = this.extractMeta(ctx);
-    const token = this.extractToken(ctx);
-
-    // 1) JWT present → strict path (optionally also require S2S if GATEWAY_ONLY)
+    // JWT present → authenticate user and enforce role decorators.
+    // Service identity is assumed to be already validated by S2SGuard.
     if (token) {
-      await this.attachUserFromToken(ctx, token);
+      await this.attachUserFromToken(ctx, token)
 
-      if (this.publicMode === 'GATEWAY_ONLY' && !this.verifyS2S(meta)) {
-        throw new UnauthorizedException('s2s_signature_required');
+      // S2SGuard already verified service identity
+
+      const user = this.getCtxUser(ctx)
+      const minRole = this.reflector.getAllAndOverride<Role>(ROLE_MIN_KEY, [ctx.getHandler?.(), ctx.getClass?.()])
+
+      if (minRole && !hasRoleAtLeast(user?.role, minRole)) {
+        throw new ForbiddenException("role_too_low")
       }
 
-      const user = this.getCtxUser(ctx);
-      if (requiredRoles.length && !requiredRoles.includes(user?.role as Role)) {
-        throw new ForbiddenException('insufficient_role');
+      const rolesAll = this.reflector.getAllAndOverride<Role[]>(ROLES_ALL_KEY, [ctx.getHandler?.(), ctx.getClass?.()]) || []
+
+      if (requiredRoles.length && !requiredRoles.includes(user?.role)) {
+        throw new ForbiddenException("role_not_allowed")
       }
-      return true;
+
+      if (rolesAll.length && !rolesAll.includes(user?.role)) {
+        throw new ForbiddenException("missing_roles")
+      }
+      this.enforceRequireUserId(ctx, requireUserId)
+      return true
     }
 
     // 2) No JWT → handle public endpoints according to mode
     if (isPublic) {
-      // 2a) Gateway-only public: allow if S2S is valid, attach propagated identity if any
-      if (this.publicMode === 'GATEWAY_ONLY') {
-        if (!this.verifyS2S(meta)) {
-          throw new UnauthorizedException('s2s_signature_required');
-        }
-        const propagatedId = this.extractUserId(meta);
-        // if a gateway propagated a user, attach it; else guest
-        this.setCtxUser(ctx, propagatedId ? { userId: propagatedId, role: 'user' } : { userId: null, role: 'guest' });
-        return true;
+      if (this.publicMode === "GATEWAY_ONLY") {
+        if (!svc) throw new UnauthorizedException("gateway_only")
+        this.enforceRequireUserId(ctx, requireUserId)
+        return true
       }
 
-      // 2b) Optional auth public: anonymous allowed
-      if (this.publicMode === 'OPTIONAL_AUTH') {
-        this.setCtxUser(ctx, { userId: null, role: 'guest' });
-        return true;
+      if (this.publicMode === "OPTIONAL_AUTH") {
+        this.setCtxUser(ctx, {userId: null, role: "guest"})
+        this.enforceRequireUserId(ctx, requireUserId)
+        return true
       }
     }
 
-    // 3) Otherwise block
-    throw new UnauthorizedException('missing_token_or_signature');
+    // No token and not allowed as public → reject request.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Auth failed", {svc})
+    }
+    throw new UnauthorizedException("missing_token_or_signature")
   }
 }

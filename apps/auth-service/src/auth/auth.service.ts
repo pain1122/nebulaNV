@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
+import { AuthRedisService } from './redis/auth-redis.service';
 import { userv1 } from '@nebula/protos';
 
 type UserResponse = userv1.UserResponse;
@@ -30,7 +31,6 @@ function normalizeEmail(s: string) {
   return s.trim().toLowerCase();
 }
 
-
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -39,6 +39,7 @@ export class AuthService {
     private readonly grpc: GrpcAuthService,
     private readonly jwt: JwtService,
     private readonly cfg: ConfigService,
+    private readonly authRedis: AuthRedisService,
   ) {}
 
   private bcryptRounds(): number {
@@ -74,9 +75,12 @@ export class AuthService {
         role: raw?.role ?? 'user',
       };
       this.logger.log(`register() end -> id=${out.id}`);
+      await this.authRedis.getTokenVersion(out.id);
       return out;
     } catch (e: any) {
-      try { console.timeEnd('auth.register->grpc.createUser'); } catch {}
+      try {
+        console.timeEnd('auth.register->grpc.createUser');
+      } catch {}
       this.logger.error(`register() gRPC error: ${e?.message || e}`);
       throw e;
     }
@@ -85,7 +89,9 @@ export class AuthService {
   async validateUser(identifier: string, password: string) {
     const isEmail = identifier.includes('@');
     const req: FindUserWithHashRequest = isEmail
-      ? userv1.FindUserWithHashRequest.create({ email: normalizeEmail(identifier) })
+      ? userv1.FindUserWithHashRequest.create({
+          email: normalizeEmail(identifier),
+        })
       : userv1.FindUserWithHashRequest.create({ phone: identifier });
 
     this.logger.debug('validateUser() → gRPC findUserWithHash start');
@@ -119,7 +125,9 @@ export class AuthService {
         role: (u as any).role,
       };
     } catch (e: any) {
-      try { console.timeEnd('grpc.findUserWithHash'); } catch {}
+      try {
+        console.timeEnd('grpc.findUserWithHash');
+      } catch {}
       this.logger.error(
         `validateUser() → error type=${e?.constructor?.name} msg=${e?.message ?? e}`,
       );
@@ -128,7 +136,19 @@ export class AuthService {
   }
 
   async login(user: { id: string; email: string; role: string }) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const isDisabled = await this.authRedis.isUserDisabled(user.id);
+    if (isDisabled) {
+      throw new UnauthorizedException('User is disabled');
+    }
+
+    const tokenVersion = await this.authRedis.getTokenVersion(user.id);
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tv: tokenVersion,
+    };
 
     const at = this.jwt.sign(payload);
     const rt = this.jwt.sign(payload, {
@@ -137,10 +157,12 @@ export class AuthService {
     });
 
     const hash = await bcrypt.hash(rt, this.bcryptRounds());
-    const setReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create({
-      userId: user.id,
-      refreshToken: hash,
-    });
+    const setReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create(
+      {
+        userId: user.id,
+        refreshToken: hash,
+      },
+    );
 
     await this.grpc.setRefreshToken(setReq); // S2S + x-user-id inside client
 
@@ -168,7 +190,10 @@ export class AuthService {
 
     // S2S + x-user-id(userId) downstream
     const getReq = userv1.GetUserWithHashRequest.create({ id: userId });
-    const uw: GetUserWithHashResponse = await this.grpc.getUserWithHash(getReq, userId);
+    const uw: GetUserWithHashResponse = await this.grpc.getUserWithHash(
+      getReq,
+      userId,
+    );
 
     if (!uw || !uw.refreshToken) {
       this.logger.error('refreshTokens() no stored refreshToken hash');
@@ -181,7 +206,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const p = { sub: userId, email: uw.email, role: uw.role };
+    const tokenVersion = await this.authRedis.getTokenVersion(userId);
+
+    const p = {
+      sub: userId,
+      email: uw.email,
+      role: uw.role,
+      tv: tokenVersion,
+    };
     const at = this.jwt.sign(p);
     const rt = this.jwt.sign(p, {
       secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
@@ -211,16 +243,20 @@ export class AuthService {
     }
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto, token: string): Promise<UserResponse> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+    token: string,
+  ): Promise<UserResponse> {
     if (!token) throw new UnauthorizedException('Missing access token');
-  
+
     const req: UpdateProfileRequest = userv1.UpdateProfileRequest.create({
       id: userId,
       email: dto.email ? normalizeEmail(dto.email) : '',
       newPassword: dto.newPassword ?? '',
       currentPassword: dto.currentPassword ?? '',
     });
-  
+
     return this.grpc.updateProfile(req, token); // JWT + S2S + x-user-id
   }
 
@@ -229,43 +265,57 @@ export class AuthService {
   async logout(req: LogoutRequest): Promise<void> {
     if (req.allDevices) {
       await this.clearStoredRefreshToken(req.userId);
-      this.logger.debug(`logout(allDevices) → cleared RT for user=${req.userId}`);
+      await this.authRedis.bumpTokenVersion(req.userId);
+      this.logger.debug(
+        `logout(allDevices) → cleared RT for user=${req.userId}`,
+      );
       return;
     }
 
     if (req.refreshToken) {
       const uw = await this.getUserWithHash(req.userId);
       if (!uw?.refreshToken) {
-        this.logger.debug(`logout(one) → no stored RT for user=${req.userId} (noop)`);
+        this.logger.debug(
+          `logout(one) → no stored RT for user=${req.userId} (noop)`,
+        );
         return;
       }
       const ok = await bcrypt.compare(req.refreshToken, uw.refreshToken);
       if (!ok) {
-        this.logger.debug(`logout(one) → provided RT mismatch for user=${req.userId} (noop)`);
+        this.logger.debug(
+          `logout(one) → provided RT mismatch for user=${req.userId} (noop)`,
+        );
         return;
       }
       await this.clearStoredRefreshToken(req.userId);
+      await this.authRedis.bumpTokenVersion(req.userId);
       this.logger.debug(`logout(one) → cleared RT for user=${req.userId}`);
       return;
     }
 
     await this.clearStoredRefreshToken(req.userId);
+    await this.authRedis.bumpTokenVersion(req.userId);
     this.logger.debug(`logout(default) → cleared RT for user=${req.userId}`);
   }
 
   // ---------------- Helpers ----------------
 
-  private async getUserWithHash(userId: string): Promise<GetUserWithHashResponse> {
-    const getReq: GetUserWithHashRequest = userv1.GetUserWithHashRequest.create({ id: userId });
+  private async getUserWithHash(
+    userId: string,
+  ): Promise<GetUserWithHashResponse> {
+    const getReq: GetUserWithHashRequest = userv1.GetUserWithHashRequest.create(
+      { id: userId },
+    );
     // Propagate userId for auditing/authorization downstream
     return this.grpc.getUserWithHash(getReq, userId);
   }
 
   private async clearStoredRefreshToken(userId: string): Promise<void> {
-    const clearReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create({
-      userId,
-      refreshToken: '',
-    });
+    const clearReq: SetRefreshTokenRequest =
+      userv1.SetRefreshTokenRequest.create({
+        userId,
+        refreshToken: '',
+      });
     await this.grpc.setRefreshToken(clearReq); // S2S + x-user-id
   }
 }

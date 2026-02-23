@@ -26,4 +26,5 @@ process.env.SVC_NAME       ||= "order-service";
 
 // IMPORTANT: tests sign gRPC metadata directly (gateway-style)
 // This must match root .env S2S_SECRET (without stray colon or quotes).
-process.env.S2S_SECRET ||= "n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
+process.env.S2S_SECRET        ||=":n}T>QYq}G*m0_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"
+process.env.S2S_SECRET_OLD    ||=":n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG"

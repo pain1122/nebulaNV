@@ -2,14 +2,14 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
-import { APP_GUARD, Reflector } from "@nestjs/core";
+import { APP_GUARD } from "@nestjs/core";
 import * as path from "path";
 
 import { envSchema } from "./config/env.validation";
 import { HealthController } from "./health.controller";
 import { AuthClientModule } from "./auth-client.module";
 import { SettingsClientModule } from "./settings-client.module";
-import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { S2SGuard, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
 import { TaxonomyModule } from "./taxonomy/taxonomy.module";
 
 export const TAXONOMY_PROTO = require.resolve("@nebula/protos/taxonomy.proto");
@@ -39,9 +39,8 @@ export const TAXONOMY_PROTO = require.resolve("@nebula/protos/taxonomy.proto");
   ],
   controllers: [HealthController],
   providers: [
-    Reflector,
-    GrpcTokenAuthGuard,
     // global guards: auth first, then throttler
+    { provide: APP_GUARD, useClass: S2SGuard },
     { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],

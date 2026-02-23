@@ -8,12 +8,15 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AuthGrpcController } from './grpc/grpc-auth.controller';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
+import { RedisModule } from './redis/redis.module';
+import { AuthRedisService } from './redis/auth-redis.service';
 
 // ✅ define the proto path here (don’t import from app.module)
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
 
 @Module({
   imports: [
+    RedisModule,
     // ConfigModule is already global (from app.module), but safe to import
     ConfigModule,
 
@@ -49,6 +52,6 @@ export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
     ]),
   ],
   controllers: [AuthController, AuthGrpcController],
-  providers: [AuthService, GrpcAuthService],
+  providers: [AuthService, AuthRedisService, GrpcAuthService],
 })
 export class AuthModule {}

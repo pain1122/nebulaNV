@@ -2,7 +2,7 @@ export default function logout() {
   return (
     <div className="col-lg-6">
       <div className="p-lg-5 p-4 text-center">
-        <lord-icon src="https://cdn.lordicon.com/hzomhqxz.json" trigger="loop" colors="primary:#405189,secondary:#08a88a" style="width:180px;height:180px"></lord-icon>
+        <lord-icon src="https://cdn.lordicon.com/hzomhqxz.json" trigger="loop" colors="primary:#405189,secondary:#08a88a" style={{width:"180px",height:"180px"}}></lord-icon>
 
         <div className="mt-4 pt-2">
           <h5>شما از سیستم خارج شده اید</h5>

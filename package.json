@@ -13,13 +13,17 @@
     "prisma:migrate:dev": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma migrate dev -- --schema ./prisma/schema.prisma",
     "prisma:migrate:deploy": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma migrate deploy -- --schema ./prisma/schema.prisma",
     "db:push": "pnpm -r -F @nebula/user-service -F @nebula/product-service -F @nebula/settings-service exec prisma db push -- --schema ./prisma/schema.prisma",
-    "studio:user": "pnpm -C apps/user-service prisma studio --schema ./prisma/schema.prisma",
-    "studio:product": "pnpm -C apps/product-service prisma studio --schema ./prisma/schema.prisma",
-    "studio:settings": "pnpm -C apps/settings-service prisma studio --schema ./prisma/schema.prisma",
-    "dev:auth": "pnpm -C apps/auth-service start:dev",
-    "dev:user": "pnpm -C apps/user-service start:dev",
-    "dev:product": "pnpm -C apps/product-service start:dev",
-    "dev:settings": "pnpm -C apps/settings-service start:dev"
+    "dev:auth": "pnpm --filter ./apps/auth-service start",
+    "dev:user": "wait-on tcp:127.0.0.1:50052 && pnpm --filter ./apps/user-service start",
+    "dev:settings": "wait-on tcp:127.0.0.1:50051 && pnpm --filter ./apps/settings-service start",
+    "dev:taxonomy": "wait-on tcp:127.0.0.1:50054 && pnpm --filter ./apps/taxonomy-service start",
+    "dev:media": "wait-on tcp:127.0.0.1:50057 && pnpm --filter ./apps/media-service start",
+    "dev:blog": "wait-on tcp:127.0.0.1:50058 && pnpm --filter ./apps/blog-service start",
+    "dev:product": "wait-on tcp:127.0.0.1:50055 && pnpm --filter ./apps/product-service start",
+    "dev:order": "wait-on tcp:127.0.0.1:50053 && pnpm --filter ./apps/order-service start",
+    "dev:backend": "concurrently -k -s first \"pnpm run dev:auth\" \"pnpm run dev:user\" \"pnpm run dev:settings\" \"pnpm run dev:taxonomy\" \"pnpm run dev:media\" \"pnpm run dev:blog\" \"pnpm run dev:product\" \"pnpm run dev:order\"",
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "dev:all": "concurrently -k \"pnpm run dev:backend\""
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -61,11 +65,13 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "concurrently": "^9.2.1",
     "express": "^5.1.0",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "wait-on": "^9.0.3"
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {

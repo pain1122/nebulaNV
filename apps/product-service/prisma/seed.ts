@@ -6,9 +6,9 @@ async function main() {
   // ID of taxonomy row from taxonomy-service (scope=product, kind=category.default)
   const defaultCategoryId =
     process.env.PRODUCT_SEED_DEFAULT_CATEGORY_ID ||
-    'REPLACE_ME_WITH_DEFAULT_CATEGORY_ID';
+    '656e9e6e-1420-4183-b1f9-6730e3b0aac8';
 
-  if (!defaultCategoryId || defaultCategoryId === 'REPLACE_ME_WITH_DEFAULT_CATEGORY_ID') {
+  if (!defaultCategoryId || defaultCategoryId === '656e9e6e-1420-4183-b1f9-6730e3b0aac8') {
     console.warn('⚠️ PRODUCT_SEED_DEFAULT_CATEGORY_ID not set. Skipping product seed.');
     return;
   }

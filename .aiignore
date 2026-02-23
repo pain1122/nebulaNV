@@ -1,0 +1,13 @@
+# AI context/execution exclude list
+# Purpose: reduce unnecessary token/context usage and scanning overhead.
+
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+coverage/
+*.min.js
+*.map
+generated/
+vendor/

@@ -1,7 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { AUTH_SERVICE, AUTH_SERVICE_NAME } from "@nebula/grpc-auth";
+import { AUTH_SERVICE } from "@nebula/grpc-auth";
 
 const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto");
 
@@ -16,7 +16,7 @@ const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto");
         useFactory: (cfg: ConfigService) => {
           const url =
             cfg.get<string>("AUTH_GRPC_URL") ||
-            "127.0.0.1:50051";
+            "127.0.0.1:50052";
 
           return {
             transport: Transport.GRPC,

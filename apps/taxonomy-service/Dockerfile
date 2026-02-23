@@ -45,7 +45,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN pnpm --filter=@nebula/taxonomy-service prisma generate --schema apps/taxonomy-service/prisma/schema.prisma
 
 # Build this service and its internal deps
-RUN pnpm turbo run build --filter=@nebula/taxonomy-service^...
+RUN pnpm turbo run build --filter=@nebula/taxonomy-service...
 
 # Create minimal deploy dir
 RUN pnpm deploy --filter=@nebula/taxonomy-service --prod /app/deploy
@@ -53,7 +53,7 @@ RUN pnpm deploy --filter=@nebula/taxonomy-service --prod /app/deploy
 # ---------------- runtime ----------------
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
-ENV NODE_ENV=taxonomyion
+ENV NODE_ENV=production
 
 COPY --from=build /app/deploy/. /app/
 
