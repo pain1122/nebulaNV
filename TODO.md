@@ -1,6 +1,6 @@
 # TODO: NebulaNV Hybrid Media Security Plan
 
-Last updated: 2026-02-23
+Last updated: 2026-02-23  
 Goal: ship a stable hybrid model where `auth-service` remains source-of-truth and storage access is defense-in-depth via Supabase policies (with MinIO for local emulation).
 
 ## Completed Baseline (Do Not Reopen)
@@ -23,17 +23,19 @@ Goal: ship a stable hybrid model where `auth-service` remains source-of-truth an
 
 ## Priority 0 - Runtime Blockers (Now)
 
-- [ ] P0-1 Fix compose validity and startup determinism
-  - Add missing `minio-data` volume declaration in `docker-compose.yml`
-  - Re-run `docker compose config` until zero warnings/errors
-- [ ] P0-2 Fix env interpolation hazards
-  - Escape `$` in `.env` secrets used by compose interpolation (or move sensitive values to safe quoting/override)
-  - Ensure no unresolved `${var}` warnings at compose parse time
-- [ ] P0-3 Normalize media env file syntax
-  - Fix `apps/media-service/.env.example` keys to valid `.env` format (`KEY=value`, no YAML `:` style)
+- [x] P0-1 Fix compose validity and startup determinism
+  - `minio-data` volume declared
+  - `docker compose config` validates with zero warnings/errors
+- [x] P0-2 Fix env interpolation hazards
+  - Compose interpolation-safe MinIO root password applied
+  - No unresolved `${var}` warnings at compose parse time
+- [x] P0-3 Normalize media env file syntax
+  - `apps/media-service/.env.example` uses valid `KEY=value` syntax
+  - Removed invalid spacing in runtime-critical keys
 - [ ] P0-4 Validate local full stack boot
-  - `docker compose up -d --build`
-  - Confirm health on exposed HTTP ports for all running services
+  - Run `docker compose up -d --build`
+  - Current blocker: `grpc-tools` binary download TLS failure during `pnpm fetch` in Docker build
+  - Exit criteria: compose build completes and all service health checks respond
 
 ## Priority 1 - Security Architecture Lock-In
 
@@ -80,7 +82,7 @@ Goal: ship a stable hybrid model where `auth-service` remains source-of-truth an
   - Create object access policies matching app-level ownership/role model
   - Validate deny-by-default posture on private paths
 - [ ] P4-2 Deployment documentation and env matrix
-  - Update `Setup.md` with local MinIO vs staging/prod Supabase provider modes
+  - Keep `Setup.md` aligned with MinIO local vs Supabase staging/prod modes
   - Document required env variables per environment
 - [ ] P4-3 Secrets hygiene
   - Rotate storage credentials after integration
@@ -136,6 +138,7 @@ pnpm -w build
 Targeted:
 
 ```bash
+docker build -f apps/auth-service/Dockerfile .
 pnpm --filter web build
 pnpm --filter @nebula/auth-service build
 ```

@@ -1,56 +1,60 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-02-21
-Purpose: compact project state to reduce re-discovery and context load.
+Last updated: 2026-02-23  
+Purpose: fast handoff for new AI sessions with minimal re-discovery.
 
 ## Working Agreement
 
-- Salar prefers to apply code edits manually.
-- Assistant should review files, give exact edit instructions, and keep explanations brief unless deeper detail is requested.
-- Tests can be deferred when explicitly requested.
+- Salar prefers manual code edits.
+- Assistant should review files, provide exact edit instructions, and keep explanations short unless deeper detail is requested.
+- Assistant may edit docs/checklists only when explicitly asked.
+- Do not make surprise code changes.
 
 ## Repository Snapshot
 
+- Stack: NestJS microservices + Next.js web app (pnpm monorepo)
 - Apps: `auth-service`, `user-service`, `product-service`, `settings-service`, `taxonomy-service`, `order-service`, `blog-service`, `media-service`, `web`
 - Packages: `grpc-auth`, `clients`, `config`, `protos`
-- Runtime target: Node `>=22`, pnpm `10.17.1`
+- Runtime target: Node `22`, pnpm `10.17.1`
 
-## Security and Runtime Status
+## Completed Security Baseline
 
-Completed hardening work:
-- `@Public` flag semantics enforced in `S2SGuard` (`gatewayOnly` aware path)
-- `@RequireUserId` enforced centrally in `GrpcTokenAuthGuard`
-- Canonical trusted `svc` propagation aligned across guard chain
-- S2S signing/verification contract unified (canonical method/path + derived secret usage)
-- Auth token boundary fixed (`ValidateToken` no longer accepts refresh token fallback)
-- Secret family boundary split (`S2S_SECRET` vs `GATEWAY_SECRET`, with gateway service-name allowlist)
-- Guard wiring fixed where bootstrap used `app.get(S2SGuard)` without provider wiring
-- Taxonomy gRPC bootstrap connection/start fixed
-- Wrong gRPC fallback ports fixed in affected client modules
-- Order gRPC identity no longer trusts caller payload `userId`
-- Web build blockers fixed (`lord-icon` typing, client/server boundary issues, lockfile conflict)
-- Real web refresh route added; fake refresh stub removed
-- Refresh token persistence removed from active `localStorage` path (cookie-backed refresh flow)
+- `@Public` behavior finalized (`gatewayOnly` / `optionalAuth`)
+- `@RequireUserId` enforced centrally
+- S2S `svc` propagation and signature contract canonicalized
+- Access vs refresh token boundary fixed in auth flow
+- Secret boundary split (`S2S_SECRET` vs `GATEWAY_SECRET`)
+- Guard/bootstrap wiring mismatches fixed
+- Wrong gRPC fallback ports corrected
+- Caller-supplied identity removed from order gRPC handlers
+- Web refresh flow moved to real route; dev stub removed
+- Refresh token no longer persisted in active `localStorage` path
 
-Open risks:
-- Regression/integration tests are not yet stabilized after hardening changes
-- Some legacy gRPC test helpers still use outdated S2S signing patterns
-- `docker-compose.yml` still defines a partial backend stack
+## Docker and Compose Status
 
-## Build Status (Latest Known)
+- `docker-compose.yml` now includes full backend + `postgres`, `redis`, `minio`, `minio-init`
+- Compose validation is clean: `docker compose config` returns without interpolation warnings
+- MinIO env interpolation issue resolved (`MINIO_ROOT_PASSWORD` now compose-safe)
+- `apps/media-service/.env.example` normalized to valid `.env` syntax
+- `.dockerignore` hardened to exclude workspace `node_modules` and `.ignored_*` junctions
 
-- `pnpm --filter @nebula/grpc-auth check-types`: pass
-- `pnpm --filter @nebula/clients check-types`: pass
-- `pnpm --filter @nebula/auth-service build`: pass
-- `pnpm --filter web build`: pass
+## Active Blocker (Current)
 
-## CI Alignment
+- `docker compose up -d --build` fails during Docker build at `pnpm fetch`
+- Failing dependency: `grpc-tools` postinstall binary download
+- Error class: TLS/network fetch failure to `https://node-precompiled-binaries.grpc.io/...`
+- Conclusion: infrastructure/network fragility during image build, not business-logic regression
 
-- `.github/workflows/ci.yml` uses Node `22`
-- `.github/workflows/proto-gen.yml` uses Node `22` and pnpm `10.17.1`
+## Next Session Entry Point
 
-## Next Focus Order
+1. Re-run `docker compose up -d --build`
+2. If TLS failure repeats, harden Docker install step for flaky binary fetches (retry/timeout/fallback strategy)
+3. After successful boot, verify health endpoints on exposed service ports
+4. Continue TODO from `Priority 0 -> P0-4`, then proceed by priority
 
-1. Keep docs aligned with real runtime behavior and compose scope.
-2. Expand `docker-compose.yml` to include the missing backend services and redis.
-3. Rework auth integration test setup (deterministic service readiness and bootstrap flow).
+## Git Hygiene Note
+
+- Previous oversized archive upload issue was caused by zipped artifacts in history
+- Current local state was cleaned to one commit without archive blobs
+- Avoid `git add .` when large local artifacts exist; stage intentionally
+- Never commit real `.env` secrets

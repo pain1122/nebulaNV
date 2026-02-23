@@ -1,13 +1,42 @@
 # AI context/execution exclude list
-# Purpose: reduce unnecessary token/context usage and scanning overhead.
+# Keep source/config/docs visible; ignore generated/build/vendor/heavy assets.
 
+# Dependency trees / build outputs
 node_modules/
 dist/
 build/
 .next/
 .nuxt/
 coverage/
-*.min.js
-*.map
+.turbo/
+.nx/
+.cache/
+.buildx-cache/
+.pnpm-store/
+pnpm-store/
+
+# Generated / vendored
 generated/
 vendor/
+prisma/generated/
+
+# Large archive and binary assets
+*.zip
+*.tar
+*.gz
+*.7z
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.mp4
+*.webm
+*.pdf
+
+# Bundled vendor artifacts and sourcemaps
+*.min.js
+*.map
+apps/web/public/assets/libs/
+apps/web/public/assets/images/
+apps/web/public/assets/fonts/
