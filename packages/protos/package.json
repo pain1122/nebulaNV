@@ -9,7 +9,6 @@
     "*.proto"
   ],
   "scripts": {
-    "prebuild": "pnpm -w proto:gen",
     "build": "tsc -p tsconfig.json",
     "clean": "rimraf dist"
   },

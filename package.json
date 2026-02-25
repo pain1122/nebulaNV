@@ -94,7 +94,6 @@
       "@prisma/engines",
       "@swc/core",
       "bcrypt",
-      "grpc-tools",
       "prisma",
       "protobufjs",
       "unrs-resolver"
