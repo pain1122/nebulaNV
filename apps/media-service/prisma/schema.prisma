@@ -10,6 +10,12 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
+enum AccessClass {
+  PUBLIC
+  PROTECTED
+  STRICT
+}
+
 enum MediaStatus {
   PENDING
   READY
@@ -43,6 +49,8 @@ model Media {
   ownerId     String?  @db.Uuid
   visibility  String   @default("private")
   scope       String   @default("panel")
+  // Define access restrictions (PUBLIC, PROTECTED, STRICT)
+  accessClass AccessClass @default(PUBLIC)
 
   sha256      String?  @unique
 
@@ -61,6 +69,7 @@ model Media {
   updatedAt   DateTime @updatedAt
 
   @@index([ownerId])
+  @@index([accessClass])
   @@index([visibility])
   @@index([scope])
   @@index([status])

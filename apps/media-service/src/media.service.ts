@@ -11,11 +11,28 @@ const safeTrim = (s: any) => (typeof s === "string" ? s.trim() : s)
 // Keep this tight for now. Expand later (video/* etc) when streaming work starts.
 const ALLOWED_PRESIGN_MIME = new Set(["image/webp", "image/jpeg", "image/png", "image/gif"])
 
+type AccessClass = "PUBLIC" | "PROTECTED" | "STRICT"
+const ACCESS_CLASS_SET = new Set<AccessClass>(["PUBLIC", "PROTECTED", "STRICT"])
+
 @Injectable()
 export class MediaService {
   private readonly log = new Logger(MediaService.name)
   constructor(private prisma: PrismaService) {}
   private s3?: S3Client
+
+  private enforceOwnerForWrite(input: {actorUserId?: string | null; actorRole?: string | null; ownerId?: string | null}) {
+    const actorUserId = input.actorUserId ?? null
+    const actorRole = input.actorRole ?? null
+    const requestedOwnerId = input.ownerId ?? null
+
+    if (!actorUserId) throw new BadRequestException("missing_actor_user_id")
+
+    if (!requestedOwnerId) return actorUserId
+
+    if (actorRole === "admin" || actorRole === "root-admin") return requestedOwnerId
+
+    return actorUserId
+  }
 
   private getS3() {
     if (this.s3) return this.s3
@@ -43,8 +60,33 @@ export class MediaService {
     return this.s3
   }
 
+  private normalizeAccessClass(input?: string | null): AccessClass | undefined {
+    const raw = safeTrim(input)
+    if (!raw) return undefined
+
+    const upper = String(raw).toUpperCase()
+    if (ACCESS_CLASS_SET.has(upper as AccessClass)) return upper as AccessClass
+
+    return undefined
+  }
+
+  private resolveAccessClass(input?: string | null, visibility?: string | null): AccessClass {
+    const normalized = this.normalizeAccessClass(input)
+    if (normalized) return normalized
+
+    const vis = safeTrim(visibility)?.toLowerCase()
+    if (vis === "public") return "PUBLIC"
+    if (vis === "private") return "PROTECTED"
+
+    return "PROTECTED"
+  }
+
+  private visibilityFromAccessClass(accessClass: AccessClass): "public" | "private" {
+    return accessClass === "PUBLIC" ? "public" : "private"
+  }
+
   // Legacy (kept)
-  async create(dto: CreateMediaDto) {
+  async create(dto: CreateMediaDto & {actorUserId?: string | null; actorRole?: string | null}) {
     const filename = safeTrim(dto.filename)
     if (!SAFE_FILENAME.test(filename)) throw new BadRequestException("filename is not safe")
 
@@ -59,6 +101,9 @@ export class MediaService {
       throw new BadRequestException("sizeBytes invalid")
     }
 
+    const accessClass = this.resolveAccessClass((dto as any).accessClass, dto.visibility)
+    const visibility = this.visibilityFromAccessClass(accessClass)
+
     return this.prisma.media.create({
       data: {
         storage: dto.storage ?? "local",
@@ -72,8 +117,13 @@ export class MediaService {
         height: dto.height ?? null,
         durationSec: dto.durationSec ?? null,
 
-        ownerId: dto.ownerId ?? null,
-        visibility: dto.visibility ?? "private",
+        ownerId: this.enforceOwnerForWrite({
+          actorUserId: dto.actorUserId ?? null,
+          actorRole: dto.actorRole ?? null,
+          ownerId: dto.ownerId ?? null,
+        }),
+        visibility,
+        accessClass,
         scope: dto.scope ?? "panel",
 
         sha256: dto.sha256 ?? null,
@@ -99,10 +149,13 @@ export class MediaService {
     const skip = Math.max(dto.skip ?? 0, 0)
     const q = (dto.q ?? "").trim()
 
+    const accessClass = this.normalizeAccessClass((dto as any).accessClass)
+
     const where: any = {
       ...(dto.ownerId ? {ownerId: dto.ownerId} : {}),
       ...(dto.visibility ? {visibility: dto.visibility} : {}),
       ...(dto.scope ? {scope: dto.scope} : {}),
+      ...(accessClass ? {accessClass} : {}),
       ...(q
         ? {
             OR: [{filename: {contains: q, mode: "insensitive"}}, {path: {contains: q, mode: "insensitive"}}, {mimeType: {contains: q, mode: "insensitive"}}, {sha256: {contains: q, mode: "insensitive"}}],
@@ -134,10 +187,11 @@ export class MediaService {
   }
 
   // Phase 2: presign creates a *pending* object key.
-  async presignUpload(b: PresignUploadDto) {
+  async presignUpload(b: PresignUploadDto & {actorUserId?: string | null; actorRole?: string | null}) {
     const bucket = process.env.MEDIA_S3_BUCKET || "media"
     const scope = b.scope ?? "panel"
-    const visibility = (b.visibility ?? "private") as "private" | "public"
+    const accessClass = this.resolveAccessClass((b as any).accessClass, b.visibility)
+    const visibility = this.visibilityFromAccessClass(accessClass)
 
     const filename = safeTrim(b.filename)
     if (!filename || !SAFE_FILENAME.test(filename)) {
@@ -155,9 +209,14 @@ export class MediaService {
     // object key
     const ext = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : ""
     const id = randomUUID()
+    const ownerId = this.enforceOwnerForWrite({
+      actorUserId: b.actorUserId ?? null,
+      actorRole: b.actorRole ?? null,
+      ownerId: b.ownerId ?? null,
+    })
 
     // IMPORTANT: upload into a pending prefix (scan/promotion later)
-    const path = `${scope}/${visibility}/pending/${id}${ext ? "." + ext : ""}`
+    const path = `${scope}/${accessClass.toLowerCase()}/pending/${ownerId}/${id}${ext ? "." + ext : ""}`
 
     const client = this.getS3()
     const cmd = new PutObjectCommand({
@@ -176,6 +235,7 @@ export class MediaService {
       mimeType,
       filename,
       visibility,
+      accessClass,
       scope,
       uploadUrl,
       expiresIn,
@@ -183,7 +243,7 @@ export class MediaService {
   }
 
   // Phase 2: FinalizeUpload verifies object exists and writes DB row with trusted size/mime.
-  async finalizeUpload(input: {storage?: string; bucket?: string; path: string; filename?: string; mimeType?: string; visibility?: string; scope?: string; ownerId?: string | null; sha256?: string | null}) {
+  async finalizeUpload(input: {storage?: string; bucket?: string; path: string; filename?: string; mimeType?: string; visibility?: string; accessClass?: string; scope?: string; ownerId?: string | null; sha256?: string | null; actorUserId?: string | null; actorRole?: string | null}) {
     const storage = input.storage ?? "s3"
     if (storage !== "s3") throw new BadRequestException("storage_not_supported")
 
@@ -201,7 +261,7 @@ export class MediaService {
       new HeadObjectCommand({
         Bucket: bucket,
         Key: path,
-      })
+      }),
     )
 
     const sizeBytes = Number(head.ContentLength ?? 0)
@@ -217,7 +277,8 @@ export class MediaService {
       throw new BadRequestException("mimeType_not_allowed")
     }
 
-    const visibility = (safeTrim(input.visibility) || "private") as "private" | "public"
+    const accessClass = this.resolveAccessClass(input.accessClass, input.visibility)
+    const visibility = this.visibilityFromAccessClass(accessClass)
     const scope = safeTrim(input.scope) || "panel"
 
     const etag = typeof head.ETag === "string" ? head.ETag.replaceAll('"', "") : null
@@ -232,8 +293,13 @@ export class MediaService {
         mimeType,
         sizeBytes,
 
-        ownerId: input.ownerId ?? null,
+        ownerId: this.enforceOwnerForWrite({
+          actorUserId: input.actorUserId ?? null,
+          actorRole: input.actorRole ?? null,
+          ownerId: input.ownerId ?? null,
+        }),
         visibility,
+        accessClass,
         scope,
 
         sha256: input.sha256 ?? null,

@@ -1,7 +1,7 @@
 import {IsOptional, IsString, IsIn, Matches} from "class-validator"
+import {Transform} from "class-transformer"
 
 const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
-
 
 export class FinalizeUploadDto {
   // storage location (object key)
@@ -24,7 +24,14 @@ export class FinalizeUploadDto {
 
   @IsOptional()
   @IsString()
+  // Optional admin override target owner. Do not use as authenticated actor identity.
   ownerId?: string
+
+  @IsOptional()
+  @IsString()
+  @Transform(({value}) => (typeof value === "string" ? value.trim().toUpperCase() : value))
+  @IsIn(["PUBLIC", "PROTECTED", "STRICT"])
+  accessClass?: string
 
   @IsOptional()
   @IsIn(["private", "public"])

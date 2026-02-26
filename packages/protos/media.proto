@@ -49,7 +49,8 @@ message Media {
 
   // storage metadata (optional)
   string etag = 20;
-  string promotedAt = 21; // ISO string (empty if not promoted)
+  string promotedAt = 21;
+  string accessClass = 22; // PUBLIC|PROTECTED|STRICT
 }
 
 // ---- RPCs ----
@@ -71,6 +72,7 @@ message CreateReq {
   string scope = 12;
 
   string sha256 = 13;
+  string accessClass = 14; // optional
 }
 
 message MediaRes {
@@ -94,6 +96,7 @@ message ListReq {
   // optional lifecycle filtering
   string status = 7;
   string scanStatus = 8;
+  string accessClass = 9; // optional
 }
 
 message ListRes {
@@ -116,6 +119,7 @@ message PresignUploadReq {
   string ownerId = 3;
   string visibility = 4;
   string scope = 5;
+  string accessClass = 6; // optional
 }
 
 message PresignUploadRes {
@@ -129,6 +133,7 @@ message PresignUploadRes {
   string mimeType = 7;
   string visibility = 8;
   string scope = 9;
+  string accessClass = 10; // resolved class
 }
 
 message FinalizeUploadReq {
@@ -146,6 +151,7 @@ message FinalizeUploadReq {
   // optional
   string ownerId = 8;
   string sha256 = 9; // if client computed; optional
+  string accessClass = 10; // optional
 }
 
 service MediaService {

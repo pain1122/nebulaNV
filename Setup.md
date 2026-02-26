@@ -151,3 +151,12 @@ pnpm --filter @nebula/auth-service build
 - `docker-compose.yml` is still a partial backend stack.
 - `media-service` does not expose an HTTP `/health` route yet.
 - Auth integration/e2e tests currently need setup/readiness overhaul.
+
+
+## Auth Ownership Boundary (P1-1)
+
+- `auth-service` is the single source of truth for identity, roles, token issue/refresh/revocation.
+- `media-service` is the policy decision point for media object access (upload/read/delete).
+- Request payload `ownerId` is treated only as an admin override target, never as caller identity.
+- Effective caller identity always comes from authenticated guard context (`req.user` / `resolveCtxUser`).
+- Storage layer policies (Supabase/MinIO/S3) are defense-in-depth and do not replace app-level authorization.

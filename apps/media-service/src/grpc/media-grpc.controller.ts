@@ -10,6 +10,18 @@ export class MediaGrpcController {
   private readonly log = new Logger(MediaGrpcController.name)
   constructor(private readonly svc: MediaService) {}
 
+  private resolveOwnerId(ctx: {userId?: string | null; role?: string}, requested?: string | null): string | null {
+    const requestedOwnerId = requested?.trim()
+    if (!requestedOwnerId) return ctx.userId ?? null
+
+    // Explicit admin override path; never anonymous caller identity.
+    if (ctx.role === "admin" || ctx.role === "root-admin") {
+      return requestedOwnerId
+    }
+
+    return ctx.userId ?? null
+  }
+
   @Public()
   @GrpcMethod("MediaService", "Ping")
   async ping(_: media.Empty): Promise<media.Pong> {
@@ -39,7 +51,11 @@ export class MediaGrpcController {
       height: req.height && req.height > 0 ? req.height : null,
       durationSec: req.durationSec && req.durationSec > 0 ? req.durationSec : null,
 
-      ownerId: req.ownerId?.trim() ? req.ownerId.trim() : (ctx.userId ?? null),
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+
+      ownerId: this.resolveOwnerId(ctx, req.ownerId),
+      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : "private",
       scope: req.scope?.trim() ? req.scope.trim() : "panel",
 
@@ -71,6 +87,7 @@ export class MediaGrpcController {
       take: req.take ?? 50,
       skip: req.skip ?? 0,
       ownerId: req.ownerId?.trim() ? req.ownerId.trim() : undefined,
+      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : undefined,
       scope: req.scope?.trim() ? req.scope.trim() : undefined,
     } as any)
@@ -99,7 +116,11 @@ export class MediaGrpcController {
     const out = await this.svc.presignUpload({
       filename: req.filename?.trim() ?? "",
       mimeType: req.mimeType?.trim() ?? "",
-      ownerId: req.ownerId?.trim() ? req.ownerId.trim() : (ctx.userId ?? undefined),
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+
+      ownerId: this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
+      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : "private",
       scope: req.scope?.trim() ? req.scope.trim() : "panel",
     } as any)
@@ -115,6 +136,7 @@ export class MediaGrpcController {
       filename: out.filename ?? "",
       mimeType: out.mimeType ?? "",
       visibility: out.visibility ?? "private",
+      accessClass: out.accessClass ?? "PUBLIC",
       scope: out.scope ?? "panel",
     })
   }
@@ -133,10 +155,13 @@ export class MediaGrpcController {
       filename: req.filename?.trim() || undefined,
       mimeType: req.mimeType?.trim() || undefined,
       visibility: req.visibility?.trim() || undefined,
+      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       scope: req.scope?.trim() || undefined,
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
 
       // if not provided, default to ctx user
-      ownerId: req.ownerId?.trim() ? req.ownerId.trim() : (ctx.userId ?? null),
+      ownerId: this.resolveOwnerId(ctx, req.ownerId),
       sha256: req.sha256?.trim() ? req.sha256.trim() : null,
     } as any)
 
@@ -162,6 +187,7 @@ function toProtoMedia(row: any): media.Media {
 
     ownerId: row.ownerId ?? "",
     visibility: row.visibility ?? "private",
+    accessClass: row.accessClass ?? "PUBLIC",
     scope: row.scope ?? "panel",
 
     sha256: row.sha256 ?? "",

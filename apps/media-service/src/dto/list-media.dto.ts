@@ -1,21 +1,21 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from "class-validator"
-import { Transform } from "class-transformer"
+import {IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min} from "class-validator"
+import {Transform} from "class-transformer"
 
 export class ListMediaDto {
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @Transform(({value}) => (typeof value === "string" ? value.trim() : value))
   q?: string
 
   @IsOptional()
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(1)
   @Max(200)
   take?: number
 
   @IsOptional()
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
   skip?: number
@@ -23,6 +23,12 @@ export class ListMediaDto {
   @IsOptional()
   @IsUUID()
   ownerId?: string
+
+  @IsOptional()
+  @IsString()
+  @Transform(({value}) => (typeof value === "string" ? value.trim().toUpperCase() : value))
+  @IsIn(["PUBLIC", "PROTECTED", "STRICT"])
+  accessClass?: string
 
   @IsOptional()
   @IsIn(["private", "public"])

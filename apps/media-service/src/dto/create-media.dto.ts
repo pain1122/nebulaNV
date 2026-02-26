@@ -1,10 +1,10 @@
-import { Transform } from "class-transformer"
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Min, Max } from "class-validator"
+import {Transform} from "class-transformer"
+import {IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Min, Max} from "class-validator"
 
 const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
 const MAX_INT_32 = 2_147_483_647
 
-const trim = ({ value }: any) => (typeof value === "string" ? value.trim() : value)
+const trim = ({value}: any) => (typeof value === "string" ? value.trim() : value)
 
 export class CreateMediaDto {
   @IsOptional()
@@ -24,7 +24,7 @@ export class CreateMediaDto {
 
   @IsString()
   @Transform(trim)
-  @Matches(SAFE_FILENAME, { message: "filename is not safe" })
+  @Matches(SAFE_FILENAME, {message: "filename is not safe"})
   filename!: string
 
   @IsString()
@@ -32,27 +32,27 @@ export class CreateMediaDto {
   mimeType!: string
 
   // Keep as string for HTTP + gRPC parity, service converts via Number()
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
   sizeBytes!: number
 
   @IsOptional()
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
   @Max(MAX_INT_32)
   width?: number
 
   @IsOptional()
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
   @Max(MAX_INT_32)
   height?: number
 
   @IsOptional()
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(0)
   @Max(MAX_INT_32)
@@ -60,7 +60,14 @@ export class CreateMediaDto {
 
   @IsOptional()
   @IsUUID()
+  // Optional admin override target owner. Never trusted as caller identity.
   ownerId?: string | null
+
+  @IsOptional()
+  @IsString()
+  @Transform(({value}) => (typeof value === "string" ? value.trim().toUpperCase() : value))
+  @IsIn(["PUBLIC", "PROTECTED", "STRICT"])
+  accessClass?: string
 
   @IsOptional()
   @IsIn(["private", "public"])
