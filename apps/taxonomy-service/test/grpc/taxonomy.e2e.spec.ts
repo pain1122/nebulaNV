@@ -7,11 +7,11 @@ const URL = process.env.TAXONOMY_GRPC_URL ?? "127.0.0.1:50057";
 
 const PROTO_PATH = path.resolve(
   __dirname,
-  "../../../../packages/protos/taxonomy.proto"
+  "../../../../packages/protos/taxonomy.proto",
 );
 
 const SCOPE = "product";
-const KIND  = "category.default";
+const KIND = "category.default";
 
 describe("taxonomy-service gRPC", () => {
   let client: taxonomy.TaxonomyServiceClient;
@@ -34,13 +34,13 @@ describe("taxonomy-service gRPC", () => {
       {
         data: {
           scope: SCOPE,
-          kind:  KIND,
-          slug:  "root-cat-grpc",
+          kind: KIND,
+          slug: "root-cat-grpc",
           title: "Root Category gRPC",
           isTree: true,
         },
       },
-      mdS2S()
+      mdS2S(),
     );
 
     expect(res.data?.id).toBeDefined();
@@ -59,14 +59,14 @@ describe("taxonomy-service gRPC", () => {
       "CreateTaxonomy",
       {
         data: {
-          scope:    SCOPE,
-          kind:     KIND,
-          slug:     "child-cat-grpc",
-          title:    "Child Category gRPC",
+          scope: SCOPE,
+          kind: KIND,
+          slug: "child-cat-grpc",
+          title: "Child Category gRPC",
           parentId: rootId,
         },
       },
-      mdS2S()
+      mdS2S(),
     );
 
     expect(res.data?.id).toBeDefined();
@@ -83,11 +83,11 @@ describe("taxonomy-service gRPC", () => {
       "ListTaxonomies",
       {
         scope: SCOPE,
-        kind:  KIND,
-        page:  1,
+        kind: KIND,
+        page: 1,
         limit: 10,
       },
-      mdS2S()
+      mdS2S(),
     );
 
     expect(res.data.length).toBeGreaterThanOrEqual(2);
@@ -100,7 +100,7 @@ describe("taxonomy-service gRPC", () => {
       client,
       "GetTaxonomy",
       { id: childId },
-      mdS2S()
+      mdS2S(),
     );
 
     expect(res.data?.id).toBe(childId);
@@ -113,8 +113,8 @@ describe("taxonomy-service gRPC", () => {
         client,
         "DeleteTaxonomy",
         { id: rootId },
-        mdS2S()
-      )
+        mdS2S(),
+      ),
     ).rejects.toBeTruthy();
   });
 
@@ -123,7 +123,7 @@ describe("taxonomy-service gRPC", () => {
       client,
       "DeleteTaxonomy",
       { id: childId },
-      mdS2S()
+      mdS2S(),
     );
     expect(delChild.success).toBe(true);
 
@@ -131,7 +131,7 @@ describe("taxonomy-service gRPC", () => {
       client,
       "DeleteTaxonomy",
       { id: rootId },
-      mdS2S()
+      mdS2S(),
     );
     expect(delRoot.success).toBe(true);
   });

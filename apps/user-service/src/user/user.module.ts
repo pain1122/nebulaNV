@@ -4,9 +4,8 @@ import { UserController } from './user.controller';
 import { PrismaService } from '../prisma.service';
 import { UserGrpcController } from './grpc/user-grpc.controller';
 
-
 @Module({
   providers: [UserService, PrismaService],
-  controllers: [UserController , UserGrpcController],
+  controllers: [UserController, UserGrpcController],
 })
 export class UserModule {}

@@ -12,6 +12,14 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
 import { AuthRedisService } from './redis/auth-redis.service';
 import { userv1 } from '@nebula/protos';
+import {
+  AuthTokenPayload,
+  AuthUserDto,
+  TokenPair,
+  isAuthTokenPayload,
+  toAuthRole,
+} from './auth.types';
+import { errorMessage, errorName } from './error.utils';
 
 type UserResponse = userv1.UserResponse;
 type CreateUserRequest = userv1.CreateUserRequest;
@@ -27,8 +35,16 @@ type LogoutRequest = {
   allDevices?: boolean;
 };
 
-function normalizeEmail(s: string) {
+function normalizeEmail(s: string): string {
   return s.trim().toLowerCase();
+}
+
+function safeTimeEnd(label: string): void {
+  try {
+    console.timeEnd(label);
+  } catch {
+    return;
+  }
 }
 
 @Injectable()
@@ -49,7 +65,7 @@ export class AuthService {
 
   // ---------------- Auth flows ----------------
 
-  async register(email: string, password: string) {
+  async register(email: string, password: string): Promise<AuthUserDto> {
     this.logger.debug('register() → hashing password');
     console.time('auth.register::bcrypt.hash');
     const hash = await bcrypt.hash(password, this.bcryptRounds());
@@ -68,25 +84,25 @@ export class AuthService {
       console.timeEnd('auth.register->grpc.createUser');
       this.logger.debug('register() → gRPC createUser done');
 
-      const raw: any = (res as any)?.user ?? res;
-      const out = {
-        id: raw?.id?.toString?.() ?? String(raw?.id ?? ''),
-        email: raw?.email ?? '',
-        role: raw?.role ?? 'user',
+      const out: AuthUserDto = {
+        id: res.id,
+        email: res.email,
+        role: toAuthRole(res.role),
       };
       this.logger.log(`register() end -> id=${out.id}`);
       await this.authRedis.getTokenVersion(out.id);
       return out;
-    } catch (e: any) {
-      try {
-        console.timeEnd('auth.register->grpc.createUser');
-      } catch {}
-      this.logger.error(`register() gRPC error: ${e?.message || e}`);
+    } catch (e: unknown) {
+      safeTimeEnd('auth.register->grpc.createUser');
+      this.logger.error(`register() gRPC error: ${errorMessage(e)}`);
       throw e;
     }
   }
 
-  async validateUser(identifier: string, password: string) {
+  async validateUser(
+    identifier: string,
+    password: string,
+  ): Promise<AuthUserDto | null> {
     const isEmail = identifier.includes('@');
     const req: FindUserWithHashRequest = isEmail
       ? userv1.FindUserWithHashRequest.create({
@@ -101,11 +117,7 @@ export class AuthService {
       const u = await this.grpc.findUserWithHash(req); // S2S only
       console.timeEnd('grpc.findUserWithHash');
 
-      const hash: string | null =
-        (u as any).passwordHash ??
-        (u as any).password ??
-        (u as any).password_hash ??
-        null;
+      const hash = u.passwordHash || null;
 
       if (!hash) {
         this.logger.warn('validateUser() → no hash on user; returning null');
@@ -120,22 +132,20 @@ export class AuthService {
 
       this.logger.debug('validateUser() → password match');
       return {
-        id: (u as any).id,
-        email: (u as any).email,
-        role: (u as any).role,
+        id: u.id,
+        email: u.email,
+        role: toAuthRole(u.role),
       };
-    } catch (e: any) {
-      try {
-        console.timeEnd('grpc.findUserWithHash');
-      } catch {}
+    } catch (e: unknown) {
+      safeTimeEnd('grpc.findUserWithHash');
       this.logger.error(
-        `validateUser() → error type=${e?.constructor?.name} msg=${e?.message ?? e}`,
+        `validateUser() → error type=${errorName(e)} msg=${errorMessage(e)}`,
       );
       return null;
     }
   }
 
-  async login(user: { id: string; email: string; role: string }) {
+  async login(user: AuthUserDto): Promise<TokenPair> {
     const isDisabled = await this.authRedis.isUserDisabled(user.id);
     if (isDisabled) {
       throw new UnauthorizedException('User is disabled');
@@ -143,7 +153,7 @@ export class AuthService {
 
     const tokenVersion = await this.authRedis.getTokenVersion(user.id);
 
-    const payload = {
+    const payload: AuthTokenPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -169,20 +179,24 @@ export class AuthService {
     return { accessToken: at, refreshToken: rt };
   }
 
-  async refreshTokens(oldRt: string) {
+  async refreshTokens(oldRt: string): Promise<TokenPair> {
     this.logger.debug('refreshTokens() start');
 
-    let payload: any;
+    let payload: AuthTokenPayload;
     try {
-      payload = this.jwt.verify(oldRt, {
+      const verified: unknown = this.jwt.verify(oldRt, {
         secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
       });
-    } catch (e: any) {
-      this.logger.error(`refreshTokens() verify failed: ${e?.message || e}`);
+      if (!isAuthTokenPayload(verified)) {
+        throw new UnauthorizedException('Invalid refresh token payload');
+      }
+      payload = verified;
+    } catch (e: unknown) {
+      this.logger.error(`refreshTokens() verify failed: ${errorMessage(e)}`);
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const userId: string | undefined = payload?.sub;
+    const userId = payload.sub;
     if (!userId) {
       this.logger.error('refreshTokens() missing payload.sub');
       throw new UnauthorizedException('Invalid refresh token');
@@ -208,10 +222,10 @@ export class AuthService {
 
     const tokenVersion = await this.authRedis.getTokenVersion(userId);
 
-    const p = {
+    const p: AuthTokenPayload = {
       sub: userId,
       email: uw.email,
-      role: uw.role,
+      role: toAuthRole(uw.role),
       tv: tokenVersion,
     };
     const at = this.jwt.sign(p);
@@ -233,7 +247,11 @@ export class AuthService {
 
   // ---------------- Profile ----------------
 
-  async getProfile(id: string, token: string, initiatorId?: string) {
+  async getProfile(
+    id: string,
+    token: string,
+    initiatorId?: string,
+  ): Promise<UserResponse> {
     try {
       if (!token) throw new UnauthorizedException('Missing access token');
       // Pass token (for @Roles on user-service) + x-user-id(id) via client

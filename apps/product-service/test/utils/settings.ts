@@ -31,8 +31,11 @@ export async function getDefaultProductCategoryGrpc(): Promise<string> {
   if (!res || !res.found || !res.value) {
     // This will show up in Jest output
     // so we know if it's a transport issue vs. DB miss.
-    // eslint-disable-next-line no-console
-    console.error("GetString(product.default.default_product_category) =>", res);
+
+    console.error(
+      "GetString(product.default.default_product_category) =>",
+      res,
+    );
     throw new Error("default_product_category missing in settings-service");
   }
 

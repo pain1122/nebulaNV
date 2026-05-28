@@ -26,11 +26,13 @@ describe('UserService gRPC (e2e, TS)', () => {
   // Use seeded accounts (same as the seeder)
   const userEmail = process.env.SEED_USER_EMAIL ?? 'user@example.com';
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
-  const userPass  = process.env.SEED_USER_PASS  ?? 'User123!';
+  const userPass = process.env.SEED_USER_PASS ?? 'User123!';
   const adminPass = process.env.SEED_ADMIN_PASS ?? 'Admin123!';
 
-  let userId = '', adminId = '';
-  let userAccess = '', adminAccess = '';
+  let userId = '',
+    adminId = '';
+  let userAccess = '',
+    adminAccess = '';
   let haveRealAdmin = false;
   let adminTokens: LoginResp | null = null;
 
@@ -55,7 +57,8 @@ describe('UserService gRPC (e2e, TS)', () => {
     }
 
     userId = subFromJwt(userTokens.accessToken);
-    adminId = haveRealAdmin && adminTokens ? subFromJwt(adminTokens.accessToken) : '';
+    adminId =
+      haveRealAdmin && adminTokens ? subFromJwt(adminTokens.accessToken) : '';
     userAccess = userTokens.accessToken;
     adminAccess = haveRealAdmin && adminTokens ? adminTokens.accessToken : '';
   });
@@ -92,15 +95,20 @@ describe('UserService gRPC (e2e, TS)', () => {
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
 
-  it(haveRealAdmin ? 'getUser admin→user succeeds' : 'getUser admin→user (no real admin) skipped', async () => {
-    if (!haveRealAdmin || !adminAccess) return;
-    const adminRole = roleFromJwt(adminAccess) ?? 'admin';
-    const res = await call<any>(
-      client,
-      'getUser',
-      { id: userId },
-      mdAuth({ access: adminAccess, userId: adminId, role: adminRole }),
-    );
-    expect(res).toHaveProperty('id', userId);
-  });
+  it(
+    haveRealAdmin
+      ? 'getUser admin→user succeeds'
+      : 'getUser admin→user (no real admin) skipped',
+    async () => {
+      if (!haveRealAdmin || !adminAccess) return;
+      const adminRole = roleFromJwt(adminAccess) ?? 'admin';
+      const res = await call<any>(
+        client,
+        'getUser',
+        { id: userId },
+        mdAuth({ access: adminAccess, userId: adminId, role: adminRole }),
+      );
+      expect(res).toHaveProperty('id', userId);
+    },
+  );
 });

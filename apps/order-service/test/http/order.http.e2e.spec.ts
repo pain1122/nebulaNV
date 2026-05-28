@@ -1,6 +1,5 @@
 // apps/order-service/test/http/order.http.e2e.spec.ts
 import { httpJson } from "../utils/http";
-import { randomUUID } from "crypto";
 
 const AUTH_HTTP = process.env.AUTH_HTTP_URL!;
 const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL!;
@@ -19,14 +18,14 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
     // user
     const u = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
-      password:   process.env.SEED_USER_PASS  ?? "User123!",
+      password: process.env.SEED_USER_PASS ?? "User123!",
     });
     userToken = u.accessToken;
 
     // admin
     const a = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
-      password:   process.env.SEED_ADMIN_PASS  ?? "Admin123!",
+      password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
     });
     adminToken = a.accessToken;
 
@@ -55,7 +54,6 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
   });
 
   it("POST /orders/cart/items creates a cart item", async () => {
-
     const res = await httpJson<any>(
       "POST",
       `${ORDER_HTTP}/orders/cart/items`,
@@ -111,12 +109,9 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
   });
 
   it("GET /orders lists includes the created order", async () => {
-    const res = await httpJson<any>(
-      "GET",
-      `${ORDER_HTTP}/orders`,
-      undefined,
-      { authorization: `Bearer ${userToken}` },
-    );
+    const res = await httpJson<any>("GET", `${ORDER_HTTP}/orders`, undefined, {
+      authorization: `Bearer ${userToken}`,
+    });
 
     expect(res.data.length).toBeGreaterThan(0);
     const hit = res.data.find((o: any) => o.id === orderId);

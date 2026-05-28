@@ -9,22 +9,22 @@ import {
   UsePipes,
   ValidationPipe,
   ParseUUIDPipe,
-} from "@nestjs/common"
-import { ProductServiceImpl } from "./product.service"
-import { Public, Roles } from "@nebula/grpc-auth"
-import { Throttle } from "@nestjs/throttler"
+} from "@nestjs/common";
+import { ProductServiceImpl } from "./product.service";
+import { Public, Roles } from "@nebula/grpc-auth";
+import { Throttle } from "@nestjs/throttler";
 import {
   CreateProductRequestDto,
   UpdateProductRequestDto,
   ListProductsRequestDto,
-} from "./dto/product-input.dto"
+} from "./dto/product-input.dto";
 
 const Pipe = new ValidationPipe({
   whitelist: true,
   forbidNonWhitelisted: true,
   transform: true,
   transformOptions: { enableImplicitConversion: true },
-})
+});
 
 @Controller("products")
 @UsePipes(Pipe)
@@ -43,20 +43,20 @@ export class ProductController {
       page: q.page ?? 1,
       limit: q.limit ?? 20,
       includeDeleted: !!q.includeDeleted,
-    })
+    });
   }
 
   @Public()
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get(":id")
   get(@Param("id", new ParseUUIDPipe({ version: "4" })) id: string) {
-    return this.svc.get(id)
+    return this.svc.get(id);
   }
 
   @Roles("admin")
   @Post()
   create(@Body() body: CreateProductRequestDto) {
-    return this.svc.create(body.data)
+    return this.svc.create(body.data);
   }
 
   @Roles("admin")
@@ -65,6 +65,6 @@ export class ProductController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @Body() body: UpdateProductRequestDto,
   ) {
-    return this.svc.update(id, body.patch)
+    return this.svc.update(id, body.patch);
   }
 }

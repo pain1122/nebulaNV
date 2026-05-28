@@ -1,17 +1,25 @@
 // apps/blog-service/src/taxonomy/dto/taxonomy.dto.ts
 
-import { IsOptional, IsString, IsUUID, IsBoolean, IsInt, IsObject, ValidateIf } from "class-validator"
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsBoolean,
+  IsInt,
+  IsObject,
+  ValidateIf,
+} from "class-validator";
 
 export class CreateTaxonomyDto {
   @IsString()
-  slug!: string
+  slug!: string;
 
   @IsString()
-  title!: string
+  title!: string;
 
   @IsOptional()
   @IsString()
-  description?: string
+  description?: string;
 
   /**
    * parentId: null or UUID
@@ -19,48 +27,48 @@ export class CreateTaxonomyDto {
    */
   @IsOptional()
   @IsUUID()
-  parentId?: string | null
+  parentId?: string | null;
 
   @IsOptional()
   @IsBoolean()
-  isHidden?: boolean
+  isHidden?: boolean;
 
   @IsOptional()
   @IsInt()
-  sortOrder?: number
+  sortOrder?: number;
 
   @IsOptional()
   @IsObject()
-  meta?: Record<string, any>
+  meta?: Record<string, any>;
 }
 
 export class UpdateTaxonomyDto {
   @IsOptional()
   @IsString()
-  slug?: string
+  slug?: string;
 
   @IsOptional()
   @IsString()
-  title?: string
+  title?: string;
 
   @IsOptional()
   @IsString()
-  description?: string
+  description?: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsUUID()
-  parentId?: string | null
+  parentId?: string | null;
 
   @IsOptional()
   @IsBoolean()
-  isHidden?: boolean
+  isHidden?: boolean;
 
   @IsOptional()
   @IsInt()
-  sortOrder?: number
+  sortOrder?: number;
 
   @IsOptional()
   @IsObject()
-  meta?: Record<string, any>
+  meta?: Record<string, any>;
 }

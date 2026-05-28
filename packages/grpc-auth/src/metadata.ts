@@ -44,7 +44,6 @@ export function withAuth(opts: {
   userId?: string | null;
   s2s?: { svc?: string; secret?: string } | boolean;
 }): Metadata {
-  const md = new Metadata();
   const a = bearer(opts.bearer);
   const b =
     opts.s2s

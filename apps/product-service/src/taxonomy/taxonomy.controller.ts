@@ -7,11 +7,11 @@ import {
   Patch,
   Post,
   Query,
-} from "@nestjs/common"
-import { Public, Roles } from "@nebula/grpc-auth"
+} from "@nestjs/common";
+import { Public, Roles } from "@nebula/grpc-auth";
 
-import { TaxonomyService, ListTaxonomyQuery } from "./taxonomy.service"
-import { CreateTaxonomyDto, UpdateTaxonomyDto } from "./dto/taxonomy.dto"
+import { TaxonomyService, ListTaxonomyQuery } from "./taxonomy.service";
+import { CreateTaxonomyDto, UpdateTaxonomyDto } from "./dto/taxonomy.dto";
 
 @Controller("taxonomies")
 export class TaxonomyController {
@@ -35,9 +35,9 @@ export class TaxonomyController {
       limit: limit ? Number(limit) : undefined,
       q: q ?? undefined,
       parentId: parentId ?? undefined,
-    }
+    };
 
-    return this.service.list(kind, query)
+    return this.service.list(kind, query);
   }
 
   // ---------------------------
@@ -47,10 +47,8 @@ export class TaxonomyController {
   // ---------------------------
   @Public()
   @Get(":kind/:id")
-  get(
-    @Param("id") id: string,
-  ) {
-    return this.service.get(id)
+  get(@Param("id") id: string) {
+    return this.service.get(id);
   }
 
   // ---------------------------
@@ -59,11 +57,8 @@ export class TaxonomyController {
   // ---------------------------
   @Roles("admin")
   @Post(":kind")
-  create(
-    @Param("kind") kind: string,
-    @Body() dto: CreateTaxonomyDto,
-  ) {
-    return this.service.create(kind, dto)
+  create(@Param("kind") kind: string, @Body() dto: CreateTaxonomyDto) {
+    return this.service.create(kind, dto);
   }
 
   // ---------------------------
@@ -72,11 +67,8 @@ export class TaxonomyController {
   // ---------------------------
   @Roles("admin")
   @Patch(":kind/:id")
-  update(
-    @Param("id") id: string,
-    @Body() dto: UpdateTaxonomyDto,
-  ) {
-    return this.service.update(id, dto)
+  update(@Param("id") id: string, @Body() dto: UpdateTaxonomyDto) {
+    return this.service.update(id, dto);
   }
 
   // ---------------------------
@@ -85,9 +77,7 @@ export class TaxonomyController {
   // ---------------------------
   @Roles("admin")
   @Delete(":kind/:id")
-  remove(
-    @Param("id") id: string,
-  ) {
-    return this.service.remove(id)
+  remove(@Param("id") id: string) {
+    return this.service.remove(id);
   }
 }

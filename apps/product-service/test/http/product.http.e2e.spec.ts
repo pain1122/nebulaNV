@@ -2,27 +2,27 @@
 import { httpJson } from "../utils/http";
 
 const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL ?? "http://127.0.0.1:3003";
-const AUTH_HTTP    = process.env.AUTH_HTTP_URL    ?? "http://127.0.0.1:3001";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
 
 type LoginResp = { accessToken: string };
 
 describe("product-service HTTP (admin writes, public reads)", () => {
   let admin = "";
-  let user  = "";
-  let id    = "";
+  let user = "";
+  let id = "";
 
   beforeAll(async () => {
     // login normal user
     const ut = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
-      password:   process.env.SEED_USER_PASS  ?? "User123!",
+      password: process.env.SEED_USER_PASS ?? "User123!",
     });
     user = ut.accessToken;
 
     // login admin
     const at = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
-      password:   process.env.SEED_ADMIN_PASS  ?? "Admin123!",
+      password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
     });
     admin = at.accessToken;
 

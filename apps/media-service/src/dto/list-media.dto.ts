@@ -1,49 +1,66 @@
-import {IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min} from "class-validator"
-import {Transform} from "class-transformer"
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from "class-validator";
+import { Transform, type TransformFnParams } from "class-transformer";
+
+const trim = ({ value }: TransformFnParams): unknown =>
+  typeof value === "string" ? value.trim() : value;
+
+const upperTrim = ({ value }: TransformFnParams): unknown =>
+  typeof value === "string" ? value.trim().toUpperCase() : value;
+
+const numberOrUndefined = ({ value }: TransformFnParams): number | undefined =>
+  value === undefined ? undefined : Number(value);
 
 export class ListMediaDto {
   @IsOptional()
   @IsString()
-  @Transform(({value}) => (typeof value === "string" ? value.trim() : value))
-  q?: string
+  @Transform(trim)
+  q?: string;
 
   @IsOptional()
-  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
+  @Transform(numberOrUndefined)
   @IsInt()
   @Min(1)
   @Max(200)
-  take?: number
+  take?: number;
 
   @IsOptional()
-  @Transform(({value}) => (value === undefined ? undefined : Number(value)))
+  @Transform(numberOrUndefined)
   @IsInt()
   @Min(0)
-  skip?: number
+  skip?: number;
 
   @IsOptional()
   @IsUUID()
-  ownerId?: string
+  ownerId?: string;
 
   @IsOptional()
   @IsString()
-  @Transform(({value}) => (typeof value === "string" ? value.trim().toUpperCase() : value))
+  @Transform(upperTrim)
   @IsIn(["PUBLIC", "PROTECTED", "STRICT"])
-  accessClass?: string
+  accessClass?: string;
 
   @IsOptional()
   @IsIn(["private", "public"])
-  visibility?: string
+  visibility?: string;
 
   @IsOptional()
   @IsIn(["panel", "user", "system"])
-  scope?: string
+  scope?: string;
 
   // ✅ new lifecycle filters (DTO-only, no Prisma typing)
   @IsOptional()
   @IsIn(["PENDING", "READY", "BLOCKED", "DELETED"])
-  status?: string
+  status?: string;
 
   @IsOptional()
   @IsIn(["NONE", "QUEUED", "SCANNING", "CLEAN", "INFECTED", "FAILED"])
-  scanStatus?: string
+  scanStatus?: string;
 }

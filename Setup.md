@@ -1,18 +1,31 @@
-# NebulaNV Local Setup
+﻿# NebulaNV Local Setup
 
-Last updated: 2026-02-21
+Last updated: 2026-05-28
+
+Use this file for first-time setup. Use `docs/architecture/local-dev-and-docker-boot.md` for the deeper boot and Docker explanation.
 
 ## 1) Prerequisites
 
 - Node.js `>=22`
 - pnpm `10.17.1`
-  - `corepack enable`
-  - `corepack prepare pnpm@10.17.1 --activate`
-- Docker Desktop (WSL2 backend on Windows)
+- Docker Desktop on Windows, preferably with the WSL2 backend
 
-## 2) Environment Files
+Enable pnpm through Corepack:
 
-Create env files from examples:
+```powershell
+corepack enable
+corepack prepare pnpm@10.17.1 --activate
+```
+
+## 2) Install Dependencies
+
+```powershell
+pnpm install
+```
+
+## 3) Environment Files
+
+Create local env files from examples:
 
 ```powershell
 Copy-Item .env.example .env
@@ -26,74 +39,50 @@ Copy-Item apps/taxonomy-service/.env.example apps/taxonomy-service/.env
 Copy-Item apps/media-service/.env.example apps/media-service/.env
 ```
 
-Root `.env` should define at least:
+Rules:
 
-```ini
-NODE_ENV=development
-PUBLIC_MODE=OPEN
+- Commit `.env.example` files.
+- Never commit real `.env` files.
+- Keep variable names consistent across root `.env`, service `.env`, Docker Compose, and tests.
+- When a port changes, update `docs/architecture/local-dev-and-docker-boot.md` too.
 
-S2S_SECRET=changeme
-S2S_SECRET_OLD=changeme
-S2S_ALLOWED_SERVICES=auth-service,user-service,settings-service,blog-service,product-service,media-service,taxonomy-service,order-service
-GATEWAY_HEADER=x-gateway-sign
+## 4) Generate gRPC / Proto Clients
 
-USER_GRPC_URL=127.0.0.1:50051
-AUTH_GRPC_URL=127.0.0.1:50052
-PRODUCT_GRPC_URL=127.0.0.1:50053
-SETTINGS_GRPC_URL=127.0.0.1:50054
-BLOG_GRPC_URL=127.0.0.1:50055
-ORDER_GRPC_URL=127.0.0.1:50056
-TAXONOMY_GRPC_URL=127.0.0.1:50057
-MEDIA_GRPC_URL=127.0.0.1:50058
-
-USER_HTTP_PORT=3100
-AUTH_HTTP_PORT=3001
-PRODUCT_HTTP_PORT=3003
-SETTINGS_HTTP_PORT=3010
-BLOG_HTTP_PORT=3004
-ORDER_HTTP_PORT=3005
-TAXONOMY_HTTP_PORT=3006
-MEDIA_HTTP_PORT=3007
-
-JWT_ACCESS_EXPIRATION=15m
-JWT_REFRESH_EXPIRATION=7d
-JWT_ACCESS_SECRET=changeme
-JWT_REFRESH_SECRET=changeme
+```powershell
+pnpm -w proto:gen
 ```
 
-Auth service also needs redis env values in `apps/auth-service/.env`:
+Use the check form when you want to confirm generated files are current:
 
-```ini
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_PASSWORD=
+```powershell
+pnpm -w proto:check
 ```
 
-## 3) Install Dependencies
+## 5) Start Infrastructure
 
-```bash
-pnpm install
+Default Docker infrastructure includes Postgres, Redis, MinIO, and MinIO bucket initialization:
+
+```powershell
+docker compose up -d postgres redis minio minio-init
 ```
 
-## 4) Start Infra Dependencies
+To start the default app stack too:
 
-Postgres (from repo compose):
-
-```bash
-docker compose up -d postgres
+```powershell
+docker compose up -d --build
 ```
 
-Redis (until compose is expanded with a redis service):
+To start the full backend Docker profile:
 
-```bash
-docker run -d --name nebula-redis -p 6379:6379 redis:7-alpine
+```powershell
+docker compose --profile full up -d --build
 ```
 
-## 5) Run Prisma Migrations
+## 6) Run Prisma Migrations
 
-Run for each Prisma-backed service:
+Run migrations per Prisma-backed service:
 
-```bash
+```powershell
 pnpm --filter ./apps/user-service prisma:migrate:dev
 pnpm --filter ./apps/product-service prisma:migrate:dev
 pnpm --filter ./apps/settings-service prisma:migrate:dev
@@ -103,60 +92,73 @@ pnpm --filter ./apps/taxonomy-service prisma:migrate:dev
 pnpm --filter ./apps/media-service prisma:migrate:dev
 ```
 
-## 6) Run Services
+If a service lacks the command, check that service's `package.json` before adding a root-level shortcut.
 
-Current compose stack is partial:
+## 7) Run Backend Locally
 
-```bash
-docker compose up -d --build
+```powershell
+pnpm dev:backend
 ```
 
-This currently starts:
-- `postgres`
-- `user-service`
-- `auth-service`
-- `product-service`
-- `settings-service`
+This starts all backend services through root `package.json` scripts.
 
-For full backend locally:
+Some services wait for dependency gRPC ports before starting. If the terminal looks quiet for a bit, check `docs/architecture/local-dev-and-docker-boot.md` before assuming it is stuck.
 
-```bash
-pnpm run dev:backend
+Current local startup dependency idea:
+
+```txt
+auth-service first
+settings/user/media wait for auth
+taxonomy waits for auth + settings
+blog/product wait for auth + settings + taxonomy
+order waits for auth + settings + product
 ```
 
-Run web:
+## 8) Run Web
 
-```bash
+```powershell
 pnpm run dev:web
 ```
 
-## 7) Verification
+## 9) Verification
 
-Baseline:
+Targeted checks are better while cleaning one service:
 
-```bash
+```powershell
+pnpm --filter @nebula/product-service build
+pnpm --filter @nebula/product-service exec eslint "{src,apps,libs,test}/**/*.ts"
+pnpm --filter @nebula/media-service build
+pnpm --filter @nebula/auth-service build
+pnpm --filter web build
+```
+
+Broad checks when the workspace is ready:
+
+```powershell
 pnpm -w proto:gen
 pnpm -w build
+docker compose config
+docker compose --profile full up -d --build
 ```
 
-Targeted:
+## 10) Useful Runtime Checks
 
-```bash
-pnpm --filter web build
-pnpm --filter @nebula/auth-service build
+Check if a gRPC port is open on Windows:
+
+```powershell
+netstat -ano | findstr :50052
+netstat -ano | findstr :50053
 ```
 
-## 8) Known Limitations
+Follow Docker logs for one service:
 
-- `docker-compose.yml` is still a partial backend stack.
-- `media-service` does not expose an HTTP `/health` route yet.
-- Auth integration/e2e tests currently need setup/readiness overhaul.
+```powershell
+docker compose logs -f product-service
+```
 
+## 11) Auth Ownership Boundary
 
-## Auth Ownership Boundary (P1-1)
-
-- `auth-service` is the single source of truth for identity, roles, token issue/refresh/revocation.
-- `media-service` is the policy decision point for media object access (upload/read/delete).
-- Request payload `ownerId` is treated only as an admin override target, never as caller identity.
-- Effective caller identity always comes from authenticated guard context (`req.user` / `resolveCtxUser`).
-- Storage layer policies (Supabase/MinIO/S3) are defense-in-depth and do not replace app-level authorization.
+- `auth-service` is the source of truth for identity, roles, token issue/refresh/revocation.
+- Services should not trust caller-supplied identity fields as authenticated user identity.
+- Effective caller identity comes from authenticated guard context.
+- Storage policies are defense-in-depth and do not replace app-level authorization.

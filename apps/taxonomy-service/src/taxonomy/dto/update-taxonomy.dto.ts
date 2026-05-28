@@ -1,50 +1,58 @@
-import {IsBoolean, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength} from "class-validator"
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from "class-validator";
 
-const SAFE = /^[a-z0-9][a-z0-9._-]*$/
+const SAFE = /^[a-z0-9][a-z0-9._-]*$/;
 
 export class UpdateTaxonomyDto {
   @IsOptional()
   @IsString()
   @Matches(SAFE)
-  scope?: string
+  scope?: string;
 
   @IsOptional()
   @IsString()
   @Matches(SAFE)
-  kind?: string
+  kind?: string;
 
   @IsOptional()
   @IsString()
   @Matches(SAFE)
   @MaxLength(80)
-  slug?: string
+  slug?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(180)
-  title?: string
+  title?: string;
 
   @IsOptional()
   @IsString()
-  description?: string
+  description?: string;
 
   @IsOptional()
   @IsBoolean()
-  isHidden?: boolean
+  isHidden?: boolean;
 
   @IsOptional()
   @IsBoolean()
-  isSystem?: boolean
+  isSystem?: boolean;
 
   @IsOptional()
   @IsInt()
-  sortOrder?: number
+  sortOrder?: number;
 
   @IsOptional()
   @IsBoolean()
-  isTree?: boolean
+  isTree?: boolean;
 
   @IsOptional()
   @IsUUID()
-  parentId?: string
+  parentId?: string;
 }

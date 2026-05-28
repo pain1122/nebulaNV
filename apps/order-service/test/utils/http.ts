@@ -5,7 +5,9 @@ export async function httpJson<T>(
   body?: any,
   headers?: Record<string, string>,
 ): Promise<T> {
-  const baseHeaders: Record<string, string> = { "content-type": "application/json" };
+  const baseHeaders: Record<string, string> = {
+    "content-type": "application/json",
+  };
   const res = await fetch(url, {
     method,
     headers: { ...baseHeaders, ...(headers ?? {}) },
@@ -21,7 +23,8 @@ export async function httpJson<T>(
 
   if (!res.ok) {
     const msg =
-      (json && (json.message || json.error)) || `${res.status} ${res.statusText}`;
+      (json && (json.message || json.error)) ||
+      `${res.status} ${res.statusText}`;
     throw new Error(msg);
   }
 

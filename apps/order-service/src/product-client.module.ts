@@ -2,7 +2,7 @@
 import { Global, Module } from "@nestjs/common";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { PRODUCT_SERVICE as PRODUCT_SERVICE_TOKEN, PRODUCT_SERVICE_NAME } from "@nebula/grpc-auth";
+import { PRODUCT_SERVICE as PRODUCT_SERVICE_TOKEN } from "@nebula/grpc-auth";
 
 // Shared ts-proto proto path
 const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto");
@@ -30,7 +30,7 @@ export const PRODUCT_SERVICE = PRODUCT_SERVICE_TOKEN;
             transport: Transport.GRPC,
             options: {
               url,
-              package: "product",           // <- package name in product.proto
+              package: "product", // <- package name in product.proto
               protoPath: PRODUCT_PROTO,
               loader: {
                 keepCase: true,

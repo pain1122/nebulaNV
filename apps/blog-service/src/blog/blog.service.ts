@@ -1,7 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
-import { CreatePostDto, UpdatePostDto, ListPostsQueryDto, BlogPostStatusDto } from "./dto/post.dto";
-import { Prisma } from "../../prisma/generated"
+import {
+  CreatePostDto,
+  UpdatePostDto,
+  ListPostsQueryDto,
+} from "./dto/post.dto";
+import { BlogPostStatus, Prisma } from "../../prisma/generated";
+import { toBlogPostView } from "./blog.mapper";
+import { toPrismaBlogPostStatus } from "./blog.types";
 
 function basicSlugify(s: string) {
   return (
@@ -12,7 +18,7 @@ function basicSlugify(s: string) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 80) || "item"
-  )
+  );
 }
 
 @Injectable()
@@ -32,26 +38,6 @@ export class BlogService {
     }
 
     return slug;
-  }
-
-  private toDto(p: any) {
-    return {
-      id: p.id,
-      slug: p.slug,
-      title: p.title,
-      body: p.body,
-      excerpt: p.excerpt,
-      coverImageUrl: p.coverImageUrl,
-      status: p.status,
-      tags: p.tags ?? [],
-      categories: p.categories ?? [],
-      metaTitle: p.metaTitle,
-      metaDescription: p.metaDescription,
-      metaKeywords: p.metaKeywords,
-      publishedAt: p.publishedAt,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-    };
   }
 
   async list(q: ListPostsQueryDto) {
@@ -77,7 +63,7 @@ export class BlogService {
     ]);
 
     return {
-      data: items.map((p) => this.toDto(p)),
+      data: items.map(toBlogPostView),
       page,
       limit,
       total,
@@ -85,13 +71,16 @@ export class BlogService {
   }
 
   async getBySlug(slug: string) {
-    const p = await this.prisma.blogPost.findFirst({ where: { slug, status: "PUBLISHED" } });
+    const p = await this.prisma.blogPost.findFirst({
+      where: { slug, status: "PUBLISHED" },
+    });
     if (!p) throw new NotFoundException("post_not_found");
-    return { data: this.toDto(p) };
+    return { data: toBlogPostView(p) };
   }
 
   async create(input: CreatePostDto) {
     const slug = await this.ensureUniqueSlug(input.slug ?? input.title);
+    const status = toPrismaBlogPostStatus(input.status, BlogPostStatus.DRAFT);
     const data = await this.prisma.blogPost.create({
       data: {
         slug,
@@ -99,29 +88,29 @@ export class BlogService {
         body: input.body,
         excerpt: input.excerpt ?? null,
         coverImageUrl: input.coverImageUrl ?? null,
-        status: (input.status as any) ?? "DRAFT",
+        status,
         tags: input.tags ?? [],
         categories: input.categories ?? [],
         metaTitle: input.metaTitle ?? null,
         metaDescription: input.metaDescription ?? null,
         metaKeywords: input.metaKeywords ?? null,
-        publishedAt: input.status === "PUBLISHED" ? new Date() : null,
+        publishedAt: status === BlogPostStatus.PUBLISHED ? new Date() : null,
       },
     });
-    return { data: this.toDto(data) };
+    return { data: toBlogPostView(data) };
   }
 
   async update(id: string, patch: UpdatePostDto) {
     const existing = await this.prisma.blogPost.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("post_not_found");
 
-    const status = (patch.status as any) ?? existing.status;
+    const status = toPrismaBlogPostStatus(patch.status, existing.status);
     const publishedAt =
-      status === "PUBLISHED"
-        ? existing.publishedAt ?? new Date()
-        : status === "DRAFT"
-        ? null
-        : existing.publishedAt;
+      status === BlogPostStatus.PUBLISHED
+        ? (existing.publishedAt ?? new Date())
+        : status === BlogPostStatus.DRAFT
+          ? null
+          : existing.publishedAt;
 
     const updated = await this.prisma.blogPost.update({
       where: { id },
@@ -140,7 +129,7 @@ export class BlogService {
       },
     });
 
-    return { data: this.toDto(updated) };
+    return { data: toBlogPostView(updated) };
   }
 
   async softDelete(id: string) {
@@ -148,7 +137,7 @@ export class BlogService {
     if (!existing) throw new NotFoundException("post_not_found");
     await this.prisma.blogPost.update({
       where: { id },
-      data: { status: "ARCHIVED" },
+      data: { status: BlogPostStatus.ARCHIVED },
     });
     return { success: true };
   }

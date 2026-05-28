@@ -2,7 +2,12 @@ import { Controller, UsePipes, ValidationPipe } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { Public, Roles } from "@nebula/grpc-auth";
 import { BlogService } from "../blog.service";
-import { CreatePostDto, UpdatePostDto, ListPostsQueryDto } from "../dto/post.dto";
+import { toProtoPost } from "../blog.mapper";
+import {
+  CreatePostDto,
+  UpdatePostDto,
+  ListPostsQueryDto,
+} from "../dto/post.dto";
 import { blogv1 } from "@nebula/protos";
 
 const Pipe = new ValidationPipe({
@@ -26,7 +31,7 @@ export class BlogGrpcController {
     const res = await this.svc.list(req);
 
     return blogv1.ListPostsResponse.create({
-      data: res.data.map((p: any) => this.toProtoPost(p)),
+      data: res.data.map(toProtoPost),
       page: res.page,
       limit: res.limit,
       total: res.total,
@@ -43,7 +48,7 @@ export class BlogGrpcController {
     const res = await this.svc.getBySlug(req.slug);
 
     return blogv1.PostResponse.create({
-      data: this.toProtoPost(res.data),
+      data: toProtoPost(res.data),
     });
   }
 
@@ -57,7 +62,7 @@ export class BlogGrpcController {
     const res = await this.svc.create(req.data);
 
     return blogv1.PostResponse.create({
-      data: this.toProtoPost(res.data),
+      data: toProtoPost(res.data),
     });
   }
 
@@ -71,7 +76,7 @@ export class BlogGrpcController {
     const res = await this.svc.update(req.id, req.patch);
 
     return blogv1.PostResponse.create({
-      data: this.toProtoPost(res.data),
+      data: toProtoPost(res.data),
     });
   }
 
@@ -87,28 +92,5 @@ export class BlogGrpcController {
     return blogv1.BasicResponse.create({
       success: true,
     });
-  }
-
-  // ------------------------------------------------------
-  // Mapper: internal BlogService DTO -> proto Post
-  // ------------------------------------------------------
-  private toProtoPost(p: any) {
-    return {
-      id: p.id,
-      slug: p.slug,
-      title: p.title,
-      body: p.body,
-      excerpt: p.excerpt ?? "",
-      coverImageUrl: p.coverImageUrl ?? "",
-      status: p.status,
-      tags: p.tags ?? [],
-      categories: p.categories ?? [],
-      metaTitle: p.metaTitle ?? "",
-      metaDescription: p.metaDescription ?? "",
-      metaKeywords: p.metaKeywords ?? "",
-      publishedAt: p.publishedAt ? new Date(p.publishedAt).toISOString() : "",
-      createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : "",
-      updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : "",
-    };
   }
 }

@@ -1,11 +1,13 @@
 // apps/product-service/test/utils/http.ts
 export async function httpJson<T>(
-  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'HEAD',
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "HEAD",
   url: string,
   body?: any,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
 ): Promise<T> {
-  const baseHeaders: Record<string, string> = { 'content-type': 'application/json' };
+  const baseHeaders: Record<string, string> = {
+    "content-type": "application/json",
+  };
 
   const init: RequestInit = {
     method,
@@ -13,7 +15,7 @@ export async function httpJson<T>(
   };
 
   // 🚫 no body on GET/HEAD
-  if (body != null && method !== 'GET' && method !== 'HEAD') {
+  if (body != null && method !== "GET" && method !== "HEAD") {
     init.body = JSON.stringify(body);
   }
 
@@ -22,10 +24,14 @@ export async function httpJson<T>(
   let json: any = null;
   try {
     json = await res.json();
-  } catch {}
+  } catch {
+    // Ignore invalid JSON responses in test helper.
+  }
 
   if (!res.ok) {
-    const msg = (json && (json.message || json.error)) || `${res.status} ${res.statusText}`;
+    const msg =
+      (json && (json.message || json.error)) ||
+      `${res.status} ${res.statusText}`;
     throw new Error(msg);
   }
   return json as T;
@@ -34,7 +40,8 @@ export async function httpJson<T>(
 // ---- default product category helper ----
 
 export async function getDefaultProductCategory() {
-  const SETTINGS_HTTP = process.env.SETTINGS_HTTP_URL ?? "http://127.0.0.1:3010";
+  const SETTINGS_HTTP =
+    process.env.SETTINGS_HTTP_URL ?? "http://127.0.0.1:3010";
 
   // Must match DefaultProductTaxonomyInitializer
   const env = process.env.NODE_ENV || "default";
@@ -56,4 +63,3 @@ export async function getDefaultProductCategory() {
 
   return res.value;
 }
-

@@ -5,6 +5,20 @@ import { Logger } from '@nestjs/common';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function previewBody(body: unknown, maskPassword: boolean): unknown {
+  if (!isRecord(body)) return body;
+  if (!maskPassword) return body;
+
+  return {
+    ...body,
+    password: body.password ? '***' : undefined,
+  };
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
@@ -17,12 +31,10 @@ async function bootstrap() {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     const isAuthPost = req.method === 'POST' && req.path.startsWith('/auth/');
-    const bodyPreview = isAuthPost
-      ? { ...req.body, password: req.body?.password ? '***' : undefined }
-      : req.body;
+    const bodyPreview = previewBody(req.body as unknown, isAuthPost);
 
     logger.log(`→ ${req.method} ${req.originalUrl}`);
-    if (bodyPreview && Object.keys(bodyPreview).length) {
+    if (isRecord(bodyPreview) && Object.keys(bodyPreview).length) {
       logger.debug(`  body: ${JSON.stringify(bodyPreview)}`);
     }
     res.on('finish', () => {
@@ -59,4 +71,4 @@ async function bootstrap() {
     `[auth-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
   );
 }
-bootstrap();
+void bootstrap();

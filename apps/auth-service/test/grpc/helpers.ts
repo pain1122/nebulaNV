@@ -5,11 +5,11 @@ import * as protoLoader from '@grpc/proto-loader';
 import * as jwt from 'jsonwebtoken';
 
 export const AUTHORIZATION_HEADER = 'authorization';
-export const X_SVC_HEADER        = 'x-svc';
-export const X_USER_ID_HEADER    = 'x-user-id';
-export const X_ROLE_HEADER       = 'x-role';
-export const X_USER_ROLE_HEADER  = 'x-user-role';
-export const X_SIGN_HEADER       = 'x-gateway-sign';
+export const X_SVC_HEADER = 'x-svc';
+export const X_USER_ID_HEADER = 'x-user-id';
+export const X_ROLE_HEADER = 'x-role';
+export const X_USER_ROLE_HEADER = 'x-user-role';
+export const X_SIGN_HEADER = 'x-gateway-sign';
 
 export function minuteBucket(): number {
   return Math.floor(Date.now() / 60000);
@@ -35,13 +35,16 @@ export function mdS2S(opts?: { svc?: string; secret?: string }): grpc.Metadata {
   return md;
 }
 
-export function mdUser(userId?: string | null, role?: string | null): grpc.Metadata {
+export function mdUser(
+  userId?: string | null,
+  role?: string | null,
+): grpc.Metadata {
   const md = new grpc.Metadata();
   if (userId) md.set(X_USER_ID_HEADER, String(userId));
   if (role) {
     // set both, some code reads x-user-role, some reads x-role
     md.set(X_USER_ROLE_HEADER, String(role));
-    md.set(X_ROLE_HEADER,      String(role));
+    md.set(X_ROLE_HEADER, String(role));
   }
   return md;
 }
@@ -58,12 +61,14 @@ export function mergeMd(
   return out;
 }
 
-export function mdAuth(params: {
-  access?: string;
-  userId?: string;
-  role?: 'user' | 'admin' | 'root-admin' | string;
-  s2s?: boolean;
-} = {}): grpc.Metadata {
+export function mdAuth(
+  params: {
+    access?: string;
+    userId?: string;
+    role?: 'user' | 'admin' | 'root-admin' | string;
+    s2s?: boolean;
+  } = {},
+): grpc.Metadata {
   const { access, userId, role, s2s = true } = params;
 
   // infer role from JWT if not provided
@@ -72,7 +77,9 @@ export function mdAuth(params: {
     try {
       const payload = jwt.decode(access) as any | null;
       if (payload?.role) effectiveRole = String(payload.role);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return mergeMd(
@@ -112,7 +119,7 @@ export function loadClient<TClient extends grpc.Client>(opts: {
     if (Ctor) return new Ctor(opts.url, grpc.credentials.createInsecure());
   }
   throw new Error(
-    `Service not found. Tried pkgs: ${pkgs.join(', ')} for ${opts.svc}`
+    `Service not found. Tried pkgs: ${pkgs.join(', ')} for ${opts.svc}`,
   );
 }
 
@@ -125,12 +132,14 @@ function resolveMethodName(client: any, name: string): string {
   const pascal = name[0].toUpperCase() + name.slice(1);
   if (client && typeof client[pascal] === 'function') return pascal;
 
-  const snake = name.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`).replace(/^_/, '');
+  const snake = name
+    .replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`)
+    .replace(/^_/, '');
   if (client && typeof client[snake] === 'function') return snake;
 
   const avail = Object.keys(client || {});
   throw new Error(
-    `gRPC method not found: tried ${name}/${lowerCamel}/${pascal}/${snake}, available: ${avail.join(', ')}`
+    `gRPC method not found: tried ${name}/${lowerCamel}/${pascal}/${snake}, available: ${avail.join(', ')}`,
   );
 }
 
@@ -138,12 +147,12 @@ export function call<TResp>(
   client: any,
   method: string,
   req: any,
-  md?: grpc.Metadata
+  md?: grpc.Metadata,
 ): Promise<TResp> {
   const m = resolveMethodName(client, method);
   return new Promise<TResp>((resolve, reject) => {
     client[m](req, md, (err: grpc.ServiceError | null, res: TResp) =>
-      err ? reject(err) : resolve(res)
+      err ? reject(err) : resolve(res),
     );
   });
 }

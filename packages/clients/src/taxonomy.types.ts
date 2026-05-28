@@ -74,6 +74,6 @@ export interface TaxonomyProxy {
 
   CreateTaxonomy(req: CreateTaxonomyReq, meta?: Metadata, opts?: CallOptions): Observable<TaxonomyRes>
   UpdateTaxonomy(req: UpdateTaxonomyReq, meta?: Metadata, opts?: CallOptions): Observable<TaxonomyRes>
-  DeleteTaxonomy(req: DeleteTaxonomyReq, meta?: Metadata, opts?: CallOptions): Observable<{}>
+  DeleteTaxonomy(req: DeleteTaxonomyReq, meta?: Metadata, opts?: CallOptions): Observable<Record<string, never>>
   ListTaxonomies(req: ListTaxonomiesReq, meta?: Metadata, opts?: CallOptions): Observable<TaxonomyListRes>
 }

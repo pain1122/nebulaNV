@@ -11,7 +11,12 @@ export class HealthController {
   @Public()
   @Get()
   async check() {
-    try { await prisma.$queryRaw`SELECT 1`; return { status: 'ok', db: 'up', time: new Date().toISOString() }; }
-    catch (e: any) { return { status: 'degraded', db: 'down', error: e?.message }; }
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { status: 'ok', db: 'up', time: new Date().toISOString() };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { status: 'degraded', db: 'down', error: message };
+    }
   }
 }

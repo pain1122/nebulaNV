@@ -1,5 +1,14 @@
-# AI context/execution exclude list
-# Keep source/config/docs visible; ignore generated/build/vendor/heavy assets.
+﻿# AI context/execution exclude list
+# Keep source/config examples/docs visible; ignore generated/build/vendor/heavy/secret artifacts.
+
+# Secrets and local env files
+.env
+.env.*
+!.env.example
+!**/.env.example
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
 
 # Dependency trees / build outputs
 node_modules/
@@ -19,6 +28,12 @@ pnpm-store/
 generated/
 vendor/
 prisma/generated/
+**/prisma/generated/
+
+# Logs / transient AI run artifacts
+*.log
+.codex-run-logs/
+.codex-web-lint.log
 
 # Large archive and binary assets
 *.zip

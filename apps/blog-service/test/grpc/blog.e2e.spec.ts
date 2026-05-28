@@ -1,58 +1,58 @@
 // apps/blog-service/test/grpc/blog.e2e.spec.ts
-import { loadClient, call, mdS2S } from './helpers';
+import { loadClient, call, mdS2S } from "./helpers";
 
-const BLOG_PROTO = require.resolve('@nebula/protos/blog.proto');
-const URL        = process.env.BLOG_GRPC_URL || '127.0.0.1:50055';
+const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
+const URL = process.env.BLOG_GRPC_URL || "127.0.0.1:50055";
 
 const input = {
-  title: 'E2E Blog Post gRPC',
-  body:  'Hello from gRPC tests',
-  status: 'PUBLISHED',
+  title: "E2E Blog Post gRPC",
+  body: "Hello from gRPC tests",
+  status: "PUBLISHED",
 };
 
-describe('BlogService gRPC (admin required on writes)', () => {
+describe("BlogService gRPC (admin required on writes)", () => {
   const client = loadClient<any>({
     url: URL,
     protoPath: BLOG_PROTO,
-    pkg: ['blog'],
-    svc: 'BlogService',
+    pkg: ["blog"],
+    svc: "BlogService",
   });
 
-  let id = '';
-  let slug = '';
+  let id = "";
+  let slug = "";
 
-  it('CreatePost works without metadata (internal call)', async () => {
-    const res = await call<any>(client, 'CreatePost', { data: input });
+  it("CreatePost works without metadata (internal call)", async () => {
+    const res = await call<any>(client, "CreatePost", { data: input });
     expect(res.data.title).toBe(input.title);
   });
 
-  it('CreatePost succeeds with S2S admin metadata', async () => {
+  it("CreatePost succeeds with S2S admin metadata", async () => {
     const res = await call<any>(
       client,
-      'CreatePost',
+      "CreatePost",
       { data: input },
-      mdS2S({ role: 'admin' }),
+      mdS2S({ role: "admin" }),
     );
     id = res.data.id;
     slug = res.data.slug;
     expect(res.data.title).toBe(input.title);
   });
 
-  it('GetPost returns the created item (public)', async () => {
+  it("GetPost returns the created item (public)", async () => {
     const res = await call<any>(
       client,
-      'GetPost',
+      "GetPost",
       { slug },
       mdS2S(), // optional: public but guard allows OPTIONAL_AUTH
     );
     expect(res.data.id).toBe(id);
   });
 
-  it('ListPosts finds the created item (public)', async () => {
+  it("ListPosts finds the created item (public)", async () => {
     const res = await call<any>(
       client,
-      'ListPosts',
-      { q: 'Blog', page: 1, limit: 20 },
+      "ListPosts",
+      { q: "Blog", page: 1, limit: 20 },
       mdS2S(),
     );
 
@@ -60,23 +60,23 @@ describe('BlogService gRPC (admin required on writes)', () => {
     expect(!!hit).toBe(true);
   });
 
-  it('UpdatePost (admin) changes title', async () => {
+  it("UpdatePost (admin) changes title", async () => {
     const res = await call<any>(
       client,
-      'UpdatePost',
-      { id, patch: { title: 'E2E Blog Post gRPC Pro' } },
-      mdS2S({ role: 'admin' }),
+      "UpdatePost",
+      { id, patch: { title: "E2E Blog Post gRPC Pro" } },
+      mdS2S({ role: "admin" }),
     );
 
-    expect(res.data.title).toBe('E2E Blog Post gRPC Pro');
+    expect(res.data.title).toBe("E2E Blog Post gRPC Pro");
   });
 
-  it('DeletePost (admin) marks post archived', async () => {
+  it("DeletePost (admin) marks post archived", async () => {
     const res = await call<any>(
       client,
-      'DeletePost',
+      "DeletePost",
       { id },
-      mdS2S({ role: 'admin' }),
+      mdS2S({ role: "admin" }),
     );
 
     expect(res.success ?? true).toBe(true);

@@ -9,8 +9,10 @@ import {
 import { Roles } from '@nebula/grpc-auth';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
-import { ReqUser, ReqUser as ReqUserType } from '../common/decorators/req-user.decorator';
-
+import {
+  ReqUser,
+  ReqUser as ReqUserType,
+} from '../common/decorators/req-user.decorator';
 
 @Controller('users')
 export class UserController {

@@ -1,19 +1,30 @@
-export async function httpJson<T>(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, body?: any, headers?: Record<string, string>): Promise<T> {
-  const baseHeaders: Record<string, string> = {"content-type": "application/json"}
+export async function httpJson<T>(
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
+  url: string,
+  body?: any,
+  headers?: Record<string, string>,
+): Promise<T> {
+  const baseHeaders: Record<string, string> = {
+    "content-type": "application/json",
+  };
   const res = await fetch(url, {
     method,
-    headers: {...baseHeaders, ...(headers ?? {})},
+    headers: { ...baseHeaders, ...(headers ?? {}) },
     body: body ? JSON.stringify(body) : undefined,
-  })
+  });
 
-  let json: any = null
+  let json: any = null;
   try {
-    json = await res.json()
-  } catch {}
+    json = await res.json();
+  } catch {
+    json = null;
+  }
 
   if (!res.ok) {
-    const msg = (json && (json.message || json.error)) || `${res.status} ${res.statusText}`
-    throw new Error(msg)
+    const msg =
+      (json && (json.message || json.error)) ||
+      `${res.status} ${res.statusText}`;
+    throw new Error(msg);
   }
-  return json as T
+  return json as T;
 }

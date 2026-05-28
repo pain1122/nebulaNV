@@ -13,15 +13,13 @@ import { ProductClientModule } from "./product-client.module";
 import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
 
 // Safe proto resolution – we won't actually use this until order.proto exists
-export const ORDER_PROTO: string =
-  (() => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      return require.resolve("@nebula/protos/order.proto");
-    } catch {
-      return "";
-    }
-  })();
+export const ORDER_PROTO: string = (() => {
+  try {
+    return require.resolve("@nebula/protos/order.proto");
+  } catch {
+    return "";
+  }
+})();
 
 @Module({
   imports: [
@@ -45,7 +43,7 @@ export const ORDER_PROTO: string =
     // gRPC clients
     SettingsClientModule,
     AuthClientModule,
-    ProductClientModule
+    ProductClientModule,
   ],
   providers: [
     Reflector,

@@ -8,22 +8,37 @@ import {
   Post,
   Delete,
   Req,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { Request } from "express";
 import { Roles } from "@nebula/grpc-auth";
 import { OrderService } from "./order.service";
-import { AddToCartDto, CheckoutDto, UpdateCartItemDto, OrderStatusDto } from "./dto/order.dto";
+import {
+  AddToCartDto,
+  CheckoutDto,
+  UpdateCartItemDto,
+  OrderStatusDto,
+} from "./dto/order.dto";
+import { OrderStatus } from "../../prisma/generated/client";
+
+type RequestUser = {
+  userId?: string;
+};
+
+type AuthenticatedRequest = Request & {
+  user?: RequestUser;
+};
 
 @Controller("orders")
 export class OrderController {
   constructor(private readonly svc: OrderService) {}
 
   private getUserId(req: Request): string {
-    const user = (req as any)?.user;
-    if (!user?.userId) {
-      throw new Error("missing user context");
+    const userId = (req as AuthenticatedRequest).user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException("missing user context");
     }
-    return user.userId;
+    return userId;
   }
 
   // ---------- Cart HTTP endpoints ----------
@@ -101,6 +116,6 @@ export class OrderController {
   ) {
     // Map DTO enum to Prisma OrderStatus enum (same strings)
     // If they differ, map explicitly.
-    return this.svc.updateOrderStatusAdmin(id, status as any);
+    return this.svc.updateOrderStatusAdmin(id, status as OrderStatus);
   }
 }

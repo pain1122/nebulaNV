@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  GatewayTimeoutException,
   HttpException,
   HttpStatus,
   InternalServerErrorException,

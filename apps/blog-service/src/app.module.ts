@@ -10,8 +10,8 @@ import { BlogModule } from "./blog/blog.module";
 import { SettingsClientModule } from "./settings-client.module";
 import { AuthClientModule } from "./auth-client.module";
 import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
-import { TaxonomyModule } from "./taxonomy/taxonomy.module"
-import { TaxonomyClientModule } from "./taxonomy-client.module"
+import { TaxonomyModule } from "./taxonomy/taxonomy.module";
+import { TaxonomyClientModule } from "./taxonomy-client.module";
 
 export const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
 

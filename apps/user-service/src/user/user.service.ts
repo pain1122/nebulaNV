@@ -6,16 +6,26 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
-import { Prisma } from '../../prisma/generated/client';
+import { User } from '../../prisma/generated/client';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
-import { toRpc, fromRpcToHttp, wrapGrpc } from '@nebula/grpc-auth';
+import { toRpc } from '@nebula/grpc-auth';
 import { status } from '@grpc/grpc-js';
 
-type User = Prisma.UserGetPayload<{}>;
+type AuthContext = {
+  userId: string;
+  role: string;
+};
 
-function mapPrisma(e: any) {
-  if (e?.code === 'P2002')
+function mapPrisma(e: unknown) {
+  if (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    e.code === 'P2002'
+  ) {
     return new BadRequestException('Email already in use');
+  }
+
   return e;
 }
 
@@ -26,9 +36,11 @@ export class UserService {
   // -------------------------------------------------------------------
   // Helper: validate user ownership or role
   // -------------------------------------------------------------------
-  private assertSelfOrAdmin(ctxUser: any, targetId: string) {
-    if (!ctxUser)
-      throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
+  private assertSelfOrAdmin(
+    ctxUser: AuthContext | undefined,
+    targetId: string,
+  ) {
+    if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
     const isSelf = ctxUser.userId === targetId;
     const isAdmin = ['admin', 'root-admin'].includes(ctxUser.role);
     if (!isSelf && !isAdmin)
@@ -66,7 +78,10 @@ export class UserService {
   // -------------------------------------------------------------------
   // Get user by ID (self or admin)
   // -------------------------------------------------------------------
-  async getUserById(id: string, ctxUser?: { userId: string; role: string }): Promise<User | null> {
+  async getUserById(
+    id: string,
+    ctxUser?: { userId: string; role: string },
+  ): Promise<User | null> {
     if (ctxUser) this.assertSelfOrAdmin(ctxUser, id);
     return this.prisma.user.findUnique({ where: { id } });
   }

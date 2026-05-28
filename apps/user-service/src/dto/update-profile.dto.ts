@@ -9,7 +9,7 @@ export class UpdateProfileDto {
   @MinLength(8)
   newPassword?: string;
 
-  @ValidateIf((dto) => dto.newPassword !== undefined) // only required if user is trying to change password
+  @ValidateIf((dto: UpdateProfileDto) => dto.newPassword !== undefined)
   @MinLength(8)
   currentPassword?: string;
 }

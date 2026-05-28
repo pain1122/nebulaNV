@@ -1,23 +1,35 @@
-import { INestApplication, Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
-import { PrismaClient } from "../prisma/generated/client";
+import {
+  INestApplication,
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
+import { Prisma, PrismaClient } from '../prisma/generated/client';
+type PrismaEventClient = {
+  $on(eventType: 'query', callback: (event: Prisma.QueryEvent) => void): void;
+  $on(eventType: 'error', callback: (event: Prisma.LogEvent) => void): void;
+};
 
 @Injectable()
 export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  private readonly log = new Logger("PrismaService");
+  private readonly log = new Logger('PrismaService');
 
   constructor() {
     super({
       log: [
-        { emit: "event", level: "query" },
-        { emit: "event", level: "error" },
+        { emit: 'event', level: 'query' },
+        { emit: 'event', level: 'error' },
       ],
     });
 
+    const prismaEvents = this as unknown as PrismaEventClient;
+
     // ✅ use bracket syntax + any to avoid Prisma 6 overload restriction
-    (this as any).$on("query", (e: any) => {
+    prismaEvents.$on('query', (e) => {
       try {
         this.log.debug?.(`QUERY: ${e.query} PARAMS: ${e.params}`);
       } catch {
@@ -25,28 +37,32 @@ export class PrismaService
       }
     });
 
-    (this as any).$on("error", (e: any) => {
+    prismaEvents.$on('error', (e) => {
       this.log.error?.(`PRISMA ERROR: ${e.message || JSON.stringify(e)}`);
     });
   }
 
   async onModuleInit() {
     await this.$connect();
-    const u = new URL(process.env.DATABASE_URL ?? "");
-    this.log.log(`[PrismaURL] ${u.protocol}//${u.hostname}:${u.port}${u.pathname}`);
+    const u = new URL(process.env.DATABASE_URL ?? '');
+    this.log.log(
+      `[PrismaURL] ${u.protocol}//${u.hostname}:${u.port}${u.pathname}`,
+    );
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
   }
 
-  async enableShutdownHooks(app: INestApplication) {
-    process.on("beforeExit", async () => {
-      try {
-        await this.$disconnect();
-      } finally {
-        await app.close();
-      }
+  enableShutdownHooks(app: INestApplication): void {
+    process.on('beforeExit', () => {
+      void (async () => {
+        try {
+          await this.$disconnect();
+        } finally {
+          await app.close();
+        }
+      })();
     });
   }
 }

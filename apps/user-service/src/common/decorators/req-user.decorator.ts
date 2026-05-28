@@ -14,15 +14,22 @@ interface AuthenticatedRequest extends Request {
 }
 
 // ✅ export this for tests
-export const reqUserFactory = (_data: unknown, ctx: ExecutionContext): ReqUser => {
+export const reqUserFactory = (
+  _data: unknown,
+  ctx: ExecutionContext,
+): ReqUser => {
   const http = ctx.switchToHttp();
   if (http?.getRequest) {
     const req = http.getRequest<AuthenticatedRequest>();
     if (req?.user) return req.user;
   }
 
-  const rpcCtx: any = ctx.switchToRpc().getContext?.() ?? {};
-  if (rpcCtx?.user) return rpcCtx.user as ReqUser;
+  type RpcContextWithUser = {
+    user?: ReqUser;
+  };
+
+  const rpcCtx: RpcContextWithUser = ctx.switchToRpc().getContext?.() ?? {};
+  if (rpcCtx.user) return rpcCtx.user;
 
   return { userId: '', email: '', role: 'user' };
 };

@@ -1,5 +1,16 @@
-import { Expose, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Expose, Type } from "class-transformer";
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from "class-validator";
 
 class NewImageDto {
   @IsString() @MaxLength(1024) url!: string;
@@ -8,10 +19,12 @@ class NewImageDto {
 }
 
 export class AddImagesDto {
-  @Expose({ name: 'productId' })
-  @IsUUID('4') productId!: string;
+  @Expose({ name: "productId" })
+  @IsUUID("4")
+  productId!: string;
 
-  @IsArray() @ArrayMaxSize(50)
+  @IsArray()
+  @ArrayMaxSize(50)
   @Type(() => NewImageDto)
   @ValidateNested({ each: true })
   images!: NewImageDto[];

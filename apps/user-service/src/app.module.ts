@@ -11,7 +11,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import * as path from 'path';
 
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
-export const AUTH_PROTO  = require.resolve('@nebula/protos/auth.proto');
+export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
 
 @Module({
   imports: [

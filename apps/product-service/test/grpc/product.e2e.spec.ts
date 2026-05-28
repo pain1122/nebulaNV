@@ -3,8 +3,8 @@ import { loadClient, call, mdS2S } from "./helpers";
 import { getDefaultProductCategoryGrpc } from "../utils/settings";
 
 const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto");
-const URL       = process.env.PRODUCT_GRPC_URL || "127.0.0.1:50053";
-const AUTH_HTTP = process.env.AUTH_HTTP_URL    ?? "http://127.0.0.1:3001";
+const URL = process.env.PRODUCT_GRPC_URL || "127.0.0.1:50053";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
 
 type LoginResp = { accessToken: string };
 
@@ -26,9 +26,9 @@ describe("ProductService gRPC (admin required on writes)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
-        password:   process.env.SEED_ADMIN_PASS  ?? "Admin123!",
+        password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
       }),
-    }).then(r => r.json() as Promise<LoginResp>);
+    }).then((r) => r.json() as Promise<LoginResp>);
 
     // Read the default product category from settings via gRPC
     categoryId = await getDefaultProductCategoryGrpc();
@@ -50,12 +50,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
   });
 
   it("GetProduct returns the created item (public)", async () => {
-    const res = await call<any>(
-      client,
-      "GetProduct",
-      { id },
-      mdS2S(),
-    );
+    const res = await call<any>(client, "GetProduct", { id }, mdS2S());
     expect(res.data.id).toBe(id);
     expect(res.data.categoryId).toBe(categoryId);
   });

@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, IsUUID, Min } from "class-validator";
 
 export enum OrderStatusDto {
   PENDING = "PENDING",

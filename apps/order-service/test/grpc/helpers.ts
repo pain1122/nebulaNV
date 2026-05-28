@@ -23,7 +23,11 @@ export function mdBearer(token?: string): grpc.Metadata {
   return md;
 }
 
-export function mdS2S(opts?: { svc?: string; userId?: string; role?: string }): grpc.Metadata {
+export function mdS2S(opts?: {
+  svc?: string;
+  userId?: string;
+  role?: string;
+}): grpc.Metadata {
   const md = new grpc.Metadata();
   const svcName = opts?.svc || process.env.SVC_NAME || "order-service";
   const header = process.env.GATEWAY_HEADER || X_SIGN_HEADER;
@@ -41,14 +45,17 @@ export function mdS2S(opts?: { svc?: string; userId?: string; role?: string }): 
   return md;
 }
 
-export function mergeMd(a?: grpc.Metadata, b?: grpc.Metadata): grpc.Metadata | undefined {
+export function mergeMd(
+  a?: grpc.Metadata,
+  b?: grpc.Metadata,
+): grpc.Metadata | undefined {
   if (!a && !b) return undefined;
   if (!a) return b;
   if (!b) return a;
 
   const merged = new grpc.Metadata();
-  for (const [k, v] of a.getMap() as any) merged.set(k, v as any);
-  for (const [k, v] of b.getMap() as any) merged.set(k, v as any);
+  for (const [k, v] of a.getMap() as any) merged.set(k, v);
+  for (const [k, v] of b.getMap() as any) merged.set(k, v);
   return merged;
 }
 
@@ -68,10 +75,7 @@ export function loadClient<T extends grpc.Client>(
 
   const proto = grpc.loadPackageDefinition(def) as any;
   const ctor = pkg.split(".").reduce((acc, k) => acc[k], proto)[svc];
-  return new ctor(
-    url,
-    grpc.credentials.createInsecure(),
-  ) as T;
+  return new ctor(url, grpc.credentials.createInsecure()) as T;
 }
 
 export function call<T>(
@@ -82,7 +86,10 @@ export function call<T>(
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const fn: any = (client as any)[method].bind(client);
-    const cb = (err: any, res: T) => (err ? reject(err) : resolve(res));
+    const cb = (err: grpc.ServiceError | null, res: T) => {
+      if (err) return reject(err);
+      resolve(res);
+    };
     if (md) fn(req, md, cb);
     else fn(req, cb);
   });

@@ -2,12 +2,12 @@
 import { httpJson } from "../utils/http";
 
 const TAXONOMY_HTTP = process.env.TAXONOMY_HTTP_URL ?? "http://127.0.0.1:3006";
-const AUTH_HTTP     = process.env.AUTH_HTTP_URL     ?? "http://127.0.0.1:3001";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
 
 type LoginResp = { accessToken: string };
 
 const SCOPE = "product";
-const KIND  = "category.default";
+const KIND = "category.default";
 
 describe("taxonomy-service HTTP (admin writes, public reads)", () => {
   let admin = "";
@@ -17,7 +17,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
   beforeAll(async () => {
     const at = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
-      password:   process.env.SEED_ADMIN_PASS ?? "Admin123!",
+      password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
     });
     admin = at.accessToken;
   });
@@ -25,8 +25,8 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
   it("POST /taxonomies creates a root taxonomy", async () => {
     const body = {
       scope: SCOPE,
-      kind:  KIND,
-      slug:  "root-cat",
+      kind: KIND,
+      slug: "root-cat",
       title: "Root Category",
       isTree: true,
     };
@@ -35,7 +35,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
       "POST",
       `${TAXONOMY_HTTP}/taxonomies`,
       body,
-      { authorization: `Bearer ${admin}` }
+      { authorization: `Bearer ${admin}` },
     );
 
     // service returns { data: dto }
@@ -55,10 +55,10 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
 
   it("POST /taxonomies creates a child taxonomy with correct depth/path", async () => {
     const body = {
-      scope:    SCOPE,
-      kind:     KIND,
-      slug:     "child-cat",
-      title:    "Child Category",
+      scope: SCOPE,
+      kind: KIND,
+      slug: "child-cat",
+      title: "Child Category",
       parentId: rootId,
     };
 
@@ -66,7 +66,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
       "POST",
       `${TAXONOMY_HTTP}/taxonomies`,
       body,
-      { authorization: `Bearer ${admin}` }
+      { authorization: `Bearer ${admin}` },
     );
 
     const t = res.data;
@@ -85,7 +85,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
       "GET",
       `${TAXONOMY_HTTP}/taxonomies?scope=${SCOPE}&kind=${KIND}`,
       undefined,
-      { authorization: `Bearer ${admin}` }
+      { authorization: `Bearer ${admin}` },
     );
 
     // list() returns { data, page, limit, total }
@@ -101,7 +101,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
       "GET",
       `${TAXONOMY_HTTP}/taxonomies/${childId}`,
       undefined,
-      { authorization: `Bearer ${admin}` }
+      { authorization: `Bearer ${admin}` },
     );
 
     const t = res.data;
@@ -117,8 +117,8 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
         "DELETE",
         `${TAXONOMY_HTTP}/taxonomies/${rootId}`,
         undefined,
-        { authorization: `Bearer ${admin}` }
-      )
+        { authorization: `Bearer ${admin}` },
+      ),
     ).rejects.toThrow(/taxonomy_has_children/);
   });
 
@@ -127,7 +127,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
       "DELETE",
       `${TAXONOMY_HTTP}/taxonomies/${childId}`,
       undefined,
-      { authorization: `Bearer ${admin}` }
+      { authorization: `Bearer ${admin}` },
     );
     expect(delChild).toBe(true);
 
@@ -135,7 +135,7 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
       "DELETE",
       `${TAXONOMY_HTTP}/taxonomies/${rootId}`,
       undefined,
-      { authorization: `Bearer ${admin}` }
+      { authorization: `Bearer ${admin}` },
     );
     expect(delRoot).toBe(true);
   });

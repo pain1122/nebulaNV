@@ -1,6 +1,6 @@
-import { Type } from 'class-transformer';
-import { ValidateNested } from 'class-validator';
-import { ProductInputDto } from './product-input.dto';
+import { Type } from "class-transformer";
+import { ValidateNested } from "class-validator";
+import { ProductInputDto } from "./product-input.dto";
 
 export class CreateProductDto {
   @Type(() => ProductInputDto)

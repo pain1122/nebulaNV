@@ -16,7 +16,7 @@ describe("Blog taxonomy HTTP (category.default kind)", () => {
   beforeAll(async () => {
     const at = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
-      password:   process.env.SEED_ADMIN_PASS  ?? "Admin123!",
+      password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
     });
     admin = at.accessToken;
   });
@@ -32,12 +32,9 @@ describe("Blog taxonomy HTTP (category.default kind)", () => {
       sortOrder: 0,
     };
 
-    const res = await httpJson<any>(
-      "POST",
-      `${BASE}/${KIND}`,
-      body,
-      { authorization: `Bearer ${admin}` },
-    );
+    const res = await httpJson<any>("POST", `${BASE}/${KIND}`, body, {
+      authorization: `Bearer ${admin}`,
+    });
 
     expect(res.data.id).toBeTruthy();
     expect(res.data.slug).toBe(slug);
@@ -61,10 +58,10 @@ describe("Blog taxonomy HTTP (category.default kind)", () => {
       "GET",
       `${BASE}/${KIND}?page=1&limit=20&q=HTTP`,
     );
-  
+
     const list = Array.isArray(res.data) ? res.data : [];
     expect(Array.isArray(list)).toBe(true);
-  
+
     const hit = list.find((t: any) => t.id === id);
     expect(!!hit).toBe(true);
     expect(typeof hit.hasChildren).toBe("boolean");
@@ -73,12 +70,9 @@ describe("Blog taxonomy HTTP (category.default kind)", () => {
   it("PATCH /taxonomies/:kind/:id (admin) updates title", async () => {
     const body = { title: "E2E HTTP Blog Category Pro" };
 
-    const res = await httpJson<any>(
-      "PATCH",
-      `${BASE}/${KIND}/${id}`,
-      body,
-      { authorization: `Bearer ${admin}` },
-    );
+    const res = await httpJson<any>("PATCH", `${BASE}/${KIND}/${id}`, body, {
+      authorization: `Bearer ${admin}`,
+    });
 
     expect(res.data.id).toBe(id);
     expect(res.data.title).toBe("E2E HTTP Blog Category Pro");

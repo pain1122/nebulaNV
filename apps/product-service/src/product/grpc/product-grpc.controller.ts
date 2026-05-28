@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Logger,
-  UsePipes,
-  ValidationPipe,
-} from "@nestjs/common";
+import { Controller, Logger, UsePipes, ValidationPipe } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 
 import { ProductServiceImpl } from "../product.service";
@@ -117,7 +112,7 @@ export class ProductGrpcController {
   @Roles("admin")
   @GrpcMethod("ProductService", "ApplyDiscountBulk")
   applyDiscountBulk(req: ApplyDiscountBulkDto) {
-    return this.svc.applyDiscountBulk(req as any);
+    return this.svc.applyDiscountBulk(req);
   }
 
   // ------------------------------------------------------
@@ -146,7 +141,10 @@ export class ProductGrpcController {
   @Public()
   @GrpcMethod("ProductService", "ListGallery")
   async listGalleryGrpc(req: ListGalleryDto) {
-    const imgs = await this.svc.listGallery(req.productId, !!req.includeDeleted);
+    const imgs = await this.svc.listGallery(
+      req.productId,
+      !!req.includeDeleted,
+    );
     return productv1.GalleryResponse.create({
       productId: req.productId,
       images: imgs.map((i) => ({
@@ -184,7 +182,11 @@ export class ProductGrpcController {
   @Roles("admin")
   @GrpcMethod("ProductService", "RemoveImage")
   async removeImageGrpc(req: RemoveImageDto) {
-    const imgs = await this.svc.removeImage(req.productId, req.imageId, !!req.hardDelete);
+    const imgs = await this.svc.removeImage(
+      req.productId,
+      req.imageId,
+      !!req.hardDelete,
+    );
     return productv1.GalleryResponse.create({
       productId: req.productId,
       images: imgs.map((i) => ({

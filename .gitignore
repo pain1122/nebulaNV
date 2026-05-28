@@ -78,3 +78,6 @@ Thumbs.db
 .tar
 .GZIP
 .BZIP2
+# Codex transient logs
+.codex-run-logs/
+.codex-web-lint.log

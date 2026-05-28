@@ -9,7 +9,9 @@ export async function httpJson<T>(method: "GET" | "POST" | "PUT" | "DELETE", url
   let json: any = null
   try {
     json = await res.json()
-  } catch {}
+  } catch {
+    // Response was not JSON; fall back to HTTP status text below.
+  }
 
   if (!res.ok) {
     const msg = (json && (json.message || json.error)) || `${res.status} ${res.statusText}`

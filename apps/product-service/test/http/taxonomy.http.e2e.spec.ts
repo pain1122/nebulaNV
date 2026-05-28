@@ -2,7 +2,7 @@
 import { httpJson } from "../utils/http";
 
 const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL || "http://127.0.0.1:3003";
-const AUTH_HTTP    = process.env.AUTH_HTTP_URL    || "http://127.0.0.1:3001";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL || "http://127.0.0.1:3001";
 
 const BASE = `${PRODUCT_HTTP}/taxonomies`;
 const KIND = "category.default";
@@ -10,7 +10,7 @@ const KIND = "category.default";
 type LoginResp = { accessToken: string };
 
 describe("Product taxonomy HTTP (category.default kind)", () => {
-  let id   = "";
+  let id = "";
   let slug = "";
   let admin = "";
 
@@ -18,7 +18,7 @@ describe("Product taxonomy HTTP (category.default kind)", () => {
     // login admin
     const at = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
       identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
-      password:   process.env.SEED_ADMIN_PASS  ?? "Admin123!",
+      password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
     });
     admin = at.accessToken;
   });
@@ -34,12 +34,9 @@ describe("Product taxonomy HTTP (category.default kind)", () => {
       sortOrder: 0,
     };
 
-    const res = await httpJson<any>(
-      "POST",
-      `${BASE}/${KIND}`,
-      body,
-      { authorization: `Bearer ${admin}` },
-    );
+    const res = await httpJson<any>("POST", `${BASE}/${KIND}`, body, {
+      authorization: `Bearer ${admin}`,
+    });
 
     expect(res.data.id).toBeTruthy();
     expect(res.data.slug).toBe(slug);
@@ -74,12 +71,9 @@ describe("Product taxonomy HTTP (category.default kind)", () => {
   it("PATCH /taxonomies/:kind/:id (admin) updates title", async () => {
     const body = { title: "E2E HTTP Category Pro" };
 
-    const res = await httpJson<any>(
-      "PATCH",
-      `${BASE}/${KIND}/${id}`,
-      body,
-      { authorization: `Bearer ${admin}` },
-    );
+    const res = await httpJson<any>("PATCH", `${BASE}/${KIND}/${id}`, body, {
+      authorization: `Bearer ${admin}`,
+    });
 
     expect(res.data.id).toBe(id);
     expect(res.data.title).toBe("E2E HTTP Category Pro");

@@ -1,32 +1,37 @@
 // apps/user-service/src/utils/rpc.ts
 import { Metadata, ServiceError, CallOptions } from '@grpc/grpc-js';
 
-/**
- * Promisify a unary gRPC method.
- * Works with all common signatures:
- *  - (req, cb)
- *  - (req, metadata, cb)
- *  - (req, metadata, options, cb)
- */
+type UnaryCallback<TRes> = (err: ServiceError | null, res: TRes) => void;
+
+type UnaryGrpcMethod<TReq, TRes> = {
+  (req: TReq, cb: UnaryCallback<TRes>): unknown;
+  (req: TReq, md: Metadata, cb: UnaryCallback<TRes>): unknown;
+  (
+    req: TReq,
+    md: Metadata,
+    opts: CallOptions,
+    cb: UnaryCallback<TRes>,
+  ): unknown;
+};
+
 export function promisifyUnary<TReq, TRes>(
-  fn: (req: TReq, md?: Metadata, opts?: CallOptions, cb?: (err: ServiceError | null, res: TRes) => void) => unknown,
+  fn: UnaryGrpcMethod<TReq, TRes>,
   md?: Metadata,
   opts?: CallOptions,
 ) {
   return (req: TReq): Promise<TRes> =>
     new Promise<TRes>((resolve, reject) => {
-      const cb = (err: ServiceError | null, res: TRes) => {
+      const cb: UnaryCallback<TRes> = (err, res) => {
         if (err) return reject(err);
         resolve(res);
       };
 
-      // Dispatch based on provided args
       if (md && opts) {
-        (fn as any)(req, md, opts, cb);
+        fn(req, md, opts, cb);
       } else if (md) {
-        (fn as any)(req, md, cb);
+        fn(req, md, cb);
       } else {
-        (fn as any)(req, cb);
+        fn(req, cb);
       }
     });
 }

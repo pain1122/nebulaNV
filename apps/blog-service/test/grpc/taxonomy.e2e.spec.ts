@@ -16,7 +16,7 @@ describe("BlogTaxonomyService gRPC (admin required on writes)", () => {
   // so here we only care about the "kind"
   const kind = "category.default";
 
-  let id   = "";
+  let id = "";
   let slug = "";
 
   it("Create (admin) succeeds for blog category kind", async () => {

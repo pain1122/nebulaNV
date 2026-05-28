@@ -1,7 +1,41 @@
-import {IsArray, ArrayMaxSize, IsBoolean, IsEnum, IsISO8601, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf, IsInt} from "class-validator"
-import {Expose, Transform, Type} from "class-transformer"
-import {ValidateNested} from "class-validator"
-const toBool = (v: any) => v === true || v === "true" || v === "1" || v === 1
+import {
+  IsArray,
+  ArrayMaxSize,
+  IsBoolean,
+  IsEnum,
+  IsISO8601,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+  IsInt,
+} from "class-validator";
+import {
+  Expose,
+  Transform,
+  Type,
+  type TransformFnParams,
+} from "class-transformer";
+import { ValidateNested } from "class-validator";
+const toBool = (value: unknown): boolean =>
+  value === true || value === "true" || value === "1" || value === 1;
+
+const toBoolTransform = ({ value }: TransformFnParams): boolean =>
+  toBool(value);
+
+type DiscountAwareInput = {
+  discountType?: unknown;
+};
+
+const hasDiscountType = (value: unknown): value is DiscountAwareInput =>
+  typeof value === "object" && value !== null && "discountType" in value;
+
+const isDiscountTypeDto = (value: unknown): value is DiscountTypeDto =>
+  Object.values(DiscountTypeDto).includes(value as DiscountTypeDto);
 
 export enum ProductStatusDto {
   DRAFT = "DRAFT",
@@ -15,196 +49,212 @@ export enum DiscountTypeDto {
 }
 
 export class ProductInputDto {
-  @IsString() @MaxLength(180) title!: string
-  @IsOptional() @IsString() @MaxLength(120) slug?: string
-  @IsOptional() @IsString() @MaxLength(120) sku?: string
+  @IsString() @MaxLength(180) title!: string;
+  @IsOptional() @IsString() @MaxLength(120) slug?: string;
+  @IsOptional() @IsString() @MaxLength(120) sku?: string;
 
   @IsOptional()
   @Type(() => Number) // ← coerce "100" -> 100
   @IsNumber()
   @Min(0)
-  price?: number
+  price?: number;
 
-  @IsOptional() @IsString() @MaxLength(8) currency?: string
-  @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto
+  @IsOptional() @IsString() @MaxLength(8) currency?: string;
+  @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto;
 
-  @IsOptional() @IsString() description?: string
-  @IsOptional() @IsString() excerpt?: string
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() excerpt?: string;
 
-  @Expose({name: "categoryId"})
+  @Expose({ name: "categoryId" })
   @IsOptional()
   @IsUUID("4")
-  categoryId?: string
+  categoryId?: string;
 
-  @Expose({name: "thumbnailUrl"})
+  @Expose({ name: "thumbnailUrl" })
   @IsOptional()
   @IsString()
   @MaxLength(1024)
-  thumbnailUrl?: string
+  thumbnailUrl?: string;
 
-  @Expose({name: "model3dUrl"})
+  @Expose({ name: "model3dUrl" })
   @IsOptional()
   @IsString()
   @MaxLength(1024)
-  model3dUrl?: string
+  model3dUrl?: string;
 
-  @Expose({name: "model3dFormat"})
+  @Expose({ name: "model3dFormat" })
   @IsOptional()
   @IsString()
   @MaxLength(16)
-  model3dFormat?: string
+  model3dFormat?: string;
 
-  @Expose({name: "model3dLiveView"})
+  @Expose({ name: "model3dLiveView" })
   @IsOptional()
-  @Transform(({value}) => toBool(value))
+  @Transform(toBoolTransform)
   @IsBoolean()
-  model3dLiveView?: boolean
+  model3dLiveView?: boolean;
 
-  @Expose({name: "model3dPosterUrl"})
+  @Expose({ name: "model3dPosterUrl" })
   @IsOptional()
   @IsString()
   @MaxLength(1024)
-  model3dPosterUrl?: string
+  model3dPosterUrl?: string;
 
-  @Expose({name: "vrEnabled"})
+  @Expose({ name: "vrEnabled" })
   @IsOptional()
-  @Transform(({value}) => toBool(value))
+  @Transform(toBoolTransform)
   @IsBoolean()
-  vrEnabled?: boolean
+  vrEnabled?: boolean;
 
-  @Expose({name: "vrPlanImageUrl"})
+  @Expose({ name: "vrPlanImageUrl" })
   @IsOptional()
   @IsString()
   @MaxLength(1024)
-  vrPlanImageUrl?: string
+  vrPlanImageUrl?: string;
 
-  @Expose({name: "metaTitle"})
+  @Expose({ name: "metaTitle" })
   @IsOptional()
   @IsString()
   @MaxLength(180)
-  metaTitle?: string
+  metaTitle?: string;
 
-  @Expose({name: "metaDescription"})
+  @Expose({ name: "metaDescription" })
   @IsOptional()
   @IsString()
-  metaDescription?: string
+  metaDescription?: string;
 
-  @Expose({name: "metaKeywords"})
+  @Expose({ name: "metaKeywords" })
   @IsOptional()
   @IsString()
   @MaxLength(512)
-  metaKeywords?: string
+  metaKeywords?: string;
 
-  @Expose({name: "customSchema"})
+  @Expose({ name: "customSchema" })
   @IsOptional()
   @IsString()
-  customSchema?: string
+  customSchema?: string;
 
-  @IsOptional() @Transform(({value}) => toBool(value)) @IsBoolean() noindex?: boolean
-
-  @Expose({name: "isFeatured"})
   @IsOptional()
-  @Transform(({value}) => toBool(value))
+  @Transform(toBoolTransform)
   @IsBoolean()
-  isFeatured?: boolean
+  noindex?: boolean;
 
-  @Expose({name: "featureSort"})
+  @Expose({ name: "isFeatured" })
+  @IsOptional()
+  @Transform(toBoolTransform)
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @Expose({ name: "featureSort" })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(1_000_000)
-  featureSort?: number
+  featureSort?: number;
 
-  @Expose({name: "promoTitle"})
+  @Expose({ name: "promoTitle" })
   @IsOptional()
   @IsString()
   @MaxLength(120)
-  promoTitle?: string
+  promoTitle?: string;
 
-  @Expose({name: "promoBadge"})
+  @Expose({ name: "promoBadge" })
   @IsOptional()
   @IsString()
   @MaxLength(32)
-  promoBadge?: string
+  promoBadge?: string;
 
-  @Expose({name: "promoActive"})
+  @Expose({ name: "promoActive" })
   @IsOptional()
-  @Transform(({value}) => toBool(value))
+  @Transform(toBoolTransform)
   @IsBoolean()
-  promoActive?: boolean
+  promoActive?: boolean;
 
-  @Expose({name: "discountType"})
+  @Expose({ name: "discountType" })
   @IsOptional()
   @IsEnum(DiscountTypeDto)
-  discountType?: DiscountTypeDto
+  discountType?: DiscountTypeDto;
 
-  @Expose({name: "discountValue"})
-  @ValidateIf((o) => o.discountType && o.discountType !== "NONE")
+  @Expose({ name: "discountValue" })
+  @ValidateIf(
+    (o: unknown) =>
+      hasDiscountType(o) &&
+      isDiscountTypeDto(o.discountType) &&
+      o.discountType !== DiscountTypeDto.NONE,
+  )
   @Type(() => Number) // ← coerce to number when present
   @IsNumber()
   @Min(0)
   @Max(1_000_000)
-  discountValue?: number
+  discountValue?: number;
 
-  @Expose({name: "discountActive"})
+  @Expose({ name: "discountActive" })
   @IsOptional()
-  @Transform(({value}) => toBool(value))
+  @Transform(toBoolTransform)
   @IsBoolean()
-  discountActive?: boolean
+  discountActive?: boolean;
 
-  @Expose({name: "discountStart"})
+  @Expose({ name: "discountStart" })
   @IsOptional()
   @IsISO8601()
-  discountStart?: string
+  discountStart?: string;
 
-  @Expose({name: "discountEnd"})
+  @Expose({ name: "discountEnd" })
   @IsOptional()
   @IsISO8601()
-  discountEnd?: string
+  discountEnd?: string;
 
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(64)
-  @IsString({each: true}) // ← validate items
-  tags?: string[]
+  @IsString({ each: true }) // ← validate items
+  tags?: string[];
 
-  @Expose({name: "complementaryIds"})
+  @Expose({ name: "complementaryIds" })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(64)
-  @IsUUID("4", {each: true}) // ← these are IDs; validate items
-  complementaryIds?: string[]
+  @IsUUID("4", { each: true }) // ← these are IDs; validate items
+  complementaryIds?: string[];
 }
 
 export class CreateProductRequestDto {
   @ValidateNested()
   @Type(() => ProductInputDto)
-  data!: ProductInputDto
+  data!: ProductInputDto;
 }
 
 export class UpdateProductRequestDto {
   @ValidateNested() // 👈 accept nested patch
   @Type(() => ProductInputDto)
-  patch!: Partial<ProductInputDto> // 👈 remove the `id` field here
+  patch!: Partial<ProductInputDto>; // 👈 remove the `id` field here
 }
 
 export class IdRequestDto {
-  @IsUUID("4") id!: string
+  @IsUUID("4") id!: string;
 }
 
 export class ListProductsRequestDto {
-  @IsOptional() @IsString() q?: string
-  @Expose({name: "categoryId"}) @IsOptional() @IsUUID("4") categoryId?: string
-
-  @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto
-
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(1) page?: number // ← coerce
-  @IsOptional() @Type(() => Number) @IsNumber() @Min(1) @Max(100) limit?: number
-
-  @Expose({name: "includeDeleted"})
+  @IsOptional() @IsString() q?: string;
+  @Expose({ name: "categoryId" })
   @IsOptional()
-  @Transform(({value}) => toBool(value))
+  @IsUUID("4")
+  categoryId?: string;
+
+  @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto;
+
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(1) page?: number; // ← coerce
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @Expose({ name: "includeDeleted" })
+  @IsOptional()
+  @Transform(toBoolTransform)
   @IsBoolean()
-  includeDeleted?: boolean // ← coerce
+  includeDeleted?: boolean; // ← coerce
 }

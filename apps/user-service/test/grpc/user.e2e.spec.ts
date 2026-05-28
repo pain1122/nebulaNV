@@ -24,25 +24,37 @@ describe('UserService gRPC (seeded users)', () => {
 
   const userEmail = process.env.SEED_USER_EMAIL ?? 'user@example.com';
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
-  const userPass  = process.env.SEED_USER_PASS  ?? 'User123!';
+  const userPass = process.env.SEED_USER_PASS ?? 'User123!';
   const adminPass = process.env.SEED_ADMIN_PASS ?? 'Admin123!';
 
-  let userId = '', adminId = '';
-  let userAccess = '', adminAccess = '';
+  let userId = '',
+    adminId = '';
+  let userAccess = '',
+    adminAccess = '';
   let haveAdmin = false;
 
   beforeAll(async () => {
     // login seeded user
-    const userTokens = await httpJson<LoginResp>('POST', `${AUTH_HTTP}/auth/login`, {
-      identifier: userEmail, password: userPass,
-    });
+    const userTokens = await httpJson<LoginResp>(
+      'POST',
+      `${AUTH_HTTP}/auth/login`,
+      {
+        identifier: userEmail,
+        password: userPass,
+      },
+    );
 
     // login seeded admin (optional, for admin path)
     let adminTokens: LoginResp | null = null;
     try {
-      adminTokens = await httpJson<LoginResp>('POST', `${AUTH_HTTP}/auth/login`, {
-        identifier: adminEmail, password: adminPass,
-      });
+      adminTokens = await httpJson<LoginResp>(
+        'POST',
+        `${AUTH_HTTP}/auth/login`,
+        {
+          identifier: adminEmail,
+          password: adminPass,
+        },
+      );
       haveAdmin = true;
     } catch {
       haveAdmin = false;
@@ -61,7 +73,10 @@ describe('UserService gRPC (seeded users)', () => {
     const res = await call<any>(
       client,
       'findUserWithHash', // case-insensitive
-      { email: 'nope+' + Math.random().toString(36).slice(2, 8) + '@example.com' },
+      {
+        email:
+          'nope+' + Math.random().toString(36).slice(2, 8) + '@example.com',
+      },
       mdS2S(),
     );
     expect(res).toMatchObject({
@@ -96,15 +111,20 @@ describe('UserService gRPC (seeded users)', () => {
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
 
-  it(haveAdmin ? 'getUser admin→user succeeds' : 'getUser admin→user (no admin) skipped', async () => {
-    if (!haveAdmin) return;
-    const adminRole = roleFromJwt(adminAccess) ?? 'admin';
-    const res = await call<any>(
-      client,
-      'getUser',
-      { id: userId },
-      mdAuth({ access: adminAccess, userId: adminId, role: adminRole }),
-    );
-    expect(res).toHaveProperty('id', userId);
-  });
+  it(
+    haveAdmin
+      ? 'getUser admin→user succeeds'
+      : 'getUser admin→user (no admin) skipped',
+    async () => {
+      if (!haveAdmin) return;
+      const adminRole = roleFromJwt(adminAccess) ?? 'admin';
+      const res = await call<any>(
+        client,
+        'getUser',
+        { id: userId },
+        mdAuth({ access: adminAccess, userId: adminId, role: adminRole }),
+      );
+      expect(res).toHaveProperty('id', userId);
+    },
+  );
 });

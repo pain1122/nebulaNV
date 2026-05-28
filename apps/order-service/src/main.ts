@@ -9,7 +9,8 @@ import compression from "compression";
 const ORDER_PROTO = require.resolve("@nebula/protos/order.proto");
 
 function getHttpPort(cfg: ConfigService): number {
-  const p = cfg.get<string>("PORT") || cfg.get<string>("ORDER_HTTP_PORT") || "3005";
+  const p =
+    cfg.get<string>("PORT") || cfg.get<string>("ORDER_HTTP_PORT") || "3005";
   return Number(p);
 }
 
@@ -57,8 +58,9 @@ async function bootstrap() {
   const httpPort = getHttpPort(cfg);
   await app.listen(httpPort, "0.0.0.0");
 
-  // eslint-disable-next-line no-console
-  console.log(`[order-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`);
+  console.log(
+    `[order-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
+  );
 }
 
-bootstrap();
+void bootstrap();

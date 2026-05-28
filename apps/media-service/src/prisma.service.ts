@@ -1,50 +1,64 @@
-import {Injectable, Logger, OnModuleInit, INestApplication} from "@nestjs/common"
-import {PrismaClient} from "../prisma/generated/client"
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  INestApplication,
+} from "@nestjs/common";
+import { Prisma, PrismaClient } from "../prisma/generated/client";
+
+const prismaClientOptions = {
+  log: [
+    { emit: "event" as const, level: "query" as const },
+    { emit: "event" as const, level: "error" as const },
+  ],
+} satisfies Prisma.PrismaClientOptions;
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit {
-  private readonly log = new Logger("PrismaService")
+export class PrismaService
+  extends PrismaClient<typeof prismaClientOptions>
+  implements OnModuleInit
+{
+  private readonly log = new Logger("PrismaService");
 
   constructor() {
-    super({
-      log: [
-        {emit: "event", level: "query"},
-        {emit: "event", level: "error"},
-      ],
-    })
+    super(prismaClientOptions);
 
-    // ✅ Use bracket syntax and `any` to bypass Prisma 6 strict typings safely
-    ;(this as any).$on("query", (e: any) => {
+    this.$on("query", (e: Prisma.QueryEvent) => {
       try {
-        this.log.debug?.(`QUERY: ${e.query} PARAMS: ${e.params}`)
-      } catch (err) {
-        this.log.warn(`Bad query log payload: ${JSON.stringify(e)}`)
+        this.log.debug(`QUERY: ${e.query} PARAMS: ${e.params}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.log.warn(`Bad query log payload: ${message}`);
       }
-    })
+    });
 
-    ;(this as any).$on("error", (e: any) => {
-      this.log.error?.(`PRISMA ERROR: ${e.message || JSON.stringify(e)}`)
-    })
+    this.$on("error", (e: Prisma.LogEvent) => {
+      this.log.error(`PRISMA ERROR: ${e.message}`);
+    });
   }
 
   async onModuleInit() {
-    await this.$connect()
-    const url = process.env.DATABASE_URL
+    await this.$connect();
+    const url = process.env.DATABASE_URL;
     if (url) {
-      const u = new URL(url)
-      this.log.log(`[PrismaURL] ${u.protocol}//${u.hostname}:${u.port}${u.pathname}`)
+      const u = new URL(url);
+      this.log.log(
+        `[PrismaURL] ${u.protocol}//${u.hostname}:${u.port}${u.pathname}`,
+      );
     } else {
-      this.log.warn("[PrismaURL] DATABASE_URL is empty")
+      this.log.warn("[PrismaURL] DATABASE_URL is empty");
     }
   }
 
-  async enableShutdownHooks(app: INestApplication) {
-    process.on("beforeExit", async () => {
-      try {
-        await this.$disconnect()
-      } finally {
-        await app.close()
-      }
-    })
+  enableShutdownHooks(app: INestApplication): void {
+    process.on("beforeExit", () => {
+      void (async () => {
+        try {
+          await this.$disconnect();
+        } finally {
+          await app.close();
+        }
+      })();
+    });
   }
 }

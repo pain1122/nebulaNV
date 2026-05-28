@@ -1,9 +1,9 @@
-import { Global, Module } from "@nestjs/common"
-import { ClientsModule, Transport } from "@nestjs/microservices"
-import { ConfigModule, ConfigService } from "@nestjs/config"
+import { Global, Module } from "@nestjs/common";
+import { ClientsModule, Transport } from "@nestjs/microservices";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 
-const TAXONOMY_PROTO = require.resolve("@nebula/protos/taxonomy.proto")
-export const TAXONOMY_SERVICE = "TAXONOMY_SERVICE"
+const TAXONOMY_PROTO = require.resolve("@nebula/protos/taxonomy.proto");
+export const TAXONOMY_SERVICE = "TAXONOMY_SERVICE";
 
 @Global()
 @Module({

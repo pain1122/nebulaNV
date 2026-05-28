@@ -1,14 +1,23 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from "@nestjs/common";
-import { TaxonomyService } from "./taxonomy.service";
-import { CreateTaxonomyDto } from "./dto/create-taxonomy.dto"
-import { UpdateTaxonomyDto } from "./dto/update-taxonomy.dto"
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from "@nestjs/common";
+import { TaxonomyService, type ListTaxonomiesQuery } from "./taxonomy.service";
+import { CreateTaxonomyDto } from "./dto/create-taxonomy.dto";
+import { UpdateTaxonomyDto } from "./dto/update-taxonomy.dto";
 
 @Controller("taxonomies")
 export class TaxonomyHttpController {
   constructor(private svc: TaxonomyService) {}
 
   @Get()
-  list(@Query() q: any) {
+  list(@Query() q: ListTaxonomiesQuery) {
     return this.svc.list(q);
   }
 
@@ -19,12 +28,12 @@ export class TaxonomyHttpController {
 
   @Post()
   create(@Body() dto: CreateTaxonomyDto) {
-    return this.svc.create(dto)
+    return this.svc.create(dto);
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateTaxonomyDto) {
-    return this.svc.update(id, dto)
+    return this.svc.update(id, dto);
   }
 
   @Delete("/:id")

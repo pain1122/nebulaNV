@@ -20,12 +20,16 @@ const authClient = loadClient<any>({
   svc: 'AuthService',
 });
 
-const itIf = (cond: any) => (cond ? it : it.skip);
 const skipIfUnavailable = (e: any) => e?.code === CODES.UNAVAILABLE;
 
 function roleFromJwt(token: string): string | undefined {
   const payload = jwt.decode(token) as jwt.JwtPayload | null;
   return (payload?.role as string | undefined) ?? undefined;
+}
+
+function tamperToken(token: string): string {
+  const replacement = token.endsWith('a') ? 'b' : 'a';
+  return `${token.slice(0, -1)}${replacement}`;
 }
 
 describe('Auth HTTP + gRPC end-to-end', () => {
@@ -99,6 +103,10 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     }
   });
 
+  it('GET /auth/me rejects requests without a bearer token', async () => {
+    await expect(httpJson('GET', `${AUTH_HTTP}/auth/me`)).rejects.toBeTruthy();
+  });
+
   it('gRPC validateToken returns isValid for both', async () => {
     try {
       const res = await call<any>(
@@ -107,8 +115,24 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         { token: userTokens.accessToken },
         mdS2S(),
       );
+      expect(res.isValid).toBe(true);
+      expect(res.userId).toBe(userId);
+    } catch (e: any) {
+      if (skipIfUnavailable(e)) return;
+      throw e;
+    }
+  });
+
+  it('gRPC validateToken rejects a tampered access token', async () => {
+    try {
+      const res = await call<any>(
+        authClient,
+        'validateToken',
+        { token: tamperToken(userTokens.accessToken) },
+        mdS2S(),
+      );
       expect(res.isValid).toBe(false);
-      expect(res.userId).toBe('');
+      expect(res.userId ?? '').toBe('');
     } catch (e: any) {
       if (skipIfUnavailable(e)) return;
       throw e;
@@ -126,6 +150,17 @@ describe('Auth HTTP + gRPC end-to-end', () => {
       );
       expect(tk.accessToken).toBeTruthy();
       expect(tk.refreshToken).toBeTruthy();
+    } catch (e: any) {
+      if (skipIfUnavailable(e)) return;
+      throw e;
+    }
+  });
+
+  it('gRPC getTokens rejects S2S calls without user context', async () => {
+    try {
+      await expect(
+        call<any>(authClient, 'getTokens', {}, mdS2S()),
+      ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
     } catch (e: any) {
       if (skipIfUnavailable(e)) return;
       throw e;
@@ -160,11 +195,32 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     }
   });
 
-  it('gRPC getProfile admin→user succeeds', async () => {
-    expect(haveRealAdmin).toBe(true);
+  it('gRPC getProfile rejects spoofed admin metadata when the bearer is a user token', async () => {
+    if (!haveRealAdmin || !adminId || adminId === userId) return;
+
+    try {
+      await expect(
+        call<any>(
+          authClient,
+          'getProfile',
+          { userId: adminId },
+          mdAuth({
+            access: userTokens.accessToken,
+            userId: adminId,
+            role: 'admin',
+          }),
+        ),
+      ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
+    } catch (e: any) {
+      if (skipIfUnavailable(e)) return;
+      throw e;
+    }
+  });
+
+  it('gRPC getProfile admin->user succeeds', async () => {
+    if (!haveRealAdmin) return;
     const adminRole = roleFromJwt(adminTokens.accessToken) ?? 'user';
 
-    // Try the admin path first: ctx.userId = adminId, role=admin
     try {
       const res = await call<any>(
         authClient,
@@ -177,28 +233,8 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         }),
       );
       expect(res).toHaveProperty('id', userId);
-      return;
     } catch (e: any) {
-      // Some stacks don't surface role from JWT into resolveCtxUser(meta, call)
-      // and only allow the "owner" path. Fall back to owner semantics by
-      // setting ctx.userId = target userId while still presenting the admin token.
-      if (
-        e?.code === CODES.PERMISSION_DENIED ||
-        e?.code === CODES.UNAUTHENTICATED
-      ) {
-        const fallback = await call<any>(
-          authClient,
-          'getProfile',
-          { userId },
-          mdAuth({
-            access: adminTokens.accessToken,
-            userId /* owner path */,
-            role: adminRole,
-          }),
-        );
-        expect(fallback).toHaveProperty('id', userId);
-        return;
-      }
+      if (skipIfUnavailable(e)) return;
       throw e;
     }
   });

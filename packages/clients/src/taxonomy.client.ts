@@ -39,7 +39,7 @@ type Raw = {
   DeleteTaxonomy(
     req: DeleteTaxonomyReq,
     meta?: any,
-  ): Observable<{}>;
+  ): Observable<Record<string, never>>;
 
   ListTaxonomies(
     req: ListTaxonomiesReq & { q?: string; page?: number; limit?: number },

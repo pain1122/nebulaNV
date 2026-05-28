@@ -1,8 +1,7 @@
 // apps/auth-service/test/utils/http.ts
 import * as jwt from 'jsonwebtoken';
 
-export const AUTH_HTTP =
-  process.env.AUTH_HTTP_URL ?? 'http://127.0.0.1:3001';
+export const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? 'http://127.0.0.1:3001';
 
 export type LoginResp = {
   accessToken: string;
@@ -13,7 +12,7 @@ export async function httpJson<T>(
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   url: string,
   body?: any,
-  token?: string
+  token?: string,
 ): Promise<T> {
   const headers: Record<string, string> = {
     'content-type': 'application/json',

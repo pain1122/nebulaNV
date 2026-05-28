@@ -1,35 +1,39 @@
-import {Transform} from "class-transformer"
-import {IsIn, IsOptional, IsString, IsUUID, Matches} from "class-validator"
+import { Transform, type TransformFnParams } from "class-transformer";
+import { IsIn, IsOptional, IsString, IsUUID, Matches } from "class-validator";
 
-const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
-const trim = ({value}: any) => (typeof value === "string" ? value.trim() : value)
+const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const trim = ({ value }: TransformFnParams): unknown =>
+  typeof value === "string" ? value.trim() : value;
+
+const upperTrim = ({ value }: TransformFnParams): unknown =>
+  typeof value === "string" ? value.trim().toUpperCase() : value;
 
 export class PresignUploadDto {
   @IsString()
   @Transform(trim)
-  @Matches(SAFE_FILENAME, {message: "filename is not safe"})
-  filename!: string
+  @Matches(SAFE_FILENAME, { message: "filename is not safe" })
+  filename!: string;
 
   @IsString()
   @Transform(trim)
-  mimeType!: string
+  mimeType!: string;
 
   @IsOptional()
   @IsUUID()
   // Optional admin override target owner. Caller identity is from auth context.
-  ownerId?: string
+  ownerId?: string;
 
   @IsOptional()
   @IsString()
-  @Transform(({value}) => (typeof value === "string" ? value.trim().toUpperCase() : value))
+  @Transform(upperTrim)
   @IsIn(["PUBLIC", "PROTECTED", "STRICT"])
-  accessClass?: string
+  accessClass?: string;
 
   @IsOptional()
   @IsIn(["private", "public"])
-  visibility?: string
+  visibility?: string;
 
   @IsOptional()
   @IsIn(["panel", "user", "system"])
-  scope?: string
+  scope?: string;
 }

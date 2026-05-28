@@ -1,88 +1,107 @@
-import {Controller, Logger} from "@nestjs/common"
-import {GrpcMethod} from "@nestjs/microservices"
-import {Metadata, status} from "@grpc/grpc-js"
-import {Public, Roles, resolveCtxUser, toRpc} from "@nebula/grpc-auth"
-import {MediaService} from "../media.service"
-import {media} from "@nebula/protos"
+import { Controller, Logger } from "@nestjs/common";
+import { GrpcMethod } from "@nestjs/microservices";
+import { Metadata, status, type ServerUnaryCall } from "@grpc/grpc-js";
+import {
+  type CreateMediaInput,
+  type FinalizeUploadInput,
+  MediaService,
+  type PresignUploadInput,
+} from "../media.service";
+import type { Media as MediaRecord } from "../../prisma/generated";
+import { Public, Roles, resolveCtxUser, toRpc } from "@nebula/grpc-auth";
+import { media } from "@nebula/protos";
+import type { ListMediaDto } from "../dto";
 
 @Controller()
 export class MediaGrpcController {
-  private readonly log = new Logger(MediaGrpcController.name)
+  private readonly log = new Logger(MediaGrpcController.name);
   constructor(private readonly svc: MediaService) {}
 
-  private resolveOwnerId(ctx: {userId?: string | null; role?: string}, requested?: string | null): string | null {
-    const requestedOwnerId = requested?.trim()
-    if (!requestedOwnerId) return ctx.userId ?? null
+  private resolveOwnerId(
+    ctx: { userId?: string | null; role?: string },
+    requested?: string | null,
+  ): string | null {
+    const requestedOwnerId = requested?.trim();
+    if (!requestedOwnerId) return ctx.userId ?? null;
 
     // Explicit admin override path; never anonymous caller identity.
     if (ctx.role === "admin" || ctx.role === "root-admin") {
-      return requestedOwnerId
+      return requestedOwnerId;
     }
 
-    return ctx.userId ?? null
+    return ctx.userId ?? null;
   }
 
   @Public()
   @GrpcMethod("MediaService", "Ping")
-  async ping(_: media.Empty): Promise<media.Pong> {
-    return media.Pong.create({message: "pong"})
+  ping(): media.Pong {
+    return media.Pong.create({ message: "pong" });
   }
 
   // admin/root-admin (panel writes)
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "Create")
-  async create(req: media.CreateReq, meta: Metadata, call: any): Promise<media.MediaRes> {
-    const ctx = resolveCtxUser(meta, call)
-    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context")
+  async create(
+    req: media.CreateReq,
+    meta: Metadata,
+    call: ServerUnaryCall<media.CreateReq, media.MediaRes>,
+  ): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const created = await this.svc.create({
+    const input: CreateMediaInput = {
       storage: req.storage?.trim() ? req.storage.trim() : "local",
       bucket: req.bucket?.trim() ? req.bucket.trim() : null,
-
       path: req.path?.trim() ?? "",
       filename: req.filename?.trim() ?? "",
       mimeType: req.mimeType?.trim() ?? "",
-
-      // keep as numeric string; service parses to Number()
       sizeBytes: req.sizeBytes?.trim() ? Number(req.sizeBytes.trim()) : 0,
-
-      // 0 means "unset" in proto land -> store null
-      width: req.width && req.width > 0 ? req.width : null,
-      height: req.height && req.height > 0 ? req.height : null,
-      durationSec: req.durationSec && req.durationSec > 0 ? req.durationSec : null,
-
+      width: req.width && req.width > 0 ? req.width : undefined,
+      height: req.height && req.height > 0 ? req.height : undefined,
+      durationSec:
+        req.durationSec && req.durationSec > 0 ? req.durationSec : undefined,
       actorUserId: ctx.userId ?? null,
       actorRole: ctx.role ?? null,
-
       ownerId: this.resolveOwnerId(ctx, req.ownerId),
       accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : "private",
       scope: req.scope?.trim() ? req.scope.trim() : "panel",
-
       sha256: req.sha256?.trim() ? req.sha256.trim() : null,
-    } as any)
+    };
 
-    this.log.debug(`[MediaService] Create id=${created.id} filename=${created.filename}`)
-    return media.MediaRes.create({media: toProtoMedia(created)})
+    const created = await this.svc.create(input);
+
+    this.log.debug(
+      `[MediaService] Create id=${created.id} filename=${created.filename}`,
+    );
+    return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "GetById")
-  async getById(req: media.GetByIdReq, meta: Metadata, call: any): Promise<media.MediaRes> {
-    const ctx = resolveCtxUser(meta, call)
-    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context")
+  async getById(
+    req: media.GetByIdReq,
+    meta: Metadata,
+    call: ServerUnaryCall<media.GetByIdReq, media.MediaRes>,
+  ): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const row = await this.svc.getById(req.id)
-    return media.MediaRes.create({media: toProtoMedia(row)})
+    const row = await this.svc.getById(req.id);
+    return media.MediaRes.create({ media: toProtoMedia(row) });
   }
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "List")
-  async list(req: media.ListReq, meta: Metadata, call: any): Promise<media.ListRes> {
-    const ctx = resolveCtxUser(meta, call)
-    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context")
+  async list(
+    req: media.ListReq,
+    meta: Metadata,
+    call: ServerUnaryCall<media.ListReq, media.ListRes>,
+  ): Promise<media.ListRes> {
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const items = await this.svc.list({
+    const input: ListMediaDto = {
       q: req.q ?? "",
       take: req.take ?? 50,
       skip: req.skip ?? 0,
@@ -90,40 +109,51 @@ export class MediaGrpcController {
       accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : undefined,
       scope: req.scope?.trim() ? req.scope.trim() : undefined,
-    } as any)
+    };
 
-    return media.ListRes.create({items: items.map(toProtoMedia)})
+    const items = await this.svc.list(input);
+
+    return media.ListRes.create({ items: items.map(toProtoMedia) });
   }
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "DeleteById")
-  async deleteById(req: media.DeleteByIdReq, meta: Metadata, call: any): Promise<media.DeleteRes> {
-    const ctx = resolveCtxUser(meta, call)
-    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context")
+  async deleteById(
+    req: media.DeleteByIdReq,
+    meta: Metadata,
+    call: ServerUnaryCall<media.DeleteByIdReq, media.DeleteRes>,
+  ): Promise<media.DeleteRes> {
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const deleted = await this.svc.deleteById(req.id)
-    this.log.debug(`[MediaService] DeleteById id=${req.id} -> ${deleted}`)
-    return media.DeleteRes.create({deleted})
+    const deleted = await this.svc.deleteById(req.id);
+    this.log.debug(`[MediaService] DeleteById id=${req.id} -> ${deleted}`);
+    return media.DeleteRes.create({ deleted });
   }
 
   // admin/root-admin (panel writes)
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "PresignUpload")
-  async presignUpload(req: media.PresignUploadReq, meta: Metadata, call: any): Promise<media.PresignUploadRes> {
-    const ctx = resolveCtxUser(meta, call)
-    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context")
+  async presignUpload(
+    req: media.PresignUploadReq,
+    meta: Metadata,
+    call: ServerUnaryCall<media.PresignUploadReq, media.PresignUploadRes>,
+  ): Promise<media.PresignUploadRes> {
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const out = await this.svc.presignUpload({
+    const input: PresignUploadInput = {
       filename: req.filename?.trim() ?? "",
       mimeType: req.mimeType?.trim() ?? "",
       actorUserId: ctx.userId ?? null,
       actorRole: ctx.role ?? null,
-
       ownerId: this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
       accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : "private",
       scope: req.scope?.trim() ? req.scope.trim() : "panel",
-    } as any)
+    };
+
+    const out = await this.svc.presignUpload(input);
 
     return media.PresignUploadRes.create({
       storage: out.storage ?? "s3",
@@ -138,20 +168,23 @@ export class MediaGrpcController {
       visibility: out.visibility ?? "private",
       accessClass: out.accessClass ?? "PUBLIC",
       scope: out.scope ?? "panel",
-    })
+    });
   }
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "FinalizeUpload")
-  async finalizeUpload(req: media.FinalizeUploadReq, meta: Metadata, call: any): Promise<media.MediaRes> {
-    const ctx = resolveCtxUser(meta, call)
-    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context")
+  async finalizeUpload(
+    req: media.FinalizeUploadReq,
+    meta: Metadata,
+    call: ServerUnaryCall<media.FinalizeUploadReq, media.MediaRes>,
+  ): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const created = await this.svc.finalizeUpload({
+    const input: FinalizeUploadInput = {
       storage: req.storage?.trim() ? req.storage.trim() : "s3",
       bucket: req.bucket?.trim() ? req.bucket.trim() : undefined,
       path: req.path?.trim() ?? "",
-
       filename: req.filename?.trim() || undefined,
       mimeType: req.mimeType?.trim() || undefined,
       visibility: req.visibility?.trim() || undefined,
@@ -159,18 +192,18 @@ export class MediaGrpcController {
       scope: req.scope?.trim() || undefined,
       actorUserId: ctx.userId ?? null,
       actorRole: ctx.role ?? null,
-
-      // if not provided, default to ctx user
       ownerId: this.resolveOwnerId(ctx, req.ownerId),
       sha256: req.sha256?.trim() ? req.sha256.trim() : null,
-    } as any)
+    };
 
-    return media.MediaRes.create({media: toProtoMedia(created)})
+    const created = await this.svc.finalizeUpload(input);
+
+    return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 }
 
 // Prisma -> Proto mapper (safe + explicit)
-function toProtoMedia(row: any): media.Media {
+function toProtoMedia(row: MediaRecord): media.Media {
   return media.Media.create({
     id: row.id,
 
@@ -201,5 +234,5 @@ function toProtoMedia(row: any): media.Media {
     quarantineReason: row.quarantineReason ?? "",
     etag: row.etag ?? "",
     promotedAt: row.promotedAt ? new Date(row.promotedAt).toISOString() : "",
-  })
+  });
 }

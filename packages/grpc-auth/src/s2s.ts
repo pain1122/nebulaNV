@@ -1,6 +1,5 @@
 // packages/grpc-auth/src/s2s.ts
 import {Metadata} from "@grpc/grpc-js"
-import * as crypto from "crypto"
 import {resolveServiceName, resolveS2SSecret, resolveS2SSignHeader, X_SVC_HEADER, X_SVC_UPSTREAM_HEADER, X_USER_ID_HEADER} from "./tokens"
 import {deriveServiceSecret, signS2S, minuteBucket, S2S_METHOD_CANONICAL, S2S_PATH_CANONICAL} from "./s2s.crypto"
 

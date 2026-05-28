@@ -9,28 +9,16 @@ import {
   Get,
   Req,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
-import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt/jwt-auth.guard';
-import { Public, Roles, RoleAtLeast } from '@nebula/grpc-auth';
-
-// Express typing for req.user (populated by GrpcTokenAuthGuard)
-declare module 'express' {
-  interface User {
-    userId: string;
-    email: string;
-    role: string;
-  }
-  interface Request {
-    user?: User;
-  }
-}
+import { Public, Roles } from '@nebula/grpc-auth';
+import type { AuthenticatedRequest } from './auth.types';
 
 function extractBearer(header?: string): string | undefined {
   if (!header) return undefined;
@@ -54,7 +42,7 @@ export class AuthController {
   async register(@Body() dto: CreateUserDto) {
     this.logger.log(`register() start email=${dto.email}`);
     const res = await this.authService.register(dto.email, dto.password);
-    this.logger.log(`register() end -> id=${(res as any)?.id ?? 'n/a'}`);
+    this.logger.log(`register() end -> id=${res.id}`);
     return res;
   }
 
@@ -104,7 +92,7 @@ export class AuthController {
   @Roles('user', 'admin', 'root-admin')
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  async logout(@Req() req: Request, @Body() dto: LogoutDto) {
+  async logout(@Req() req: AuthenticatedRequest, @Body() dto: LogoutDto) {
     await this.authService.logout({
       userId: req.user!.userId,
       refreshToken: dto.refreshToken,
@@ -114,11 +102,15 @@ export class AuthController {
   }
 
   @Get('me')
-  @Roles('user','admin','root-admin')
+  @Roles('user', 'admin', 'root-admin')
   @UseGuards(JwtAuthGuard)
-  getProfile(@Req() req: Request) {
+  getProfile(@Req() req: AuthenticatedRequest) {
     const token = extractBearer(req.headers.authorization);
     if (!token) throw new UnauthorizedException('Missing access token');
-    return this.authService.getProfile(req.user!.userId, token, req.user!.userId);
+    return this.authService.getProfile(
+      req.user!.userId,
+      token,
+      req.user!.userId,
+    );
   }
 }

@@ -17,6 +17,13 @@ import {
   RequireUserId,
 } from '@nebula/grpc-auth';
 import * as jsonwebtoken from 'jsonwebtoken';
+import {
+  AuthUserDto,
+  isAuthTokenPayload,
+  toAuthRole,
+  type RpcContextWithAuthUser,
+} from '../auth.types';
+import { errorMessage } from '../error.utils';
 
 type ValidateUserRequest = authv1.ValidateUserRequest;
 type ValidateUserResponse = authv1.ValidateUserResponse;
@@ -65,7 +72,7 @@ export class AuthGrpcController {
   async getProfile(
     data: { userId: string },
     meta: Metadata,
-    call: any,
+    call: RpcContextWithAuthUser,
   ): Promise<UserResponse> {
     try {
       const token = this.requireBearer(meta);
@@ -78,12 +85,12 @@ export class AuthGrpcController {
       return await wrapGrpc(
         this.authService.getProfile(data.userId, token, ctx.userId),
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw err instanceof RpcException
         ? err
         : new RpcException({
             code: status.UNAUTHENTICATED,
-            message: err.message,
+            message: errorMessage(err, 'Unauthenticated'),
           });
     }
   }
@@ -101,10 +108,10 @@ export class AuthGrpcController {
         isValid: !!user,
         userId: user?.id ?? '',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,
-        message: err.message || 'Invalid credentials',
+        message: errorMessage(err, 'Invalid credentials'),
       });
     }
   }
@@ -115,7 +122,7 @@ export class AuthGrpcController {
   async getTokens(
     _data: GetTokensRequest,
     meta: Metadata,
-    call: any,
+    call: RpcContextWithAuthUser,
   ): Promise<GetTokensResponse> {
     // never trust input.userId; take it from the (guarded) context
     const ctx = resolveCtxUser(meta, call);
@@ -130,11 +137,13 @@ export class AuthGrpcController {
     const req = userv1.GetUserWithHashRequest.create({ id: ctx.userId });
     const uw = await this.grpc.getUserWithHash(req, ctx.userId);
 
-    const { accessToken, refreshToken } = await this.authService.login({
-      id: String((uw as any).id),
-      email: (uw as any).email,
-      role: (uw as any).role,
-    });
+    const user: AuthUserDto = {
+      id: uw.id,
+      email: uw.email,
+      role: toAuthRole(uw.role),
+    };
+
+    const { accessToken, refreshToken } = await this.authService.login(user);
 
     return authv1.GetTokensResponse.create({ accessToken, refreshToken });
   }
@@ -146,10 +155,10 @@ export class AuthGrpcController {
       const { accessToken, refreshToken } =
         await this.authService.refreshTokens(data.refreshToken);
       return authv1.GetTokensResponse.create({ accessToken, refreshToken });
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,
-        message: err.message,
+        message: errorMessage(err, 'Invalid refresh token'),
       });
     }
   }
@@ -175,10 +184,20 @@ export class AuthGrpcController {
     }
 
     try {
-      const payload: any = jsonwebtoken.verify(
+      const verified: unknown = jsonwebtoken.verify(
         data.token,
         accessSecret as jsonwebtoken.Secret,
       );
+      if (!isAuthTokenPayload(verified)) {
+        return authv1.ValidateTokenResponse.create({
+          isValid: false,
+          userId: '',
+          email: '',
+          role: '',
+        });
+      }
+
+      const payload = verified;
 
       // 🔒 Redis-based freshness checks (authoritative)
       if (await this.authRedis.isUserDisabled(payload.sub)) {
@@ -207,8 +226,8 @@ export class AuthGrpcController {
         email: payload.email,
         role: payload.role,
       });
-    } catch (err: any) {
-      console.error('[ValidateToken] failed:', err?.message || 'unknown');
+    } catch (err: unknown) {
+      console.error('[ValidateToken] failed:', errorMessage(err));
       return authv1.ValidateTokenResponse.create({
         isValid: false,
         userId: '',

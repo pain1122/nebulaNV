@@ -25,7 +25,9 @@ export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
       inject: [ConfigService],
       useFactory: (cfg: ConfigService) => ({
         secret: cfg.get<string>('JWT_ACCESS_SECRET'),
-        signOptions: { expiresIn: cfg.get<string>('JWT_ACCESS_EXPIRATION') ?? '15m' },
+        signOptions: {
+          expiresIn: cfg.get<string>('JWT_ACCESS_EXPIRATION') ?? '15m',
+        },
       }),
     }),
 

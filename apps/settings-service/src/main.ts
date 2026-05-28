@@ -35,7 +35,6 @@ async function bootstrap() {
   const httpPort = getHttpPort();
   await app.listen(httpPort);
 
-  // eslint-disable-next-line no-console
   console.log(`[settings-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`);
 }
 bootstrap();
