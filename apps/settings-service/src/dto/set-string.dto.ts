@@ -1,4 +1,4 @@
-import { IsString, Matches, IsOptional, MaxLength } from 'class-validator';
+import { IsString, Matches, IsOptional, MaxLength } from "class-validator";
 const SAFE = /^[a-z0-9][a-z0-9._-]*$/;
 
 export class SetStringDto {

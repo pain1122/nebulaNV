@@ -1,13 +1,13 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
 export function deriveServiceSecret(
   masterSecret: string,
   serviceName: string,
 ): string {
   return crypto
-    .createHmac('sha256', masterSecret)
+    .createHmac("sha256", masterSecret)
     .update(`svc:${serviceName}`)
-    .digest('hex');
+    .digest("hex");
 }
 
 export function signS2S(
@@ -18,7 +18,7 @@ export function signS2S(
   minute: number,
 ): string {
   const payload = `${svc}:${method}:${path}:${minute}`;
-  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
 
 export function minuteBucket(): number {

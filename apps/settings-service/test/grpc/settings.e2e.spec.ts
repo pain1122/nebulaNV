@@ -17,7 +17,7 @@ describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
     svc: "SettingsService",
   });
 
-  const ns  = "e2e";
+  const ns = "e2e";
   const env = "default";
   const key = `theme_color_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -26,7 +26,7 @@ describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
       client,
       "SetString",
       { namespace: ns, environment: env, key, value: "red" },
-      mdS2S({ role: "admin" }) // provide a user context
+      mdS2S({ role: "admin" }), // provide a user context
     );
     expect(set).toEqual({ value: "red" });
 
@@ -34,7 +34,7 @@ describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
       client,
       "GetString",
       { namespace: ns, environment: env, key },
-      mdS2S() // reads don't need admin, but still carry userId
+      mdS2S(), // reads don't need admin, but still carry userId
     );
     expect(get).toEqual({ value: "red", found: true });
   });
@@ -44,7 +44,7 @@ describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
       client,
       "DeleteString",
       { namespace: ns, environment: env, key },
-      mdS2S({ role: "admin" }) // admin-only
+      mdS2S({ role: "admin" }), // admin-only
     );
     expect(del).toEqual({ deleted: true });
 
@@ -52,14 +52,19 @@ describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
       client,
       "GetString",
       { namespace: ns, environment: env, key },
-      mdS2S()
+      mdS2S(),
     );
     expect(get2).toEqual({ value: "", found: false });
   });
 
   it("Missing signature → request fails", async () => {
     await expect(
-      call<any>(client, "SetString", { namespace: ns, environment: env, key, value: "x" }) // no mdS2S()
+      call<any>(client, "SetString", {
+        namespace: ns,
+        environment: env,
+        key,
+        value: "x",
+      }), // no mdS2S()
     ).rejects.toBeTruthy();
   });
 });

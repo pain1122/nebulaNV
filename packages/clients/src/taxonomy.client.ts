@@ -1,7 +1,8 @@
 // packages/clients/src/taxonomy.client.ts
-import type { ClientGrpc } from '@nestjs/microservices';
-import type { Observable } from 'rxjs';
-import { buildS2SMetadata } from '@nebula/grpc-auth';
+import type { CallOptions, Metadata } from "@grpc/grpc-js";
+import type { ClientGrpc } from "@nestjs/microservices";
+import type { Observable } from "rxjs";
+import { buildS2SMetadata } from "@nebula/grpc-auth";
 
 import type {
   TaxonomyProxy,
@@ -13,68 +14,73 @@ import type {
   ListTaxonomiesReq,
   TaxonomyRes,
   TaxonomyListRes,
-} from './taxonomy.types';
+} from "./taxonomy.types";
+
+type UpdateTaxonomyPatch = Omit<UpdateTaxonomyReq, "id">;
 
 type Raw = {
   GetTaxonomy(
     req: GetTaxonomyReq,
-    meta?: any,
+    meta?: Metadata,
+    opts?: CallOptions,
   ): Observable<TaxonomyRes>;
 
   GetBySlug(
     req: GetBySlugReq,
-    meta?: any,
+    meta?: Metadata,
+    opts?: CallOptions,
   ): Observable<TaxonomyRes>;
 
   CreateTaxonomy(
     req: { data: CreateTaxonomyReq },
-    meta?: any,
+    meta?: Metadata,
+    opts?: CallOptions,
   ): Observable<TaxonomyRes>;
 
   UpdateTaxonomy(
-    req: { id: string; patch: UpdateTaxonomyReq },
-    meta?: any,
+    req: { id: string; patch: UpdateTaxonomyPatch },
+    meta?: Metadata,
+    opts?: CallOptions,
   ): Observable<TaxonomyRes>;
 
   DeleteTaxonomy(
     req: DeleteTaxonomyReq,
-    meta?: any,
+    meta?: Metadata,
+    opts?: CallOptions,
   ): Observable<Record<string, never>>;
 
   ListTaxonomies(
     req: ListTaxonomiesReq & { q?: string; page?: number; limit?: number },
-    meta?: any,
+    meta?: Metadata,
+    opts?: CallOptions,
   ): Observable<TaxonomyListRes>;
 };
 
 export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
-  const raw = client.getService<Raw>('TaxonomyService') as any;
-  const defaultMeta = () => buildS2SMetadata({ serviceName: process.env.SVC_NAME });
+  const raw = client.getService<Raw>("TaxonomyService");
+  const defaultMeta = () =>
+    buildS2SMetadata({ serviceName: process.env.SVC_NAME });
 
   return {
-    GetTaxonomy: (req, m) =>
-      raw.GetTaxonomy(req, m ?? defaultMeta()),
+    GetTaxonomy: (req, m, opts) =>
+      raw.GetTaxonomy(req, m ?? defaultMeta(), opts),
 
-    GetBySlug: (req, m) =>
-      raw.GetBySlug(req, m ?? defaultMeta()),
+    GetBySlug: (req, m, opts) => raw.GetBySlug(req, m ?? defaultMeta(), opts),
 
-    CreateTaxonomy: (req, m) =>
+    CreateTaxonomy: (req, m, opts) =>
       // Wrap flat input into { data: ... } as required by CreateTaxonomyRequest
-      raw.CreateTaxonomy({ data: req }, m ?? defaultMeta()),
+      raw.CreateTaxonomy({ data: req }, m ?? defaultMeta(), opts),
 
-    UpdateTaxonomy: (req, m) => {
+    UpdateTaxonomy: (req, m, opts) => {
       const { id, ...patch } = req;
       // Map flat shape into { id, patch } as required by UpdateTaxonomyRequest
-      return raw.UpdateTaxonomy(
-        { id, patch: patch as CreateTaxonomyReq },
-        m ?? defaultMeta(),
-      );
+      return raw.UpdateTaxonomy({ id, patch }, m ?? defaultMeta(), opts);
     },
 
-    DeleteTaxonomy: (req, m) =>
-      raw.DeleteTaxonomy(req, m ?? defaultMeta()),
+    DeleteTaxonomy: (req, m, opts) =>
+      raw.DeleteTaxonomy(req, m ?? defaultMeta(), opts),
 
-    ListTaxonomies: (req, m) =>
-      raw.ListTaxonomies(req, m ?? defaultMeta()),
+    ListTaxonomies: (req, m, opts) =>
+      raw.ListTaxonomies(req, m ?? defaultMeta(), opts),
   };
 }

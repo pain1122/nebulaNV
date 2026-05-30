@@ -4,10 +4,10 @@ import * as protoLoader from "@grpc/proto-loader";
 import * as crypto from "crypto";
 
 export const X_SIGN_HEADER = process.env.GATEWAY_HEADER ?? "x-gateway-sign";
-export const X_SVC_HEADER  = "x-svc";
+export const X_SVC_HEADER = "x-svc";
 
 // also used by resolveCtxUser()
-const X_USER_ID_HEADER   = "x-user-id";
+const X_USER_ID_HEADER = "x-user-id";
 const X_USER_ROLE_HEADER = "x-user-role";
 
 export function minuteBucket() {
@@ -29,10 +29,14 @@ export function mdS2S(opts?: {
 }) {
   const md = new grpc.Metadata();
 
-  const secret  = process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? "dev-secret";
-  const svc     = opts?.svc ?? process.env.SVC_NAME ?? "gateway";
+  const secret =
+    process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? "dev-secret";
+  const svc = opts?.svc ?? process.env.SVC_NAME ?? "gateway";
   const payload = `${minuteBucket()}:${svc}`;
-  const sign    = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  const sign = crypto
+    .createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex");
 
   md.set(X_SVC_HEADER, svc);
   md.set(X_SIGN_HEADER, sign);
@@ -61,7 +65,10 @@ export function loadClient<T>(opts: {
   const grpcObj = (grpc as any).loadPackageDefinition(pkgDef);
   const ns = opts.pkg.reduce((acc: any, k: string) => acc?.[k], grpcObj);
   const Ctor = ns?.[opts.svc];
-  if (!Ctor) throw new Error(`Service ${opts.pkg.join(".")}#${opts.svc} not found in ${opts.protoPath}`);
+  if (!Ctor)
+    throw new Error(
+      `Service ${opts.pkg.join(".")}#${opts.svc} not found in ${opts.protoPath}`,
+    );
   return new Ctor(opts.url, grpc.credentials.createInsecure());
 }
 
@@ -69,12 +76,12 @@ export async function call<TResp>(
   client: any,
   m: string,
   req: any,
-  md?: grpc.Metadata
+  md?: grpc.Metadata,
 ): Promise<TResp> {
   const metadata = md ?? new grpc.Metadata();
   return new Promise<TResp>((resolve, reject) => {
     client[m](req, metadata, (err: grpc.ServiceError | null, res: TResp) =>
-      err ? reject(err) : resolve(res)
+      err ? reject(err) : resolve(res),
     );
   });
 }

@@ -24,23 +24,23 @@ export const MEDIA_SERVICE_NAME = "MediaService" as const;
 // ---------------------------------------------
 // 🔑 Common metadata/header keys (standardized)
 // ---------------------------------------------
-export const AUTHORIZATION_HEADER = "authorization" as const;        // "Bearer <token>"
+export const AUTHORIZATION_HEADER = "authorization" as const; // "Bearer <token>"
 export const S2S_SIGNATURE_HEADER_DEFAULT = "x-gateway-sign" as const;
-export const X_SVC_HEADER = "x-svc" as const;                        // caller service name
-export const X_SVC_UPSTREAM_HEADER = "x-svc-upstream" as const;      // previous hop (trace)
-export const X_USER_ID_HEADER = "x-user-id" as const;                // original initiator
+export const X_SVC_HEADER = "x-svc" as const; // caller service name
+export const X_SVC_UPSTREAM_HEADER = "x-svc-upstream" as const; // previous hop (trace)
+export const X_USER_ID_HEADER = "x-user-id" as const; // original initiator
 
 // ---------------------------------------------
 // 🌱 Env var keys (centralized references)
 // ---------------------------------------------
-export const ENV_GATEWAY_SECRET = "GATEWAY_SECRET" as const;  // per-service secret (gateway→this service)
+export const ENV_GATEWAY_SECRET = "GATEWAY_SECRET" as const; // per-service secret (gateway→this service)
 export const ENV_GATEWAY_SECRET_OLD = "GATEWAY_SECRET_OLD" as const;
 export const ENV_GATEWAY_SERVICES = "S2S_GATEWAY_SERVICES" as const;
-export const ENV_S2S_SECRET = "S2S_SECRET" as const;           // shared secret (service↔service)
-export const ENV_GATEWAY_HEADER = "GATEWAY_HEADER" as const;   // header name override
-export const ENV_SERVICE_NAME = "SERVICE_NAME" as const;       // preferred service name var
-export const ENV_SERVICE_NAME_ALT = "SVC_NAME" as const;       // alt service name var
-export const ENV_PUBLIC_MODE = "PUBLIC_MODE" as const;         // OPEN | OPTIONAL_AUTH | GATEWAY_ONLY
+export const ENV_S2S_SECRET = "S2S_SECRET" as const; // shared secret (service↔service)
+export const ENV_GATEWAY_HEADER = "GATEWAY_HEADER" as const; // header name override
+export const ENV_SERVICE_NAME = "SERVICE_NAME" as const; // preferred service name var
+export const ENV_SERVICE_NAME_ALT = "SVC_NAME" as const; // alt service name var
+export const ENV_PUBLIC_MODE = "PUBLIC_MODE" as const; // OPEN | OPTIONAL_AUTH | GATEWAY_ONLY
 
 // ---------------------------------------------
 // 🚦 Public mode (typed)
@@ -86,17 +86,15 @@ export function resolveGatewaySecret(): string | undefined {
 }
 
 export function resolveInboundInterserviceSecrets(): string[] {
-  return [
-    process.env.S2S_SECRET,
-    process.env.S2S_SECRET_OLD,
-  ].filter(Boolean) as string[];
+  return [process.env.S2S_SECRET, process.env.S2S_SECRET_OLD].filter(
+    Boolean,
+  ) as string[];
 }
 
 export function resolveInboundGatewaySecrets(): string[] {
-  return [
-    process.env.GATEWAY_SECRET,
-    process.env.GATEWAY_SECRET_OLD,
-  ].filter(Boolean) as string[];
+  return [process.env.GATEWAY_SECRET, process.env.GATEWAY_SECRET_OLD].filter(
+    Boolean,
+  ) as string[];
 }
 
 export function resolveGatewayServiceNames(): string[] {
@@ -109,10 +107,9 @@ export function resolveGatewayServiceNames(): string[] {
 export function resolveAllowedServices(): string[] {
   return (process.env.S2S_ALLOWED_SERVICES ?? "")
     .split(",")
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
-
 
 /**
  * Select the appropriate secret for OUTBOUND signing.
@@ -121,22 +118,24 @@ export function resolveAllowedServices(): string[] {
  *
  * Most microservices should call this with kind: "interservice".
  */
-export function selectOutboundS2SSecret(kind: "interservice" | "gateway"): string | undefined {
+export function selectOutboundS2SSecret(
+  kind: "interservice" | "gateway",
+): string | undefined {
   if (kind === "interservice") return resolveS2SSecret();
   return resolveGatewaySecret();
 }
 
 /** Resolve public mode (guard policy) with sane fallback. */
 export function resolvePublicMode(): PublicMode {
-    const raw = (process.env[ENV_PUBLIC_MODE] ?? "OPEN").toUpperCase();
+  const raw = (process.env[ENV_PUBLIC_MODE] ?? "OPEN").toUpperCase();
   switch (raw) {
-    case 'OPEN':
-      return 'OPEN';
-    case 'GATEWAY_ONLY':
-      return 'GATEWAY_ONLY';
-    case 'OPTIONAL_AUTH':
+    case "OPEN":
+      return "OPEN";
+    case "GATEWAY_ONLY":
+      return "GATEWAY_ONLY";
+    case "OPTIONAL_AUTH":
     default:
-      return 'OPTIONAL_AUTH';
+      return "OPTIONAL_AUTH";
   }
 }
 

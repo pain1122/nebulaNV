@@ -24,7 +24,8 @@ export default tseslint.config(
       sourceType: "commonjs",
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["test/*.ts", "test/*/*.ts"],
+          allowDefaultProject: ["test/*.ts", "test/*/*.ts", "test/*/*/*.ts"],
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -46,6 +47,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-return": "warn",
       "@typescript-eslint/no-unsafe-argument": "warn",
       "@typescript-eslint/no-redundant-type-constituents": "warn",
+      "@typescript-eslint/unbound-method": "warn",
+      "@typescript-eslint/no-unused-vars": "warn",
     },
   },
 )

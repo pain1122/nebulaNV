@@ -1,6 +1,6 @@
 // packages/clients/src/settings.types.ts
-import type { Metadata, CallOptions } from '@grpc/grpc-js';
-import type { Observable } from 'rxjs';
+import type { Metadata, CallOptions } from "@grpc/grpc-js";
+import type { Observable } from "rxjs";
 
 export type GetStringReq = {
   namespace: string;
@@ -38,18 +38,18 @@ export interface SettingsProxy {
   GetString(
     req: GetStringReq,
     meta?: Metadata,
-    opts?: CallOptions
+    opts?: CallOptions,
   ): Observable<GetStringRes>;
 
   SetString(
     req: SetStringReq,
     meta?: Metadata,
-    opts?: CallOptions
+    opts?: CallOptions,
   ): Observable<SetStringRes>;
 
   DeleteString(
     req: DeleteStringReq,
     meta?: Metadata,
-    opts?: CallOptions
+    opts?: CallOptions,
   ): Observable<DeleteStringRes>;
 }

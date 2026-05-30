@@ -1,4 +1,4 @@
-import { IsString, Matches, IsOptional } from 'class-validator';
+import { IsString, Matches, IsOptional } from "class-validator";
 
 const SAFE = /^[a-z0-9][a-z0-9._-]*$/;
 

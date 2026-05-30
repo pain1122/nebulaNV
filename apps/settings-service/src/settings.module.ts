@@ -1,21 +1,21 @@
-import {Module} from "@nestjs/common"
-import {ConfigModule} from "@nestjs/config"
-import {APP_GUARD} from "@nestjs/core"
-import {ThrottlerModule, ThrottlerGuard} from "@nestjs/throttler"
-import {ClientsModule, Transport} from "@nestjs/microservices"
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ClientsModule, Transport } from "@nestjs/microservices";
 
-import {SettingsController} from "./settings.controller"
-import {SettingsGrpcController} from "./grpc/settings-grpc.controller"
-import {PrismaService} from "./prisma.service"
-import {envSchema} from "./config/env.validation"
-import {SettingsService} from "./settings.service"
-import {HealthController} from "./health.controller"
+import { SettingsController } from "./settings.controller";
+import { SettingsGrpcController } from "./grpc/settings-grpc.controller";
+import { PrismaService } from "./prisma.service";
+import { envSchema } from "./config/env.validation";
+import { SettingsService } from "./settings.service";
+import { HealthController } from "./health.controller";
 
-export const SETTINGS_PROTO = require.resolve("@nebula/protos/settings.proto")
-const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto")
+export const SETTINGS_PROTO = require.resolve("@nebula/protos/settings.proto");
+const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto");
 
-import {GrpcTokenAuthGuard} from "@nebula/grpc-auth"
-import * as path from "path"
+import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import * as path from "path";
 
 @Module({
   imports: [
@@ -23,9 +23,12 @@ import * as path from "path"
       isGlobal: true,
       expandVariables: true,
       validationSchema: envSchema,
-      envFilePath: [path.resolve(__dirname, "../.env"), path.resolve(__dirname, "../../..", ".env")],
+      envFilePath: [
+        path.resolve(__dirname, "../.env"),
+        path.resolve(__dirname, "../../..", ".env"),
+      ],
     }),
-    ThrottlerModule.forRoot([{ttl: 60_000, limit: 120}]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
 
     // ✅ same shape user-service uses (package list MUST match your proto)
     ClientsModule.register([
@@ -41,6 +44,11 @@ import * as path from "path"
     ]),
   ],
   controllers: [SettingsController, SettingsGrpcController, HealthController],
-  providers: [PrismaService, SettingsService, {provide: APP_GUARD, useClass: ThrottlerGuard}, {provide: APP_GUARD, useClass: GrpcTokenAuthGuard}],
+  providers: [
+    PrismaService,
+    SettingsService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+  ],
 })
 export class SettingsModule {}

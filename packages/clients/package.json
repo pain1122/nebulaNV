@@ -9,8 +9,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint \"src/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "lint": "eslint \"src/**/*.ts\" \"index.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"index.ts\" --fix",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "clean": "rimraf dist"
   },

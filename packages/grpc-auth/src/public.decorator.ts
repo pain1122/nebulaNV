@@ -1,9 +1,9 @@
-import { SetMetadata, applyDecorators } from '@nestjs/common';
+import { SetMetadata, applyDecorators } from "@nestjs/common";
 
-export const IS_PUBLIC_KEY = 'isPublic';
-export const PUBLIC_FLAGS_KEY = 'publicFlags';
-export const INTERNAL_ONLY_KEY = 'internalOnly';
-export const REQUIRE_USER_ID_KEY = 'requireUserId';
+export const IS_PUBLIC_KEY = "isPublic";
+export const PUBLIC_FLAGS_KEY = "publicFlags";
+export const INTERNAL_ONLY_KEY = "internalOnly";
+export const REQUIRE_USER_ID_KEY = "requireUserId";
 
 export type PublicFlags = {
   /** Allow calls without JWT (client may still send JWT). */
