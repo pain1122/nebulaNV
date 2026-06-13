@@ -14,7 +14,7 @@ import { HealthController } from "./health.controller";
 export const SETTINGS_PROTO = require.resolve("@nebula/protos/settings.proto");
 const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto");
 
-import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
 import * as path from "path";
 
 @Module({
@@ -47,6 +47,7 @@ import * as path from "path";
   providers: [
     PrismaService,
     SettingsService,
+    S2SGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
   ],

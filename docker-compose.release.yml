@@ -1,0 +1,273 @@
+x-internal-grpc: &internal-grpc
+  USER_GRPC_URL: user-service:50051
+  AUTH_GRPC_URL: auth-service:50052
+  PRODUCT_GRPC_URL: product-service:50053
+  SETTINGS_GRPC_URL: settings-service:50054
+  BLOG_GRPC_URL: blog-service:50055
+  ORDER_GRPC_URL: order-service:50056
+  TAXONOMY_GRPC_URL: taxonomy-service:50057
+  MEDIA_GRPC_URL: media-service:50058
+
+x-common-service-env: &common-service-env
+  NODE_ENV: ${NODE_ENV:-production}
+  PUBLIC_MODE: ${PUBLIC_MODE:-GATEWAY_ONLY}
+  GATEWAY_HEADER: ${GATEWAY_HEADER:-x-gateway-sign}
+  GATEWAY_SECRET: ${GATEWAY_SECRET:?GATEWAY_SECRET is required}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+  JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
+  JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
+  S2S_SECRET: ${S2S_SECRET:?S2S_SECRET is required}
+  S2S_SECRET_OLD: ${S2S_SECRET_OLD:-}
+  S2S_ALLOWED_SERVICES: ${S2S_ALLOWED_SERVICES:-auth-service,user-service,settings-service,blog-service,product-service,media-service,taxonomy-service,order-service}
+  S2S_GATEWAY_SERVICES: ${S2S_GATEWAY_SERVICES:-gateway,web}
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-nebula}
+    ports:
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-media}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 2; done;
+        mc mb -p "local/$MEDIA_S3_BUCKET" || true;
+        exit 0;
+
+  user-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-user-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${USER_HTTP_PORT:-3100}:3100"
+      - "${USER_GRPC_PORT:-50051}:50051"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: user-service
+      PORT: 3100
+      GRPC_PORT: 50051
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_users?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_users_shadow"
+
+  auth-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-auth-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    ports:
+      - "${AUTH_HTTP_PORT:-3001}:3001"
+      - "${AUTH_GRPC_PORT:-50052}:50052"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: auth-service
+      PORT: 3001
+      GRPC_PORT: 50052
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+  settings-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-settings-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${SETTINGS_HTTP_PORT:-3010}:3010"
+      - "${SETTINGS_GRPC_PORT:-50054}:50054"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: settings-service
+      PORT: 3010
+      GRPC_PORT: 50054
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_settings?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_settings_shadow"
+
+  taxonomy-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-taxonomy-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      settings-service:
+        condition: service_started
+    ports:
+      - "${TAXONOMY_HTTP_PORT:-3006}:3006"
+      - "${TAXONOMY_GRPC_PORT:-50057}:50057"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: taxonomy-service
+      PORT: 3006
+      GRPC_PORT: 50057
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_taxonomy?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_taxonomy_shadow"
+
+  product-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-product-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      settings-service:
+        condition: service_started
+      taxonomy-service:
+        condition: service_started
+    ports:
+      - "${PRODUCT_HTTP_PORT:-3003}:3003"
+      - "${PRODUCT_GRPC_PORT:-50053}:50053"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: product-service
+      PORT: 3003
+      GRPC_PORT: 50053
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_products?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_products_shadow"
+
+  blog-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-blog-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      settings-service:
+        condition: service_started
+      taxonomy-service:
+        condition: service_started
+    ports:
+      - "${BLOG_HTTP_PORT:-3004}:3004"
+      - "${BLOG_GRPC_PORT:-50055}:50055"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: blog-service
+      PORT: 3004
+      GRPC_PORT: 50055
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_blog?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_blog_shadow"
+
+  order-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-order-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      settings-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+    ports:
+      - "${ORDER_HTTP_PORT:-3005}:3005"
+      - "${ORDER_GRPC_PORT:-50056}:50056"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: order-service
+      PORT: 3005
+      GRPC_PORT: 50056
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_order?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_order_shadow"
+
+  media-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-media-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "${MEDIA_HTTP_PORT:-3007}:3007"
+      - "${MEDIA_GRPC_PORT:-50058}:50058"
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: media-service
+      PORT: 3007
+      GRPC_PORT: 50058
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_media?schema=public"
+      SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_media_shadow"
+      MEDIA_STORAGE_PROVIDER: ${MEDIA_STORAGE_PROVIDER:-minio}
+      MEDIA_STORAGE_DRIVER: s3
+      MEDIA_S3_ENDPOINT: ${MEDIA_S3_INTERNAL_ENDPOINT:-http://minio:9000}
+      MEDIA_S3_INTERNAL_ENDPOINT: ${MEDIA_S3_INTERNAL_ENDPOINT:-http://minio:9000}
+      MEDIA_S3_PUBLIC_ENDPOINT: ${MEDIA_S3_PUBLIC_ENDPOINT:?MEDIA_S3_PUBLIC_ENDPOINT is required}
+      MEDIA_S3_REGION: ${MEDIA_S3_REGION:-us-east-1}
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-media}
+      MEDIA_S3_ACCESS_KEY: ${MEDIA_S3_ACCESS_KEY:?MEDIA_S3_ACCESS_KEY is required}
+      MEDIA_S3_SECRET_KEY: ${MEDIA_S3_SECRET_KEY:?MEDIA_S3_SECRET_KEY is required}
+      MEDIA_S3_FORCE_PATH_STYLE: ${MEDIA_S3_FORCE_PATH_STYLE:-true}
+      MEDIA_SIGNED_UPLOAD_TTL_SECONDS: ${MEDIA_SIGNED_UPLOAD_TTL_SECONDS:-600}
+      MEDIA_SIGNED_READ_TTL_SECONDS: ${MEDIA_SIGNED_READ_TTL_SECONDS:-300}
+      MEDIA_STRICT_READ_TTL_SECONDS: ${MEDIA_STRICT_READ_TTL_SECONDS:-30}
+      MEDIA_PUBLIC_FOLDER: ${MEDIA_PUBLIC_FOLDER:-uploads}
+      MEDIA_PRIVATE_FOLDER: ${MEDIA_PRIVATE_FOLDER:-private/objects}
+      MEDIA_SYSTEM_FOLDER: ${MEDIA_SYSTEM_FOLDER:-system}
+
+volumes:
+  pgdata:
+  minio-data:

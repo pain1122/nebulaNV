@@ -18,6 +18,7 @@ import {
   ListMediaDto,
   GetMediaDto,
   DeleteMediaDto,
+  FinalizeUploadDto,
   PresignUploadDto,
 } from "./dto";
 
@@ -100,6 +101,44 @@ export class MediaController {
         ownerId: this.resolveOwnerId(req, b.ownerId),
         actorUserId,
         actorRole: req.user?.role ?? null,
+      }),
+    };
+  }
+
+  @Roles("admin", "root-admin")
+  @Post("finalize")
+  async finalize(
+    @Body() b: FinalizeUploadDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const actorUserId = req.user?.userId;
+    if (!actorUserId) throw new UnauthorizedException("missing_user_context");
+
+    return {
+      data: await this.svc.finalizeUpload({
+        ...b,
+        ownerId: this.resolveOwnerId(req, b.ownerId),
+        actorUserId,
+        actorRole: req.user?.role ?? null,
+      }),
+    };
+  }
+
+  @Roles("admin", "root-admin")
+  @Post(":id/read-url")
+  async createReadUrl(
+    @Param() p: GetMediaDto,
+    @Req() req: AuthenticatedRequest,
+    @Query("download") download?: string,
+  ) {
+    const actorUserId = req.user?.userId;
+    if (!actorUserId) throw new UnauthorizedException("missing_user_context");
+
+    return {
+      data: await this.svc.createReadUrl(p.id, {
+        actorUserId,
+        actorRole: req.user?.role ?? null,
+        download: download === "true" || download === "1",
       }),
     };
   }

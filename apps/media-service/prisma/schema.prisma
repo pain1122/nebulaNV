@@ -39,6 +39,9 @@ model Media {
   bucket      String?
   path        String
   filename    String
+  folderPath  String   @default("/")
+  displayName String   @default("")
+  originalFilename String?
   mimeType    String
   sizeBytes   Int
 
@@ -72,6 +75,9 @@ model Media {
   @@index([accessClass])
   @@index([visibility])
   @@index([scope])
+  @@index([folderPath])
+  @@index([displayName])
+  @@index([scope, folderPath])
   @@index([status])
   @@index([scanStatus])
   @@index([promotedAt])

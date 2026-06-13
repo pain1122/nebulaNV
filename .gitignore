@@ -11,7 +11,10 @@ out/
 .cache/
 *.tsbuildinfo
 coverage/
-deploy/
+deploy/*
+!deploy/
+!deploy/README.md
+!deploy/.env.production.example
 
 # ----------------------------
 # Node / package managers
@@ -32,6 +35,7 @@ lerna-debug.log*
 .env.*
 !*.env.example
 !**/.env.example
+!deploy/.env.production.example
 
 # ----------------------------
 # OS / editors

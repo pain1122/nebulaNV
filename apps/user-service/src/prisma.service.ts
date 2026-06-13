@@ -28,7 +28,7 @@ export class PrismaService
 
     const prismaEvents = this as unknown as PrismaEventClient;
 
-    // ✅ use bracket syntax + any to avoid Prisma 6 overload restriction
+    // Use a narrow event client type to avoid Prisma 6 overload restrictions.
     prismaEvents.$on('query', (e) => {
       try {
         this.log.debug?.(`QUERY: ${e.query} PARAMS: ${e.params}`);

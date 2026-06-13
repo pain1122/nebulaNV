@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { envSchema } from './config/env.validation';
-import { GrpcTokenAuthGuard, AUTH_SERVICE } from '@nebula/grpc-auth';
+import { GrpcTokenAuthGuard, AUTH_SERVICE, S2SGuard } from '@nebula/grpc-auth';
 import { UserModule } from './user/user.module';
 import { PrismaService } from './prisma.service';
 import { HealthController } from './health.controller';
@@ -47,6 +47,8 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
   providers: [
     Reflector,
     PrismaService,
+    S2SGuard,
+    GrpcTokenAuthGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
   ],

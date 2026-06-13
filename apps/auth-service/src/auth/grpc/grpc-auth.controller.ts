@@ -15,14 +15,10 @@ import {
   toRpc,
   resolveCtxUser,
   RequireUserId,
+  type RpcContextWithContext,
 } from '@nebula/grpc-auth';
 import * as jsonwebtoken from 'jsonwebtoken';
-import {
-  AuthUserDto,
-  isAuthTokenPayload,
-  toAuthRole,
-  type RpcContextWithAuthUser,
-} from '../auth.types';
+import { AuthUserDto, isAuthTokenPayload, toAuthRole } from '../auth.types';
 import { errorMessage } from '../error.utils';
 
 type ValidateUserRequest = authv1.ValidateUserRequest;
@@ -72,7 +68,7 @@ export class AuthGrpcController {
   async getProfile(
     data: { userId: string },
     meta: Metadata,
-    call: RpcContextWithAuthUser,
+    call: RpcContextWithContext,
   ): Promise<UserResponse> {
     try {
       const token = this.requireBearer(meta);
@@ -122,7 +118,7 @@ export class AuthGrpcController {
   async getTokens(
     _data: GetTokensRequest,
     meta: Metadata,
-    call: RpcContextWithAuthUser,
+    call: RpcContextWithContext,
   ): Promise<GetTokensResponse> {
     // never trust input.userId; take it from the (guarded) context
     const ctx = resolveCtxUser(meta, call);

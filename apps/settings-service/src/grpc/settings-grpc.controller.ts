@@ -1,7 +1,21 @@
-import { Controller, UsePipes, ValidationPipe, Logger } from "@nestjs/common";
+import {
+  Controller,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  Logger,
+} from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { Metadata, status, type ServerUnaryCall } from "@grpc/grpc-js";
-import { Public, Roles, resolveCtxUser, toRpc } from "@nebula/grpc-auth";
+import { Metadata, status } from "@grpc/grpc-js";
+import {
+  GrpcTokenAuthGuard,
+  Public,
+  Roles,
+  S2SGuard,
+  toRpc,
+  type CtxUser,
+  type RpcContextWithContext,
+} from "@nebula/grpc-auth";
 import { SettingsService } from "../settings.service";
 import { settings } from "@nebula/protos";
 
@@ -12,11 +26,27 @@ const Pipe = new ValidationPipe({
   transformOptions: { enableImplicitConversion: true },
 });
 
+@UseGuards(S2SGuard, GrpcTokenAuthGuard)
 @Controller()
 @UsePipes(Pipe)
 export class SettingsGrpcController {
   private readonly log = new Logger(SettingsGrpcController.name);
   constructor(private readonly svc: SettingsService) {}
+
+  private verifiedCtxUser(
+    meta: Metadata,
+    call: RpcContextWithContext,
+  ): CtxUser | null {
+    const user = call?.user ?? (meta as Metadata & { user?: CtxUser }).user;
+
+    if (!user?.userId) return null;
+
+    return {
+      userId: user.userId,
+      role: user.role,
+      email: user.email,
+    };
+  }
 
   // Read can remain public
   @Public()
@@ -36,9 +66,9 @@ export class SettingsGrpcController {
   async setString(
     req: settings.SetStringReq,
     meta: Metadata,
-    call: ServerUnaryCall<settings.SetStringReq, settings.SetStringRes>,
+    call: RpcContextWithContext,
   ): Promise<settings.SetStringRes> {
-    const ctx = resolveCtxUser(meta, call);
+    const ctx = this.verifiedCtxUser(meta, call);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
     const env = req.environment?.trim() ? req.environment : "default";
     const value = await this.svc.setString(
@@ -58,9 +88,9 @@ export class SettingsGrpcController {
   async deleteString(
     req: settings.DeleteReq,
     meta: Metadata,
-    call: ServerUnaryCall<settings.DeleteReq, settings.DeleteRes>,
+    call: RpcContextWithContext,
   ): Promise<settings.DeleteRes> {
-    const ctx = resolveCtxUser(meta, call);
+    const ctx = this.verifiedCtxUser(meta, call);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
     const env = req.environment?.trim() ? req.environment : "default";
     const deleted = await this.svc.deleteString(req.namespace, req.key, env);

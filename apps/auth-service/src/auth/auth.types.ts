@@ -63,7 +63,3 @@ export type AuthenticatedRequest = Request & {
 export type MetadataWithAuthUser = Metadata & {
   user?: AuthenticatedRequestUser;
 };
-
-export type RpcContextWithAuthUser = {
-  user?: AuthenticatedRequestUser;
-};

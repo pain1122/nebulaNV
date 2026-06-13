@@ -74,7 +74,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<GetCartRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.getCartForUser(ctxUser.userId);
   }
@@ -86,7 +86,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<AddToCartRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.addToCart(ctxUser.userId, {
       productId: req.productId,
@@ -101,7 +101,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<UpdateCartItemRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.updateCartItem(ctxUser.userId, req.itemId, {
       quantity: req.quantity,
@@ -115,7 +115,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<RemoveCartItemRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.removeCartItem(ctxUser.userId, req.itemId);
   }
@@ -127,7 +127,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<CheckoutRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.checkout(ctxUser.userId, req.note);
   }
@@ -139,7 +139,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<GetOrderRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.getOrderForUser(ctxUser.userId, req.id);
   }
@@ -151,7 +151,7 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<ListOrdersRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = resolveCtxUser(meta);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     const orderStatus = toOrderStatus(req.status);
     return this.svc.listOrdersForUser(ctxUser.userId, orderStatus);

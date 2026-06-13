@@ -36,6 +36,23 @@ export class CreateMediaDto {
   @Transform(trim)
   path!: string;
 
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  folderPath?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_FILENAME, { message: "displayName is not safe" })
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_FILENAME, { message: "originalFilename is not safe" })
+  originalFilename?: string;
+
   @IsString()
   @Transform(trim)
   @Matches(SAFE_FILENAME, { message: "filename is not safe" })

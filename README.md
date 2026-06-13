@@ -30,6 +30,70 @@ It evolves from a basic service-oriented architecture to a **multi-tenant, polyg
 
 ---
 
+## 🗂 Media, Storage & Polyglot Boundaries
+
+NebulaNV's media layer is intentionally split between **file storage**, **security policy**, and **heavy processing**.
+
+### Media-Service Is The Security Boundary
+
+`media-service` is the app-facing authority for media privacy and file access. The admin panel and public web app should talk to `media-service`, not directly to permanent storage credentials.
+
+`media-service` owns:
+
+- media metadata and database records
+- owner/user relationships
+- `PUBLIC`, `PROTECTED`, and `STRICT` access classes
+- upload authorization
+- short-lived signed upload/read URLs
+- admin file-manager actions: list, search, upload, finalize, read, delete
+- future edit/variant records for thumbnails, optimized images, and edited versions
+
+### Supabase, MinIO, and AWS Roles
+
+Supabase Storage is planned as the preferred managed/self-contained file backend because it has a clean dashboard UI, useful storage tooling, and an S3-compatible API. It is **not** treated as the final privacy authority for NebulaNV.
+
+MinIO is the local development S3-compatible replacement. It lets the project test AWS-style object storage without needing an AWS account.
+
+AWS S3 is the future production-compatible target. The media contract should stay S3-compatible so MinIO, Supabase Storage S3, and AWS S3 can all sit behind the same media-service policy layer.
+
+The intended endpoint split is:
+
+```env
+MEDIA_S3_INTERNAL_ENDPOINT=http://minio:9000
+MEDIA_S3_PUBLIC_ENDPOINT=http://127.0.0.1:9000
+```
+
+For Supabase:
+
+```env
+MEDIA_S3_INTERNAL_ENDPOINT=https://project-ref.storage.supabase.co/storage/v1/s3
+MEDIA_S3_PUBLIC_ENDPOINT=https://project-ref.storage.supabase.co/storage/v1/s3
+```
+
+For AWS/CDN later:
+
+```env
+MEDIA_S3_INTERNAL_ENDPOINT=https://s3.amazonaws.com
+MEDIA_S3_PUBLIC_ENDPOINT=https://cdn.example.com
+```
+
+### Access Classes
+
+- `PUBLIC`: safe public assets after validation/promotion; suitable for CDN/public URLs.
+- `PROTECTED`: authenticated or owner-scoped assets; served through short-lived signed URLs.
+- `STRICT`: sensitive assets; prefer very short-lived URLs, backend-mediated access, and audit logging.
+
+### Polyglot Responsibilities
+
+- **TypeScript/NestJS:** request-path APIs, auth, media policy, service contracts, admin/public app integration.
+- **Go:** state-service, Redis/NATS coordination, search/audit services, and production workers such as media-worker, showroom-asset-worker, and streaming-worker.
+- **Rust:** performance-critical 3D/media tooling, WebAssembly helpers, GLB/GLTF processing, scene/geometry optimization, and browser/mobile showroom acceleration.
+- **Python:** AI, recommendations, analytics, tagging, and offline intelligence workflows.
+
+The guiding rule is: **storage holds bytes, media-service enforces access, workers process heavy jobs, and the frontend never receives permanent storage credentials.**
+
+---
+
 ## 🛠 Tech Stack
 
 | Layer | Technology |

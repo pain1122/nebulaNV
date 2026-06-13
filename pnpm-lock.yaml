@@ -192,6 +192,9 @@ importers:
       '@nestjs/throttler':
         specifier: ^6.4.0
         version: 6.4.0(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(reflect-metadata@0.2.2)
+      bcrypt:
+        specifier: ^6.0.0
+        version: 6.0.0
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -204,6 +207,9 @@ importers:
       ioredis:
         specifier: ^5.9.2
         version: 5.9.2
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
@@ -310,6 +316,12 @@ importers:
       '@nebula/clients':
         specifier: workspace:*
         version: file:packages/clients(@grpc/grpc-js@1.14.0)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/grpc-auth':
+        specifier: workspace:^
+        version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -334,6 +346,12 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.2
+        version: 0.14.2
       compression:
         specifier: ^1.8.1
         version: 1.8.1
@@ -343,6 +361,12 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -410,6 +434,12 @@ importers:
       '@grpc/proto-loader':
         specifier: ^0.8.0
         version: 0.8.0
+      '@nebula/grpc-auth':
+        specifier: workspace:^
+        version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -434,9 +464,21 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.2
+        version: 0.14.2
       express:
         specifier: ^5.1.0
         version: 5.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -504,6 +546,12 @@ importers:
       '@nebula/clients':
         specifier: workspace:*
         version: file:packages/clients(@grpc/grpc-js@1.14.0)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/grpc-auth':
+        specifier: workspace:^
+        version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -528,6 +576,12 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.2
+        version: 0.14.2
       compression:
         specifier: ^1.8.1
         version: 1.8.1
@@ -537,6 +591,12 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -604,6 +664,12 @@ importers:
       '@nebula/clients':
         specifier: workspace:*
         version: file:packages/clients(@grpc/grpc-js@1.14.0)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/grpc-auth':
+        specifier: workspace:^
+        version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -628,6 +694,12 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.2
+        version: 0.14.2
       compression:
         specifier: ^1.8.1
         version: 1.8.1
@@ -637,6 +709,12 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -695,6 +773,12 @@ importers:
       '@grpc/proto-loader':
         specifier: ^0.8.0
         version: 0.8.0
+      '@nebula/grpc-auth':
+        specifier: workspace:^
+        version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -719,9 +803,21 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.2
+        version: 0.14.2
       express:
         specifier: ^5.1.0
         version: 5.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -786,6 +882,12 @@ importers:
       '@nebula/clients':
         specifier: workspace:*
         version: file:packages/clients(@grpc/grpc-js@1.14.0)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/grpc-auth':
+        specifier: workspace:^
+        version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -810,6 +912,12 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.2
+        version: 0.14.2
       compression:
         specifier: ^1.8.1
         version: 1.8.1
@@ -819,6 +927,12 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -886,6 +1000,9 @@ importers:
       '@nebula/grpc-auth':
         specifier: workspace:^
         version: file:packages/grpc-auth(@grpc/grpc-js@1.14.0)(@nebula/protos@file:packages/protos)(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/microservices@11.1.6)(@nestjs/platform-express@11.1.6)(rxjs@7.8.2)
+      '@nebula/protos':
+        specifier: workspace:*
+        version: link:../../packages/protos
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -910,6 +1027,9 @@ importers:
       '@prisma/client':
         specifier: 6.16.2
         version: 6.16.2(prisma@6.16.2(typescript@5.9.2))(typescript@5.9.2)
+      bcrypt:
+        specifier: ^6.0.0
+        version: 6.0.0
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.2
@@ -922,6 +1042,9 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
+      joi:
+        specifier: ^18.0.1
+        version: 18.0.2
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
@@ -1211,6 +1334,10 @@ importers:
         version: 5.9.2
 
   packages/protos:
+    dependencies:
+      '@bufbuild/protobuf':
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       ts-proto:
         specifier: ^2.7.7
@@ -9588,6 +9715,8 @@ snapshots:
       '@ckeditor/ckeditor5-utils': 47.3.0
       ckeditor5: 47.3.0
       es-toolkit: 1.39.5
+    transitivePeerDependencies:
+      - supports-color
 
   '@ckeditor/ckeditor5-editor-multi-root@44.3.0':
     dependencies:
@@ -9619,6 +9748,8 @@ snapshots:
       '@ckeditor/ckeditor5-table': 47.3.0
       '@ckeditor/ckeditor5-utils': 47.3.0
       ckeditor5: 47.3.0
+    transitivePeerDependencies:
+      - supports-color
 
   '@ckeditor/ckeditor5-emoji@44.3.0':
     dependencies:
@@ -11556,7 +11687,9 @@ snapshots:
       jsonwebtoken: 9.0.2
       rxjs: 7.8.2
 
-  '@nebula/protos@file:packages/protos': {}
+  '@nebula/protos@file:packages/protos':
+    dependencies:
+      '@bufbuild/protobuf': 2.9.0
 
   '@nestjs/cli@11.0.10(@swc/cli@0.7.8(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@24.5.2)':
     dependencies:
@@ -14065,7 +14198,7 @@ snapshots:
 
   effect@3.16.12:
     dependencies:
-      '@standard-schema/spec': 1.0.0
+      '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
 
   electron-to-chromium@1.5.266: {}
@@ -17850,7 +17983,7 @@ snapshots:
   wait-on@9.0.3:
     dependencies:
       axios: 1.13.2
-      joi: 18.0.1
+      joi: 18.0.2
       lodash: 4.17.21
       minimist: 1.2.8
       rxjs: 7.8.2

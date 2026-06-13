@@ -1,4 +1,4 @@
-import { Controller } from '@nestjs/common';
+import { Controller, UseGuards } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { Metadata, status } from '@grpc/grpc-js';
 import { userv1 } from '@nebula/protos';
@@ -9,15 +9,13 @@ import {
   toRpc,
   resolveCtxUser,
   Public,
+  S2SGuard,
+  GrpcTokenAuthGuard,
   type CtxUser,
+  type RpcContextWithContext,
 } from '@nebula/grpc-auth';
 
-type GrpcCallWithUser = {
-  user?: {
-    role?: string;
-  };
-};
-
+@UseGuards(S2SGuard, GrpcTokenAuthGuard)
 @Controller()
 export class UserGrpcController {
   constructor(private readonly users: UserService) {}
@@ -33,14 +31,29 @@ export class UserGrpcController {
       );
   }
 
+  private verifiedCtxUser(
+    meta: Metadata,
+    call: RpcContextWithContext,
+  ): CtxUser | null {
+    const user = call?.user ?? (meta as Metadata & { user?: CtxUser }).user;
+
+    if (!user?.userId) return null;
+
+    return {
+      userId: user.userId,
+      role: user.role,
+      email: user.email,
+    };
+  }
+
   @Roles('user', 'admin', 'root-admin')
   @GrpcMethod('UserService', 'GetUser')
   async getUser(
     data: userv1.GetUserRequest,
     meta: Metadata,
-    call: any,
+    call: RpcContextWithContext,
   ): Promise<userv1.UserResponse> {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = this.verifiedCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
     this.assertSelfOrAdmin(ctxUser, data.id);
 
@@ -59,13 +72,11 @@ export class UserGrpcController {
   async findUser(
     data: userv1.FindUserRequest,
     meta: Metadata,
-    call: GrpcCallWithUser,
+    call: RpcContextWithContext,
   ) {
-    const role =
-      call?.user?.role ??
-      (meta.get?.('x-user-role')?.[0] as string | undefined) ??
-      '';
-    const isAdmin = role === 'admin' || role === 'root-admin';
+    const ctxUser = this.verifiedCtxUser(meta, call);
+    const isAdmin = ctxUser?.role === 'admin' || ctxUser?.role === 'root-admin';
+
     if (!isAdmin) throw toRpc(status.PERMISSION_DENIED, 'admin_only');
 
     const u = data.email
@@ -87,9 +98,9 @@ export class UserGrpcController {
   async updateProfile(
     data: userv1.UpdateProfileRequest,
     meta: Metadata,
-    call: any,
+    call: RpcContextWithContext,
   ): Promise<userv1.UserResponse> {
-    const ctxUser = resolveCtxUser(meta, call);
+    const ctxUser = this.verifiedCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
     this.assertSelfOrAdmin(ctxUser, data.id);
 
@@ -110,7 +121,11 @@ export class UserGrpcController {
   @Public({ gatewayOnly: true })
   @RequireUserId()
   @GrpcMethod('UserService', 'CreateUser')
-  async createUser(data: userv1.CreateUserRequest, meta: Metadata, call: any) {
+  async createUser(
+    data: userv1.CreateUserRequest,
+    meta: Metadata,
+    call: RpcContextWithContext,
+  ) {
     const ctxUser = resolveCtxUser(meta, call);
     const isAdmin = ['admin', 'root-admin'].includes(ctxUser?.role ?? '');
     const role = isAdmin && data.role ? data.role : 'user';

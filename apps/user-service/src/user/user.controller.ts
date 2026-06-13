@@ -20,8 +20,8 @@ export class UserController {
 
   @Roles('admin')
   @Get()
-  async getAllUsers() {
-    return this.userService.getAllUsers();
+  async getAllUsers(@ReqUser() user: ReqUserType) {
+    return this.userService.getAllUsers(user);
   }
   @Put('me')
   @Roles('user', 'admin', 'root-admin')

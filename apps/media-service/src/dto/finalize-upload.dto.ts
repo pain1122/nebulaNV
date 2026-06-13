@@ -6,9 +6,28 @@ const upperTrim = ({ value }: TransformFnParams): unknown =>
   typeof value === "string" ? value.trim().toUpperCase() : value;
 
 export class FinalizeUploadDto {
+  @IsOptional()
+  @IsString()
+  @IsIn(["s3"])
+  storage?: string;
+
   // storage location (object key)
   @IsString()
   path!: string;
+
+  @IsOptional()
+  @IsString()
+  folderPath?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_FILENAME, { message: "displayName is not safe" })
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_FILENAME, { message: "originalFilename is not safe" })
+  originalFilename?: string;
 
   // optional overrides / hints
   @IsOptional()

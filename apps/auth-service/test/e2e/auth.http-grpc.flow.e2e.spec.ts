@@ -51,6 +51,24 @@ describe('Auth HTTP + gRPC end-to-end', () => {
   // Consider we have a real admin if login with seeded admin succeeds.
   let haveRealAdmin = false;
 
+  it('POST /auth/register creates a new user with normalized email', async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const email = `E2E.Auth.${suffix}@Example.com`;
+
+    const res = await httpJson<{ id: string; email: string; role: string }>(
+      'POST',
+      `${AUTH_HTTP}/auth/register`,
+      {
+        email,
+        password: 'Register123!',
+      },
+    );
+
+    expect(res.id).toBeTruthy();
+    expect(res.email).toBe(email.toLowerCase());
+    expect(res.role).toBe('user');
+  });
+
   it('logs in both', async () => {
     userTokens = await httpJson('POST', `${AUTH_HTTP}/auth/login`, {
       identifier: userEmail,
@@ -81,6 +99,23 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     process.env.ADMIN_ACCESS = adminTokens.accessToken;
   });
 
+  it('POST /auth/refresh rejects invalid refresh tokens', async () => {
+    await expect(
+      httpJson('POST', `${AUTH_HTTP}/auth/refresh`, {
+        refreshToken: 'not-a-valid-refresh-token',
+      }),
+    ).rejects.toBeTruthy();
+  });
+
+  it('POST /auth/logout rejects requests without a bearer token', async () => {
+    await expect(
+      httpJson('POST', `${AUTH_HTTP}/auth/logout`, {
+        refreshToken: userTokens.refreshToken,
+        allDevices: false,
+      }),
+    ).rejects.toBeTruthy();
+  });
+
   it('GET /auth/me works for both (needs controller to pass initiatorId)', async () => {
     // This assumes AuthController GET /auth/me calls:
     // this.authService.getProfile(req.user!.userId, token, req.user!.userId)
@@ -105,6 +140,39 @@ describe('Auth HTTP + gRPC end-to-end', () => {
 
   it('GET /auth/me rejects requests without a bearer token', async () => {
     await expect(httpJson('GET', `${AUTH_HTTP}/auth/me`)).rejects.toBeTruthy();
+  });
+
+  it('gRPC validateUser returns success for valid credentials and false for invalid credentials', async () => {
+    try {
+      const ok = await call<any>(
+        authClient,
+        'validateUser',
+        {
+          identifier: userEmail,
+          password: userPass1,
+        },
+        mdS2S(),
+      );
+
+      expect(ok.isValid).toBe(true);
+      expect(ok.userId).toBe(userId);
+
+      const bad = await call<any>(
+        authClient,
+        'validateUser',
+        {
+          identifier: userEmail,
+          password: `${userPass1}-wrong`,
+        },
+        mdS2S(),
+      );
+
+      expect(bad.isValid).toBe(false);
+      expect(bad.userId ?? '').toBe('');
+    } catch (e: any) {
+      if (skipIfUnavailable(e)) return;
+      throw e;
+    }
   });
 
   it('gRPC validateToken returns isValid for both', async () => {
@@ -150,6 +218,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
       );
       expect(tk.accessToken).toBeTruthy();
       expect(tk.refreshToken).toBeTruthy();
+      userTokens = tk;
     } catch (e: any) {
       if (skipIfUnavailable(e)) return;
       throw e;
@@ -160,6 +229,22 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     try {
       await expect(
         call<any>(authClient, 'getTokens', {}, mdS2S()),
+      ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
+    } catch (e: any) {
+      if (skipIfUnavailable(e)) return;
+      throw e;
+    }
+  });
+
+  it('gRPC getProfile rejects requests without a bearer token', async () => {
+    try {
+      await expect(
+        call<any>(
+          authClient,
+          'getProfile',
+          { userId },
+          mergeMd(mdS2S(), mdUser(userId, 'user')),
+        ),
       ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
     } catch (e: any) {
       if (skipIfUnavailable(e)) return;

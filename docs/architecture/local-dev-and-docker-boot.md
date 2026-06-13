@@ -1,6 +1,6 @@
 ﻿# Local Dev And Docker Boot
 
-Last checked: 2026-05-28
+Last checked: 2026-06-08
 
 This document explains how the backend starts locally and in Docker.
 
@@ -238,6 +238,37 @@ It creates:
 
 Each service should point its `DATABASE_URL` at its own database.
 
+## Host Commands Against Docker Postgres
+
+Per-service `.env` files are for local development, where the service process
+runs on the host machine. Docker Compose overrides database URLs for container
+runtime, where services reach Postgres through the Docker service name:
+
+```txt
+postgres:5432
+```
+
+Do not replace local service `.env` files with Docker-only URLs. If a host
+PowerShell command needs to apply migrations or run tests against the Docker
+Postgres instance, set temporary environment variables for that shell session.
+
+Example for settings-service when Docker exposes Postgres as `15432:5432`:
+
+```powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:15432/nebula_settings?schema=public"
+$env:SHADOW_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:15432/postgres?schema=nebula_settings_shadow"
+
+pnpm --filter @nebula/settings-service prisma:migrate:deploy
+pnpm --filter @nebula/settings-service test
+
+Remove-Item Env:DATABASE_URL
+Remove-Item Env:SHADOW_DATABASE_URL
+```
+
+Use this only for host-to-Docker maintenance commands. Containers should keep
+using the Compose-provided `postgres:5432` URLs, and local development should
+keep using the service `.env` URLs.
+
 ## Dockerfiles
 
 There are two Dockerfile patterns.
@@ -308,6 +339,53 @@ If Docker services cannot talk to each other:
 2. Check `docker compose logs -f <service>`.
 3. Check whether the service uses Docker DNS names instead of `127.0.0.1`.
 4. Check whether the needed service is hidden behind the `full` profile.
+
+### Docker / WSL Clock Drift
+
+S2S gRPC signatures are minute-windowed. If the Windows host clock and Docker
+container clock drift apart, valid gRPC test metadata can fail with:
+
+```txt
+16 UNAUTHENTICATED: invalid_s2s_signature
+```
+
+Check host and container time:
+
+```powershell
+node -e "console.log(Date.now(), new Date().toISOString())"
+docker compose exec -T user-service node -e "console.log(Date.now(), new Date().toISOString())"
+```
+
+The timestamps should be within a few seconds. If Docker is several minutes
+behind or ahead, reset Docker Desktop and WSL from an Administrator PowerShell:
+
+```powershell
+docker compose down
+Stop-Process -Name "Docker Desktop","com.docker.backend" -Force -ErrorAction SilentlyContinue
+wsl --terminate docker-desktop
+wsl --shutdown
+Restart-Service LxssManager -Force
+```
+
+If Windows time sync reports no configured time source, configure it:
+
+```powershell
+Start-Service W32Time
+w32tm /config /syncfromflags:manual /manualpeerlist:"time.windows.com,0x8 pool.ntp.org,0x8" /reliable:no /update
+Restart-Service W32Time
+w32tm /resync /rediscover /force
+w32tm /query /status
+w32tm /query /source
+```
+
+Then start Docker Desktop manually, wait until the engine is ready, and run:
+
+```powershell
+docker compose up -d
+```
+
+Verify the clocks again before running S2S/gRPC tests. Do not weaken the S2S
+signature window as a workaround; fix Docker/WSL time sync instead.
 
 ## Change Checklist
 

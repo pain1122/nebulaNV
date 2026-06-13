@@ -55,6 +55,11 @@ export class ListMediaDto {
   @IsIn(["panel", "user", "system"])
   scope?: string;
 
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  folderPath?: string;
+
   // ✅ new lifecycle filters (DTO-only, no Prisma typing)
   @IsOptional()
   @IsIn(["PENDING", "READY", "BLOCKED", "DELETED"])

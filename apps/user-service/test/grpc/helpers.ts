@@ -1,7 +1,7 @@
 // apps/user-service/test/grpc/helpers.ts
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import * as crypto from 'crypto';
+import { buildS2SMetadata } from '@nebula/grpc-auth';
 
 export const CODES = grpc.status;
 
@@ -9,7 +9,7 @@ export const CODES = grpc.status;
 export function mdAuth(
   opts: { access?: string; userId?: string; role?: string } = {},
 ) {
-  const md = new grpc.Metadata();
+  const md = mdS2S();
   if (opts.access) md.set('authorization', `Bearer ${opts.access}`);
   if (opts.userId) md.set('x-user-id', opts.userId);
   if (opts.role) md.set('x-user-role', opts.role);
@@ -23,24 +23,16 @@ export function mdUser(userId: string, role?: string) {
   return md;
 }
 
-export function minuteBucket(): number {
-  return Math.floor(Date.now() / 60_000);
-}
+export function mdS2S(
+  opts: { userId?: string; role?: string; serviceName?: string } = {},
+) {
+  const md = buildS2SMetadata({
+    serviceName: opts.serviceName ?? 'auth-service',
+  });
 
-export function mdS2S() {
-  const svc = process.env.SVC_NAME ?? 'user-service';
-  const secret =
-    process.env.S2S_SECRET ??
-    process.env.GATEWAY_SECRET ??
-    'n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG';
-  const sig = crypto
-    .createHmac('sha256', secret)
-    .update(`${minuteBucket()}:${svc}`)
-    .digest('hex');
+  if (opts.userId) md.set('x-user-id', opts.userId);
+  if (opts.role) md.set('x-user-role', opts.role);
 
-  const md = new grpc.Metadata();
-  md.set('x-svc', svc);
-  md.set('x-gateway-sign', sig);
   return md;
 }
 

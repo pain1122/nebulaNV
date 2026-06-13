@@ -1,19 +1,20 @@
-import { Metadata } from '@grpc/grpc-js';
-import {
-  ForbiddenException,
-  UnauthorizedException,
-  type ExecutionContext,
-} from '@nestjs/common';
+import { Metadata, status } from '@grpc/grpc-js';
+import { type ExecutionContext } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { IS_PUBLIC_KEY, ROLES_KEY, type Role } from '@nebula/grpc-auth';
+import {
+  IS_PUBLIC_KEY,
+  ROLES_KEY,
+  type Role,
+  type RpcContextWithContext,
+} from '@nebula/grpc-auth';
 import { JwtAuthGuard } from '../../src/auth/jwt/jwt-auth.guard';
 import type {
   AuthTokenPayload,
   AuthenticatedRequest,
   MetadataWithAuthUser,
-  RpcContextWithAuthUser,
 } from '../../src/auth/auth.types';
 
 type GuardFixture = {
@@ -26,8 +27,31 @@ type GuardFixture = {
 type GuardContextOptions = {
   req?: Partial<AuthenticatedRequest>;
   metadata?: Metadata;
-  rpcContext?: RpcContextWithAuthUser;
+  rpcContext?: RpcContextWithContext;
 };
+
+function expectRpcException(
+  action: () => unknown,
+  code: number,
+  message?: string,
+): void {
+  let thrown: unknown;
+
+  try {
+    action();
+  } catch (err) {
+    thrown = err;
+  }
+
+  expect(thrown).toBeInstanceOf(RpcException);
+
+  const error = (thrown as RpcException).getError();
+  expect(error).toMatchObject({ code });
+
+  if (message) {
+    expect(error).toMatchObject({ message });
+  }
+}
 
 function createGuard(options: {
   isPublic?: boolean;
@@ -64,6 +88,7 @@ function makeContext({
 }: GuardContextOptions): ExecutionContext {
   const context = rpcContext ?? {};
   return {
+    getType: () => (metadata ? 'rpc' : 'http'),
     getHandler: jest.fn(),
     getClass: jest.fn(),
     switchToHttp: () => ({
@@ -95,7 +120,7 @@ describe('JwtAuthGuard security behavior', () => {
     jwtService.verify.mockReturnValue(validUserPayload);
 
     const metadata = metadataWithBearer();
-    const rpcContext: RpcContextWithAuthUser = {};
+    const rpcContext: RpcContextWithContext = {};
     const context = makeContext({
       req: {},
       metadata,
@@ -129,7 +154,11 @@ describe('JwtAuthGuard security behavior', () => {
       rpcContext: {},
     });
 
-    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    expectRpcException(
+      () => guard.canActivate(context),
+      status.PERMISSION_DENIED,
+      'Insufficient role',
+    );
     expect((metadata as MetadataWithAuthUser).user).toEqual({
       userId: validUserPayload.sub,
       email: validUserPayload.email,
@@ -148,7 +177,10 @@ describe('JwtAuthGuard security behavior', () => {
       rpcContext: {},
     });
 
-    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+    expectRpcException(
+      () => guard.canActivate(context),
+      status.UNAUTHENTICATED,
+    );
     expect((metadata as MetadataWithAuthUser).user).toBeUndefined();
   });
 
@@ -158,5 +190,30 @@ describe('JwtAuthGuard security behavior', () => {
 
     expect(guard.canActivate(context)).toBe(true);
     expect(jwtService.verify).not.toHaveBeenCalled();
+  });
+
+  it('allows a signed admin token to satisfy admin role requirements', () => {
+    const { guard, jwtService } = createGuard({ roles: ['admin'] });
+    jwtService.verify.mockReturnValue({
+      sub: 'admin-1',
+      email: 'admin@test.com',
+      role: 'admin',
+      tv: 1,
+    });
+
+    const metadata = metadataWithBearer();
+    const rpcContext: RpcContextWithContext = {};
+    const context = makeContext({
+      req: {},
+      metadata,
+      rpcContext,
+    });
+
+    expect(guard.canActivate(context)).toBe(true);
+    expect(rpcContext.user).toEqual({
+      userId: 'admin-1',
+      email: 'admin@test.com',
+      role: 'admin',
+    });
   });
 });

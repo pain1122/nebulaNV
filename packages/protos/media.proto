@@ -51,6 +51,9 @@ message Media {
   string etag = 20;
   string promotedAt = 21;
   string accessClass = 22; // PUBLIC|PROTECTED|STRICT
+  string folderPath = 23; // filemanager folder, e.g. /images/products
+  string displayName = 24; // admin-facing file name in folder
+  string originalFilename = 25; // original client filename when known
 }
 
 // ---- RPCs ----
@@ -73,6 +76,9 @@ message CreateReq {
 
   string sha256 = 13;
   string accessClass = 14; // optional
+  string folderPath = 15;
+  string displayName = 16;
+  string originalFilename = 17;
 }
 
 message MediaRes {
@@ -97,6 +103,7 @@ message ListReq {
   string status = 7;
   string scanStatus = 8;
   string accessClass = 9; // optional
+  string folderPath = 10;
 }
 
 message ListRes {
@@ -120,6 +127,8 @@ message PresignUploadReq {
   string visibility = 4;
   string scope = 5;
   string accessClass = 6; // optional
+  string folderPath = 7;
+  string displayName = 8;
 }
 
 message PresignUploadRes {
@@ -134,6 +143,9 @@ message PresignUploadRes {
   string visibility = 8;
   string scope = 9;
   string accessClass = 10; // resolved class
+  string folderPath = 11;
+  string displayName = 12;
+  string originalFilename = 13;
 }
 
 message FinalizeUploadReq {
@@ -152,6 +164,9 @@ message FinalizeUploadReq {
   string ownerId = 8;
   string sha256 = 9; // if client computed; optional
   string accessClass = 10; // optional
+  string folderPath = 11;
+  string displayName = 12;
+  string originalFilename = 13;
 }
 
 service MediaService {

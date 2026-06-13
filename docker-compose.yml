@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: nebula
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
@@ -75,6 +75,7 @@ services:
 
   # 👤 User Service
   user-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-user-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
@@ -88,6 +89,7 @@ services:
       - apps/user-service/.env
     ports:
       - "3100:3100"
+      - "50051:50051"
     environment:
       <<: *internal-grpc
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nebula_users?schema=public
@@ -96,6 +98,7 @@ services:
 
   # 🔐 Auth Service
   auth-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-auth-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
@@ -119,13 +122,15 @@ services:
       USER_GRPC_URL: user-service:50051
     ports:
       - "3001:3001"
+      - "50052:50052"
 
   # 🛒 Product Service
   product-service:
-    profiles: ["full"]
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-product-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/product-service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: product-runtime
     container_name: product-service
     depends_on:
       postgres:
@@ -148,9 +153,11 @@ services:
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres?schema=nebula_products_shadow
     ports:
       - "3003:3003"
+      - "50053:50053"
 
   # ⚙️ Settings Service
   settings-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-settings-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
@@ -164,6 +171,7 @@ services:
       - apps/settings-service/.env
     ports:
       - "3010:3010"
+      - "50054:50054"
     environment:
       <<: *internal-grpc
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nebula_settings?schema=public
@@ -171,10 +179,11 @@ services:
 
   
   taxonomy-service:
-    profiles: ["full"]
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-taxonomy-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/taxonomy-service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: taxonomy-runtime
     container_name: taxonomy-service
     depends_on:
       postgres:
@@ -194,12 +203,14 @@ services:
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres?schema=nebula_taxonomy_shadow
     ports:
       - "3006:3006"
+      - "50057:50057"
 
   blog-service:
-    profiles: ["full"]
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-blog-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/blog-service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: blog-runtime
     container_name: blog-service
     depends_on:
       postgres:
@@ -222,12 +233,14 @@ services:
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres?schema=nebula_blog_shadow
     ports:
       - "3004:3004"
+      - "50055:50055"
 
   order-service:
-    profiles: ["full"]
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-order-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: apps/order-service/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      target: order-runtime
     container_name: order-service
     depends_on:
       postgres:
@@ -250,8 +263,10 @@ services:
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres?schema=nebula_order_shadow
     ports:
       - "3005:3005"
+      - "50056:50056"
 
   media-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-media-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
@@ -274,14 +289,25 @@ services:
       AUTH_GRPC_URL: auth-service:50052
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nebula_media?schema=public
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres?schema=nebula_media_shadow
+      MEDIA_STORAGE_PROVIDER: minio
       MEDIA_STORAGE_DRIVER: s3
       MEDIA_S3_ENDPOINT: http://minio:9000
+      MEDIA_S3_INTERNAL_ENDPOINT: http://minio:9000
+      MEDIA_S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
       MEDIA_S3_REGION: us-east-1
       MEDIA_S3_BUCKET: media
       MEDIA_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MEDIA_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MEDIA_S3_FORCE_PATH_STYLE: "true"
+      MEDIA_SIGNED_UPLOAD_TTL_SECONDS: 600
+      MEDIA_SIGNED_READ_TTL_SECONDS: 300
+      MEDIA_STRICT_READ_TTL_SECONDS: 30
+      MEDIA_PUBLIC_FOLDER: uploads
+      MEDIA_PRIVATE_FOLDER: private/objects
+      MEDIA_SYSTEM_FOLDER: system
     ports:
       - "3007:3007"
+      - "50058:50058"
 
 volumes:
   pgdata:

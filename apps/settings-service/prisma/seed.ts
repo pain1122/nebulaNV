@@ -1,7 +1,12 @@
 import { PrismaClient, Prisma } from './generated/client';
 const prisma = new PrismaClient();
 
-async function upsertJson(ns: string, key: string, value: any, env = 'default') {
+async function upsertJson(
+  ns: string,
+  key: string,
+  value: Prisma.InputJsonValue,
+  env = 'default',
+) {
   await prisma.setting.upsert({
     where: { namespace_environment_key: { namespace: ns, environment: env, key } },
     update: {

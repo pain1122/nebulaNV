@@ -24,7 +24,6 @@ async function main() {
   await prisma.product.createMany({
     data: [
       {
-        id:           undefined as any, // let DB default uuid
         slug:         'demo-widget-1',
         title:        'Demo Widget 1',
         description:  'A demo product linked to default category.',
@@ -63,7 +62,6 @@ async function main() {
         updatedAt:      now,
       },
       {
-        id:           undefined as any,
         slug:         'demo-widget-2',
         title:        'Demo Widget 2',
         description:  'Another demo product for the same category.',

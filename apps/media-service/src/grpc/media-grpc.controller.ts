@@ -1,6 +1,6 @@
 import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { Metadata, status, type ServerUnaryCall } from "@grpc/grpc-js";
+import { Metadata, status } from "@grpc/grpc-js";
 import {
   type CreateMediaInput,
   type FinalizeUploadInput,
@@ -41,18 +41,19 @@ export class MediaGrpcController {
   // admin/root-admin (panel writes)
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "Create")
-  async create(
-    req: media.CreateReq,
-    meta: Metadata,
-    call: ServerUnaryCall<media.CreateReq, media.MediaRes>,
-  ): Promise<media.MediaRes> {
-    const ctx = resolveCtxUser(meta, call);
+  async create(req: media.CreateReq, meta: Metadata): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const input: CreateMediaInput = {
       storage: req.storage?.trim() ? req.storage.trim() : "local",
       bucket: req.bucket?.trim() ? req.bucket.trim() : null,
       path: req.path?.trim() ?? "",
+      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
+      displayName: req.displayName?.trim() ? req.displayName.trim() : undefined,
+      originalFilename: req.originalFilename?.trim()
+        ? req.originalFilename.trim()
+        : undefined,
       filename: req.filename?.trim() ?? "",
       mimeType: req.mimeType?.trim() ?? "",
       sizeBytes: req.sizeBytes?.trim() ? Number(req.sizeBytes.trim()) : 0,
@@ -82,9 +83,8 @@ export class MediaGrpcController {
   async getById(
     req: media.GetByIdReq,
     meta: Metadata,
-    call: ServerUnaryCall<media.GetByIdReq, media.MediaRes>,
   ): Promise<media.MediaRes> {
-    const ctx = resolveCtxUser(meta, call);
+    const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const row = await this.svc.getById(req.id);
@@ -93,12 +93,8 @@ export class MediaGrpcController {
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "List")
-  async list(
-    req: media.ListReq,
-    meta: Metadata,
-    call: ServerUnaryCall<media.ListReq, media.ListRes>,
-  ): Promise<media.ListRes> {
-    const ctx = resolveCtxUser(meta, call);
+  async list(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+    const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const input: ListMediaDto = {
@@ -109,6 +105,7 @@ export class MediaGrpcController {
       accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : undefined,
       scope: req.scope?.trim() ? req.scope.trim() : undefined,
+      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
     };
 
     const items = await this.svc.list(input);
@@ -121,9 +118,8 @@ export class MediaGrpcController {
   async deleteById(
     req: media.DeleteByIdReq,
     meta: Metadata,
-    call: ServerUnaryCall<media.DeleteByIdReq, media.DeleteRes>,
   ): Promise<media.DeleteRes> {
-    const ctx = resolveCtxUser(meta, call);
+    const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const deleted = await this.svc.deleteById(req.id);
@@ -137,9 +133,8 @@ export class MediaGrpcController {
   async presignUpload(
     req: media.PresignUploadReq,
     meta: Metadata,
-    call: ServerUnaryCall<media.PresignUploadReq, media.PresignUploadRes>,
   ): Promise<media.PresignUploadRes> {
-    const ctx = resolveCtxUser(meta, call);
+    const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const input: PresignUploadInput = {
@@ -149,8 +144,10 @@ export class MediaGrpcController {
       actorRole: ctx.role ?? null,
       ownerId: this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
       accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
-      visibility: req.visibility?.trim() ? req.visibility.trim() : "private",
+      visibility: req.visibility?.trim() ? req.visibility.trim() : undefined,
       scope: req.scope?.trim() ? req.scope.trim() : "panel",
+      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
+      displayName: req.displayName?.trim() ? req.displayName.trim() : undefined,
     };
 
     const out = await this.svc.presignUpload(input);
@@ -168,6 +165,9 @@ export class MediaGrpcController {
       visibility: out.visibility ?? "private",
       accessClass: out.accessClass ?? "PUBLIC",
       scope: out.scope ?? "panel",
+      folderPath: out.folderPath ?? "/",
+      displayName: out.displayName ?? "",
+      originalFilename: out.originalFilename ?? "",
     });
   }
 
@@ -176,15 +176,19 @@ export class MediaGrpcController {
   async finalizeUpload(
     req: media.FinalizeUploadReq,
     meta: Metadata,
-    call: ServerUnaryCall<media.FinalizeUploadReq, media.MediaRes>,
   ): Promise<media.MediaRes> {
-    const ctx = resolveCtxUser(meta, call);
+    const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const input: FinalizeUploadInput = {
       storage: req.storage?.trim() ? req.storage.trim() : "s3",
       bucket: req.bucket?.trim() ? req.bucket.trim() : undefined,
       path: req.path?.trim() ?? "",
+      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
+      displayName: req.displayName?.trim() ? req.displayName.trim() : undefined,
+      originalFilename: req.originalFilename?.trim()
+        ? req.originalFilename.trim()
+        : undefined,
       filename: req.filename?.trim() || undefined,
       mimeType: req.mimeType?.trim() || undefined,
       visibility: req.visibility?.trim() || undefined,
@@ -210,6 +214,9 @@ function toProtoMedia(row: MediaRecord): media.Media {
     storage: row.storage ?? "local",
     bucket: row.bucket ?? "",
     path: row.path ?? "",
+    folderPath: row.folderPath ?? "/",
+    displayName: row.displayName ?? "",
+    originalFilename: row.originalFilename ?? "",
     filename: row.filename ?? "",
     mimeType: row.mimeType ?? "",
     sizeBytes: (row.sizeBytes ?? 0).toString(),

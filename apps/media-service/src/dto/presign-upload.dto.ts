@@ -19,6 +19,17 @@ export class PresignUploadDto {
   mimeType!: string;
 
   @IsOptional()
+  @IsString()
+  @Transform(trim)
+  folderPath?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_FILENAME, { message: "displayName is not safe" })
+  displayName?: string;
+
+  @IsOptional()
   @IsUUID()
   // Optional admin override target owner. Caller identity is from auth context.
   ownerId?: string;

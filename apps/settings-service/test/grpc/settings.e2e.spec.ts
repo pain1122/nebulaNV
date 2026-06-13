@@ -1,14 +1,18 @@
-// apps/settings-service/test/grpc/settings.e2e.spec.ts
-import { loadClient, call, mdS2S } from "./helpers";
+import { loadClient, call, mdAuth, CODES } from "./helpers";
+import { httpJson } from "../utils/http";
 
 const SETTINGS_PROTO = require.resolve("@nebula/protos/settings.proto");
 const URL = process.env.SETTINGS_GRPC_URL || "127.0.0.1:50054";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
 
-describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
-  // ensure svc name is "bucket" (matches test title & signature payload)
-  beforeAll(() => {
-    process.env.SVC_NAME = "bucket";
-  });
+type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+describe("SettingsService gRPC (public reads, admin writes)", () => {
+  let userAccess = "";
+  let adminAccess = "";
 
   const client = loadClient<any>({
     url: URL,
@@ -21,50 +25,98 @@ describe("SettingsService gRPC (gateway-only S2S, svc:bucket)", () => {
   const env = "default";
   const key = `theme_color_${Math.random().toString(36).slice(2, 8)}`;
 
-  it("SetString then GetString (hit)", async () => {
+  beforeAll(async () => {
+    const user = await httpJson<LoginResponse>("POST", `${AUTH_HTTP}/auth/login`, {
+      identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
+      password: process.env.SEED_USER_PASS ?? "User123!",
+    });
+    userAccess = user.accessToken;
+
+    const admin = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP}/auth/login`,
+      {
+        identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
+        password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
+      },
+    );
+    adminAccess = admin.accessToken;
+  });
+
+  it("GetString is public and returns a miss for an unknown key", async () => {
+    const get = await call<any>(client, "GetString", {
+      namespace: ns,
+      environment: env,
+      key,
+    });
+
+    expect(get).toEqual({ value: "", found: false });
+  });
+
+  it("SetString rejects normal users", async () => {
+    await expect(
+      call<any>(
+        client,
+        "SetString",
+        { namespace: ns, environment: env, key, value: "red" },
+        mdAuth({ access: userAccess }),
+      ),
+    ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
+  });
+
+  it("SetString then GetString succeeds for admins", async () => {
     const set = await call<any>(
       client,
       "SetString",
       { namespace: ns, environment: env, key, value: "red" },
-      mdS2S({ role: "admin" }), // provide a user context
+      mdAuth({ access: adminAccess }),
     );
     expect(set).toEqual({ value: "red" });
 
-    const get = await call<any>(
-      client,
-      "GetString",
-      { namespace: ns, environment: env, key },
-      mdS2S(), // reads don't need admin, but still carry userId
-    );
+    const get = await call<any>(client, "GetString", {
+      namespace: ns,
+      environment: env,
+      key,
+    });
     expect(get).toEqual({ value: "red", found: true });
   });
 
-  it("DeleteString then GetString (miss again)", async () => {
+  it("DeleteString rejects normal users", async () => {
+    await expect(
+      call<any>(
+        client,
+        "DeleteString",
+        { namespace: ns, environment: env, key },
+        mdAuth({ access: userAccess }),
+      ),
+    ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
+  });
+
+  it("DeleteString then GetString succeeds for admins", async () => {
     const del = await call<any>(
       client,
       "DeleteString",
       { namespace: ns, environment: env, key },
-      mdS2S({ role: "admin" }), // admin-only
+      mdAuth({ access: adminAccess }),
     );
     expect(del).toEqual({ deleted: true });
 
-    const get2 = await call<any>(
-      client,
-      "GetString",
-      { namespace: ns, environment: env, key },
-      mdS2S(),
-    );
-    expect(get2).toEqual({ value: "", found: false });
+    const get = await call<any>(client, "GetString", {
+      namespace: ns,
+      environment: env,
+      key,
+    });
+    expect(get).toEqual({ value: "", found: false });
   });
 
-  it("Missing signature → request fails", async () => {
+  it("SetString rejects requests without S2S metadata", async () => {
     await expect(
       call<any>(client, "SetString", {
         namespace: ns,
         environment: env,
         key,
         value: "x",
-      }), // no mdS2S()
-    ).rejects.toBeTruthy();
+      }),
+    ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
   });
 });

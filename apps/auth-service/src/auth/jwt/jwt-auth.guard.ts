@@ -8,12 +8,18 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY, Role, IS_PUBLIC_KEY } from '@nebula/grpc-auth';
+import { RpcException } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
+import {
+  ROLES_KEY,
+  Role,
+  IS_PUBLIC_KEY,
+  type RpcContextWithContext,
+} from '@nebula/grpc-auth';
 import type {
   AuthenticatedRequest,
   AuthenticatedRequestUser,
   MetadataWithAuthUser,
-  RpcContextWithAuthUser,
 } from '../auth.types';
 import { isAuthTokenPayload } from '../auth.types';
 
@@ -28,6 +34,32 @@ export class JwtAuthGuard implements CanActivate {
     private readonly cfg: ConfigService,
     private readonly reflector: Reflector,
   ) {}
+
+  private isRpc(ctx: ExecutionContext): boolean {
+    return ctx.getType<'http' | 'rpc'>() === 'rpc';
+  }
+
+  private unauthenticated(ctx: ExecutionContext, message: string): never {
+    if (this.isRpc(ctx)) {
+      throw new RpcException({
+        code: status.UNAUTHENTICATED,
+        message,
+      });
+    }
+
+    throw new UnauthorizedException(message);
+  }
+
+  private forbidden(ctx: ExecutionContext, message: string): never {
+    if (this.isRpc(ctx)) {
+      throw new RpcException({
+        code: status.PERMISSION_DENIED,
+        message,
+      });
+    }
+
+    throw new ForbiddenException(message);
+  }
 
   canActivate(ctx: ExecutionContext): boolean {
     // 0) Public routes → allow
@@ -54,7 +86,7 @@ export class JwtAuthGuard implements CanActivate {
       const auth = typeof rawAuth === 'string' ? rawAuth : undefined;
       token = this.getBearer(auth);
     }
-    if (!token) throw new UnauthorizedException('Missing Bearer token');
+    if (!token) this.unauthenticated(ctx, 'Missing Bearer token');
 
     // 3) Verify locally with ACCESS secret (+ small skew tolerance)
     const secret = this.cfg.get<string>('JWT_ACCESS_SECRET');
@@ -62,7 +94,7 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const verified: unknown = this.jwt.verify(token, { secret });
       if (!isAuthTokenPayload(verified)) {
-        throw new UnauthorizedException('Invalid token payload');
+        this.unauthenticated(ctx, 'Invalid token payload');
       }
       user = {
         userId: verified.sub,
@@ -71,7 +103,7 @@ export class JwtAuthGuard implements CanActivate {
       };
       // (Optional small skew check is handled by jwt.verify already)
     } catch {
-      throw new UnauthorizedException('Invalid or expired token');
+      this.unauthenticated(ctx, 'Invalid or expired token');
     }
 
     // 4) Attach user back to context (HTTP + gRPC)
@@ -84,8 +116,7 @@ export class JwtAuthGuard implements CanActivate {
         md.user = user;
       }
       const rpcCtx =
-        ctx.switchToRpc().getContext<RpcContextWithAuthUser | undefined>() ??
-        {};
+        ctx.switchToRpc().getContext<RpcContextWithContext | undefined>() ?? {};
       rpcCtx.user = user;
       (ctx as ExecutionContextWithAuthUser).user = user;
     }
@@ -97,7 +128,7 @@ export class JwtAuthGuard implements CanActivate {
         ctx.getClass?.(),
       ]) ?? [];
     if (required.length && !required.includes(user.role)) {
-      throw new ForbiddenException('Insufficient role');
+      this.forbidden(ctx, 'Insufficient role');
     }
 
     return true;

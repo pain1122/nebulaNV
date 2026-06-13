@@ -49,6 +49,60 @@ describe('UserService HTTP (seeded users)', () => {
     }
   });
 
+  it('GET /health returns ok', async () => {
+    const res = await httpJson<{ status: string; db: string }>(
+      'GET',
+      `${USER_HTTP}/health`,
+    );
+
+    expect(res.status).toBe('ok');
+    expect(res.db).toBe('up');
+  });
+
+  it('GET /users rejects normal users', async () => {
+    await expect(
+      httpJson('GET', `${USER_HTTP}/users`, undefined, userAccess),
+    ).rejects.toBeTruthy();
+  });
+
+  it('GET /users lists users for admin when seeded admin exists', async () => {
+    if (!haveAdmin) return;
+
+    const users = await httpJson<
+      Array<{ id: string; email: string; role: string }>
+    >('GET', `${USER_HTTP}/users`, undefined, adminAccess);
+
+    expect(Array.isArray(users)).toBe(true);
+    expect(users.some((u) => u.id === userId)).toBe(true);
+    expect(users.some((u) => u.id === adminId)).toBe(true);
+  });
+
+  it('GET /users/:id lets admin read another user when seeded admin exists', async () => {
+    if (!haveAdmin) return;
+
+    const res = await httpJson<any>(
+      'GET',
+      `${USER_HTTP}/users/${userId}`,
+      undefined,
+      adminAccess,
+    );
+
+    expect(res).toHaveProperty('id', userId);
+  });
+
+  it('PUT /users/me rejects duplicate email', async () => {
+    if (!haveAdmin) return;
+
+    await expect(
+      httpJson(
+        'PUT',
+        `${USER_HTTP}/users/me`,
+        { email: adminEmail },
+        userAccess,
+      ),
+    ).rejects.toBeTruthy();
+  });
+
   it('GET /users/:id (self) succeeds', async () => {
     const me = await httpJson<any>(
       'GET',

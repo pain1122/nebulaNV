@@ -1,16 +1,16 @@
 ﻿# Site Essentials - NebulaNV (English Education Website)
 
-Last updated: 2026-05-28
+Last updated: 2026-06-09
 Purpose: single source of truth for launch essentials before prioritization.
 
 ## 0) Priority Bands
 
 - `P0-MUST (Release)`:
-  `SITE-01..07`, `USER-01..06`, `BLOG-01..08`, `PROD-01..04`, `PROD-08..09`, `PROD-11`, `PROD-13`, `PROD-15`, `PROD-17..20`, `PAGE-01..04`, `SET-01..08`, `MED-01..05`, `ADM-01..09`, `ADM-11`, `API-01..07`, `SEO-01..12`, `OPS-01..06`.
+  `SITE-01..07`, `USER-01..06`, `BLOG-01..08`, `PROD-01..04`, `PROD-08..09`, `PROD-11`, `PROD-13`, `PROD-15`, `PROD-17..20`, `PAGE-01..04`, `SET-01..08`, `MED-01..07`, `ADM-01..09`, `ADM-11`, `API-01..07`, `SEO-01..12`, `OPS-01..06`.
 - `P1-SHOULD (If Time Holds)`:
-  `PROD-05..07`, `PROD-10`, `PROD-12`, `PROD-14`, `PROD-16`, `PROD-21`, `PAGE-05`, `ADM-10`, `API-08`.
+  `PROD-05..07`, `PROD-10`, `PROD-12`, `PROD-14`, `PROD-16`, `PROD-21`, `PAGE-05`, `MED-08..10`, `ADM-10`, `API-08`, `OPS-07`.
 - `P2-DEFER (Post-Launch)`:
-  Any architecture rewrites, realtime streaming/classrooms, queue/agent overhaul, deep observability stack.
+  3D showroom implementation, realtime streaming/classrooms, media workers, queue/agent overhaul, deep observability stack, and architecture rewrites not required for launch.
 
 ## 1) Product Scope (Launch)
 
@@ -100,6 +100,11 @@ Purpose: single source of truth for launch essentials before prioritization.
 - `MED-03` Access class support (`PUBLIC`, `PROTECTED`, `STRICT`) wired end-to-end.
 - `MED-04` Safe defaults for access class and ownership.
 - `MED-05` Basic media metadata: filename, MIME type, size, owner.
+- `MED-06` Presigned upload lifecycle: request upload URL, upload object, finalize, create DB row, read/list/delete.
+- `MED-07` Storage endpoint split: internal S3 endpoint for services and public/client endpoint for browsers/tests.
+- `MED-08` Immutable original + variant model for thumbnails, optimized images, and edited files.
+- `MED-09` Provider compatibility mode for MinIO now, Supabase Storage S3 next, and AWS S3 later.
+- `MED-10` Asset bundle metadata model for future 3D showroom files and grouped media assets.
 
 ## 9) Admin Panel Essentials
 
@@ -149,6 +154,7 @@ Purpose: single source of truth for launch essentials before prioritization.
 - `OPS-04` Backup plan for DB and media metadata.
 - `OPS-05` Release smoke checks for core public + admin flows.
 - `OPS-06` Pre-release crawl/index audit: canonical, duplicates, 404, sitemap freshness.
+- `OPS-07` Kubernetes readiness notes: stateless app containers, secrets/config maps, persistent DB/media volumes, health/readiness probes, and migration jobs.
 
 ## 13) Website Gaps To Confirm Before Prioritization
 
@@ -170,6 +176,8 @@ Purpose: single source of truth for launch essentials before prioritization.
 
 ## 15) Explicitly Post-Launch (Do Not Expand Scope Now)
 
+- Full 3D showroom implementation.
+- Media worker services for image variants, file metadata extraction, 3D processing, and streaming processing.
 - Realtime sessions/classroom streaming.
 - Full queue/agent/event-driven overhaul.
 - Deep analytics platform and complex observability stack.

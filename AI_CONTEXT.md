@@ -1,6 +1,6 @@
 ﻿# AI Context: NebulaNV
 
-Last updated: 2026-05-28
+Last updated: 2026-06-09
 Purpose: fast handoff for new AI or developer sessions with minimal re-discovery and zero setup loss.
 
 ## Working Agreement
@@ -13,7 +13,7 @@ Purpose: fast handoff for new AI or developer sessions with minimal re-discovery
 
 ## Current Delivery Mode
 
-- Current mode: stabilization, lint cleanup, onboarding documentation, and boot reliability.
+- Current mode: Docker-backed stabilization, contract freeze, media security/storage design, and launch-scope cleanup.
 - The old 20-day release plan is now historical context; keep its launch scope, but use current docs for daily navigation.
 - Scope source of truth: `site essentials.md`.
 - Execution board: `TODO.md`.
@@ -44,6 +44,12 @@ Purpose: fast handoff for new AI or developer sessions with minimal re-discovery
 
 ## Recently Completed
 
+- Docker Compose now boots the full backend stack with postgres, redis, minio, and minio-init.
+- Backend Docker build flow uses shared `docker/backend.Dockerfile` runtime targets for all backend services.
+- Release packaging lane exists for prebuilt images: `docker-compose.release.yml`, `deploy/.env.production.example`, and Docker image save/load PowerShell helpers.
+- Auth-service launch HTTP/gRPC contract tests are green.
+- User-service launch HTTP/gRPC contract tests are green.
+- Settings-service launch HTTP/gRPC contract tests are green.
 - Strict ESLint/type-safety cleanup pass across backend services, with product-service source now build-clean.
 - Product-service unsafe `any` cleanup in DTO transforms, Prisma mapping, product service logic, taxonomy gRPC mapping, and product gRPC bulk discount request handling.
 - Product-service build verified after source lint cleanup.
@@ -54,9 +60,29 @@ Purpose: fast handoff for new AI or developer sessions with minimal re-discovery
 
 ## Current Lint/Test Reality
 
+- Media-service is healthy in Docker, can reach MinIO internally, and has media DB migrations applied.
+- Media-service tests currently fail because presigned URLs expose Docker-internal `minio:9000`, which host/browser clients cannot resolve.
+- Media-service lint currently has source errors for unused gRPC `call` params in `apps/media-service/src/grpc/media-grpc.controller.ts`.
+- Media-service needs split storage endpoints: internal S3 endpoint for service-to-storage traffic and public/client endpoint for browser/Jest uploads.
 - Product-service source lint errors have been resolved.
 - Remaining product-service lint output is warning-only and mostly in test helpers/specs around untyped HTTP/gRPC test clients.
 - Test warning cleanup is useful, but not the same urgency as source errors.
+
+## Media Roadmap Boundary
+
+- Media-service owns policy, records, upload authorization, access classes, storage keys, and media metadata.
+- Object storage owns bytes. Current local provider is MinIO; future provider targets are Supabase Storage S3 mode and AWS S3.
+- Workers should perform heavy processing later; they should not own media policy.
+- Launch-critical media work: presign/finalize contract, public vs internal endpoint split, `PUBLIC|PROTECTED|STRICT` behavior, deterministic key layout, env validation, and storage round-trip tests.
+- P1 media work: provider compatibility docs, immutable originals, variants, image/file editing baseline, and asset bundle metadata.
+- P2 media work: full 3D showroom, streaming pipeline, Go workers, deeper queue/event architecture.
+
+## Language Placement
+
+- TypeScript/Nest remains the request-path API layer for auth, users, settings, media policy, products, blog, taxonomy, and order flows.
+- Go should start as worker services after media contracts are stable: `media-worker-go`, `showroom-asset-worker-go`, then `streaming-worker-go`.
+- Rust should be reserved for later performance-critical or security-sensitive components only after worker boundaries are proven.
+- Python should be reserved for AI/ML/offline media intelligence, analytics experiments, or tooling where Python libraries are clearly better than TypeScript/Go.
 
 ## Immediate Next Session Entry
 
@@ -64,7 +90,8 @@ Purpose: fast handoff for new AI or developer sessions with minimal re-discovery
 2. Use `docs/README.md` as the first map for architecture and service boundaries.
 3. Use `docs/architecture/local-dev-and-docker-boot.md` when changing ports, Docker Compose, `.env.example`, or service startup order.
 4. Continue source cleanup before test-warning cleanup when a service still has errors.
-5. Validate frequently with targeted commands before broad workspace commands.
+5. For media-service, do not add workers before the media-service contract and DB/job model are clear.
+6. Validate frequently with targeted commands before broad workspace commands.
 
 ## Verification Commands
 
@@ -80,7 +107,8 @@ Broader checks when ready:
 ```powershell
 pnpm -w build
 docker compose config
-docker compose --profile full up -d --build
+docker compose up -d --build
+docker compose ps -a
 ```
 
 ## Git Hygiene Note

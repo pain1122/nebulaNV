@@ -39,7 +39,7 @@ export class CreateTaxonomyDto {
 
   @IsOptional()
   @IsObject()
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export class UpdateTaxonomyDto {
@@ -70,5 +70,5 @@ export class UpdateTaxonomyDto {
 
   @IsOptional()
   @IsObject()
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }

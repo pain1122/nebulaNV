@@ -12,6 +12,7 @@ import { AuthClientModule } from "./auth-client.module";
 import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
 import { TaxonomyModule } from "./taxonomy/taxonomy.module";
 import { TaxonomyClientModule } from "./taxonomy-client.module";
+import { HealthController } from "./health.controller";
 
 export const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
 
@@ -42,6 +43,7 @@ export const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
     // local taxonomy façade
     TaxonomyModule,
   ],
+  controllers: [HealthController],
   providers: [
     Reflector,
     S2SGuard,

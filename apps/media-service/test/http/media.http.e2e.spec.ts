@@ -28,7 +28,9 @@ describe("media-service HTTP (admin-only)", () => {
     const body = {
       filename: `e2e_${Math.random().toString(36).slice(2, 8)}.webp`,
       mimeType: "image/webp",
-      visibility: "private",
+      folderPath: "/test/presign",
+      displayName: `public_${Math.random().toString(36).slice(2, 8)}.webp`,
+      visibility: "public",
       scope: "panel",
     };
 
@@ -48,12 +50,21 @@ describe("media-service HTTP (admin-only)", () => {
     );
 
     expect(res?.data?.uploadUrl).toBeTruthy();
+    expect(new URL(res.data.uploadUrl).hostname).not.toBe("minio");
     expect(res?.data?.bucket).toBeTruthy();
     expect(res?.data?.path).toBeTruthy();
+    expect(res.data.path).toBe(`uploads/test/presign/${body.displayName}`);
+    expect(res.data.folderPath).toBe("/test/presign");
+    expect(res.data.displayName).toBe(body.displayName);
+    expect(res.data.originalFilename).toBe(body.filename);
+    expect(res.data.path).not.toContain("pending");
+    expect(res.data.path).not.toContain("protected");
     expect(res?.data?.mimeType).toBe("image/webp");
   });
 
-  it("POST /media -> GET -> LIST -> DELETE (admin)", async () => {
+  it("presign -> PUT -> finalize -> GET -> LIST -> read-url -> DELETE (admin)", async () => {
+    const folderPath = `/test/e2e_${Math.random().toString(36).slice(2, 8)}`;
+
     // 1) presign
     const presign = await httpJson<any>(
       "POST",
@@ -61,13 +72,19 @@ describe("media-service HTTP (admin-only)", () => {
       {
         filename: "e2e.webp",
         mimeType: "image/webp",
-        visibility: "private",
+        folderPath,
+        displayName: "hero.webp",
+        visibility: "public",
         scope: "panel",
       },
       { authorization: `Bearer ${adminAccess}` },
     );
 
     const uploadUrl: string = presign.data.uploadUrl;
+    expect(new URL(uploadUrl).hostname).not.toBe("minio");
+    expect(presign.data.path).toBe(`uploads/${folderPath.slice(1)}/hero.webp`);
+    expect(presign.data.folderPath).toBe(folderPath);
+    expect(presign.data.displayName).toBe("hero.webp");
 
     // 2) upload tiny payload
     const up = await fetch(uploadUrl, {
@@ -77,24 +94,29 @@ describe("media-service HTTP (admin-only)", () => {
     });
     expect([200, 204]).toContain(up.status);
 
-    // 3) create row
+    // 3) finalize row from trusted object metadata
     const created = await httpJson<any>(
       "POST",
-      `${MEDIA_HTTP}/media`,
+      `${MEDIA_HTTP}/media/finalize`,
       {
         storage: "s3",
         bucket: presign.data.bucket,
         path: presign.data.path,
+        folderPath: presign.data.folderPath,
+        displayName: presign.data.displayName,
+        originalFilename: presign.data.originalFilename,
         filename: presign.data.filename ?? "e2e.webp",
         mimeType: presign.data.mimeType ?? "image/webp",
-        sizeBytes: "5",
-        visibility: presign.data.visibility ?? "private",
+        visibility: presign.data.visibility ?? "public",
         scope: presign.data.scope ?? "panel",
       },
       { authorization: `Bearer ${adminAccess}` },
     );
 
     expect(created?.data?.id).toBeTruthy();
+    expect(created.data.path).toBe(presign.data.path);
+    expect(created.data.folderPath).toBe(folderPath);
+    expect(created.data.displayName).toBe("hero.webp");
     const id = created.data.id;
 
     // user cannot list/get
@@ -131,6 +153,27 @@ describe("media-service HTTP (admin-only)", () => {
       },
     );
     expect(Array.isArray(list.data)).toBe(true);
+
+    const folderList = await httpJson<any>(
+      "GET",
+      `${MEDIA_HTTP}/media?folderPath=${encodeURIComponent(folderPath)}`,
+      undefined,
+      {
+        authorization: `Bearer ${adminAccess}`,
+      },
+    );
+    expect(folderList.data.some((item: any) => item.id === id)).toBe(true);
+
+    const readUrl = await httpJson<any>(
+      "POST",
+      `${MEDIA_HTTP}/media/${id}/read-url`,
+      undefined,
+      {
+        authorization: `Bearer ${adminAccess}`,
+      },
+    );
+    expect(readUrl.data.url).toBeTruthy();
+    expect(readUrl.data.expiresIn).toBeGreaterThan(0);
 
     // delete
     const del = await httpJson<any>(

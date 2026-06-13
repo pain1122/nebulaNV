@@ -1,51 +1,41 @@
 // apps/settings-service/test/grpc/helpers.ts
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import * as crypto from "crypto";
+import { buildS2SMetadata } from "@nebula/grpc-auth";
 
 export const X_SIGN_HEADER = process.env.GATEWAY_HEADER ?? "x-gateway-sign";
 export const X_SVC_HEADER = "x-svc";
-
-// also used by resolveCtxUser()
-const X_USER_ID_HEADER = "x-user-id";
-const X_USER_ROLE_HEADER = "x-user-role";
-
-export function minuteBucket() {
-  return Math.floor(Date.now() / 60_000);
-}
+export const CODES = grpc.status;
 
 /**
- * Build gateway-style S2S metadata.
+ * Build service-to-service metadata.
  * Adds:
  *   - x-svc
- *   - signature header (HMAC_SHA256( "<minute>:+<svc>" , SECRET ))
- *   - x-user-id (required by controllers via resolveCtxUser)
- *   - x-user-role (optional; use 'admin' for admin endpoints)
+ *   - signature header using the shared canonical S2S contract
+ *   - x-user-id / x-user-role when a test needs to mimic forwarded context
  */
 export function mdS2S(opts?: {
-  svc?: string;
+  serviceName?: string;
   userId?: string;
   role?: "user" | "admin" | "root-admin";
 }) {
-  const md = new grpc.Metadata();
+  const md = buildS2SMetadata({
+    serviceName: opts?.serviceName ?? "auth-service",
+  });
 
-  const secret =
-    process.env.S2S_SECRET ?? process.env.GATEWAY_SECRET ?? "dev-secret";
-  const svc = opts?.svc ?? process.env.SVC_NAME ?? "gateway";
-  const payload = `${minuteBucket()}:${svc}`;
-  const sign = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
+  if (opts?.userId) md.set("x-user-id", opts.userId);
+  if (opts?.role) md.set("x-user-role", opts.role);
 
-  md.set(X_SVC_HEADER, svc);
-  md.set(X_SIGN_HEADER, sign);
+  return md;
+}
 
-  // Simulate gateway injecting initiator context
-  const userId = opts?.userId ?? "e2e-user";
-  md.set(X_USER_ID_HEADER, userId);
-  if (opts?.role) md.set(X_USER_ROLE_HEADER, opts.role);
-
+export function mdAuth(opts: {
+  access: string;
+  userId?: string;
+  role?: "user" | "admin" | "root-admin";
+}) {
+  const md = mdS2S({ userId: opts.userId, role: opts.role });
+  md.set("authorization", `Bearer ${opts.access}`);
   return md;
 }
 
