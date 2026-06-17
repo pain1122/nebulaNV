@@ -1,105 +1,230 @@
-﻿# AI Context: NebulaNV
+# AI Context: NebulaNV
 
-Last updated: 2026-06-09
-Purpose: fast handoff for new AI or developer sessions with minimal re-discovery and zero setup loss.
+Last updated: 2026-06-17
+Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
-## Working Agreement
+## 1. Collaboration Contract
 
-- Salar is actively learning the project and wants explanations of the syntax, type choices, and service boundaries.
-- Assistant may inspect files freely and should explain findings in plain language.
-- Assistant edits code/docs when explicitly requested; otherwise prefer exact edit guidance.
-- No surprise rewrites. Preserve user work and avoid broad deletes unless the target is clearly generated or temporary.
-- Never commit or expose real `.env` secrets. Use `.env.example` and docs for variable names only.
+- Salar is actively learning the project and wants explanations of syntax, type choices, and service boundaries.
+- The assistant may inspect files freely and should explain findings in plain language.
+- The assistant must not edit files unless Salar explicitly says `change it` or directly says to `change` a named file/task in an edit context.
+- If Salar uses wording that sounds equivalent but does not include `change`, such as `do it`, `fix it`, `apply it`, `go ahead`, or `make it happen`, the assistant must ask: `Should I change it?`
+- When not allowed to edit, give exact edit instructions, file paths, and reasoning.
+- Before suggesting code changes, explain what problem the change solves and what contract it affects.
 
-## Current Delivery Mode
+## 2. Absolute Safety Rules
 
-- Current mode: Docker-backed stabilization, contract freeze, media security/storage design, and launch-scope cleanup.
-- The old 20-day release plan is now historical context; keep its launch scope, but use current docs for daily navigation.
-- Scope source of truth: `site essentials.md`.
-- Execution board: `TODO.md`.
-- Developer docs index: `docs/README.md`.
-- Boot/runbook: `docs/architecture/local-dev-and-docker-boot.md`.
+- Never expose, print, or commit real `.env` secrets.
+- Use `.env.example`, deployment examples, and docs for variable names only.
+- Never delete user work unless Salar explicitly asks for that exact deletion.
+- Never run destructive git commands such as `git reset --hard` or `git checkout --` unless explicitly requested.
+- Always check `git status --short` before editing, committing, or discussing final workspace state.
+- Avoid broad rewrites. Keep changes scoped to the named file/task.
+- Do not change service contracts without checking the related DTO, controller, gRPC controller, proto, tests, and Prisma shape.
+- Do not treat generated/build/vendor/log artifacts as source of truth.
 
-## Repository Snapshot
+## 3. Project Snapshot
 
-- Stack: NestJS microservices + Next.js web app in a pnpm monorepo.
-- Apps: `auth-service`, `user-service`, `product-service`, `settings-service`, `taxonomy-service`, `order-service`, `blog-service`, `media-service`, `web`.
-- Packages: `grpc-auth`, `clients`, `config`, `protos`.
+- Stack: NestJS microservices plus Next.js web app in a pnpm monorepo.
+- Backend apps: `auth-service`, `user-service`, `product-service`, `settings-service`, `taxonomy-service`, `order-service`, `blog-service`, `media-service`.
+- Frontend app: `web`.
+- Shared packages: `grpc-auth`, `clients`, `config`, `protos`.
 - Runtime target: Node `>=22`, pnpm `10.17.1`.
 - Default branch: `main`.
 - GitHub remote: `origin` -> `https://github.com/pain1122/nebulaNV`.
 
-## Current Service Port Map
+## 4. Current Source Of Truth
 
-| Service | HTTP | gRPC |
-| --- | ---: | ---: |
-| user-service | 3100 | 50051 |
-| auth-service | 3001 | 50052 |
-| product-service | 3003 | 50053 |
+- Product vision and long roadmap: `README.md`.
+- Launch/business scope: `site essentials.md`.
+- Execution board: `TODO.md`.
+- Developer docs index: `docs/README.md`.
+- Contract/boundary rules: `docs/architecture/contracts-and-boundaries.md`.
+- Boot/runbook: `docs/architecture/local-dev-and-docker-boot.md`.
+- Current focus file: `docs/current-focus.md`.
+- Active report file: planned as `docs/reports/active-report.md`; until it exists, use latest files in `docs/reports/`.
+
+## 5. How To Load Context For A Task
+
+For any task, load context in this order:
+
+1. `AI_CONTEXT.md`
+2. `TODO.md` or `docs/current-focus.md` when it exists
+3. `docs/README.md`
+4. `docs/architecture/system-relationships.md` when it exists
+5. `docs/architecture/contracts-and-boundaries.md` when changing DTO/proto/service/Prisma/mapper behavior
+6. Relevant `docs/services/<service>.md`
+7. Relevant `docs/packages/<package>.md` when package docs exist
+8. Only then inspect source files
+
+Use source files as final truth when docs and code disagree.
+
+## 6. Anti-Noise Protocol
+
+Before searching, decide the smallest useful search surface. Do not recursively scan the whole repo unless the task truly needs repo-wide discovery.
+
+Default search policy:
+
+- Start with docs and the named service/package.
+- Search source before tests unless the task is specifically about tests.
+- Search tests before implementation only when validating expected behavior.
+- Never include generated, vendor, build, cache, or static asset folders in normal searches.
+
+Always exclude these paths unless the user explicitly asks about them:
+
+- `**/node_modules/**`
+- `**/dist/**`
+- `**/.next/**`
+- `**/coverage/**`
+- `**/prisma/generated/**`
+- `apps/web/public/**`
+- generated proto/build output
+- Docker/image/export artifacts
+- logs and local temp files
+
+Preferred discovery command:
+
+```powershell
+rg --files apps packages docs `
+  -g '!**/node_modules/**' `
+  -g '!**/dist/**' `
+  -g '!**/.next/**' `
+  -g '!**/coverage/**' `
+  -g '!**/prisma/generated/**' `
+  -g '!apps/web/public/**'
+```
+
+Preferred text search pattern:
+
+```powershell
+rg -n 'SearchTerm|OtherTerm' apps packages docs `
+  -g '!**/node_modules/**' `
+  -g '!**/dist/**' `
+  -g '!**/.next/**' `
+  -g '!**/coverage/**' `
+  -g '!**/prisma/generated/**' `
+  -g '!apps/web/public/**'
+```
+
+When output is too large:
+
+- Stop widening the search.
+- Narrow by service, file type, or exact symbol.
+- Prefer `rg --files | rg '<filename-or-folder>'` before reading files.
+- Read selected files only, not whole directories.
+- Summarize findings instead of dumping large output.
+
+PowerShell rules:
+
+- Prefer single quotes around search patterns.
+- Avoid complicated nested quote regex in one command.
+- Prefer simple repeated searches over one clever fragile command.
+- Do not pass Unix-style globs like `apps/*/jest.config.ts` directly to `rg` in PowerShell; use `rg --files` and pipe/narrow, or use `Get-ChildItem`.
+- Split searches into discovery, narrowing, then reading instead of one fragile command.
+- For multiline Node scripts, use a PowerShell here-string:
+
+```powershell
+@'
+console.log("safe multiline script")
+'@ | node -
+```
+
+- If the content being written contains PowerShell here-string delimiters (`@'` or `'@`), do not wrap the whole write in a PowerShell here-string; use `apply_patch` or another safer write method.
+- Do not mix PowerShell path enumeration with `cmd /c` for file operations.
+
+## 7. Service Port Map
+
+| Service          | HTTP |  gRPC |
+| ---------------- | ---: | ----: |
+| user-service     | 3100 | 50051 |
+| auth-service     | 3001 | 50052 |
+| product-service  | 3003 | 50053 |
 | settings-service | 3010 | 50054 |
-| blog-service | 3004 | 50055 |
-| order-service | 3005 | 50056 |
+| blog-service     | 3004 | 50055 |
+| order-service    | 3005 | 50056 |
 | taxonomy-service | 3006 | 50057 |
-| media-service | 3007 | 50058 |
+| media-service    | 3007 | 50058 |
 
-## Recently Completed
+## 8. Critical Architecture Rules
 
-- Docker Compose now boots the full backend stack with postgres, redis, minio, and minio-init.
-- Backend Docker build flow uses shared `docker/backend.Dockerfile` runtime targets for all backend services.
-- Release packaging lane exists for prebuilt images: `docker-compose.release.yml`, `deploy/.env.production.example`, and Docker image save/load PowerShell helpers.
-- Auth-service launch HTTP/gRPC contract tests are green.
-- User-service launch HTTP/gRPC contract tests are green.
-- Settings-service launch HTTP/gRPC contract tests are green.
-- Strict ESLint/type-safety cleanup pass across backend services, with product-service source now build-clean.
-- Product-service unsafe `any` cleanup in DTO transforms, Prisma mapping, product service logic, taxonomy gRPC mapping, and product gRPC bulk discount request handling.
-- Product-service build verified after source lint cleanup.
-- Local backend startup dependency order updated with `wait-on` so dependent services wait for required gRPC ports.
-- `pnpm dev:backend` verified to start all backend services locally.
-- Developer documentation set created under `docs/`, including type-shape, naming, service-boundary, service-note, and local boot docs.
-- Logging/observability backlog captured in `TODO.md` for later structured logging and request correlation.
+- Auth-service owns token issuance, refresh, validation, logout/revocation behavior, and auth-facing gRPC methods.
+- User-service owns users, profiles, roles, and user persistence.
+- Settings-service may influence runtime app/business configuration, frontend/admin-managed defaults, SEO/site settings, and safe database-backed defaults.
+- Settings-service must not define secrets, authentication policy, internal trust boundaries, role hierarchy, storage credentials, database URLs, or whether auth is required.
+- Taxonomy-service owns taxonomy/category/tag/grouping records and taxonomy-specific CRUD.
+- Media-service owns media policy, media metadata, access classes, signed URLs, and upload/read authorization.
+- Object storage providers such as MinIO, Supabase Storage S3, and AWS S3 hold bytes; they are not the app privacy authority.
+- Services should not import another service's Prisma client or query another service's database directly.
+- Service-to-service communication should use explicit gRPC/client contracts.
+- Source files should avoid unsafe `any`; test files may still have warning-level loose typing during stabilization.
 
-## Current Lint/Test Reality
+## 9. Media Boundary Summary
 
-- Media-service is healthy in Docker, can reach MinIO internally, and has media DB migrations applied.
-- Media-service tests currently fail because presigned URLs expose Docker-internal `minio:9000`, which host/browser clients cannot resolve.
-- Media-service lint currently has source errors for unused gRPC `call` params in `apps/media-service/src/grpc/media-grpc.controller.ts`.
-- Media-service needs split storage endpoints: internal S3 endpoint for service-to-storage traffic and public/client endpoint for browser/Jest uploads.
-- Product-service source lint errors have been resolved.
-- Remaining product-service lint output is warning-only and mostly in test helpers/specs around untyped HTTP/gRPC test clients.
-- Test warning cleanup is useful, but not the same urgency as source errors.
+- Current local object storage: MinIO.
+- Planned compatible providers: Supabase Storage S3 mode and AWS S3.
+- Admin filemanager is a public media-library lane restricted to `admin/root-admin`.
+- Public filemanager assets live under `MEDIA_PUBLIC_FOLDER`, currently `uploads`.
+- Public filemanager paths should be human-readable, such as `uploads/images/products/hero.webp`.
+- Sensitive files must use feature-owned upload flows, not the general filemanager.
+- `PROTECTED` and `STRICT` media should use opaque storage keys, owner/scope/business context in DB metadata, and short-lived read/render URLs.
+- Storage path is not the security boundary; media-service policy checks are.
+- Heavy processing workers are later work. Workers must not own media access policy.
 
-## Media Roadmap Boundary
+## 10. Docker And Runtime Notes
 
-- Media-service owns policy, records, upload authorization, access classes, storage keys, and media metadata.
-- Object storage owns bytes. Current local provider is MinIO; future provider targets are Supabase Storage S3 mode and AWS S3.
-- Workers should perform heavy processing later; they should not own media policy.
-- Launch-critical media work: presign/finalize contract, public vs internal endpoint split, `PUBLIC|PROTECTED|STRICT` behavior, deterministic key layout, env validation, and storage round-trip tests.
-- P1 media work: provider compatibility docs, immutable originals, variants, image/file editing baseline, and asset bundle metadata.
-- P2 media work: full 3D showroom, streaming pipeline, Go workers, deeper queue/event architecture.
+- Docker service-to-service URLs use Docker DNS names such as `postgres:5432`, `auth-service:50052`, and `minio:9000`.
+- Host tests and browser-facing URLs use exposed localhost ports such as `127.0.0.1:3007` or `127.0.0.1:9000`.
+- Docker Postgres is exposed locally on host port `15432`.
+- MinIO server container should stay running.
+- `minio-init` is expected to exit with status `0` after creating/configuring the bucket.
+- If a service was recreated with `--no-deps`, verify required dependencies are already running and healthy.
+- Docker image release packaging exists through `docker-compose.release.yml`, `deploy/.env.production.example`, and `scripts/docker/*.ps1`.
 
-## Language Placement
+## 11. Language Placement
 
-- TypeScript/Nest remains the request-path API layer for auth, users, settings, media policy, products, blog, taxonomy, and order flows.
-- Go should start as worker services after media contracts are stable: `media-worker-go`, `showroom-asset-worker-go`, then `streaming-worker-go`.
-- Rust should be reserved for later performance-critical or security-sensitive components only after worker boundaries are proven.
-- Python should be reserved for AI/ML/offline media intelligence, analytics experiments, or tooling where Python libraries are clearly better than TypeScript/Go.
+- TypeScript/NestJS remains the request-path API layer for auth, users, settings, media policy, products, blog, taxonomy, and order flows.
+- Go should start later as worker/state infrastructure after contracts are stable: media worker, showroom asset worker, streaming worker, state/search/audit style services.
+- Rust is reserved for later performance-critical 3D/media/browser/mobile acceleration or security-sensitive components after worker boundaries are proven.
+- Python is reserved for AI/ML, analytics, recommendations, tagging, or offline intelligence workflows where Python libraries are clearly better.
 
-## Immediate Next Session Entry
+## 12. Verification Baseline
 
-1. Check `git status --short` before edits because this repo often has a large dirty worktree.
-2. Use `docs/README.md` as the first map for architecture and service boundaries.
-3. Use `docs/architecture/local-dev-and-docker-boot.md` when changing ports, Docker Compose, `.env.example`, or service startup order.
-4. Continue source cleanup before test-warning cleanup when a service still has errors.
-5. For media-service, do not add workers before the media-service contract and DB/job model are clear.
-6. Validate frequently with targeted commands before broad workspace commands.
+### Testing And Health Expectations
 
-## Verification Commands
+TL;DR:
+
+- All backend services expose `/health`.
+- Only some `/health` endpoints currently verify database connectivity.
+- Media-service has the strongest readiness setup right now: HTTP `/health` plus gRPC `Ping`.
+- Most test setup files still prove only that ports are open, not that real gRPC calls work.
+- Full details live in `docs/architecture/testing-and-health.md`.
+
+Testing is part of the service contract, not an afterthought.
+
+For every service contract change, check the matching layer:
+
+- HTTP behavior: route, auth requirement, role behavior, success shape, failure shape.
+- gRPC behavior: method name, metadata requirements, S2S signature, role behavior, status codes.
+- Database behavior: migrations applied, Prisma model shape matches service logic, service can connect to its own DB.
+- S2S behavior: valid internal calls succeed, invalid/spoofed calls fail.
+- Docker behavior: service starts healthy with Docker dependencies and exposed ports.
+
+Preferred test types:
+
+- Unit/security tests for guards, auth decisions, Redis/session rules, and pure service logic.
+- HTTP e2e tests for public/admin/user-facing routes.
+- gRPC e2e tests for service-to-service contracts.
+- Smoke/health tests for `/health`, gRPC readiness, DB reachability, Redis, MinIO/S3, and S2S connectivity.
+
+Do not weaken tests just to make them pass. If a test fails, first decide whether the code is wrong, the test is stale, or the contract intentionally changed.
+
+Targeted commands:
 
 ```powershell
 pnpm -w proto:gen
-pnpm --filter @nebula/product-service build
-pnpm --filter @nebula/product-service exec eslint "{src,apps,libs,test}/**/*.ts"
-pnpm dev:backend
+pnpm --filter @nebula/media-service build
+pnpm --filter @nebula/media-service lint
+pnpm --filter @nebula/media-service test -- --runInBand
 ```
 
 Broader checks when ready:
@@ -111,9 +236,20 @@ docker compose up -d --build
 docker compose ps -a
 ```
 
-## Git Hygiene Note
+Docker DB migration pattern for a service that uses Docker Postgres from the host:
 
-- Avoid casual `git add .` unless the user explicitly wants a full project upload.
-- Stage intentionally by path when preparing normal commits.
+```powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:15432/<db>?schema=public"
+$env:SHADOW_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:15432/postgres?schema=<shadow_schema>"
+pnpm --filter @nebula/<service> prisma:migrate:deploy
+Remove-Item Env:DATABASE_URL
+Remove-Item Env:SHADOW_DATABASE_URL
+```
+
+## 13. Git Hygiene
+
+- Avoid casual `git add .` unless Salar explicitly wants a full project upload.
+- Stage intentionally by path during normal work.
+- Commit and push only when Salar explicitly asks.
 - Keep generated logs, build output, local envs, and secrets out of git.
-- Do not delete old user notes or reports unless the user names them directly.
+- Do not delete old user notes, reports, or docs unless Salar names them directly.
