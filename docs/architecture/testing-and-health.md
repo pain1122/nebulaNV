@@ -203,6 +203,21 @@ rg --files apps\product-service | rg "taxonomy"
 Get-Content -Raw apps\product-service\src\taxonomy\taxonomy.service.ts
 ```
 
+Do not use Bash-style `&&` command chaining in PowerShell. Use separate commands or `;` only when sequential execution is safe.
+
+Good:
+
+```powershell
+git add -A AI_CONTEXT.md docs
+git status --short
+```
+
+Also acceptable when the first command does not need to gate the second:
+
+```powershell
+git add -A AI_CONTEXT.md docs; git status --short
+```
+
 Avoid shell glob assumptions that work in bash but fail in PowerShell.
 
 Prefer explicit paths and repo searches over commands like:

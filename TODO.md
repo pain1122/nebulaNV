@@ -1,6 +1,6 @@
 ﻿# TODO: NebulaNV Stabilization Board
 
-Last updated: 2026-06-10
+Last updated: 2026-06-22
 Current mode: stabilize, document, verify, then ship in controlled slices.
 Scope source of truth: `site essentials.md`
 Developer docs index: `docs/README.md`
@@ -141,6 +141,7 @@ Two-lane media rule: the admin filemanager is the public media-library lane and 
 
 - [x] Document local startup dependency graph and ports.
 - [x] Document Docker Compose default backend stack behavior.
+- [ ] Critical: make auth/S2S request time validation server-runtime authoritative. Do not trust client/caller machine time to extend validity windows; clamp any timestamp/bucket checks to receiving server time with a small allowed skew so clock drift is visible and client clock freezing cannot create infinite valid buckets.
 - [ ] Add MinIO healthcheck or document why Compose shows plain `Up` for MinIO.
 - [ ] Add Docker/Kubernetes env notes for internal service URLs vs public/browser URLs.
 - [ ] Keep release Compose compatible with future Kubernetes: no app state in containers, secrets from env, DB/media in volumes/services, migrations as jobs.

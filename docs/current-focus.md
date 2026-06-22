@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-06-17
+Last updated: 2026-06-22
 
 ## Active Phase
 
@@ -18,6 +18,9 @@ Make media-service fully functional for admin filemanager public assets, S3-comp
 - Media-service MinIO/S3 presign/finalize/read-url smoke path works.
 - Docker release image/load/save docs added.
 - AI context and testing/health docs started.
+- Package docs added for protos, config, clients, and grpc-auth.
+- Docker configuration map added at `docs/docker-configs.md`.
+- Docs index now points to package notes and Docker config notes.
 
 ## Immediate Next Work
 
@@ -25,7 +28,7 @@ Make media-service fully functional for admin filemanager public assets, S3-comp
 2. Add folder/list/search behavior tests.
 3. Add stronger media health checks for DB + MinIO/S3.
 4. Decide whether to add gRPC `Ping` to more services.
-5. Update TODO based on what is now done.
+5. Keep TODO/docs aligned as contract freeze work continues.
 
 ## Not Now
 

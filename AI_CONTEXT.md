@@ -1,6 +1,6 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-06-17
+Last updated: 2026-06-22
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
 ## 1. Collaboration Contract
@@ -41,6 +41,8 @@ Purpose: fast, safe handoff for AI/developer sessions without re-discovering the
 - Developer docs index: `docs/README.md`.
 - Contract/boundary rules: `docs/architecture/contracts-and-boundaries.md`.
 - Boot/runbook: `docs/architecture/local-dev-and-docker-boot.md`.
+- Docker/Compose/release image map: `docs/docker-configs.md`.
+- Shared package notes: `docs/packages/*.md`.
 - Current focus file: `docs/current-focus.md`.
 - Active report file: planned as `docs/reports/active-report.md`; until it exists, use latest files in `docs/reports/`.
 
@@ -55,7 +57,8 @@ For any task, load context in this order:
 5. `docs/architecture/contracts-and-boundaries.md` when changing DTO/proto/service/Prisma/mapper behavior
 6. Relevant `docs/services/<service>.md`
 7. Relevant `docs/packages/<package>.md` when package docs exist
-8. Only then inspect source files
+8. `docs/docker-configs.md` when changing Compose, Dockerfiles, image release flow, env boundaries, or runtime URLs
+9. Only then inspect source files
 
 Use source files as final truth when docs and code disagree.
 
@@ -117,6 +120,7 @@ When output is too large:
 PowerShell rules:
 
 - Prefer single quotes around search patterns.
+- Do not use Bash-style command chaining such as `&&` in PowerShell. Use `;` only when sequential execution is safe, or run commands as separate tool calls.
 - Avoid complicated nested quote regex in one command.
 - Prefer simple repeated searches over one clever fragile command.
 - Do not pass Unix-style globs like `apps/*/jest.config.ts` directly to `rg` in PowerShell; use `rg --files` and pipe/narrow, or use `Get-ChildItem`.

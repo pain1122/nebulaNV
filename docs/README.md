@@ -12,8 +12,10 @@ For most backend tasks, read in this order:
 2. [System Relationships](architecture/system-relationships.md)
 3. [Contracts And Boundaries](architecture/contracts-and-boundaries.md)
 4. The relevant service note under [Service Notes](#service-notes)
-5. [Testing And Health](architecture/testing-and-health.md) if changing behavior or verification
-6. [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md) if running services or Docker
+5. The relevant package note under [Package Notes](#package-notes) if touching shared packages
+6. [Testing And Health](architecture/testing-and-health.md) if changing behavior or verification
+7. [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md) if running services or Docker
+8. [Docker Configs](docker-configs.md) if changing Compose, images, env, Dockerfiles, or release packaging
 
 ## Architecture Notes
 
@@ -21,6 +23,14 @@ For most backend tasks, read in this order:
 - [Contracts And Boundaries](architecture/contracts-and-boundaries.md): DTO/proto/service/Prisma/mapper rules, naming, identity, cross-service clients.
 - [Testing And Health](architecture/testing-and-health.md): build/lint/test layers, health model, readiness gaps, verification checklist.
 - [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md): ports, Docker/runtime URLs, DB migration patterns, WSL/Docker clock drift.
+- [Docker Configs](docker-configs.md): Compose files, backend Dockerfile, release image flow, env boundaries, Docker guardrails.
+
+## Package Notes
+
+- [Protos Package](packages/protos.md)
+- [Config Package](packages/config.md)
+- [Clients Package](packages/clients.md)
+- [gRPC Auth Package](packages/grpc-auth.md)
 
 ## Service Notes
 
@@ -62,4 +72,6 @@ When changing a service contract:
 - Update `system-relationships.md` if connections changed.
 - Update `contracts-and-boundaries.md` only if a global rule changed.
 - Update `testing-and-health.md` if verification expectations changed.
+- Update package notes if a shared package contract or exported helper changed.
+- Update `docker-configs.md` if Compose, Dockerfiles, release images, or runtime env boundaries changed.
 - Validate related file paths before adding them to docs.
