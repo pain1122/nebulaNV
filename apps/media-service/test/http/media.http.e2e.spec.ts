@@ -24,6 +24,57 @@ describe("media-service HTTP (admin-only)", () => {
     adminAccess = at.accessToken;
   });
 
+  async function uploadPublicMedia(folderPath: string, displayName: string) {
+    const presign = await httpJson<any>(
+      "POST",
+      `${MEDIA_HTTP}/media/presign`,
+      {
+        filename: displayName,
+        mimeType: "image/webp",
+        folderPath,
+        displayName,
+        visibility: "public",
+        scope: "panel",
+      },
+      { authorization: `Bearer ${adminAccess}` },
+    );
+
+    const up = await fetch(presign.data.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": "image/webp" },
+      body: Buffer.from("hello"),
+    });
+    expect([200, 204]).toContain(up.status);
+
+    const created = await httpJson<any>(
+      "POST",
+      `${MEDIA_HTTP}/media/finalize`,
+      {
+        storage: "s3",
+        bucket: presign.data.bucket,
+        path: presign.data.path,
+        folderPath: presign.data.folderPath,
+        displayName: presign.data.displayName,
+        originalFilename: presign.data.originalFilename,
+        filename: presign.data.filename,
+        mimeType: presign.data.mimeType,
+        visibility: presign.data.visibility,
+        scope: presign.data.scope,
+      },
+      { authorization: `Bearer ${adminAccess}` },
+    );
+
+    return created.data;
+  }
+
+  it("GET /health reports DB and storage checks", async () => {
+    const health = await httpJson<any>("GET", `${MEDIA_HTTP}/health`);
+
+    expect(health.status).toBe("ok");
+    expect(health.checks.db.status).toBe("ok");
+    expect(["ok", "skipped"]).toContain(health.checks.storage.status);
+  });
+
   it("POST /media/presign requires admin (user denied, admin allowed)", async () => {
     const body = {
       filename: `e2e_${Math.random().toString(36).slice(2, 8)}.webp`,
@@ -185,5 +236,157 @@ describe("media-service HTTP (admin-only)", () => {
       },
     );
     expect(del).toEqual({ deleted: true });
+  });
+
+  it("GET /media/browse returns Supabase-style folders and files", async () => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const baseFolder = `/test/browse_${suffix}`;
+    const heroName = `hero_${suffix}.webp`;
+    const sideName = `side_${suffix}.webp`;
+    const ids: string[] = [];
+
+    try {
+      const hero = await uploadPublicMedia(`${baseFolder}/shoes`, heroName);
+      const side = await uploadPublicMedia(
+        `${baseFolder}/shoes/gallery`,
+        sideName,
+      );
+      ids.push(hero.id, side.id);
+
+      const rootBrowse = await httpJson<any>(
+        "GET",
+        `${MEDIA_HTTP}/media/browse?take=200`,
+        undefined,
+        { authorization: `Bearer ${adminAccess}` },
+      );
+      expect(rootBrowse.data.folders.some((f: any) => f.name === "test")).toBe(
+        true,
+      );
+
+      const testBrowse = await httpJson<any>(
+        "GET",
+        `${MEDIA_HTTP}/media/browse?path=${encodeURIComponent("test")}&take=200`,
+        undefined,
+        { authorization: `Bearer ${adminAccess}` },
+      );
+      expect(
+        testBrowse.data.folders.some((f: any) => f.name === `browse_${suffix}`),
+      ).toBe(true);
+
+      const baseBrowse = await httpJson<any>(
+        "GET",
+        `${MEDIA_HTTP}/media/browse?folderPath=${encodeURIComponent(baseFolder)}&take=200`,
+        undefined,
+        { authorization: `Bearer ${adminAccess}` },
+      );
+      expect(baseBrowse.data.folders.some((f: any) => f.name === "shoes")).toBe(
+        true,
+      );
+      expect(Array.isArray(baseBrowse.data.files)).toBe(true);
+
+      const shoesBrowse = await httpJson<any>(
+        "GET",
+        `${MEDIA_HTTP}/media/browse?path=${encodeURIComponent(`${baseFolder.slice(1)}/shoes`)}&take=200`,
+        undefined,
+        { authorization: `Bearer ${adminAccess}` },
+      );
+      expect(
+        shoesBrowse.data.folders.some((f: any) => f.name === "gallery"),
+      ).toBe(true);
+      expect(
+        shoesBrowse.data.files.some(
+          (file: any) => file.displayName === heroName,
+        ),
+      ).toBe(true);
+
+      const searchBrowse = await httpJson<any>(
+        "GET",
+        `${MEDIA_HTTP}/media/browse?folderPath=${encodeURIComponent(`${baseFolder}/shoes`)}&search=${encodeURIComponent("hero")}`,
+        undefined,
+        { authorization: `Bearer ${adminAccess}` },
+      );
+      expect(
+        searchBrowse.data.files.some(
+          (file: any) => file.displayName === heroName,
+        ),
+      ).toBe(true);
+      expect(
+        searchBrowse.data.files.some(
+          (file: any) => file.displayName === sideName,
+        ),
+      ).toBe(false);
+    } finally {
+      for (const id of ids) {
+        await httpJson<any>("DELETE", `${MEDIA_HTTP}/media/${id}`, undefined, {
+          authorization: `Bearer ${adminAccess}`,
+        }).catch(() => undefined);
+      }
+    }
+  });
+
+  it("POST /media/presign rejects protected/strict filemanager uploads", async () => {
+    const base = {
+      filename: "secret.webp",
+      mimeType: "image/webp",
+      folderPath: "/test/private",
+      displayName: "secret.webp",
+      scope: "panel",
+    };
+
+    await expect(
+      httpJson<any>(
+        "POST",
+        `${MEDIA_HTTP}/media/presign`,
+        { ...base, accessClass: "PROTECTED" },
+        { authorization: `Bearer ${adminAccess}` },
+      ),
+    ).rejects.toBeTruthy();
+
+    await expect(
+      httpJson<any>(
+        "POST",
+        `${MEDIA_HTTP}/media/presign`,
+        { ...base, accessClass: "STRICT" },
+        { authorization: `Bearer ${adminAccess}` },
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it("POST /media/finalize rejects protected/strict public filemanager paths", async () => {
+    await expect(
+      httpJson<any>(
+        "POST",
+        `${MEDIA_HTTP}/media/finalize`,
+        {
+          storage: "s3",
+          bucket: "media",
+          path: "uploads/test/private/secret.webp",
+          filename: "secret.webp",
+          mimeType: "image/webp",
+          accessClass: "STRICT",
+          scope: "panel",
+        },
+        { authorization: `Bearer ${adminAccess}` },
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it("POST /media/finalize rejects descriptive protected/strict private paths", async () => {
+    await expect(
+      httpJson<any>(
+        "POST",
+        `${MEDIA_HTTP}/media/finalize`,
+        {
+          storage: "s3",
+          bucket: "media",
+          path: "private/objects/products/secret.webp",
+          filename: "secret.webp",
+          mimeType: "image/webp",
+          accessClass: "STRICT",
+          scope: "panel",
+        },
+        { authorization: `Bearer ${adminAccess}` },
+      ),
+    ).rejects.toBeTruthy();
   });
 });

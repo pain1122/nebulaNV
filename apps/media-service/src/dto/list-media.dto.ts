@@ -15,6 +15,9 @@ const trim = ({ value }: TransformFnParams): unknown =>
 const upperTrim = ({ value }: TransformFnParams): unknown =>
   typeof value === "string" ? value.trim().toUpperCase() : value;
 
+const lowerTrim = ({ value }: TransformFnParams): unknown =>
+  typeof value === "string" ? value.trim().toLowerCase() : value;
+
 const numberOrUndefined = ({ value }: TransformFnParams): number | undefined =>
   value === undefined ? undefined : Number(value);
 
@@ -23,6 +26,16 @@ export class ListMediaDto {
   @IsString()
   @Transform(trim)
   q?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  path?: string;
 
   @IsOptional()
   @Transform(numberOrUndefined)
@@ -60,7 +73,29 @@ export class ListMediaDto {
   @Transform(trim)
   folderPath?: string;
 
-  // ✅ new lifecycle filters (DTO-only, no Prisma typing)
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  mimeType?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(lowerTrim)
+  @IsIn(["image", "video", "audio", "document"])
+  mediaType?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(lowerTrim)
+  @IsIn(["name", "createdAt", "updatedAt", "size"])
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(lowerTrim)
+  @IsIn(["asc", "desc"])
+  order?: string;
+
   @IsOptional()
   @IsIn(["PENDING", "READY", "BLOCKED", "DELETED"])
   status?: string;

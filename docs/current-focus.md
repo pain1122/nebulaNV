@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-06-22
+Last updated: 2026-06-23
 
 ## Active Phase
 
@@ -8,7 +8,7 @@ P0-0 Media-service foundation and filemanager safety.
 
 ## Current Goal
 
-Make media-service fully functional for admin filemanager public assets, S3-compatible storage, Supabase/AWS readiness, and strict separation from future protected/private upload flows.
+Freeze the media-service launch contract after the storage-key boundary, public filemanager browse contract, and stronger health checks are verified.
 
 ## Recently Completed
 
@@ -21,19 +21,25 @@ Make media-service fully functional for admin filemanager public assets, S3-comp
 - Package docs added for protos, config, clients, and grpc-auth.
 - Docker configuration map added at `docs/docker-configs.md`.
 - Docs index now points to package notes and Docker config notes.
+- Media storage-key boundary enforced for public descriptive keys vs protected/strict opaque keys.
+- Media HTTP and gRPC focused e2e tests cover public filemanager paths and protected/strict rejection cases.
+- Media admin browse endpoint added with Supabase-style `{ folders, files }` output for public filemanager navigation.
+- Media health now checks DB and S3-compatible storage reachability.
+- Rebuilt media-service Docker image verified with `/health` reporting DB and MinIO/S3 checks as `ok`.
+- Supabase/filemanager policy conclusion report added at `docs/reports/2026-06-23-media-filemanager-and-supabase-conclusion.md`.
 
 ## Immediate Next Work
 
-1. Finish media-service public filemanager contract.
-2. Add folder/list/search behavior tests.
-3. Add stronger media health checks for DB + MinIO/S3.
-4. Decide whether to add gRPC `Ping` to more services.
-5. Keep TODO/docs aligned as contract freeze work continues.
+1. Decide whether legacy direct `POST /media` remains admin-only compatibility or moves toward finalize-only writes.
+2. Define public file collision behavior for `(scope, folderPath, displayName)` before frontend media picker work grows.
+3. Freeze media HTTP contract for health, list/get/create/delete, browse, presign, finalize, and admin read-url behavior.
+4. Freeze media gRPC contract for Ping, Create, GetById, List, DeleteById, PresignUpload, and FinalizeUpload.
+5. Start the admin media picker/filemanager UI against `GET /media/browse` after the backend contract is accepted.
 
 ## Not Now
 
 - Go workers.
 - Rust/WebXR optimization.
 - Kubernetes manifests.
-- Protected/strict media full feature flows.
+- Full protected/strict media UX/render flows beyond the opaque-key boundary.
 - Streaming pipeline.

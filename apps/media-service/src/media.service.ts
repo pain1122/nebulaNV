@@ -11,12 +11,14 @@ import {
   S3Client,
   PutObjectCommand,
   HeadObjectCommand,
+  HeadBucketCommand,
   GetObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   AccessClass as PrismaAccessClass,
+  type Media,
   MediaStatus,
   Prisma,
   ScanStatus,
@@ -24,6 +26,9 @@ import {
 
 const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const SAFE_FOLDER_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const OPAQUE_KEY_SEGMENT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function safeTrim(value: string): string;
 function safeTrim<T>(value: T): T;
 function safeTrim(value: unknown): unknown {
@@ -80,6 +85,24 @@ export type FinalizeUploadInput = OwnerScopedInput & {
 
 export type CreateReadUrlInput = ActorContext & {
   download?: boolean;
+};
+
+type BrowseFolderEntry = {
+  id: null;
+  type: "folder";
+  name: string;
+  path: string;
+  folderPath: string;
+  metadata: null;
+};
+
+type BrowseFileEntry = Media & {
+  type: "file";
+  name: string;
+  metadata: {
+    size: number;
+    mimetype: string;
+  };
 };
 
 const ACCESS_CLASS_SET = new Set<AccessClass>(Object.values(PrismaAccessClass));
@@ -166,6 +189,23 @@ export class MediaService {
 
     this.publicS3 = new S3Client(this.getS3Config(endpoint));
     return this.publicS3;
+  }
+
+  async checkStorageHealth() {
+    const driver = process.env.MEDIA_STORAGE_DRIVER ?? "s3";
+    if (driver !== "s3") {
+      return { status: "skipped" as const, driver };
+    }
+
+    const bucket = process.env.MEDIA_S3_BUCKET || "media";
+    await this.getInternalS3().send(new HeadBucketCommand({ Bucket: bucket }));
+
+    return {
+      status: "ok" as const,
+      driver,
+      provider: process.env.MEDIA_STORAGE_PROVIDER ?? "s3",
+      bucket,
+    };
   }
 
   private normalizeAccessClass(input?: string | null): AccessClass | undefined {
@@ -261,6 +301,123 @@ export class MediaService {
     return `/${segments.join("/")}`;
   }
 
+  private normalizeBrowseFolderPath(value?: string | null): string {
+    const raw = safeTrim(value ?? "") || "";
+    let stripped = raw === "/" ? "" : raw.replace(/^\/+|\/+$/g, "");
+    const publicRoot = this.getFolderRoot("MEDIA_PUBLIC_FOLDER", "uploads");
+
+    if (stripped === publicRoot) return "/";
+    if (stripped.startsWith(`${publicRoot}/`)) {
+      stripped = stripped.slice(publicRoot.length + 1);
+    }
+
+    return this.normalizeFilemanagerFolderPath(stripped);
+  }
+
+  private toBrowsePath(folderPath: string): string {
+    return folderPath === "/" ? "" : folderPath.slice(1);
+  }
+
+  private childFolderName(
+    parentFolderPath: string,
+    candidateFolderPath: string,
+  ): string | null {
+    if (candidateFolderPath === parentFolderPath) return null;
+
+    const relative =
+      parentFolderPath === "/"
+        ? candidateFolderPath.replace(/^\/+/, "")
+        : candidateFolderPath.startsWith(`${parentFolderPath}/`)
+          ? candidateFolderPath.slice(parentFolderPath.length + 1)
+          : "";
+
+    const child = relative.split("/").filter(Boolean)[0];
+    return child || null;
+  }
+
+  private buildSearchWhere(search: string): Prisma.MediaWhereInput | undefined {
+    if (!search) return undefined;
+
+    return {
+      OR: [
+        { filename: { contains: search, mode: "insensitive" } },
+        { displayName: { contains: search, mode: "insensitive" } },
+        { originalFilename: { contains: search, mode: "insensitive" } },
+        { path: { contains: search, mode: "insensitive" } },
+        { mimeType: { contains: search, mode: "insensitive" } },
+        { sha256: { contains: search, mode: "insensitive" } },
+      ],
+    };
+  }
+
+  private buildMediaTypeWhere(
+    mediaType?: string,
+  ): Prisma.MediaWhereInput | undefined {
+    if (!mediaType) return undefined;
+
+    if (
+      mediaType === "image" ||
+      mediaType === "video" ||
+      mediaType === "audio"
+    ) {
+      return { mimeType: { startsWith: `${mediaType}/` } };
+    }
+
+    if (mediaType === "document") {
+      return {
+        OR: [
+          { mimeType: "application/pdf" },
+          { mimeType: { startsWith: "text/" } },
+          { mimeType: { contains: "msword", mode: "insensitive" } },
+          { mimeType: { contains: "officedocument", mode: "insensitive" } },
+        ],
+      };
+    }
+
+    return undefined;
+  }
+
+  private buildBrowseFileOrder(
+    sortBy?: string,
+    order?: string,
+  ): Prisma.MediaOrderByWithRelationInput {
+    const direction = order === "desc" ? "desc" : "asc";
+
+    if (sortBy === "createdAt") return { createdAt: direction };
+    if (sortBy === "updatedAt") return { updatedAt: direction };
+    if (sortBy === "size") return { sizeBytes: direction };
+    return { displayName: direction };
+  }
+
+  private createBrowseFolderEntry(
+    parentFolderPath: string,
+    name: string,
+  ): BrowseFolderEntry {
+    const folderPath =
+      parentFolderPath === "/" ? `/${name}` : `${parentFolderPath}/${name}`;
+
+    return {
+      id: null,
+      type: "folder",
+      name,
+      path: this.toBrowsePath(folderPath),
+      folderPath,
+      metadata: null,
+    };
+  }
+
+  private createBrowseFileEntry(row: Media): BrowseFileEntry {
+    return {
+      ...row,
+      type: "file",
+      name: row.displayName || row.filename,
+      metadata: {
+        size: row.sizeBytes,
+        mimetype: row.mimeType,
+      },
+    };
+  }
+
   private resolveDisplayName(filename: string, displayName?: string | null) {
     const resolved = safeTrim(displayName ?? "") || filename;
     if (!SAFE_FILENAME.test(resolved)) {
@@ -268,6 +425,59 @@ export class MediaService {
     }
 
     return resolved;
+  }
+
+  private isUnderFolderRoot(
+    path: string,
+    envName: string,
+    fallback: string,
+  ): boolean {
+    const root = this.getFolderRoot(envName, fallback);
+    return path === root || path.startsWith(`${root}/`);
+  }
+
+  private enforceFinalizeStorageLane(
+    path: string,
+    accessClass: AccessClass,
+    input: Pick<FinalizeUploadInput, "folderPath" | "displayName">,
+  ): void {
+    const isPublicPath = this.isUnderFolderRoot(
+      path,
+      "MEDIA_PUBLIC_FOLDER",
+      "uploads",
+    );
+
+    if (accessClass === "PUBLIC") {
+      if (!isPublicPath) {
+        throw new BadRequestException("public_uploads_must_use_public_folder");
+      }
+      return;
+    }
+
+    if (
+      isPublicPath ||
+      input.folderPath !== undefined ||
+      input.displayName !== undefined
+    ) {
+      throw new BadRequestException("sensitive_uploads_must_use_opaque_keys");
+    }
+
+    const privateRoot = this.getFolderRoot(
+      "MEDIA_PRIVATE_FOLDER",
+      "private/objects",
+    );
+    const opaqueSegment = path.split("/").pop() ?? "";
+    const expectedPrivatePath = `${privateRoot}/${opaqueSegment}`;
+
+    if (
+      isPublicPath ||
+      path !== expectedPrivatePath ||
+      !OPAQUE_KEY_SEGMENT.test(opaqueSegment) ||
+      input.folderPath !== undefined ||
+      input.displayName !== undefined
+    ) {
+      throw new BadRequestException("sensitive_uploads_must_use_opaque_keys");
+    }
   }
 
   private createPublicLibraryKey(
@@ -463,6 +673,109 @@ export class MediaService {
     });
   }
 
+  async browsePublicFilemanager(dto: ListMediaDto) {
+    const take = Math.min(Math.max(dto.take ?? 50, 1), 200);
+    const skip = Math.max(dto.skip ?? 0, 0);
+    const search = ((dto.search ?? dto.q) || "").trim();
+    const folderPath = this.normalizeBrowseFolderPath(
+      dto.path ?? dto.folderPath,
+    );
+    const requestedAccessClass = this.normalizeAccessClass(dto.accessClass);
+
+    if (requestedAccessClass && requestedAccessClass !== "PUBLIC") {
+      throw new BadRequestException("filemanager_browse_is_public_only");
+    }
+
+    if (dto.visibility && dto.visibility !== "public") {
+      throw new BadRequestException("filemanager_browse_is_public_only");
+    }
+
+    const publicRoot = this.getFolderRoot("MEDIA_PUBLIC_FOLDER", "uploads");
+    const baseWhere: Prisma.MediaWhereInput = {
+      accessClass: "PUBLIC",
+      visibility: "public",
+      path: { startsWith: `${publicRoot}/` },
+      ...(dto.ownerId ? { ownerId: dto.ownerId } : {}),
+      ...(dto.scope ? { scope: dto.scope } : {}),
+    };
+
+    if (dto.status && MEDIA_STATUS_SET.has(dto.status)) {
+      baseWhere.status = dto.status as MediaStatus;
+    }
+
+    if (dto.scanStatus && SCAN_STATUS_SET.has(dto.scanStatus)) {
+      baseWhere.scanStatus = dto.scanStatus as ScanStatus;
+    }
+
+    const browseFilters: Prisma.MediaWhereInput[] = [];
+    const searchWhere = this.buildSearchWhere(search);
+    const mediaTypeWhere = this.buildMediaTypeWhere(dto.mediaType);
+
+    if (searchWhere) browseFilters.push(searchWhere);
+    if (dto.mimeType) browseFilters.push({ mimeType: dto.mimeType });
+    if (mediaTypeWhere) browseFilters.push(mediaTypeWhere);
+
+    const fileWhere: Prisma.MediaWhereInput = {
+      ...baseWhere,
+      folderPath,
+      ...(browseFilters.length ? { AND: browseFilters } : {}),
+    };
+
+    const childPrefix = folderPath === "/" ? "/" : `${folderPath}/`;
+    const descendantWhere: Prisma.MediaWhereInput = {
+      ...baseWhere,
+      folderPath: { startsWith: childPrefix },
+      NOT: { folderPath },
+    };
+
+    const fileFetchLimit = Math.min(skip + take, 500);
+    const [fileRows, descendantRows] = await Promise.all([
+      this.prisma.media.findMany({
+        where: fileWhere,
+        orderBy: this.buildBrowseFileOrder(dto.sortBy, dto.order),
+        take: fileFetchLimit,
+      }),
+      this.prisma.media.findMany({
+        where: descendantWhere,
+        select: { folderPath: true },
+        distinct: ["folderPath"],
+        take: 5_000,
+      }),
+    ]);
+
+    const searchLower = search.toLowerCase();
+    const folderNames = new Set<string>();
+
+    for (const row of descendantRows) {
+      const name = this.childFolderName(folderPath, row.folderPath);
+      if (!name) continue;
+      if (searchLower && !name.toLowerCase().includes(searchLower)) continue;
+      folderNames.add(name);
+    }
+
+    const folderDirection = dto.order === "desc" ? -1 : 1;
+    const folderEntries = Array.from(folderNames)
+      .sort((a, b) => a.localeCompare(b) * folderDirection)
+      .map((name) => this.createBrowseFolderEntry(folderPath, name));
+
+    const fileEntries = fileRows.map((row) => this.createBrowseFileEntry(row));
+    const items = [...folderEntries, ...fileEntries].slice(skip, skip + take);
+    const folders = items.filter((item) => item.type === "folder");
+    const files = items.filter((item) => item.type === "file");
+    const browsePath = this.toBrowsePath(folderPath);
+
+    return {
+      path: browsePath,
+      folderPath,
+      storagePrefix: browsePath ? `${publicRoot}/${browsePath}` : publicRoot,
+      limit: take,
+      offset: skip,
+      folders,
+      files,
+      items,
+    };
+  }
+
   // Filemanager presign creates a public-library object key.
   async presignUpload(b: PresignUploadInput) {
     const bucket = process.env.MEDIA_S3_BUCKET || "media";
@@ -544,13 +857,30 @@ export class MediaService {
     if (!SAFE_FILENAME.test(filename))
       throw new BadRequestException("filename is not safe");
 
-    const libraryMetadata = this.derivePublicLibraryMetadata(
-      path,
-      filename,
-      input.folderPath,
-      input.displayName,
-      input.originalFilename,
+    const accessClass = this.resolveAccessClass(
+      input.accessClass,
+      input.visibility,
     );
+
+    this.enforceFinalizeStorageLane(path, accessClass, {
+      folderPath: input.folderPath,
+      displayName: input.displayName,
+    });
+
+    const libraryMetadata =
+      accessClass === "PUBLIC"
+        ? this.derivePublicLibraryMetadata(
+            path,
+            filename,
+            input.folderPath,
+            input.displayName,
+            input.originalFilename,
+          )
+        : {
+            folderPath: "/",
+            displayName: filename,
+            originalFilename: input.originalFilename ?? filename,
+          };
 
     const client = this.getInternalS3();
 
@@ -579,10 +909,6 @@ export class MediaService {
       throw new BadRequestException("mimeType_not_allowed");
     }
 
-    const accessClass = this.resolveAccessClass(
-      input.accessClass,
-      input.visibility,
-    );
     const visibility = this.visibilityFromAccessClass(accessClass);
     const scope = safeTrim(input.scope) || "panel";
 

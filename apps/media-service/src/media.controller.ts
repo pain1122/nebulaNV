@@ -64,6 +64,12 @@ export class MediaController {
   }
 
   @Roles("admin", "root-admin")
+  @Get("browse")
+  async browse(@Query() q: ListMediaDto) {
+    return { data: await this.svc.browsePublicFilemanager(q) };
+  }
+
+  @Roles("admin", "root-admin")
   @Get(":id")
   async get(@Param() p: GetMediaDto) {
     return { data: await this.svc.getById(p.id) };

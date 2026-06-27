@@ -50,10 +50,10 @@ Two-lane media rule: the admin filemanager is the public media-library lane and 
 - [x] Ensure generated upload/read URLs use the public endpoint, not Docker-internal `minio:9000`.
 - [x] Add configurable media folder roots: `MEDIA_PUBLIC_FOLDER`, `MEDIA_PRIVATE_FOLDER`, and `MEDIA_SYSTEM_FOLDER`.
 - [x] Normalize configured folder roots to S3-safe `/` paths and reject `..`, leading slash, and ambiguous backslashes.
-- [ ] Define two-lane storage key strategy: human paths under public filemanager root, opaque generated keys under private/system roots.
+- [x] Define two-lane storage key strategy: human paths under public filemanager root, opaque generated keys under private/system roots.
 - [x] Implement public filemanager storage keys under `MEDIA_PUBLIC_FOLDER/{folderPath}/{displayName}`.
-- [ ] Use descriptive physical storage keys only for approved public library assets and public SEO/render variants.
-- [ ] Use opaque storage keys for `PROTECTED` and `STRICT` originals.
+- [x] Use descriptive physical storage keys only for approved public library assets and public SEO/render variants.
+- [x] Use opaque storage keys for `PROTECTED` and `STRICT` originals.
 
 #### P0-0B Admin Filemanager Contract
 
@@ -63,8 +63,8 @@ Two-lane media rule: the admin filemanager is the public media-library lane and 
 - [ ] Limit admin filemanager browse/upload/delete actions to `MEDIA_PUBLIC_FOLDER`.
 - [x] Treat filemanager uploads as public media-library assets by default.
 - [x] Allow admins to create arbitrary folder structures under `MEDIA_PUBLIC_FOLDER`.
-- [ ] Add admin browse endpoint returning `{ folders, files }` for a selected public-library folder path.
-- [ ] Add browse/search filters for public filemanager: folder, q, media type, MIME type, status, scanStatus, and accessClass.
+- [x] Add admin browse endpoint returning `{ folders, files }` for a selected public-library folder path.
+- [x] Add browse/search filters for public filemanager: folder, q, media type, MIME type, status, scanStatus, and accessClass.
 - [ ] Decide whether legacy direct `POST /media` create stays admin-only compatibility or is replaced by finalize-only writes.
 - [ ] Add filemanager tests for admin/root-admin only: list, get, presign, finalize, read-url, delete.
 - [ ] Add filemanager actions checklist: create folder, rename folder/file, move/copy file, metadata update, soft-delete or hard-delete decision.

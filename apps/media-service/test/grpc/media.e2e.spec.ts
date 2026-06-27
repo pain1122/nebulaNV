@@ -101,6 +101,72 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
     expect(del).toEqual({ deleted: true });
   });
 
+  it("PresignUpload rejects protected/strict filemanager uploads", async () => {
+    const base = {
+      filename: "secret.webp",
+      mimeType: "image/webp",
+      folderPath: "/test/private",
+      displayName: "secret.webp",
+      scope: "panel",
+    };
+
+    await expect(
+      call<any>(
+        client,
+        "PresignUpload",
+        { ...base, accessClass: "PROTECTED" },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toBeTruthy();
+
+    await expect(
+      call<any>(
+        client,
+        "PresignUpload",
+        { ...base, accessClass: "STRICT" },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it("FinalizeUpload rejects protected/strict public filemanager paths", async () => {
+    await expect(
+      call<any>(
+        client,
+        "FinalizeUpload",
+        {
+          storage: "s3",
+          bucket: "media",
+          path: "uploads/test/private/secret.webp",
+          filename: "secret.webp",
+          mimeType: "image/webp",
+          accessClass: "STRICT",
+          scope: "panel",
+        },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it("FinalizeUpload rejects descriptive protected/strict private paths", async () => {
+    await expect(
+      call<any>(
+        client,
+        "FinalizeUpload",
+        {
+          storage: "s3",
+          bucket: "media",
+          path: "private/objects/products/secret.webp",
+          filename: "secret.webp",
+          mimeType: "image/webp",
+          accessClass: "STRICT",
+          scope: "panel",
+        },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toBeTruthy();
+  });
+
   it("Missing signature → request fails", async () => {
     await expect(
       call<any>(client, "PresignUpload", {
