@@ -12,6 +12,25 @@ import { Public, Roles, resolveCtxUser, toRpc } from "@nebula/grpc-auth";
 import { media } from "@nebula/protos";
 import type { ListMediaDto } from "../dto";
 
+type GrpcPresignOutput = {
+  storage?: string | null;
+  bucket?: string | null;
+  path?: string | null;
+  uploadUrl?: string | null;
+  expiresIn?: number | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  visibility?: string | null;
+  accessClass?: string | null;
+  scope?: string | null;
+  folderPath?: string | null;
+  displayName?: string | null;
+  originalFilename?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  ownerId?: string | null;
+};
+
 @Controller()
 export class MediaGrpcController {
   private readonly log = new Logger(MediaGrpcController.name);
@@ -30,6 +49,152 @@ export class MediaGrpcController {
     }
 
     return ctx.userId ?? null;
+  }
+
+  private listInput(
+    req: media.ListReq,
+    ctx: { userId?: string | null; role?: string },
+    overrides: Partial<ListMediaDto> = {},
+  ): ListMediaDto {
+    return {
+      q: req.q ?? "",
+      take: req.take ?? 50,
+      skip: req.skip ?? 0,
+      ownerId:
+        overrides.ownerId ??
+        (req.ownerId?.trim()
+          ? (this.resolveOwnerId(ctx, req.ownerId) ?? undefined)
+          : undefined),
+      accessClass:
+        overrides.accessClass ??
+        (req.accessClass?.trim() ? req.accessClass.trim() : undefined),
+      visibility:
+        overrides.visibility ??
+        (req.visibility?.trim() ? req.visibility.trim() : undefined),
+      scope: overrides.scope ?? (req.scope?.trim() ? req.scope.trim() : undefined),
+      entityType:
+        overrides.entityType ??
+        (req.entityType?.trim() ? req.entityType.trim() : undefined),
+      entityId:
+        overrides.entityId ??
+        (req.entityId?.trim() ? req.entityId.trim() : undefined),
+      folderPath:
+        overrides.folderPath ??
+        (req.folderPath?.trim() ? req.folderPath.trim() : undefined),
+      status: overrides.status ?? (req.status?.trim() ? req.status.trim() : undefined),
+      scanStatus:
+        overrides.scanStatus ??
+        (req.scanStatus?.trim() ? req.scanStatus.trim() : undefined),
+    };
+  }
+
+  private presignInput(
+    req: media.PresignUploadReq,
+    ctx: { userId?: string | null; role?: string },
+    overrides: Partial<PresignUploadInput> = {},
+  ): PresignUploadInput {
+    return {
+      filename: req.filename?.trim() ?? "",
+      mimeType: req.mimeType?.trim() ?? "",
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+      ownerId:
+        overrides.ownerId ??
+        (this.resolveOwnerId(ctx, req.ownerId) ?? undefined),
+      accessClass:
+        overrides.accessClass ??
+        (req.accessClass?.trim() ? req.accessClass.trim() : undefined),
+      visibility:
+        overrides.visibility ??
+        (req.visibility?.trim() ? req.visibility.trim() : undefined),
+      scope: overrides.scope ?? (req.scope?.trim() ? req.scope.trim() : "panel"),
+      folderPath:
+        overrides.folderPath ??
+        (req.folderPath?.trim() ? req.folderPath.trim() : undefined),
+      displayName:
+        overrides.displayName ??
+        (req.displayName?.trim() ? req.displayName.trim() : undefined),
+      entityType:
+        overrides.entityType ??
+        (req.entityType?.trim() ? req.entityType.trim() : undefined),
+      entityId:
+        overrides.entityId ??
+        (req.entityId?.trim() ? req.entityId.trim() : undefined),
+    };
+  }
+
+  private finalizeInput(
+    req: media.FinalizeUploadReq,
+    ctx: { userId?: string | null; role?: string },
+    overrides: Partial<FinalizeUploadInput> = {},
+  ): FinalizeUploadInput {
+    return {
+      storage: req.storage?.trim() ? req.storage.trim() : "s3",
+      bucket: req.bucket?.trim() ? req.bucket.trim() : undefined,
+      path: req.path?.trim() ?? "",
+      folderPath:
+        overrides.folderPath ??
+        (req.folderPath?.trim() ? req.folderPath.trim() : undefined),
+      displayName:
+        overrides.displayName ??
+        (req.displayName?.trim() ? req.displayName.trim() : undefined),
+      originalFilename: req.originalFilename?.trim()
+        ? req.originalFilename.trim()
+        : undefined,
+      filename: req.filename?.trim() || undefined,
+      mimeType: req.mimeType?.trim() || undefined,
+      visibility:
+        overrides.visibility ??
+        (req.visibility?.trim() ? req.visibility.trim() : undefined),
+      accessClass:
+        overrides.accessClass ??
+        (req.accessClass?.trim() ? req.accessClass.trim() : undefined),
+      scope: overrides.scope ?? (req.scope?.trim() || undefined),
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+      ownerId:
+        overrides.ownerId ??
+        this.resolveOwnerId(ctx, req.ownerId),
+      sha256: req.sha256?.trim() ? req.sha256.trim() : null,
+      entityType:
+        overrides.entityType ??
+        (req.entityType?.trim() ? req.entityType.trim() : undefined),
+      entityId:
+        overrides.entityId ??
+        (req.entityId?.trim() ? req.entityId.trim() : undefined),
+    };
+  }
+
+  private presignResponse(out: GrpcPresignOutput) {
+    return media.PresignUploadRes.create({
+      storage: out.storage ?? "s3",
+      bucket: out.bucket ?? "",
+      path: out.path ?? "",
+      uploadUrl: out.uploadUrl ?? "",
+      expiresIn: out.expiresIn ?? 600,
+
+      filename: out.filename ?? "",
+      mimeType: out.mimeType ?? "",
+      visibility: out.visibility ?? "private",
+      accessClass: out.accessClass ?? "PUBLIC",
+      scope: out.scope ?? "panel",
+      folderPath: out.folderPath ?? "/",
+      displayName: out.displayName ?? "",
+      originalFilename: out.originalFilename ?? "",
+      entityType: out.entityType ?? "",
+      entityId: out.entityId ?? "",
+      ownerId: out.ownerId ?? "",
+    });
+  }
+
+  private readUrlResponse(out: Awaited<ReturnType<MediaService["createReadUrl"]>>) {
+    return media.ReadUrlRes.create({
+      url: out.url,
+      expiresIn: out.expiresIn,
+      accessClass: out.accessClass,
+      filename: out.filename,
+      mimeType: out.mimeType,
+    });
   }
 
   @Public()
@@ -67,6 +232,8 @@ export class MediaGrpcController {
       accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
       visibility: req.visibility?.trim() ? req.visibility.trim() : "private",
       scope: req.scope?.trim() ? req.scope.trim() : "panel",
+      entityType: req.entityType?.trim() ? req.entityType.trim() : undefined,
+      entityId: req.entityId?.trim() ? req.entityId.trim() : undefined,
       sha256: req.sha256?.trim() ? req.sha256.trim() : null,
     };
 
@@ -97,16 +264,7 @@ export class MediaGrpcController {
     const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const input: ListMediaDto = {
-      q: req.q ?? "",
-      take: req.take ?? 50,
-      skip: req.skip ?? 0,
-      ownerId: req.ownerId?.trim() ? req.ownerId.trim() : undefined,
-      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
-      visibility: req.visibility?.trim() ? req.visibility.trim() : undefined,
-      scope: req.scope?.trim() ? req.scope.trim() : undefined,
-      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
-    };
+    const input = this.listInput(req, ctx);
 
     const items = await this.svc.list(input);
 
@@ -137,38 +295,11 @@ export class MediaGrpcController {
     const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const input: PresignUploadInput = {
-      filename: req.filename?.trim() ?? "",
-      mimeType: req.mimeType?.trim() ?? "",
-      actorUserId: ctx.userId ?? null,
-      actorRole: ctx.role ?? null,
-      ownerId: this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
-      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
-      visibility: req.visibility?.trim() ? req.visibility.trim() : undefined,
-      scope: req.scope?.trim() ? req.scope.trim() : "panel",
-      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
-      displayName: req.displayName?.trim() ? req.displayName.trim() : undefined,
-    };
+    const input = this.presignInput(req, ctx);
 
     const out = await this.svc.presignUpload(input);
 
-    return media.PresignUploadRes.create({
-      storage: out.storage ?? "s3",
-      bucket: out.bucket ?? "",
-      path: out.path ?? "",
-      uploadUrl: out.uploadUrl ?? "",
-      expiresIn: out.expiresIn ?? 600,
-
-      // optional echo fields (nice for clients)
-      filename: out.filename ?? "",
-      mimeType: out.mimeType ?? "",
-      visibility: out.visibility ?? "private",
-      accessClass: out.accessClass ?? "PUBLIC",
-      scope: out.scope ?? "panel",
-      folderPath: out.folderPath ?? "/",
-      displayName: out.displayName ?? "",
-      originalFilename: out.originalFilename ?? "",
-    });
+    return this.presignResponse(out);
   }
 
   @Roles("admin", "root-admin")
@@ -180,29 +311,259 @@ export class MediaGrpcController {
     const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
-    const input: FinalizeUploadInput = {
-      storage: req.storage?.trim() ? req.storage.trim() : "s3",
-      bucket: req.bucket?.trim() ? req.bucket.trim() : undefined,
-      path: req.path?.trim() ?? "",
-      folderPath: req.folderPath?.trim() ? req.folderPath.trim() : undefined,
-      displayName: req.displayName?.trim() ? req.displayName.trim() : undefined,
-      originalFilename: req.originalFilename?.trim()
-        ? req.originalFilename.trim()
-        : undefined,
-      filename: req.filename?.trim() || undefined,
-      mimeType: req.mimeType?.trim() || undefined,
-      visibility: req.visibility?.trim() || undefined,
-      accessClass: req.accessClass?.trim() ? req.accessClass.trim() : undefined,
-      scope: req.scope?.trim() || undefined,
-      actorUserId: ctx.userId ?? null,
-      actorRole: ctx.role ?? null,
-      ownerId: this.resolveOwnerId(ctx, req.ownerId),
-      sha256: req.sha256?.trim() ? req.sha256.trim() : null,
-    };
+    const input = this.finalizeInput(req, ctx);
 
     const created = await this.svc.finalizeUpload(input);
 
     return media.MediaRes.create({ media: toProtoMedia(created) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "ListPublicLibrary")
+  async listPublicLibrary(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.browsePublicFilemanager(
+      this.listInput(req, ctx, {
+        accessClass: "PUBLIC",
+        visibility: "public",
+      }),
+    );
+
+    return media.ListRes.create({ items: out.files.map(toProtoMedia) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "ListProtectedLibrary")
+  async listProtectedLibrary(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.browseProtectedFilemanager(
+      this.listInput(req, ctx, {
+        ownerId: this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
+        accessClass: "PROTECTED",
+        visibility: "private",
+      }),
+    );
+
+    return media.ListRes.create({ items: out.files.map(toProtoMedia) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "ListStrictLibrary")
+  async listStrictLibrary(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.browseStrictFilemanager(
+      this.listInput(req, ctx, {
+        ownerId: this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
+        accessClass: "STRICT",
+        visibility: "private",
+      }),
+    );
+
+    return media.ListRes.create({ items: out.files.map(toProtoMedia) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "PresignPublicLibraryUpload")
+  async presignPublicLibraryUpload(
+    req: media.PresignUploadReq,
+    meta: Metadata,
+  ): Promise<media.PresignUploadRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.presignUpload(
+      this.presignInput(req, ctx, {
+        accessClass: "PUBLIC",
+        visibility: "public",
+      }),
+    );
+    return this.presignResponse(out);
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "PresignProtectedLibraryUpload")
+  async presignProtectedLibraryUpload(
+    req: media.PresignUploadReq,
+    meta: Metadata,
+  ): Promise<media.PresignUploadRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.presignProtectedLibraryUpload(
+      this.presignInput(req, ctx, {
+        accessClass: "PROTECTED",
+        visibility: "private",
+      }),
+    );
+    return this.presignResponse(out);
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "PresignStrictLibraryUpload")
+  async presignStrictLibraryUpload(
+    req: media.PresignUploadReq,
+    meta: Metadata,
+  ): Promise<media.PresignUploadRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.presignStrictLibraryUpload(
+      this.presignInput(req, ctx, {
+        accessClass: "STRICT",
+        visibility: "private",
+      }),
+    );
+    return this.presignResponse(out);
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "FinalizePublicLibraryUpload")
+  async finalizePublicLibraryUpload(
+    req: media.FinalizeUploadReq,
+    meta: Metadata,
+  ): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const created = await this.svc.finalizeUpload(
+      this.finalizeInput(req, ctx, {
+        accessClass: "PUBLIC",
+        visibility: "public",
+      }),
+    );
+    return media.MediaRes.create({ media: toProtoMedia(created) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "FinalizeProtectedLibraryUpload")
+  async finalizeProtectedLibraryUpload(
+    req: media.FinalizeUploadReq,
+    meta: Metadata,
+  ): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const created = await this.svc.finalizeUpload(
+      this.finalizeInput(req, ctx, {
+        accessClass: "PROTECTED",
+        visibility: "private",
+      }),
+    );
+    return media.MediaRes.create({ media: toProtoMedia(created) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "FinalizeStrictLibraryUpload")
+  async finalizeStrictLibraryUpload(
+    req: media.FinalizeUploadReq,
+    meta: Metadata,
+  ): Promise<media.MediaRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const created = await this.svc.finalizeUpload(
+      this.finalizeInput(req, ctx, {
+        accessClass: "STRICT",
+        visibility: "private",
+      }),
+    );
+    return media.MediaRes.create({ media: toProtoMedia(created) });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "CreatePublicLibraryReadUrl")
+  async createPublicLibraryReadUrl(
+    req: media.ReadUrlReq,
+    meta: Metadata,
+  ): Promise<media.ReadUrlRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.createPublicLibraryReadUrl(req.id, {
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+      download: req.download,
+    });
+    return this.readUrlResponse(out);
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "CreateProtectedLibraryReadUrl")
+  async createProtectedLibraryReadUrl(
+    req: media.ReadUrlReq,
+    meta: Metadata,
+  ): Promise<media.ReadUrlRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.createProtectedLibraryReadUrl(req.id, {
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+      download: req.download,
+    });
+    return this.readUrlResponse(out);
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "CreateStrictLibraryReadUrl")
+  async createStrictLibraryReadUrl(
+    req: media.ReadUrlReq,
+    meta: Metadata,
+  ): Promise<media.ReadUrlRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.createStrictLibraryReadUrl(req.id, {
+      actorUserId: ctx.userId ?? null,
+      actorRole: ctx.role ?? null,
+      download: req.download,
+    });
+    return this.readUrlResponse(out);
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "DeletePublicLibraryById")
+  async deletePublicLibraryById(
+    req: media.DeleteByIdReq,
+    meta: Metadata,
+  ): Promise<media.DeleteRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const deleted = await this.svc.deletePublicLibraryById(req.id);
+    return media.DeleteRes.create({ deleted });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "DeleteProtectedLibraryById")
+  async deleteProtectedLibraryById(
+    req: media.DeleteByIdReq,
+    meta: Metadata,
+  ): Promise<media.DeleteRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const deleted = await this.svc.deleteProtectedLibraryById(req.id);
+    return media.DeleteRes.create({ deleted });
+  }
+
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "DeleteStrictLibraryById")
+  async deleteStrictLibraryById(
+    req: media.DeleteByIdReq,
+    meta: Metadata,
+  ): Promise<media.DeleteRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const deleted = await this.svc.deleteStrictLibraryById(req.id);
+    return media.DeleteRes.create({ deleted });
   }
 }
 
@@ -229,6 +590,8 @@ function toProtoMedia(row: MediaRecord): media.Media {
     visibility: row.visibility ?? "private",
     accessClass: row.accessClass ?? "PUBLIC",
     scope: row.scope ?? "panel",
+    entityType: row.entityType ?? "",
+    entityId: row.entityId ?? "",
 
     sha256: row.sha256 ?? "",
 

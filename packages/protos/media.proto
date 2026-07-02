@@ -54,6 +54,8 @@ message Media {
   string folderPath = 23; // filemanager folder, e.g. /images/products
   string displayName = 24; // admin-facing file name in folder
   string originalFilename = 25; // original client filename when known
+  string entityType = 26; // product|order|passport|...
+  string entityId = 27;   // feature/business entity id
 }
 
 // ---- RPCs ----
@@ -79,6 +81,8 @@ message CreateReq {
   string folderPath = 15;
   string displayName = 16;
   string originalFilename = 17;
+  string entityType = 18;
+  string entityId = 19;
 }
 
 message MediaRes {
@@ -104,6 +108,8 @@ message ListReq {
   string scanStatus = 8;
   string accessClass = 9; // optional
   string folderPath = 10;
+  string entityType = 11;
+  string entityId = 12;
 }
 
 message ListRes {
@@ -118,6 +124,19 @@ message DeleteRes {
   bool deleted = 1;
 }
 
+message ReadUrlReq {
+  string id = 1;
+  bool download = 2;
+}
+
+message ReadUrlRes {
+  string url = 1;
+  int32 expiresIn = 2;
+  string accessClass = 3;
+  string filename = 4;
+  string mimeType = 5;
+}
+
 // ---- Presign / Finalize ----
 
 message PresignUploadReq {
@@ -129,6 +148,8 @@ message PresignUploadReq {
   string accessClass = 6; // optional
   string folderPath = 7;
   string displayName = 8;
+  string entityType = 9;
+  string entityId = 10;
 }
 
 message PresignUploadRes {
@@ -146,6 +167,9 @@ message PresignUploadRes {
   string folderPath = 11;
   string displayName = 12;
   string originalFilename = 13;
+  string entityType = 14;
+  string entityId = 15;
+  string ownerId = 16;
 }
 
 message FinalizeUploadReq {
@@ -167,6 +191,8 @@ message FinalizeUploadReq {
   string folderPath = 11;
   string displayName = 12;
   string originalFilename = 13;
+  string entityType = 14;
+  string entityId = 15;
 }
 
 service MediaService {
@@ -181,4 +207,25 @@ service MediaService {
 
   rpc PresignUpload(PresignUploadReq) returns (PresignUploadRes);
   rpc FinalizeUpload(FinalizeUploadReq) returns (MediaRes);
+
+  // Explicit lane families for filemanager/backend jobs.
+  rpc ListPublicLibrary(ListReq) returns (ListRes);
+  rpc ListProtectedLibrary(ListReq) returns (ListRes);
+  rpc ListStrictLibrary(ListReq) returns (ListRes);
+
+  rpc PresignPublicLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
+  rpc PresignProtectedLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
+  rpc PresignStrictLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
+
+  rpc FinalizePublicLibraryUpload(FinalizeUploadReq) returns (MediaRes);
+  rpc FinalizeProtectedLibraryUpload(FinalizeUploadReq) returns (MediaRes);
+  rpc FinalizeStrictLibraryUpload(FinalizeUploadReq) returns (MediaRes);
+
+  rpc CreatePublicLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+  rpc CreateProtectedLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+  rpc CreateStrictLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+
+  rpc DeletePublicLibraryById(DeleteByIdReq) returns (DeleteRes);
+  rpc DeleteProtectedLibraryById(DeleteByIdReq) returns (DeleteRes);
+  rpc DeleteStrictLibraryById(DeleteByIdReq) returns (DeleteRes);
 }

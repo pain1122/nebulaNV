@@ -1,6 +1,6 @@
 ﻿# TODO: NebulaNV Stabilization Board
 
-Last updated: 2026-06-22
+Last updated: 2026-07-02
 Current mode: stabilize, document, verify, then ship in controlled slices.
 Scope source of truth: `site essentials.md`
 Developer docs index: `docs/README.md`
@@ -39,7 +39,7 @@ Design note: Supabase Storage is used for its clean storage UI, self-contained f
 
 Storage/rendering rule: admin filemanager access and website rendering access are separate contracts. Filemanager endpoints stay `admin/root-admin`. Public website rendering must use approved variants and policy-aware render URLs, not permanent storage credentials or raw originals.
 
-Two-lane media rule: the admin filemanager is the public media-library lane and is limited to a configurable public folder such as `uploads/`. Sensitive media is uploaded through feature-owned private upload buttons only, never through the general filemanager. Feature-owned uploads use `PROTECTED` or `STRICT`, opaque storage keys, owner/scope/business context in DB metadata, and short-lived render/read URLs.
+Lane-aware media rule: the admin filemanager should become one reusable UI shell backed by separate backend route families for `PUBLIC`, `PROTECTED`, and `STRICT` lanes. Public media uses descriptive keys under `MEDIA_PUBLIC_FOLDER`. Protected and strict media use opaque keys under `MEDIA_PRIVATE_FOLDER`, list by owner/scope/business context instead of S3 folders, and use policy-checked short-lived read paths. Strict media adds stronger privacy/audit rules and should not leak sensitive original filenames through storage keys or casual metadata views.
 
 #### P0-0A Storage Baseline - MinIO/S3 Compatibility
 
@@ -57,45 +57,78 @@ Two-lane media rule: the admin filemanager is the public media-library lane and 
 
 #### P0-0B Admin Filemanager Contract
 
-- [ ] Freeze media HTTP contract for health, admin list/get/create/delete, presign, finalize, and admin read-url behavior.
-- [ ] Freeze media gRPC contract for Ping, Create, GetById, List, DeleteById, PresignUpload, and FinalizeUpload.
-- [ ] Keep filemanager management endpoints restricted to `admin/root-admin`.
-- [ ] Limit admin filemanager browse/upload/delete actions to `MEDIA_PUBLIC_FOLDER`.
+- [x] Freeze media HTTP contract for health, admin list/get/create/delete, browse, presign, finalize, admin read-url, lane wrappers, and public delete preview/confirm behavior.
+- [x] Freeze media gRPC contract for Ping, Create, GetById, List, DeleteById, PresignUpload, and FinalizeUpload.
+- [x] Add public-library HTTP route family wrappers for browse, presign, finalize, read-url, and delete.
+- [x] Define protected-library and strict-library route families.
+- [x] Define protected/strict context metadata requirements: ownerId, scope, entity type/id, and allowed actor roles.
+- [x] Define strict privacy behavior for display names, original filename handling, read path, audit, and encryption direction.
+- [x] Keep current media management endpoints restricted to `admin/root-admin` in controller/guard wiring.
+- [x] Limit public filemanager browse/presign/finalize actions to `MEDIA_PUBLIC_FOLDER`.
+- [x] Decide whether global admin delete stays admin/root-admin maintenance or narrows to root-admin only.
 - [x] Treat filemanager uploads as public media-library assets by default.
-- [x] Allow admins to create arbitrary folder structures under `MEDIA_PUBLIC_FOLDER`.
+- [x] Support arbitrary virtual folder structures under `MEDIA_PUBLIC_FOLDER` through uploaded media `folderPath` metadata.
+- [x] Decide whether empty folder creation is needed or whether folders remain virtual DB-derived prefixes.
+- [x] Add public bulk delete and recursive folder delete preview/confirm contracts.
 - [x] Add admin browse endpoint returning `{ folders, files }` for a selected public-library folder path.
 - [x] Add browse/search filters for public filemanager: folder, q, media type, MIME type, status, scanStatus, and accessClass.
-- [ ] Decide whether legacy direct `POST /media` create stays admin-only compatibility or is replaced by finalize-only writes.
-- [ ] Add filemanager tests for admin/root-admin only: list, get, presign, finalize, read-url, delete.
-- [ ] Add filemanager actions checklist: create folder, rename folder/file, move/copy file, metadata update, soft-delete or hard-delete decision.
-- [ ] Enforce unique public library path behavior for `(folderPath, displayName, scope)` or define collision/overwrite rules.
+- [x] Add stronger media health response with DB and S3-compatible storage checks.
+- [x] Add focused tests for public descriptive paths vs protected/strict opaque path rejection.
+- [x] Add browse tests for Supabase-style folder/file/search output.
+- [x] Enforce public finalize path/metadata consistency so `path`, `folderPath`, and `displayName` cannot disagree.
+- [x] Forbid direct S3 row creation through legacy HTTP `POST /media` and gRPC `Create`; keep direct create as legacy non-S3 compatibility only if needed.
+- [x] Add missing admin/root-admin restriction tests for browse, read-url, and delete.
+- [x] Add public-library read-url/delete wrapper tests for public media and non-public rejection.
+- [x] Add filemanager actions checklist: create folder, rename folder/file, move/copy file, metadata update, soft-delete or hard-delete decision.
+- [x] Define public library collision behavior for `(scope, folderPath, displayName)`: presign auto-renames duplicates with numeric suffixes, and finalize rejects exact already-taken names.
+- [x] Fix stale gRPC e2e test title that says `Create` while the test now uses `FinalizeUpload`.
+- [x] Add lane-specific media gRPC route families for public/protected/strict list, presign, finalize, read-url, and delete.
+- [x] Harden public delete confirmation: use `GATEWAY_SECRET`, bind preview token to the same actor user/role, and expire it through `MEDIA_DELETE_CONFIRM_TTL_SECONDS`.
+- [x] Cap synchronous public bulk/recursive delete through `MEDIA_SYNC_DELETE_MAX_FILES`; reserve oversized destructive plans for workers/queues.
+
+#### Later Admin Filemanager Implementation Follow-Ups
+
+- [ ] Add durable strict media audit storage for reads/deletes beyond service logs.
+- [ ] Decide and implement strict media encryption layer: provider SSE first, app-level envelope encryption later, or both.
+- [ ] Add worker/queue execution for oversized public delete plans and stale/orphan reconciliation.
+- [ ] Add explicit public media folder records for old-school empty folder support.
+- [ ] Make public browse merge explicit folder records with file-derived folders.
+- [ ] Add public folder create/rename/move/delete implementation.
+- [ ] Before UI implementation, analyze Salar's uploaded Vite admin panel and its built-in Velzon filemanager template; adapt Nebula's filemanager UX to that panel instead of designing it separately.
 
 #### P0-0C Access Classes and Render Policy
 
-- [ ] Complete end-to-end `accessClass` wiring (`PUBLIC|PROTECTED|STRICT`) in DTO/proto/controller/service.
-- [ ] Define read/access behavior for `PUBLIC`, `PROTECTED`, and `STRICT` media.
-- [ ] Add tests that `visibility=public` maps to `accessClass=PUBLIC`.
-- [ ] Add tests that `visibility=private` maps to `accessClass=PROTECTED`.
-- [ ] Add tests that `accessClass` overrides old visibility compatibility when both are supplied.
-- [ ] Add tests that `STRICT` read URLs use `MEDIA_STRICT_READ_TTL_SECONDS`.
-- [ ] Add tests that `PUBLIC` and `PROTECTED` read URLs use `MEDIA_SIGNED_READ_TTL_SECONDS`.
-- [ ] Decide and implement website-facing render URL endpoint separately from admin filemanager endpoints.
-- [ ] Add feature-owned private upload flow for `PROTECTED` and `STRICT` files outside the general filemanager.
-- [ ] Require feature context for sensitive uploads: ownerId, scope, accessClass, and business entity id when needed.
-- [ ] Ensure sensitive files are only listed/rendered from their owning feature page.
-- [ ] Ensure client-side user panels can only see their own protected files.
-- [ ] Add ID-based and path-based render URL resolution that share the same media-service policy checks.
-- [ ] Ensure render endpoint blocks unapproved assets (`PENDING`, `QUEUED`, `INFECTED`, `BLOCKED`) from public website use.
-- [ ] Keep `STRICT` out of public rendering unless a later explicit audited flow is designed.
+- [x] Complete base `accessClass` wiring (`PUBLIC|PROTECTED|STRICT`) in DTO/proto/controller/service.
+- [x] Freeze read/access behavior for `PUBLIC`, `PROTECTED`, and `STRICT` media in contract docs and tests.
+- [x] Add tests that `visibility=public` maps to `accessClass=PUBLIC`.
+- [x] Add tests that `visibility=private` maps to `accessClass=PROTECTED`.
+- [x] Add tests that `accessClass` overrides old visibility compatibility when both are supplied.
+- [x] Add tests that `STRICT` read URLs use `MEDIA_STRICT_READ_TTL_SECONDS`.
+- [x] Add tests that `PUBLIC` and `PROTECTED` read URLs use `MEDIA_SIGNED_READ_TTL_SECONDS`.
+- [x] Decide and implement website-facing render URL endpoint separately from admin filemanager endpoints.
+- [x] Define protected/strict filemanager lane upload/read contracts using context-scoped backend routes.
+- [x] Add protected/strict filemanager lane upload flows using opaque storage keys and required business context.
+- [x] Require feature context for sensitive uploads: ownerId, scope, accessClass, and business entity id when needed.
+- [x] Add protected/strict context fields to media proto and gRPC controller mappings.
+- [x] Add deeper protected/strict gRPC lane tests for finalize, list, read-url denial while pending, and lane delete wrappers.
+- [x] Ensure protected files are only listed/read from their owning feature page by requiring `ownerId + scope + entityType + entityId` on user-panel protected routes.
+- [x] Ensure client-side user panels can only see their own protected files through `my/protected-library` browse/read-url routes.
+- [x] Run focused protected/strict HTTP and gRPC media e2e tests once the backend stack is up.
+- [x] Add ID-based public render URL resolution that uses media-service policy checks.
+- [x] Drop path-based render resolution from launch scope; filemanager thumbnails and website rendering should use media IDs.
+- [x] Ensure render endpoint blocks unapproved assets (`PENDING`, `QUEUED`, `INFECTED`, `BLOCKED`) from public website use.
+- [x] Tighten admin read-url availability to `READY/CLEAN` only, blocking pending, queued, blocked, deleted, infected, failed, and unscanned rows.
+- [x] Keep `STRICT` out of public rendering unless a later explicit audited flow is designed.
+- [x] Wire gRPC `ListReq.status` and `ListReq.scanStatus` through the controller or remove them from the frozen contract.
 
 #### P0-0D Download Resistance and SEO Media Strategy
 
-- [ ] Define stable SEO/public media URL policy for approved `PUBLIC` variants.
-- [ ] Define short-lived render URL policy for `PROTECTED` and `STRICT` assets.
-- [ ] Do not expose original files to public website rendering by default.
-- [ ] Use optimized/derived variants for public website and Google image indexing.
-- [ ] Add image sitemap plan for approved public variants.
-- [ ] Add response header policy: `inline` for render, `attachment` only for explicit admin/download flows.
+- [x] Define stable SEO/public media URL policy for approved `PUBLIC` variants.
+- [x] Define short-lived render URL policy for `PROTECTED` and `STRICT` assets.
+- [x] Do not expose original files to public website rendering by default.
+- [x] Define `variant=web` as the launch public optimized-variant contract; defer actual generated derivatives to the media worker phase.
+- [x] Add image sitemap plan: approved public `variant=web` media is index-eligible by default, sitemap output comes from indexable public content records, and semantic image metadata belongs to product/blog/page/settings records instead of the filemanager.
+- [x] Add response header policy: public render is `inline` with conservative public caching; signed read URLs are `inline` by default, `private, no-store`, and `attachment` only for explicit download flows.
 - [ ] Add CORS/origin policy for render URLs and storage/CDN access.
 - [ ] Document canvas/WebGL rendering as a download-resistance layer, not a foolproof DRM layer.
 - [ ] Decide watermark/downsized preview behavior for sensitive previews.
@@ -120,6 +153,14 @@ Two-lane media rule: the admin filemanager is the public media-library lane and 
 - [ ] Freeze blog-service launch HTTP/gRPC contract.
 - [ ] Freeze product-service launch HTTP/gRPC contract.
 - [ ] Freeze order-service launch HTTP/gRPC contract.
+- [ ] Revisit P0-0 media closeout findings before freezing the media-service launch contract.
+- [ ] Harden media gRPC validation so invalid enum-like contract values fail loudly instead of being silently ignored: `accessClass`, `status`, and `scanStatus`.
+- [ ] Decide whether Prisma `Media.accessClass` should default to `PROTECTED` instead of `PUBLIC`, then add the migration or document why DB-level public default is intentional.
+- [ ] Expand public render denial tests so the completed checklist claim is explicit for pending, queued, blocked, deleted, infected, failed, and unscanned media, not only the broad `READY/CLEAN` implementation.
+- [ ] Mark older media reports as historical/superseded where current lane-aware filemanager direction differs from the earlier public-only filemanager direction.
+- [ ] Clean media-service docs structure so verification facts are not listed under Known Gaps.
+- [ ] Refresh Docker boot docs/reports that still mention the old `full` profile if current Compose keeps all backend services in the default stack.
+- [ ] Decide system-initializer settings write contract for product/blog default taxonomy IDs. Current settings gRPC writes require `admin/root-admin` JWT context; product/blog default taxonomy initializers must not rely on `x-user-id` alone. Choose a safe internal/system RPC, seed step, or admin-authenticated startup path.
 - [ ] Enforce consistent API response/error shape across launch services.
 - [x] Ensure `pnpm -w proto:gen` passes from a clean state.
 - [ ] Ensure `pnpm -w build` passes from a clean state.
@@ -130,7 +171,7 @@ Two-lane media rule: the admin filemanager is the public media-library lane and 
 - [x] Product-service source lint errors removed.
 - [ ] Clean remaining product-service test warnings where they hide useful failures.
 - [x] Verify auth-service source lint/build state after recent strict cleanup.
-- [x] Verify media-service source lint/build state after recent strict cleanup.
+- [ ] Re-verify media-service source lint/build state after current media contract edits and the planned `lint:fix` pass.
 - [ ] Verify blog-service source lint/build state after recent strict cleanup.
 - [ ] Verify order-service source lint/build state after recent strict cleanup.
 - [ ] Verify taxonomy-service source lint/build state after recent strict cleanup.
@@ -244,4 +285,3 @@ pnpm --filter @nebula/media-service build
 pnpm --filter @nebula/auth-service build
 pnpm --filter web build
 ```
-

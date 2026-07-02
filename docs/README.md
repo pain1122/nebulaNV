@@ -47,6 +47,8 @@ For most backend tasks, read in this order:
 ## Reports
 
 - [2026-05-28 Stabilization And Docs Report](reports/2026-05-28-stabilization-and-docs-report.md)
+- [2026-06-23 Media Filemanager And Supabase Conclusion](reports/2026-06-23-media-filemanager-and-supabase-conclusion.md)
+- [2026-06-29 Media Filemanager Vision Evolution](reports/2026-06-29-media-filemanager-vision-evolution.md)
 
 ## Documentation Rule
 

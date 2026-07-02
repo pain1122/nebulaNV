@@ -85,8 +85,7 @@ export class DefaultProductTaxonomyInitializer implements OnModuleInit {
         title: "بدون دسته‌بندی",
         description: "دسته پیش‌فرض برای محصولاتی که هنوز دسته‌بندی نشده‌اند.",
         isTree: false,
-        parentId: null,
-        depth: 0,
+        parentId: "",
         path: slug,
         isHidden: false,
         isSystem: true, // mark as system so it can't be deleted

@@ -1,7 +1,8 @@
 import { Transform, type TransformFnParams } from "class-transformer";
 import { IsIn, IsOptional, IsString, IsUUID, Matches } from "class-validator";
 
-const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._()\-]*$/;
+const SAFE_CONTEXT_VALUE = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 const trim = ({ value }: TransformFnParams): unknown =>
   typeof value === "string" ? value.trim() : value;
 
@@ -45,6 +46,20 @@ export class PresignUploadDto {
   visibility?: string;
 
   @IsOptional()
-  @IsIn(["panel", "user", "system"])
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "scope is not safe" })
   scope?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "entityType is not safe" })
+  entityType?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "entityId is not safe" })
+  entityId?: string;
 }

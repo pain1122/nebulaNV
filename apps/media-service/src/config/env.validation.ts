@@ -66,6 +66,8 @@ export const envSchema = Joi.object({
   MEDIA_SIGNED_UPLOAD_TTL_SECONDS: Joi.number().integer().min(1).default(600),
   MEDIA_SIGNED_READ_TTL_SECONDS: Joi.number().integer().min(1).default(300),
   MEDIA_STRICT_READ_TTL_SECONDS: Joi.number().integer().min(1).default(30),
+  MEDIA_DELETE_CONFIRM_TTL_SECONDS: Joi.number().integer().min(1).default(30),
+  MEDIA_SYNC_DELETE_MAX_FILES: Joi.number().integer().min(1).max(10_000).default(500),
   MEDIA_PUBLIC_FOLDER: folderRoot.default("uploads"),
   MEDIA_PRIVATE_FOLDER: folderRoot.default("private/objects"),
   MEDIA_SYSTEM_FOLDER: folderRoot.default("system"),

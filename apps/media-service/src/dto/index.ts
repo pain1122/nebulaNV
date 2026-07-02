@@ -4,3 +4,6 @@ export * from "./list-media.dto";
 export * from "./delete-media.dto";
 export * from "./presign-upload.dto";
 export * from "./finalize-upload.dto";
+export * from "./public-library-delete.dto";
+export * from "./render-media.dto";
+export * from "./protected-feature-media.dto";

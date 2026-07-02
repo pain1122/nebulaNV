@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   Min,
 } from "class-validator";
@@ -11,6 +12,7 @@ import { Transform, type TransformFnParams } from "class-transformer";
 
 const trim = ({ value }: TransformFnParams): unknown =>
   typeof value === "string" ? value.trim() : value;
+const SAFE_CONTEXT_VALUE = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 
 const upperTrim = ({ value }: TransformFnParams): unknown =>
   typeof value === "string" ? value.trim().toUpperCase() : value;
@@ -65,8 +67,22 @@ export class ListMediaDto {
   visibility?: string;
 
   @IsOptional()
-  @IsIn(["panel", "user", "system"])
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "scope is not safe" })
   scope?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "entityType is not safe" })
+  entityType?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "entityId is not safe" })
+  entityId?: string;
 
   @IsOptional()
   @IsString()

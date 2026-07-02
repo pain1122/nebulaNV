@@ -1,6 +1,6 @@
 ﻿# Site Essentials - NebulaNV (English Education Website)
 
-Last updated: 2026-06-09
+Last updated: 2026-06-29
 Purpose: single source of truth for launch essentials before prioritization.
 
 ## 0) Priority Bands
@@ -15,7 +15,7 @@ Purpose: single source of truth for launch essentials before prioritization.
 ## 1) Product Scope (Launch)
 
 - Public website built with Next.js + Tailwind.
-- Admin panel built with Next.js + Bootstrap.
+- Admin panel built as a Vite React SPA; visual stack is still allowed to evolve as long as backend contracts stay stable.
 - Backend APIs stable enough for public + admin flows.
 - Blog + user club features fully usable at launch.
 - Product, taxonomy, media, settings, and auth contracts remain stable across HTTP and gRPC.

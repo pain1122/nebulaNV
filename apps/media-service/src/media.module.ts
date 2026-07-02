@@ -6,6 +6,7 @@ import { ClientsModule, Transport } from "@nestjs/microservices";
 import * as path from "path";
 
 import { MediaController } from "./media.controller";
+import { MediaRenderController } from "./media-render.controller";
 import { MediaGrpcController } from "./grpc/media-grpc.controller";
 import { HealthController } from "./health.controller";
 import { MediaService } from "./media.service";
@@ -44,7 +45,12 @@ export const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
     ]),
   ],
 
-  controllers: [MediaController, MediaGrpcController, HealthController],
+  controllers: [
+    MediaController,
+    MediaRenderController,
+    MediaGrpcController,
+    HealthController,
+  ],
 
   providers: [
     PrismaService,

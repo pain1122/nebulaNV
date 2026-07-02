@@ -52,6 +52,8 @@ model Media {
   ownerId     String?  @db.Uuid
   visibility  String   @default("private")
   scope       String   @default("panel")
+  entityType  String?
+  entityId    String?
   // Define access restrictions (PUBLIC, PROTECTED, STRICT)
   accessClass AccessClass @default(PUBLIC)
 
@@ -75,6 +77,9 @@ model Media {
   @@index([accessClass])
   @@index([visibility])
   @@index([scope])
+  @@index([entityType, entityId])
+  @@index([scope, entityType, entityId])
+  @@index([ownerId, scope, entityType, entityId])
   @@index([folderPath])
   @@index([displayName])
   @@index([scope, folderPath])

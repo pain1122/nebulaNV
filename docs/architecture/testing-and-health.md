@@ -192,6 +192,15 @@ When running host commands against Docker Postgres, temporarily override `DATABA
 
 See `docs/architecture/local-dev-and-docker-boot.md` for the full host-vs-container DB URL explanation.
 
+Example for media-service Docker e2e:
+
+```powershell
+$env:DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:15432/nebula_media?schema=public"
+pnpm --filter @nebula/media-service prisma:migrate:deploy
+pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/http/media.http.e2e.spec.ts --runInBand
+pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand
+```
+
 ## Search And Shell Reliability
 
 Use `rg --files` before reading paths. Do not infer file paths from class names, proto names, or conceptual feature names.

@@ -20,7 +20,7 @@ It evolves from a basic service-oriented architecture to a **multi-tenant, polyg
 - 🧩 **Microservices Architecture:** Modular apps (user, auth, product, blog, order, settings, media)
 - 🧠 **State-Service:** Centralized cache, session, and sync layer (Go + Redis + NATS)
 - 💾 **Multi-Database:** PostgreSQL, MongoDB, Redis, ClickHouse
-- 🌐 **Web Application:** Next.js 15 + Tailwind CSS (SSR, SEO, Admin & Public)
+- 🌐 **Web Applications:** Next.js + Tailwind for the public SEO website; Vite React SPA for the admin panel
 - 📱 **Mobile Apps:** React Native / Flutter (shared gRPC APIs)
 - 🎨 **Media System:** Uploads, resizing, watermarking, anti-theft protection
 - 🧠 **AI & Analytics:** Python-based recommendation and insights services
