@@ -144,6 +144,7 @@ Work in this order so the context stays reliable:
 ## Not Now
 
 - Admin web media picker/filemanager UI.
+- Curated UI block/theme system for web, responsive views, and mobile apps; this belongs to a later client-side composition phase after backend/media launch contracts stabilize.
 - Full protected/strict UI implementation beyond drafting the backend contract.
 - UI phase note: when the Vite admin panel is ready, analyze the built-in Velzon panel filemanager template before building Nebula's filemanager. Salar likes that built-in filemanager direction: clean, light, customizable, old-school enough to feel obvious, and visually close to the panel. Use its dashboard shell, folder/sidebar area, main file area, right preview/details panel, clean density, and practical filemanager behavior as a visual/UX reference, then adapt Nebula's filemanager to the actual uploaded panel instead of designing in isolation.
 - Protected/strict website render flows.

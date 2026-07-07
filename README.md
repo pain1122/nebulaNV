@@ -22,6 +22,7 @@ It evolves from a basic service-oriented architecture to a **multi-tenant, polyg
 - 💾 **Multi-Database:** PostgreSQL, MongoDB, Redis, ClickHouse
 - 🌐 **Web Applications:** Next.js + Tailwind for the public SEO website; Vite React SPA for the admin panel
 - 📱 **Mobile Apps:** React Native / Flutter (shared gRPC APIs)
+- 🧱 **Planned UI Composition:** Curated theme and block system for optimized NebulaNV storefronts, responsive layouts, and later native mobile app views
 - 🎨 **Media System:** Uploads, resizing, watermarking, anti-theft protection
 - 🧠 **AI & Analytics:** Python-based recommendation and insights services
 - 🕶 **VR/3D Support:** React Three Fiber + Rust engine for immersive experiences

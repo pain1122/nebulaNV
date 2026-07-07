@@ -45,3 +45,12 @@ Admin panel direction:
 
 - Vite React SPA is the preferred admin panel direction because the admin is interactive, authenticated, and does not need public SEO.
 - The reusable media filemanager should live in the admin app and call media-service lane routes, not raw S3/Supabase APIs.
+
+Planned block/theme direction:
+
+- Future client-side work may add a curated NebulaNV block and theme system for storefront pages, admin-configured page sections, and later native mobile app views.
+- The system should use shared schemas, theme tokens, and data bindings, with platform-specific renderers for Next.js web and mobile app targets.
+- Web rendering should preserve SSR by server-rendering schema and data, then using CSS grid, container queries, and small client islands for interactive blocks.
+- Blocks should be space-aware: a product slider in a full-width slot can show more items, while the same block in a `1/3` slot can switch to fewer or more compact cards.
+- Layouts should support breakpoint-specific spans, ordering, visibility, and stack behavior so mobile web can reorder content independently from desktop.
+- See [Block And Theme System](../frontend/block-and-theme-system.md).

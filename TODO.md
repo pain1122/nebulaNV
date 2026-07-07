@@ -236,6 +236,9 @@ Lane-aware media rule: the admin filemanager should become one reusable UI shell
 
 - [ ] Product depth: variable products, variants, discount campaign entity, backorders, variant matrix, downloads, draft preview.
 - [ ] Preview and audit: page preview workflow, signed preview-token endpoints, admin audit log.
+- [ ] Define curated NebulaNV block/theme composition schema: sections, layout presets, slots, block props, theme tokens, responsive placement, smart slot rules, and SSR-safe rendering constraints.
+- [ ] Define web/mobile renderer split: Next.js responsive web renderer with CSS grid/container queries, plus later native mobile renderer using the same schema and theme/data contracts.
+- [ ] Define first block catalog: hero, product slider/grid, promo banner, blog cards, media gallery, CTA, FAQ, testimonials, profile/order/app-view panels, and safe allowed-slot rules.
 - [ ] Media provider integration: document and verify Supabase Storage S3 mode beside local MinIO and future AWS S3.
 - [ ] Media variants: add DB/API support for original files, thumbnails, optimized images, edited versions, and derived files.
 - [ ] Media editing baseline: define safe edit workflow where originals are immutable and edits create variants.
@@ -243,6 +246,8 @@ Lane-aware media rule: the admin filemanager should become one reusable UI shell
 
 ## Priority 2 - Post-Launch
 
+- [ ] Implement NebulaNV block editor with saved sections, draft/preview/publish, version restore, performance budgets, accessibility/SEO warnings, and breakpoint/app previews.
+- [ ] Explore native Android/iOS block renderers after web schema and SSR rendering are proven.
 - [ ] Realtime sessions/classroom streaming.
 - [ ] 3D showroom feature: GLB/GLTF/USDZ asset bundles, texture handling, preview image, and scene manifest flow.
 - [ ] Streaming media pipeline: video ingest, transcode jobs, thumbnails, HLS/DASH outputs, and signed playback.

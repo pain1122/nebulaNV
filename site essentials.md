@@ -176,6 +176,7 @@ Purpose: single source of truth for launch essentials before prioritization.
 
 ## 15) Explicitly Post-Launch (Do Not Expand Scope Now)
 
+- Curated cross-platform UI block/theme system for storefront pages, responsive web layouts, and later Android/iOS app views.
 - Full 3D showroom implementation.
 - Media worker services for image variants, file metadata extraction, 3D processing, and streaming processing.
 - Realtime sessions/classroom streaming.

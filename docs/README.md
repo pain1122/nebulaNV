@@ -25,6 +25,10 @@ For most backend tasks, read in this order:
 - [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md): ports, Docker/runtime URLs, DB migration patterns, WSL/Docker clock drift.
 - [Docker Configs](docker-configs.md): Compose files, backend Dockerfile, release image flow, env boundaries, Docker guardrails.
 
+## Frontend Notes
+
+- [Block And Theme System](frontend/block-and-theme-system.md): planned curated web/mobile composition system, responsive slots, smart block rules, theme tokens, SSR strategy, and native mobile renderer direction.
+
 ## Package Notes
 
 - [Protos Package](packages/protos.md)
