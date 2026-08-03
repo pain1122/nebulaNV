@@ -83,3 +83,4 @@ docker-compose.*.yml
 # exclude only generated client
 # -------------------------------------------
 **/prisma/generated
+/packages/protos/generated

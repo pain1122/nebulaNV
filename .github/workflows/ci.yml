@@ -12,15 +12,14 @@ jobs:
         with: { version: 10.17.1 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: "pnpm" }
-      - uses: arduino/setup-protoc@v3
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify proto generation
+        run: pnpm proto:check
       - name: Lint backend workspaces
         run: pnpm lint:backend
       - name: Check backend types
         run: pnpm check-types:backend
-      - name: Verify generated proto contracts
-        run: pnpm proto:check
       - name: Run focused container-free security tests
         run: pnpm test:security
       - name: Build backend sources

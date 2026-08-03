@@ -96,6 +96,7 @@ Purpose:
 - Uses `pnpm fetch` for dependency cache.
 - Copies package manifests first for better Docker layer caching.
 - Copies Prisma schemas before install because workspace postinstall runs Prisma generation.
+- Excludes host-generated proto TypeScript from the Docker context and regenerates it through the package-owned pinned toolchain before compiling `@nebula/protos`.
 - Runs one shared backend build through Turbo.
 - Builds the four small shared runtime packages before the cached Turbo service build. This refreshes pnpm's injected workspace copies even when Turbo would otherwise restore a shared-package build and skip its post-build synchronization hook.
 - Uses a versioned Docker-only Turbo cache namespace so artifacts admitted by the runtime-import verifier are not mixed with older incompatible compiler output.

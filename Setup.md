@@ -48,11 +48,16 @@ Rules:
 
 ## 4) Generate gRPC / Proto Clients
 
+Normal backend source and Docker builds generate the ignored TypeScript
+contracts automatically through `@nebula/protos`. Run the explicit command
+when changing a `.proto` file or when you want to inspect the local output:
+
 ```powershell
 pnpm -w proto:gen
 ```
 
-Use the check form when you want to confirm generated files are current:
+Use the non-mutating check form to prove the pinned generator can produce the
+complete expected contract inventory:
 
 ```powershell
 pnpm -w proto:check

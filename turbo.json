@@ -11,9 +11,6 @@
       "dependsOn": ["^build"],
       "outputs": [
         "dist/**",
-        "apps/**/dist/**",
-        "packages/**/dist/**",
-        "packages/protos/generated/**",
         ".next/**",
         "!.next/cache/**"
       ]

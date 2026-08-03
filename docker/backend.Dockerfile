@@ -80,8 +80,10 @@ COPY packages/grpc-auth ./packages/grpc-auth
 COPY packages/protos ./packages/protos
 
 # A Turbo cache hit skips pnpm's post-build injected-dependency sync. Build the
-# small shared workspaces first so Nest can resolve their package names, then
-# keep verified Docker artifacts in a versioned cache namespace.
+# small shared workspaces first so Nest can resolve their package names. The
+# proto package generates its ignored TypeScript contracts inside this stage,
+# so the image never depends on host-generated output. Keep verified Docker
+# artifacts in a versioned cache namespace.
 ARG TURBO_FORCE=0
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     --mount=type=cache,id=nebula-turbo,target=/app/.turbo,sharing=locked \

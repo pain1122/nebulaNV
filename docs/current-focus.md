@@ -33,7 +33,7 @@ same backend commands.
 | Demo seeds                        | complete                       | User/settings retain base ownership; product/blog base seeds perform no writes. The API demo seed uses the ordinary seeded admin, preserves initializer/service validation, refuses production, and was live-verified for create and safe-repeat behavior.               |
 | Database recovery                 | complete                       | All seven schemas were deployed and checked on disposable databases. Binary dump/restore, intentional migration failure/stop/recovery, and a maintenance backup/restore of the seven development databases were live-verified.                                           |
 | Legacy user refresh-token storage | complete                       | Active refresh sessions still use auth-service Redis session families. The unused single-value column, RPC, and response fields were removed; the migration, rebuilt services, migration status, and focused live tests were user-verified.                              |
-| CI                                | partial implementation         | CI runs lint, types, focused security tests, build, and provisioned e2e. Proto checks are separate; Compose checks, backend image builds/scans, secret scanning, and retained reports are missing.                                                                       |
+| CI                                | partial implementation         | CI runs backend lint, types, isolated proto generation, focused security tests, build, Compose validation, and provisioned e2e. The first clean quality run exposed host-generated proto reliance; package-owned source/Docker generation is implemented locally and awaits the hosted rerun. Image reuse/scans, secret scanning, and retained reports remain missing. |
 
 ## Active Work Order
 
@@ -123,6 +123,7 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 - [x] Do not run the broad root `pnpm format` command or introduce a repository-wide formatter rewrite; use existing lint plus targeted formatting corrections.
 - [x] Make the live lane call the same `backend:boot` and `test:e2e` commands documented for local use.
 - [x] Validate both local and release Compose configurations in CI.
+- [x] Make ignored proto output reproducible from a clean checkout: one package-owned pinned generator serves local source builds and Docker, `proto:check` is non-mutating, and Turbo caches the generated package output.
 - [ ] Build the eight backend images once through the sequential inventory-backed Bake runner and reuse them for live tests and scans.
 - [ ] User gate: the backend-only lint, type, proto, security, and source-build commands pass locally with no errors; observe the updated quality/live workflow in GitHub Actions.
 
@@ -179,6 +180,7 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 - Batch 4 backend-tooling tests pass 23/23. Local and release Compose configurations parse. On 2026-08-03 the supported `pnpm backend:boot` workflow completed in roughly 30 minutes: all eight images built sequentially, all backend services plus MinIO became healthy, and the idempotent API demo seed reported its product and blog records as existing.
 - Batch 5A tooling coverage passes 24/24. A Turbo dry run selected the eight backend services and four shared package dependencies, with `apps/web` absent. Local and release Compose validation also passes; the new quality commands and CI jobs still require their user/hosted-run gates.
 - The user ran `lint:backend`, `check-types:backend`, `proto:check`, `test:security`, and `build:backend`; all completed without errors. The 943 lint warnings are entirely under `test/**`: 942 are unsafe-`any` warnings from e2e fixtures/response handling and one is an unused test variable. Production `src/**` reports no warnings. Per scope, test-warning cleanup is deferred while actual test failures remain blocking.
+- The first hosted clean quality run correctly failed before lint consumers because ignored `packages/protos/generated` output was absent. The package now owns pinned generation, its build creates and compiles that output, and Docker excludes host-generated contracts. The isolated generation/non-mutation check, corrected Turbo graphs, all backend lint tasks with zero errors, all backend type checks, all backend source builds, and both Compose validations pass locally. Hosted quality/live reruns remain the gate.
 - Active refresh-token rotation/replay/logout behavior is covered by the existing auth Redis security tests and remains unchanged by the planned legacy cleanup.
 - The raw workspace production audit currently includes backend, tooling, and deferred web findings; its unclassified total must not be used as an F2 backend gate.
 

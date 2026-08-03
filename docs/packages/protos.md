@@ -19,8 +19,9 @@ Important files:
 - `packages/protos/*.proto`
 - `packages/protos/generated/*.ts`
 - `packages/protos/index.ts`
-- `scripts/proto-gen.mjs`
+- `packages/protos/scripts/generate.mjs`
 - `packages/protos/package.json`
+- `packages/protos/turbo.json`
 - `packages/protos/tsconfig.json`
 
 ## Proto Contracts
@@ -54,7 +55,10 @@ Current generated files include:
 - `order.ts`
 - `typeRegistry.ts`
 
-Generated files should not be hand-edited.
+Generated files are ignored build artifacts and should not be hand-edited or
+committed. The proto package build generates them before TypeScript
+compilation, and the backend Docker build generates its own copy inside the
+build stage rather than accepting host-generated output.
 
 Regenerate with:
 
@@ -62,13 +66,18 @@ Regenerate with:
 pnpm proto:gen
 ```
 
-Check generated output with:
+Check that the pinned compiler and plugin can generate the complete expected
+contract inventory without changing the working tree:
 
 ```powershell
 pnpm proto:check
 ```
 
-`proto:check` regenerates into a temporary directory and compares only generated proto output. Unrelated working-tree changes do not affect it.
+`proto:check` generates into an isolated temporary directory, verifies that
+each source contract and `typeRegistry.ts` were produced, then removes the
+temporary output. Unrelated working-tree changes do not affect it. The normal
+package build separately generates the ignored output and compiles it, proving
+that the generated TypeScript remains usable.
 
 ## Public Exports
 
@@ -135,10 +144,10 @@ Backward-compatibility and deprecation rules live in `docs/architecture/api-and-
 ## Known Watch Points
 
 - Do not hand-edit `packages/protos/generated`.
+- Keep `protoc` and `ts-proto` owned and versioned by this package; do not add a
+  second system or CI-only generator path.
 - Do not treat proto fields as database truth; Prisma schemas still define persisted storage.
 - User-service no longer exposes refresh-token persistence or a token-update
   RPC. Field number `5` and the name `refreshToken` remain reserved in both
   hash-bearing user responses so they cannot be reused accidentally.
 - Keep proto contracts backward-aware because several services consume them directly.
-- `packages/protos/scripts/write-index-dts.cjs` appears stale because it only writes `authv1` and `userv1`.
-- If declaration generation starts using that script again, update it or remove it to avoid misleading package types.

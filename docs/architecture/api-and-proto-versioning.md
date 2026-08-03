@@ -86,4 +86,8 @@ pnpm test:e2e:provision
 pnpm test:e2e
 ```
 
-Generated files are never edited by hand. `proto:check` compares only generated proto output, so unrelated tracked changes do not affect the result.
+Generated files are ignored build artifacts and are never edited by hand.
+`proto:check` performs isolated, non-mutating generation and verifies the
+expected contract inventory, so unrelated tracked changes do not affect the
+result. Source and Docker builds generate again through the same package-owned
+tool before compiling the output.

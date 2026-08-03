@@ -129,21 +129,12 @@ importers:
       prisma:
         specifier: 6.16.2
         version: 6.16.2(typescript@5.9.2)
-      proto:
-        specifier: ^1.0.19
-        version: 1.0.19
-      protoc:
-        specifier: ^32.1.0
-        version: 32.1.0
       ts-jest:
         specifier: ^29.4.4
         version: 29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@24.5.2)(ts-node@10.9.2(@swc/core@1.13.5)(@types/node@24.5.2)(typescript@5.9.2)))(typescript@5.9.2)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@swc/core@1.13.5)(@types/node@24.5.2)(typescript@5.9.2)
-      ts-proto:
-        specifier: ^2.7.7
-        version: 2.7.7
       tsconfig-paths:
         specifier: ^4.2.0
         version: 4.2.0
@@ -1354,6 +1345,9 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
+      protoc:
+        specifier: ^32.1.0
+        version: 32.1.0
       ts-proto:
         specifier: ^2.7.7
         version: 2.7.7
@@ -7115,9 +7109,6 @@ packages:
 
   property-information@7.1.0:
     resolution: {integrity: sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ==}
-
-  proto@1.0.19:
-    resolution: {integrity: sha512-NNRn4T3FAcMbiRZAr6HlAP3PyqSv79bcYdfiZbY1nognRTVeGAd5Ncg4yHZdM2ey9ovP/sOg/0lfalvaj3ZpHA==}
 
   protobufjs@7.5.0:
     resolution: {integrity: sha512-Z2E/kOY1QjoMlCytmexzYfDm/w5fKAiRwpSzGtdnXW1zC88Z2yXazHHrOtwCzn+7wSxyE8PYM4rvVcMphF9sOA==}
@@ -16906,8 +16897,6 @@ snapshots:
       react-is: 16.13.1
 
   property-information@7.1.0: {}
-
-  proto@1.0.19: {}
 
   protobufjs@7.5.0:
     dependencies:

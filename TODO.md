@@ -162,7 +162,7 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [x] Export generated order contracts from `@nebula/protos`.
 - [x] Use generated/shared contract types where available.
 - [x] Remove unnecessary local proto-type duplicates.
-- [x] Make proto checks ignore unrelated working-tree changes.
+- [x] Make proto checks perform isolated, non-mutating generation without depending on unrelated working-tree changes.
 - [x] Define backward-compatible API/proto versioning rules.
 
 ### Standard Service Bootstrap
