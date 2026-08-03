@@ -212,11 +212,11 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 ### CI
 
 - [ ] Verify formatting, lint, types, protos, tests, and builds.
-- [ ] Start required databases and storage.
-- [ ] Run migrations and seeds.
-- [ ] Run integration/e2e tests.
-- [ ] Build container images.
-- [ ] Verify Compose configuration.
+- [x] Start required databases and storage.
+- [x] Run migrations and seeds.
+- [ ] Run integration/e2e tests; the current clean-run blocker is missing host-side internal-package `dist` outputs before Jest compilation.
+- [x] Build container images.
+- [x] Verify Compose configuration.
 - [ ] Add dependency, image, and secret scanning.
 - [ ] Preserve useful build/test artifacts.
 
