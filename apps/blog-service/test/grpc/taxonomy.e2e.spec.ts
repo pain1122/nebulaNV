@@ -1,8 +1,13 @@
 // apps/blog-service/test/grpc/taxonomy.e2e.spec.ts
-import { loadClient, call, mdS2S } from "./helpers";
+import { status } from "@grpc/grpc-js";
+import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
+import { httpJson } from "../utils/http";
 
 const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
 const URL = process.env.BLOG_GRPC_URL || "127.0.0.1:50055";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
+
+type LoginResponse = { accessToken: string };
 
 describe("BlogTaxonomyService gRPC (admin required on writes)", () => {
   const client = loadClient<any>({
@@ -18,6 +23,18 @@ describe("BlogTaxonomyService gRPC (admin required on writes)", () => {
 
   let id = "";
   let slug = "";
+
+  beforeAll(async () => {
+    const login = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP}/auth/login`,
+      {
+        identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
+        password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
+      },
+    );
+    setS2STestActorToken(login.accessToken);
+  });
 
   it("Create (admin) succeeds for blog category kind", async () => {
     slug = `e2e-blog-tax-grpc-${Date.now()}`;
@@ -57,6 +74,20 @@ describe("BlogTaxonomyService gRPC (admin required on writes)", () => {
     expect(res.data.id).toBe(id);
     expect(res.data.slug).toBe(slug);
     expect(res.data.kind).toBe(kind);
+  });
+
+  it("Get (public) returns NOT_FOUND for a missing taxonomy item", async () => {
+    await expect(
+      call<any>(
+        client,
+        "Get",
+        { id: "11111111-1111-4111-8111-111111111111" },
+        mdS2S(),
+      ),
+    ).rejects.toMatchObject({
+      code: status.NOT_FOUND,
+      details: "taxonomy_not_found",
+    });
   });
 
   it("List (public) finds the created item for that kind", async () => {

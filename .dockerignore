@@ -16,10 +16,27 @@
 **/.vercel
 **/.pnpm-store
 **/.tsbuildinfo
-coverage
-.cache
-deploy
-.buildx-cache
+/coverage
+/.cache
+/deploy
+/.buildx-cache
+
+# Documentation and tests are not backend image build inputs.
+/docs
+/my reports
+/test
+**/test
+**/tests
+**/__tests__
+**/*.spec.ts
+**/*.e2e-spec.ts
+**/jest.config.*
+**/tsconfig.spec.json
+TODO.md
+README.md
+AI_CONTEXT.md
+Setup.md
+site essentials.md
 
 # -------------------------------------------
 # Local & IDE
@@ -35,8 +52,6 @@ Thumbs.db
 # -------------------------------------------
 .env
 .env.*
-!*.env.example
-!**/.env.example
 
 # -------------------------------------------
 # Logs & temp

@@ -1,22 +1,46 @@
-// apps/auth-service/test/grpc/helpers.ts
-import * as crypto from 'crypto';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import * as jwt from 'jsonwebtoken';
+import { authv1, userv1 } from '@nebula/protos';
+import {
+  copyS2SSigningIntent,
+  finalizeS2SClientMetadata,
+  markS2SMetadata,
+  registerS2SClientDefinition,
+  type S2SSigningIdentity,
+} from '@nebula/grpc-auth';
 
 export const AUTHORIZATION_HEADER = 'authorization';
-export const X_SVC_HEADER = 'x-svc';
-export const X_USER_ID_HEADER = 'x-user-id';
-export const X_ROLE_HEADER = 'x-role';
-export const X_USER_ROLE_HEADER = 'x-user-role';
-export const X_SIGN_HEADER = 'x-gateway-sign';
 
-export function minuteBucket(): number {
-  return Math.floor(Date.now() / 60000);
-}
-export function hmac(secret: string, payload: string): string {
-  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
-}
+const gatewayAuth: S2SSigningIdentity = {
+  kind: 'gateway',
+  serviceName: 'gateway',
+  key: {
+    id: 'gateway-auth-v1',
+    secret:
+      process.env.S2S_TEST_GATEWAY_KEY ??
+      'dev-only-gateway-to-auth-s2s-key-00001',
+  },
+};
+
+const authAuth: S2SSigningIdentity = {
+  kind: 'service',
+  serviceName: 'auth-service',
+  key: {
+    id: 'auth-auth-v1',
+    secret:
+      process.env.S2S_TEST_SERVICE_KEY ??
+      'dev-only-auth-to-auth-s2s-key-00000001',
+  },
+};
+
+const authUser: S2SSigningIdentity = {
+  kind: 'service',
+  serviceName: 'auth-service',
+  key: {
+    id: 'auth-user-v1',
+    secret: 'dev-only-auth-to-user-s2s-key-00000001',
+  },
+};
 
 export function mdBearer(token?: string): grpc.Metadata {
   const md = new grpc.Metadata();
@@ -24,39 +48,32 @@ export function mdBearer(token?: string): grpc.Metadata {
   return md;
 }
 
-export function mdS2S(opts?: { svc?: string; secret?: string }): grpc.Metadata {
-  const md = new grpc.Metadata();
-  const svc = opts?.svc ?? process.env.SVC_NAME ?? 'auth-service';
-  const secret = opts?.secret ?? process.env.GATEWAY_SECRET;
-  if (!secret) return md;
-  const sig = hmac(secret, `${svc}:${minuteBucket()}`);
-  md.set(X_SIGN_HEADER, sig);
-  md.set(X_SVC_HEADER, svc);
-  return md;
+export function mdS2S(opts?: { kind?: 'service' | 'gateway' }): grpc.Metadata {
+  const identity = opts?.kind === 'service' ? authAuth : gatewayAuth;
+  return markS2SMetadata(new grpc.Metadata(), {
+    ...identity,
+    targets: { 'user-service': authUser },
+  });
 }
 
-export function mdUser(
-  userId?: string | null,
-  role?: string | null,
-): grpc.Metadata {
+/** Test-only hostile metadata; production helpers must never create this. */
+export function mdForgedActor(userId: string, role: string): grpc.Metadata {
   const md = new grpc.Metadata();
-  if (userId) md.set(X_USER_ID_HEADER, String(userId));
-  if (role) {
-    // set both, some code reads x-user-role, some reads x-role
-    md.set(X_USER_ROLE_HEADER, String(role));
-    md.set(X_ROLE_HEADER, String(role));
-  }
+  md.set('x-user-id', userId);
+  md.set('x-user-role', role);
   return md;
 }
 
 export function mergeMd(
-  ...arr: Array<grpc.Metadata | undefined>
+  ...sources: Array<grpc.Metadata | undefined>
 ): grpc.Metadata {
   const out = new grpc.Metadata();
-  for (const m of arr) {
-    if (!m) continue;
-    const map: Record<string, string> = (m as any)?.getMap?.() ?? {};
-    for (const k in map) out.set(k, map[k]);
+  for (const source of sources) {
+    if (!source) continue;
+    for (const [key, value] of Object.entries(source.getMap())) {
+      out.set(key, value);
+    }
+    copyS2SSigningIntent(source, out);
   }
   return out;
 }
@@ -64,29 +81,11 @@ export function mergeMd(
 export function mdAuth(
   params: {
     access?: string;
-    userId?: string;
-    role?: 'user' | 'admin' | 'root-admin' | string;
     s2s?: boolean;
   } = {},
 ): grpc.Metadata {
-  const { access, userId, role, s2s = true } = params;
-
-  // infer role from JWT if not provided
-  let effectiveRole = role;
-  if (!effectiveRole && access) {
-    try {
-      const payload = jwt.decode(access) as any | null;
-      if (payload?.role) effectiveRole = String(payload.role);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return mergeMd(
-    mdBearer(access),
-    s2s ? mdS2S() : undefined,
-    mdUser(userId, effectiveRole),
-  );
+  const { access, s2s = true } = params;
+  return mergeMd(mdBearer(access), s2s ? mdS2S() : undefined);
 }
 
 export function loadClient<TClient extends grpc.Client>(opts: {
@@ -95,52 +94,48 @@ export function loadClient<TClient extends grpc.Client>(opts: {
   pkg: string | string[];
   svc: string;
 }): TClient {
-  const def = protoLoader.loadSync(opts.protoPath, {
+  const definition = protoLoader.loadSync(opts.protoPath, {
     keepCase: true,
-    longs: String as any,
-    enums: String as any,
+    longs: String,
+    enums: String,
     defaults: true,
     oneofs: true,
   });
-  const loaded = grpc.loadPackageDefinition(def) as any;
-  const pkgs = Array.isArray(opts.pkg) ? opts.pkg : [opts.pkg];
+  const loaded = grpc.loadPackageDefinition(definition) as any;
+  const packages = Array.isArray(opts.pkg) ? opts.pkg : [opts.pkg];
 
-  for (const pkg of pkgs) {
-    let obj: any = loaded;
-    let ok = true;
-    for (const part of pkg.split('.')) {
-      obj = obj?.[part];
-      if (!obj) {
-        ok = false;
-        break;
-      }
+  for (const packageName of packages) {
+    const namespace = packageName
+      .split('.')
+      .reduce((current: any, key) => current?.[key], loaded);
+    const Ctor = namespace?.[opts.svc];
+    if (!Ctor) continue;
+    const client = new Ctor(
+      opts.url,
+      grpc.credentials.createInsecure(),
+    ) as TClient;
+    const signingDefinition =
+      opts.svc === 'AuthService'
+        ? authv1.AuthServiceService
+        : opts.svc === 'UserService'
+          ? userv1.UserServiceService
+          : undefined;
+    if (!signingDefinition) {
+      throw new Error(`Signing definition for ${opts.svc} not found`);
     }
-    const Ctor = ok && obj?.[opts.svc];
-    if (Ctor) return new Ctor(opts.url, grpc.credentials.createInsecure());
+    registerS2SClientDefinition(client, signingDefinition);
+    return client;
   }
-  throw new Error(
-    `Service not found. Tried pkgs: ${pkgs.join(', ')} for ${opts.svc}`,
-  );
+  throw new Error(`Service ${opts.svc} not found`);
 }
 
 function resolveMethodName(client: any, name: string): string {
-  if (client && typeof client[name] === 'function') return name;
-
-  const lowerCamel = name[0].toLowerCase() + name.slice(1);
-  if (client && typeof client[lowerCamel] === 'function') return lowerCamel;
-
-  const pascal = name[0].toUpperCase() + name.slice(1);
-  if (client && typeof client[pascal] === 'function') return pascal;
-
-  const snake = name
-    .replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`)
-    .replace(/^_/, '');
-  if (client && typeof client[snake] === 'function') return snake;
-
-  const avail = Object.keys(client || {});
-  throw new Error(
-    `gRPC method not found: tried ${name}/${lowerCamel}/${pascal}/${snake}, available: ${avail.join(', ')}`,
+  if (typeof client?.[name] === 'function') return name;
+  const alternate = Object.keys(client ?? {}).find(
+    (key) => key.toLowerCase() === name.toLowerCase(),
   );
+  if (!alternate) throw new Error(`gRPC method not found: ${name}`);
+  return alternate;
 }
 
 export function call<TResp>(
@@ -149,10 +144,19 @@ export function call<TResp>(
   req: any,
   md?: grpc.Metadata,
 ): Promise<TResp> {
-  const m = resolveMethodName(client, method);
+  const resolved = resolveMethodName(client, method);
+  const metadata = finalizeS2SClientMetadata({
+    client,
+    method: resolved,
+    request: req,
+    metadata: md,
+  });
   return new Promise<TResp>((resolve, reject) => {
-    client[m](req, md, (err: grpc.ServiceError | null, res: TResp) =>
-      err ? reject(err) : resolve(res),
+    client[resolved](
+      req,
+      metadata,
+      (err: grpc.ServiceError | null, response: TResp) =>
+        err ? reject(err) : resolve(response),
     );
   });
 }

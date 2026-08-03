@@ -1,28 +1,11 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Put,
-  Delete,
-  Query,
-  UsePipes,
-  ValidationPipe,
-} from "@nestjs/common";
+import { Body, Controller, Get, Put, Delete, Query } from "@nestjs/common";
 import { Public, Roles } from "@nebula/grpc-auth";
 import { SettingsService } from "./settings.service";
 import { GetStringDto } from "./dto/get-string.dto";
 import { SetStringDto } from "./dto/set-string.dto";
 import { DeleteStringDto } from "./dto/delete-string.dto";
 
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
-
 @Controller("settings")
-@UsePipes(Pipe)
 export class SettingsController {
   constructor(private readonly svc: SettingsService) {}
 

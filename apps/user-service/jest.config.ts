@@ -7,7 +7,7 @@ const config: Config = {
   // catch both unit and e2e specs
   testRegex: '(/__tests__/.*|(\\.|/)(e2e-)?spec)\\.ts$',
   moduleFileExtensions: ['ts', 'js', 'json'],
-  transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
+  transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
   globalSetup: '<rootDir>/test/setup/wait-for-services.ts',
   // ✅ Load dotenv and our env defaults before tests

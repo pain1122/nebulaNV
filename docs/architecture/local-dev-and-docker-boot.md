@@ -1,6 +1,6 @@
 ﻿# Local Dev And Docker Boot
 
-Last checked: 2026-06-08
+Last checked: 2026-07-13
 
 This document explains how the backend starts locally and in Docker.
 
@@ -10,16 +10,16 @@ It intentionally avoids listing secret values. Environment variable names are sa
 
 Current service ports from app `.env` files:
 
-| Service | HTTP Port | gRPC Port |
-| --- | ---: | ---: |
-| user-service | 3100 | 50051 |
-| auth-service | 3001 | 50052 |
-| product-service | 3003 | 50053 |
-| settings-service | 3010 | 50054 |
-| blog-service | 3004 | 50055 |
-| order-service | 3005 | 50056 |
-| taxonomy-service | 3006 | 50057 |
-| media-service | 3007 | 50058 |
+| Service          | HTTP Port | gRPC Port |
+| ---------------- | --------: | --------: |
+| user-service     |      3100 |     50051 |
+| auth-service     |      3001 |     50052 |
+| product-service  |      3003 |     50053 |
+| settings-service |      3010 |     50054 |
+| blog-service     |      3004 |     50055 |
+| order-service    |      3005 |     50056 |
+| taxonomy-service |      3006 |     50057 |
+| media-service    |      3007 |     50058 |
 
 ## Local Backend Startup
 
@@ -70,16 +70,16 @@ auth-service
 
 Operationally, the current local scripts wait on:
 
-| Script | Waits On |
-| --- | --- |
-| `dev:auth` | nothing |
-| `dev:user` | auth gRPC `50052` |
-| `dev:settings` | auth gRPC `50052` |
-| `dev:taxonomy` | auth gRPC `50052`, settings gRPC `50054` |
-| `dev:media` | auth gRPC `50052` |
-| `dev:blog` | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057` |
-| `dev:product` | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057` |
-| `dev:order` | auth gRPC `50052`, settings gRPC `50054`, product gRPC `50053` |
+| Script         | Waits On                                                        |
+| -------------- | --------------------------------------------------------------- |
+| `dev:auth`     | nothing                                                         |
+| `dev:user`     | auth gRPC `50052`                                               |
+| `dev:settings` | auth gRPC `50052`                                               |
+| `dev:taxonomy` | auth gRPC `50052`, settings gRPC `50054`                        |
+| `dev:media`    | auth gRPC `50052`                                               |
+| `dev:blog`     | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057` |
+| `dev:product`  | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057` |
+| `dev:order`    | auth gRPC `50052`, settings gRPC `50054`, product gRPC `50053`  |
 
 ## Why Startup Can Look Stuck
 
@@ -111,9 +111,9 @@ Root `.env` contains shared values such as:
 
 - `NODE_ENV`
 - `PUBLIC_MODE`
-- `S2S_SECRET`
-- `S2S_ALLOWED_SERVICES`
-- `GATEWAY_HEADER`
+- `S2S_SIGNATURE_HEADER`
+- `S2S_MAX_CLOCK_SKEW_MS`
+- `S2S_REPLAY_STORE` and Redis connection settings
 - `*_GRPC_URL`
 - `*_HTTP_PORT`
 - JWT settings
@@ -126,7 +126,7 @@ Per-service `.env` files usually contain:
 - `GRPC_PORT`
 - `DATABASE_URL`
 - `SHADOW_DATABASE_URL`
-- `GATEWAY_SECRET`
+- pairwise `S2S_OUTBOUND_KEYS`, `S2S_INBOUND_KEYS`, and `GATEWAY_INBOUND_KEYS`
 - service-specific storage or Redis values
 
 Do not document secret values. Document names, purpose, and expected format only.
@@ -168,30 +168,45 @@ Core infrastructure:
 - `minio`
 - `minio-init`
 
-Core app services without a `full` profile:
+The backend stack contains all eight app services:
 
 - `user-service`
 - `auth-service`
 - `settings-service`
 - `media-service`
-
-Services currently behind the `full` profile:
-
 - `taxonomy-service`
 - `blog-service`
 - `product-service`
 - `order-service`
 
-To start the default stack:
+For a complete supported boot, run:
 
 ```powershell
-docker compose up -d --build
+pnpm backend:boot
 ```
 
-To include full-profile services:
+The command extends the single inventory-backed provisioner. It waits for
+healthy PostgreSQL, Redis, and MinIO; proves all seven expected databases exist;
+completes MinIO bucket initialization; deploys and checks migrations; applies
+all base seeds; builds the eight official Bake targets sequentially; starts
+Compose with `--no-build`; waits for the eight HTTP readiness contracts; and
+runs the idempotent API demo seed. `pnpm test:e2e:provision` is a compatibility
+alias to the same workflow.
+
+Plain Compose startup does not run migrations, seeds, or builds. Use it only to
+restart an already-prepared database and existing images:
 
 ```powershell
-docker compose --profile full up -d --build
+docker compose up -d --no-build
+```
+
+Readiness can be checked without changing the stack. The down command removes
+containers and the Compose network but deliberately omits `-v`, preserving the
+PostgreSQL and MinIO named volumes:
+
+```powershell
+pnpm backend:health
+pnpm backend:down
 ```
 
 To follow one service:
@@ -271,49 +286,145 @@ keep using the service `.env` URLs.
 
 ## Dockerfiles
 
-There are two Dockerfile patterns.
-
-Shared optimized backend Dockerfile:
+All eight backend images use the shared multi-target Dockerfile:
 
 ```txt
 docker/backend.Dockerfile
 ```
 
-Currently used in compose by:
+Compose selects one independent runtime target for each service:
 
 - `user-service`
 - `auth-service`
 - `settings-service`
 - `media-service`
+- `taxonomy-service`
+- `product-service`
+- `blog-service`
+- `order-service`
 
-Per-service Dockerfiles:
+`docker-bake.hcl` defines the official target set. Normal tooling invokes those
+targets sequentially in backend-inventory order. The first target commits the
+shared build, dependency, and runtime-base layers; later targets can reuse those
+completed layers instead of competing to materialize identical pnpm installs
+and large copies. Do not use the grouped `docker buildx bake backend --load`
+command for normal Docker Desktop builds.
 
-```txt
-apps/product-service/Dockerfile
-apps/taxonomy-service/Dockerfile
-apps/blog-service/Dockerfile
-apps/order-service/Dockerfile
-```
-
-These build a single service and its workspace dependencies.
+The resulting images still share an identical, stable production-dependency
+layer. Compiled universal internal packages are added afterward as small
+synchronized overlays, so an internal source edit does not recreate that large
+third-party layer. Each image contains all internal packages it needs plus only
+its own service build and Prisma client, and remains independently runnable and
+deployable. Licensed or tenant-specific feature modules must remain separate
+images rather than being placed in this common foundation.
 
 ## Prisma Generation
 
-Root scripts currently include Prisma commands for:
+The root `package.json` owns the backend inventory used by local tooling. It
+records all eight backend packages, directories, Docker identities, ports, and
+the seven Prisma database names. `scripts/backend.mjs` reads that inventory and
+runs Prisma services sequentially in this fixed order:
 
-- user-service
-- product-service
-- settings-service
+```txt
+user -> settings -> media -> taxonomy -> product -> blog -> order
+```
 
-Some service Dockerfiles also run service-local Prisma generation.
+Use the root commands instead of maintaining another service list:
+
+```powershell
+pnpm prisma:gen
+pnpm prisma:migrate:dev
+pnpm prisma:migrate:deploy
+pnpm prisma:migrate:status
+pnpm prisma:seed
+pnpm backend:seed
+pnpm db:push
+```
+
+The runner stops at the first failed service and identifies the operation,
+service, and database name without printing database credentials. Service-local
+Prisma commands remain available for focused work.
+
+`pnpm prisma:seed` is the base-database seed. User-service owns the development
+admin and normal-user records, settings-service owns its defaults, and media,
+taxonomy, product, blog, and order currently own no base rows. The user seed
+refuses to run when `NODE_ENV=production`.
+
+After all services are ready, `pnpm backend:seed` logs in as the ordinary seeded
+admin and creates one stable product and one published blog post through the
+existing HTTP APIs. It omits the product category so product-service resolves
+its initializer-owned default. Matching records are reported as existing and
+are never updated. The command refuses production and never logs credentials or
+tokens. Custom seed credentials must be supplied through `SEED_ADMIN_EMAIL` and
+`SEED_ADMIN_PASS` in the invoking environment.
 
 When adding a service with Prisma, check:
 
 - service package scripts
-- root Prisma scripts
+- root `nebula.backendServices` inventory
 - Dockerfile Prisma generation
 - Docker Compose `DATABASE_URL`
 - Docker Compose init database list
+
+## Clean Migration And Local Database Recovery
+
+The inventory-backed database checks use temporary databases whose names
+contain `_verify_`; they do not rewrite the seven normal development databases
+or delete Docker volumes:
+
+```powershell
+pnpm db:verify:migrations
+pnpm test:database-recovery
+```
+
+`db:verify:migrations` deploys and checks every service migration in the fixed
+inventory order. `test:database-recovery` proves that custom-format PostgreSQL
+dumps preserve binary values and that an intentional temporary migration
+failure stops later services. It then recreates only the affected disposable
+database and applies the real migrations. The invalid migration exists only in
+an operating-system temporary copy of the Prisma tree.
+
+Local maintenance backups cover the seven inventory-owned PostgreSQL databases.
+The target directory must be explicit and must not already exist. It contains
+one binary PostgreSQL custom-format dump per database plus `manifest.json`,
+which records the exact service, database, file, format, and creation time.
+Backups do not include Redis, MinIO objects, secrets, or Docker volumes.
+
+Stop the eight backend services before backup or restore, but leave PostgreSQL
+running:
+
+```powershell
+$backendServices = @(
+  "user-service",
+  "auth-service",
+  "settings-service",
+  "media-service",
+  "taxonomy-service",
+  "product-service",
+  "blog-service",
+  "order-service"
+)
+
+docker compose stop $backendServices
+
+$backupDirectory = ".nebula-backups\local-maintenance"
+pnpm run db:backup -- $backupDirectory
+pnpm run db:restore -- $backupDirectory --confirm=RESTORE_LOCAL_DATABASES
+
+pnpm prisma:migrate:status
+docker compose up -d --no-build $backendServices
+docker compose ps
+pnpm backend:seed
+```
+
+Both maintenance commands refuse to run while a backend service is running.
+Restore validates the manifest and every dump before changing a database, then
+drops, recreates, and restores the seven canonical databases in inventory
+order. The explicit confirmation token protects against accidental invocation;
+restore remains destructive to those database contents. Never edit or delete
+Prisma `_prisma_migrations` records manually. Recover a disposable development
+database by recreating only that database and applying the repository's real
+migrations; production recovery requires its own reviewed operational plan.
 
 ## Boot Troubleshooting
 
@@ -338,7 +449,7 @@ If Docker services cannot talk to each other:
 1. Check `docker compose ps`.
 2. Check `docker compose logs -f <service>`.
 3. Check whether the service uses Docker DNS names instead of `127.0.0.1`.
-4. Check whether the needed service is hidden behind the `full` profile.
+4. Check whether its declared Compose dependencies are healthy.
 
 ### Docker / WSL Clock Drift
 
@@ -400,4 +511,3 @@ When changing ports or boot order:
 - Update this document.
 
 Ports are contracts. Treat them with the same paranoia as DTO field names.
-

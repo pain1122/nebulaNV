@@ -1,5 +1,4 @@
-﻿
-# Docker Configs
+﻿# Docker Configs
 
 ## Purpose
 
@@ -10,14 +9,18 @@ Use this as a map. Do not duplicate full deployment instructions here; detailed 
 ## Main Files
 
 - `docker-compose.yml`: local/dev backend stack with build blocks.
+- `docker-bake.hcl`: official eight-image backend target set.
 - `docker-compose.release.yml`: release stack with prebuilt/preloaded images only.
 - `docker/backend.Dockerfile`: shared multi-stage backend image builder.
 - `.dockerignore`: root Docker build context filter.
+- `scripts/docker/build-backend.ps1`: cached/clean PowerShell build entry point.
 - `deploy/.env.production.example`: release env template.
 - `deploy/README.md`: image-save/load release runbook.
 - `scripts/docker/save-release-images.ps1`: saves release images into `deploy/nebula-images.tar`.
 - `scripts/docker/load-release-images.ps1`: loads `deploy/nebula-images.tar`.
 - `scripts/db/init-multiple-dbs.sh`: creates per-service Postgres databases on first volume init.
+- Root `package.json` field `nebula.backendServices`: tooling-owned backend package, database, image, and port inventory.
+- `scripts/backend.mjs`: inventory-backed provisioning, Prisma, development, database verification/recovery, and release-image command source.
 
 ## Local Compose
 
@@ -33,6 +36,7 @@ Purpose:
 - Uses root `.env` plus service-local `.env` files.
 - Overrides database URLs to point at the Docker Postgres service.
 - Overrides internal gRPC URLs to Docker service DNS names.
+- Uses health-gated infrastructure and backend dependency startup.
 
 Image names use:
 
@@ -93,8 +97,28 @@ Purpose:
 - Copies package manifests first for better Docker layer caching.
 - Copies Prisma schemas before install because workspace postinstall runs Prisma generation.
 - Runs one shared backend build through Turbo.
-- Runs `pnpm deploy --prod` into `/out/<service>`.
+- Builds the four small shared runtime packages before the cached Turbo service build. This refreshes pnpm's injected workspace copies even when Turbo would otherwise restore a shared-package build and skip its post-build synchronization hook.
+- Uses a versioned Docker-only Turbo cache namespace so artifacts admitted by the runtime-import verifier are not mixed with older incompatible compiler output.
+- Creates one production workspace dependency graph instead of eight sequential `pnpm deploy` trees.
+- Keeps the large external production dependency layer keyed only by lockfiles and package manifests.
+- Overlays compiled universal internal packages in separate small layers after dependency installation.
 - Creates one runtime target per backend service.
+- Verifies every declared internal package entry point while building each runtime target.
+
+The common layers provide storage reuse, not a runtime dependency between
+containers. Every image manifest contains its own copy of the required layer
+references and remains independently pushable, pullable, savable, and runnable.
+Only universal foundation packages belong in the internal-package overlay.
+Tenant-specific or licensed feature implementations must use separate
+module/service images and must not be added to that overlay.
+
+This ordering is an integrity rule as well as a performance rule: compiled
+first-party files must not be copied into `prod-deps` before `pnpm install`.
+Doing so makes every shared-code edit recreate and reload the large production
+dependency layer. `runtime-base` instead copies the stable dependency graph,
+adds the allowed compiled package artifacts, and synchronizes those artifacts
+into pnpm's prepared injected-workspace slots. The build fails if an expected
+slot is absent.
 
 Runtime targets:
 
@@ -113,7 +137,10 @@ Each runtime target exposes its HTTP and gRPC ports and runs:
 node dist/main.js
 ```
 
-Each runtime target has an HTTP `/health` Docker healthcheck.
+Each runtime target has an HTTP `/health/ready` Docker healthcheck. Readiness
+returns HTTP `503` while a required local dependency is unavailable, so Docker
+does not mark a degraded service healthy. `GET /health` remains a compatibility
+alias, while `GET /health/live` reports process liveness only.
 
 ## Runtime Images
 
@@ -181,6 +208,10 @@ Important:
 - `scripts/db/init-multiple-dbs.sh` runs only on first Postgres volume initialization.
 - If the `pgdata` volume already exists, changing the script will not recreate databases.
 - Migrations are still a deliberate deployment step, not automatically solved by Compose.
+- `pnpm db:verify:migrations` and `pnpm test:database-recovery` operate only on guarded disposable `_verify_` databases.
+- `pnpm db:backup` and `pnpm db:restore` cover the seven inventory-owned local databases and require all eight backend services to be stopped.
+- Restore requires `--confirm=RESTORE_LOCAL_DATABASES`; it never removes Docker volumes.
+- The canonical maintenance procedure and backup contents are documented in `docs/architecture/local-dev-and-docker-boot.md`.
 
 ## Media Storage Model
 
@@ -209,8 +240,9 @@ Do not collapse these into one value unless the runtime environment actually use
 
 Local Compose:
 
-- Uses root `.env`.
-- Uses service-local `.env`.
+- Loads root `.env`, then the matching service-local `.env`; a service-local duplicate has higher `env_file` precedence.
+- Applies explicit `environment` values after both env files.
+- Keeps shared `HTTP_CORS_ORIGINS` in root `.env`; the shared Compose environment mapping injects that root value into all eight services.
 - Overrides Docker-specific database URLs and internal service URLs in `environment`.
 
 Release Compose:
@@ -218,12 +250,15 @@ Release Compose:
 - Uses `deploy/.env.production`.
 - Does not use service-local `.env` files.
 - Requires production secrets through env interpolation.
+- Requires `HTTP_CORS_ORIGINS` from the deployment environment when direct browser origins are allowed.
 
 Important env groups:
 
 - Service identity: `SVC_NAME`
 - Public behavior: `PUBLIC_MODE`
-- S2S/auth: `GATEWAY_HEADER`, `GATEWAY_SECRET`, `S2S_SECRET`, JWT secrets
+- S2S transport: `S2S_SIGNATURE_HEADER`, bounded clock skew, Redis replay settings
+- Scoped trust: per-service `S2S_OUTBOUND_KEYS`, `S2S_INBOUND_KEYS`, and `GATEWAY_INBOUND_KEYS`
+- User auth: JWT secrets
 - Internal service registry: `*_GRPC_URL`
 - Per-service database URLs
 - Media S3-compatible storage settings
@@ -233,14 +268,37 @@ Important env groups:
 Build images on a machine that can install dependencies:
 
 ```powershell
-docker compose build
+.\scripts\docker\build-backend.ps1
 ```
+
+The script delegates to the inventory-backed runner in `scripts/backend.mjs`.
+It invokes one official Bake target at a time and stops on the first failure.
+The first target commits the shared build, production-dependency, and
+runtime-base layers; the remaining targets reuse those layers and export one
+image at a time. Normal builds preserve Docker, pnpm, and Turbo caches. `-Clean`
+invalidates the first target's shared layers, then allows the remaining targets
+to reuse the newly committed result.
+
+This ordering is required for the supported Docker Desktop workflow. A grouped
+`docker buildx bake backend --load` run on 2026-08-03 reached only 98 of 536
+steps after about 700 seconds while separate service solves materialized the
+same 1,029-package install and large runtime copies. The grouped run was stopped;
+it is not the supported local build command. Final image export can still take
+time, but sequential output identifies the exact target responsible.
+
+The completed 2026-08-03 `pnpm backend:boot` user gate took roughly 30 minutes
+with warm dependency content: all eight sequential image targets completed,
+Compose reached healthy state for MinIO and every backend service, and the
+idempotent API demo seed completed.
 
 Save images:
 
 ```powershell
 .\scripts\docker\save-release-images.ps1
 ```
+
+The save script derives the eight backend image names from the root inventory;
+the Postgres, Redis, and MinIO images remain explicit infrastructure entries.
 
 Load images on deployment machine:
 
@@ -264,6 +322,8 @@ docker compose --env-file deploy\.env.production -f docker-compose.release.yml u
 - Do not replace `MEDIA_S3_PUBLIC_ENDPOINT` with `minio:9000`; signed URLs need a client-reachable host.
 - Do not rely on Postgres init scripts after the volume already exists.
 - Keep app containers stateless; persistent data belongs in external services or Docker volumes.
+- Keep shared runtime content limited to universal foundation contracts, clients, configuration, and transport/security helpers.
+- Keep proprietary licensed modules out of core service images unless that image is explicitly the purchased module artifact.
 - Keep Compose release compatible with future Kubernetes expectations: env-driven config, externalized state, no app-local persistent files.
 - Use PowerShell-safe commands in docs and scripts. Do not write Bash-style `&&` command chains in PowerShell examples.
 
@@ -278,19 +338,46 @@ docker compose config
 Build local images:
 
 ```powershell
-docker compose --progress=plain build --provenance=false --sbom=false
+.\scripts\docker\build-backend.ps1
+```
+
+Cross-platform direct equivalent:
+
+```powershell
+pnpm docker:build:backend
+```
+
+Deliberate cold build:
+
+```powershell
+.\scripts\docker\build-backend.ps1 -Clean
 ```
 
 Start local stack:
 
 ```powershell
-docker compose up -d --force-recreate
+pnpm backend:boot
+```
+
+This is the supported complete workflow and includes the Bake image build,
+migrations, migration status, base seeds, readiness, and API demo seed. For an
+existing-database restart with already-built images, use:
+
+```powershell
+docker compose up -d --no-build
 ```
 
 Check containers:
 
 ```powershell
 docker compose ps -a
+```
+
+Check readiness or stop containers while preserving named volumes:
+
+```powershell
+pnpm backend:health
+pnpm backend:down
 ```
 
 Release config check:

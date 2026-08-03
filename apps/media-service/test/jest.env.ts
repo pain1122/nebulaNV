@@ -12,12 +12,13 @@ process.env.SEED_USER_EMAIL ||= "user@example.com";
 process.env.SEED_USER_PASS ||= "User123!";
 
 // S2S signature
-process.env.GATEWAY_HEADER ||= "x-gateway-sign";
-process.env.SVC_NAME ||= "bucket";
+process.env.S2S_SIGNATURE_HEADER ||= "x-s2s-signature";
+process.env.MEDIA_DELETE_CONFIRM_SECRET ||=
+  "test-only-media-delete-confirm-secret-0001";
+process.env.SVC_NAME ||= "gateway";
 
 // IMPORTANT: S2S secret used by mdS2S() in gRPC tests
-process.env.S2S_SECRET ||= ":n}T>QYq}G*m0_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
-process.env.S2S_SECRET_OLD ||= ":n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
+process.env.S2S_TEST_GATEWAY_KEY ||= "dev-only-gateway-to-media-s2s-key-0001";
 
 // Storage (Supabase Storage S3 gateway)
 process.env.MEDIA_STORAGE_DRIVER ||= "s3";

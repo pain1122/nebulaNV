@@ -1,9 +1,7 @@
 import { Metadata, status } from '@grpc/grpc-js';
 import { type ExecutionContext } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
 import {
   IS_PUBLIC_KEY,
   ROLES_KEY,
@@ -16,11 +14,12 @@ import type {
   AuthenticatedRequest,
   MetadataWithAuthUser,
 } from '../../src/auth/auth.types';
+import type { AccessTokenValidationService } from '../../src/auth/token/access-token-validation.service';
 
 type GuardFixture = {
   guard: JwtAuthGuard;
-  jwtService: {
-    verify: jest.Mock<unknown, [string, { secret?: string }]>;
+  accessTokens: {
+    validate: jest.Mock;
   };
 };
 
@@ -30,15 +29,15 @@ type GuardContextOptions = {
   rpcContext?: RpcContextWithContext;
 };
 
-function expectRpcException(
-  action: () => unknown,
+async function expectRpcException(
+  action: () => Promise<unknown>,
   code: number,
   message?: string,
-): void {
+): Promise<void> {
   let thrown: unknown;
 
   try {
-    action();
+    await action();
   } catch (err) {
     thrown = err;
   }
@@ -57,11 +56,8 @@ function createGuard(options: {
   isPublic?: boolean;
   roles?: Role[];
 }): GuardFixture {
-  const jwtService = {
-    verify: jest.fn<unknown, [string, { secret?: string }]>(),
-  };
-  const configService = {
-    get: jest.fn().mockReturnValue('access-secret'),
+  const accessTokens = {
+    validate: jest.fn(),
   };
   const reflector = {
     getAllAndOverride: jest.fn((key: unknown) => {
@@ -73,11 +69,10 @@ function createGuard(options: {
 
   return {
     guard: new JwtAuthGuard(
-      jwtService as unknown as JwtService,
-      configService as unknown as ConfigService,
+      accessTokens as unknown as AccessTokenValidationService,
       reflector as unknown as Reflector,
     ),
-    jwtService,
+    accessTokens,
   };
 }
 
@@ -112,12 +107,19 @@ const validUserPayload: AuthTokenPayload = {
   email: 'user@test.com',
   role: 'user',
   tv: 1,
+  sid: 'session-1',
+  jti: 'access-1',
+  typ: 'access',
 };
 
 describe('JwtAuthGuard security behavior', () => {
-  it('reads bearer tokens from gRPC metadata when there is no HTTP request', () => {
-    const { guard, jwtService } = createGuard({ roles: ['user'] });
-    jwtService.verify.mockReturnValue(validUserPayload);
+  it('reads bearer tokens from gRPC metadata when there is no HTTP request', async () => {
+    const { guard, accessTokens } = createGuard({ roles: ['user'] });
+    accessTokens.validate.mockResolvedValue({
+      valid: true,
+      payload: validUserPayload,
+      sessionRef: 'safe-session-reference',
+    });
 
     const metadata = metadataWithBearer();
     const rpcContext: RpcContextWithContext = {};
@@ -127,22 +129,28 @@ describe('JwtAuthGuard security behavior', () => {
       rpcContext,
     });
 
-    expect(guard.canActivate(context)).toBe(true);
+    await expect(guard.canActivate(context)).resolves.toBe(true);
     expect((metadata as MetadataWithAuthUser).user).toEqual({
       userId: validUserPayload.sub,
       email: validUserPayload.email,
       role: validUserPayload.role,
+      sessionRef: 'safe-session-reference',
     });
     expect(rpcContext.user).toEqual({
       userId: validUserPayload.sub,
       email: validUserPayload.email,
       role: validUserPayload.role,
+      sessionRef: 'safe-session-reference',
     });
   });
 
-  it('does not trust spoofed gRPC role metadata over the signed JWT payload', () => {
-    const { guard, jwtService } = createGuard({ roles: ['admin'] });
-    jwtService.verify.mockReturnValue(validUserPayload);
+  it('does not trust spoofed gRPC role metadata over the signed JWT payload', async () => {
+    const { guard, accessTokens } = createGuard({ roles: ['admin'] });
+    accessTokens.validate.mockResolvedValue({
+      valid: true,
+      payload: validUserPayload,
+      sessionRef: 'safe-session-reference',
+    });
 
     const metadata = metadataWithBearer();
     metadata.set('x-user-id', 'admin-1');
@@ -154,7 +162,7 @@ describe('JwtAuthGuard security behavior', () => {
       rpcContext: {},
     });
 
-    expectRpcException(
+    await expectRpcException(
       () => guard.canActivate(context),
       status.PERMISSION_DENIED,
       'Insufficient role',
@@ -163,12 +171,16 @@ describe('JwtAuthGuard security behavior', () => {
       userId: validUserPayload.sub,
       email: validUserPayload.email,
       role: 'user',
+      sessionRef: 'safe-session-reference',
     });
   });
 
-  it('rejects signed tokens with missing auth payload fields', () => {
-    const { guard, jwtService } = createGuard({ roles: ['user'] });
-    jwtService.verify.mockReturnValue({ sub: 'user-1' });
+  it('rejects tokens rejected by authoritative validation', async () => {
+    const { guard, accessTokens } = createGuard({ roles: ['user'] });
+    accessTokens.validate.mockResolvedValue({
+      valid: false,
+      reason: 'token_version_mismatch',
+    });
 
     const metadata = metadataWithBearer();
     const context = makeContext({
@@ -177,28 +189,35 @@ describe('JwtAuthGuard security behavior', () => {
       rpcContext: {},
     });
 
-    expectRpcException(
+    await expectRpcException(
       () => guard.canActivate(context),
       status.UNAUTHENTICATED,
     );
     expect((metadata as MetadataWithAuthUser).user).toBeUndefined();
   });
 
-  it('does not verify tokens for routes marked public', () => {
-    const { guard, jwtService } = createGuard({ isPublic: true });
+  it('does not verify tokens for routes marked public', async () => {
+    const { guard, accessTokens } = createGuard({ isPublic: true });
     const context = makeContext({});
 
-    expect(guard.canActivate(context)).toBe(true);
-    expect(jwtService.verify).not.toHaveBeenCalled();
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(accessTokens.validate).not.toHaveBeenCalled();
   });
 
-  it('allows a signed admin token to satisfy admin role requirements', () => {
-    const { guard, jwtService } = createGuard({ roles: ['admin'] });
-    jwtService.verify.mockReturnValue({
-      sub: 'admin-1',
-      email: 'admin@test.com',
-      role: 'admin',
-      tv: 1,
+  it('allows a valid admin token to satisfy admin role requirements', async () => {
+    const { guard, accessTokens } = createGuard({ roles: ['admin'] });
+    accessTokens.validate.mockResolvedValue({
+      valid: true,
+      payload: {
+        sub: 'admin-1',
+        email: 'admin@test.com',
+        role: 'admin',
+        tv: 1,
+        sid: 'session-admin',
+        jti: 'access-admin',
+        typ: 'access',
+      },
+      sessionRef: 'safe-admin-session-reference',
     });
 
     const metadata = metadataWithBearer();
@@ -209,11 +228,12 @@ describe('JwtAuthGuard security behavior', () => {
       rpcContext,
     });
 
-    expect(guard.canActivate(context)).toBe(true);
+    await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(rpcContext.user).toEqual({
       userId: 'admin-1',
       email: 'admin@test.com',
       role: 'admin',
+      sessionRef: 'safe-admin-session-reference',
     });
   });
 });

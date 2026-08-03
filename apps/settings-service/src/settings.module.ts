@@ -10,11 +10,12 @@ import { PrismaService } from "./prisma.service";
 import { envSchema } from "./config/env.validation";
 import { SettingsService } from "./settings.service";
 import { HealthController } from "./health.controller";
+import { createServiceLifecycleProvider } from "@packages/config";
 
 export const SETTINGS_PROTO = require.resolve("@nebula/protos/settings.proto");
 const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto");
 
-import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
+import { GRPC_SECURITY_PROVIDERS, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
 import * as path from "path";
 
 @Module({
@@ -45,11 +46,12 @@ import * as path from "path";
   ],
   controllers: [SettingsController, SettingsGrpcController, HealthController],
   providers: [
+    createServiceLifecycleProvider("settings-service"),
     PrismaService,
     SettingsService,
-    S2SGuard,
+    ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+    { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },
   ],
 })
 export class SettingsModule {}

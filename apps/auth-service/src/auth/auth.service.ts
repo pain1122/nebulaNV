@@ -1,32 +1,28 @@
 // apps/auth-service/src/auth/auth.service.ts
-import {
-  Injectable,
-  UnauthorizedException,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { createHash, randomUUID } from 'node:crypto';
+import { safeErrorName } from '@packages/config';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GrpcAuthService } from './grpc/grpc-auth.service';
 import { AuthRedisService } from './redis/auth-redis.service';
 import { userv1 } from '@nebula/protos';
+import { wrapGrpc } from '@nebula/grpc-auth';
 import {
-  AuthTokenPayload,
   AuthUserDto,
   TokenPair,
-  isAuthTokenPayload,
+  type AccessTokenPayload,
+  type RefreshTokenPayload,
+  isRefreshTokenPayload,
   toAuthRole,
 } from './auth.types';
-import { errorMessage, errorName } from './error.utils';
 
 type UserResponse = userv1.UserResponse;
 type CreateUserRequest = userv1.CreateUserRequest;
 type FindUserWithHashRequest = userv1.FindUserWithHashRequest;
 type UpdateProfileRequest = userv1.UpdateProfileRequest;
-type GetUserWithHashRequest = userv1.GetUserWithHashRequest;
-type SetRefreshTokenRequest = userv1.SetRefreshTokenRequest;
 type GetUserWithHashResponse = userv1.GetUserWithHashResponse;
 
 type LogoutRequest = {
@@ -35,16 +31,14 @@ type LogoutRequest = {
   allDevices?: boolean;
 };
 
+type IssuedTokenPair = TokenPair & {
+  refreshTokenId: string;
+  refreshTokenHash: string;
+  refreshTtlSeconds: number;
+};
+
 function normalizeEmail(s: string): string {
   return s.trim().toLowerCase();
-}
-
-function safeTimeEnd(label: string): void {
-  try {
-    console.timeEnd(label);
-  } catch {
-    return;
-  }
 }
 
 @Injectable()
@@ -67,9 +61,7 @@ export class AuthService {
 
   async register(email: string, password: string): Promise<AuthUserDto> {
     this.logger.debug('register() → hashing password');
-    console.time('auth.register::bcrypt.hash');
     const hash = await bcrypt.hash(password, this.bcryptRounds());
-    console.timeEnd('auth.register::bcrypt.hash');
 
     const req: CreateUserRequest = userv1.CreateUserRequest.create({
       email: normalizeEmail(email),
@@ -78,10 +70,8 @@ export class AuthService {
     });
 
     this.logger.debug('register() → gRPC createUser start');
-    console.time('auth.register->grpc.createUser');
     try {
       const res = await this.grpc.createUser(req); // S2S only inside the client
-      console.timeEnd('auth.register->grpc.createUser');
       this.logger.debug('register() → gRPC createUser done');
 
       const out: AuthUserDto = {
@@ -89,12 +79,11 @@ export class AuthService {
         email: res.email,
         role: toAuthRole(res.role),
       };
-      this.logger.log(`register() end -> id=${out.id}`);
+      this.logger.log(`auth_register_succeeded userId=${out.id}`);
       await this.authRedis.getTokenVersion(out.id);
       return out;
     } catch (e: unknown) {
-      safeTimeEnd('auth.register->grpc.createUser');
-      this.logger.error(`register() gRPC error: ${errorMessage(e)}`);
+      this.logger.error(`auth_register_failed cause=${safeErrorName(e)}`);
       throw e;
     }
   }
@@ -111,11 +100,8 @@ export class AuthService {
       : userv1.FindUserWithHashRequest.create({ phone: identifier });
 
     this.logger.debug('validateUser() → gRPC findUserWithHash start');
-    console.time('grpc.findUserWithHash');
-
     try {
       const u = await this.grpc.findUserWithHash(req); // S2S only
-      console.timeEnd('grpc.findUserWithHash');
 
       const hash = u.passwordHash || null;
 
@@ -137,10 +123,7 @@ export class AuthService {
         role: toAuthRole(u.role),
       };
     } catch (e: unknown) {
-      safeTimeEnd('grpc.findUserWithHash');
-      this.logger.error(
-        `validateUser() → error type=${errorName(e)} msg=${errorMessage(e)}`,
-      );
+      this.logger.error(`auth_validate_user_failed cause=${safeErrorName(e)}`);
       return null;
     }
   }
@@ -152,47 +135,37 @@ export class AuthService {
     }
 
     const tokenVersion = await this.authRedis.getTokenVersion(user.id);
+    const sessionId = randomUUID();
+    const issued = this.issueTokenPair(user, tokenVersion, sessionId);
 
-    const payload: AuthTokenPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tv: tokenVersion,
-    };
-
-    const at = this.jwt.sign(payload);
-    const rt = this.jwt.sign(payload, {
-      secret: this.cfg.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.cfg.get('JWT_REFRESH_EXPIRATION'),
+    await this.authRedis.createRefreshSession({
+      userId: user.id,
+      sessionId,
+      tokenId: issued.refreshTokenId,
+      tokenHash: issued.refreshTokenHash,
+      ttlSeconds: issued.refreshTtlSeconds,
     });
 
-    const hash = await bcrypt.hash(rt, this.bcryptRounds());
-    const setReq: SetRefreshTokenRequest = userv1.SetRefreshTokenRequest.create(
-      {
-        userId: user.id,
-        refreshToken: hash,
-      },
-    );
-
-    await this.grpc.setRefreshToken(setReq); // S2S + x-user-id inside client
-
-    return { accessToken: at, refreshToken: rt };
+    return {
+      accessToken: issued.accessToken,
+      refreshToken: issued.refreshToken,
+    };
   }
 
   async refreshTokens(oldRt: string): Promise<TokenPair> {
     this.logger.debug('refreshTokens() start');
 
-    let payload: AuthTokenPayload;
+    let payload: RefreshTokenPayload;
     try {
       const verified: unknown = this.jwt.verify(oldRt, {
         secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
       });
-      if (!isAuthTokenPayload(verified)) {
+      if (!isRefreshTokenPayload(verified)) {
         throw new UnauthorizedException('Invalid refresh token payload');
       }
       payload = verified;
-    } catch (e: unknown) {
-      this.logger.error(`refreshTokens() verify failed: ${errorMessage(e)}`);
+    } catch {
+      this.logger.warn('refreshTokens() rejected during verification');
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -202,63 +175,60 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // S2S + x-user-id(userId) downstream
-    const getReq = userv1.GetUserWithHashRequest.create({ id: userId });
-    const uw: GetUserWithHashResponse = await this.grpc.getUserWithHash(
-      getReq,
-      userId,
-    );
-
-    if (!uw || !uw.refreshToken) {
-      this.logger.error('refreshTokens() no stored refreshToken hash');
-      throw new UnauthorizedException('No refresh token on record');
+    const tokenVersion = await this.authRedis.getTokenVersion(userId);
+    if (payload.tv !== tokenVersion) {
+      this.logger.warn('refreshTokens() rejected stale token version');
+      throw new UnauthorizedException('Invalid refresh token');
     }
-
-    const ok = await bcrypt.compare(oldRt, uw.refreshToken);
-    if (!ok) {
-      this.logger.error('refreshTokens() bcrypt.compare failed (mismatch)');
+    if (await this.authRedis.isUserDisabled(userId)) {
+      this.logger.warn('refreshTokens() rejected disabled user');
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const tokenVersion = await this.authRedis.getTokenVersion(userId);
+    const getReq = userv1.GetUserWithHashRequest.create({ id: userId });
+    const uw: GetUserWithHashResponse = await this.grpc.getUserWithHash(getReq);
+    if (!uw) throw new UnauthorizedException('Invalid refresh token');
 
-    const p: AuthTokenPayload = {
-      sub: userId,
-      email: uw.email,
-      role: toAuthRole(uw.role),
-      tv: tokenVersion,
-    };
-    const at = this.jwt.sign(p);
-    const rt = this.jwt.sign(p, {
-      secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.cfg.get<string>('JWT_REFRESH_EXPIRATION'),
+    const issued = this.issueTokenPair(
+      {
+        id: userId,
+        email: uw.email,
+        role: toAuthRole(uw.role),
+      },
+      tokenVersion,
+      payload.sid,
+    );
+    const rotation = await this.authRedis.rotateRefreshSession({
+      userId,
+      sessionId: payload.sid,
+      expectedTokenId: payload.jti,
+      expectedTokenHash: this.hashToken(oldRt),
+      nextTokenId: issued.refreshTokenId,
+      nextTokenHash: issued.refreshTokenHash,
+      ttlSeconds: issued.refreshTtlSeconds,
     });
 
-    await this.grpc.setRefreshToken(
-      userv1.SetRefreshTokenRequest.create({
-        userId,
-        refreshToken: await bcrypt.hash(rt, this.bcryptRounds()),
-      }),
-    );
+    if (rotation !== 'rotated') {
+      this.logger.warn(
+        rotation === 'replayed'
+          ? 'refreshTokens() replay detected; session revoked'
+          : 'refreshTokens() rejected missing session',
+      );
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     this.logger.debug('refreshTokens() success -> tokens rotated');
-    return { accessToken: at, refreshToken: rt };
+    return {
+      accessToken: issued.accessToken,
+      refreshToken: issued.refreshToken,
+    };
   }
 
   // ---------------- Profile ----------------
 
-  async getProfile(
-    id: string,
-    token: string,
-    initiatorId?: string,
-  ): Promise<UserResponse> {
-    try {
-      if (!token) throw new UnauthorizedException('Missing access token');
-      // Pass token (for @Roles on user-service) + x-user-id(id) via client
-      return this.grpc.getUser(id, token, initiatorId);
-    } catch {
-      throw new NotFoundException('User not found');
-    }
+  async getProfile(id: string, token: string): Promise<UserResponse> {
+    if (!token) throw new UnauthorizedException('Missing access token');
+    return wrapGrpc(this.grpc.getUser(id, token));
   }
 
   async updateProfile(
@@ -275,65 +245,101 @@ export class AuthService {
       currentPassword: dto.currentPassword ?? '',
     });
 
-    return this.grpc.updateProfile(req, token); // JWT + S2S + x-user-id
+    return this.grpc.updateProfile(req, token);
   }
 
   // ---------------- Logout / Revocation ----------------
 
   async logout(req: LogoutRequest): Promise<void> {
     if (req.allDevices) {
-      await this.clearStoredRefreshToken(req.userId);
+      await this.authRedis.revokeAllRefreshSessions(req.userId);
       await this.authRedis.bumpTokenVersion(req.userId);
       this.logger.debug(
-        `logout(allDevices) → cleared RT for user=${req.userId}`,
+        `logout(allDevices) → revoked sessions for user=${req.userId}`,
       );
       return;
     }
 
     if (req.refreshToken) {
-      const uw = await this.getUserWithHash(req.userId);
-      if (!uw?.refreshToken) {
-        this.logger.debug(
-          `logout(one) → no stored RT for user=${req.userId} (noop)`,
-        );
+      const payload = this.verifyRefreshToken(req.refreshToken);
+      if (!payload || payload.sub !== req.userId) {
+        this.logger.debug('logout(one) → invalid refresh token (noop)');
         return;
       }
-      const ok = await bcrypt.compare(req.refreshToken, uw.refreshToken);
-      if (!ok) {
-        this.logger.debug(
-          `logout(one) → provided RT mismatch for user=${req.userId} (noop)`,
-        );
-        return;
-      }
-      await this.clearStoredRefreshToken(req.userId);
-      await this.authRedis.bumpTokenVersion(req.userId);
-      this.logger.debug(`logout(one) → cleared RT for user=${req.userId}`);
+      await this.authRedis.revokeRefreshSession(req.userId, payload.sid);
+      this.logger.debug(`logout(one) → revoked session for user=${req.userId}`);
       return;
     }
 
-    await this.clearStoredRefreshToken(req.userId);
+    await this.authRedis.revokeAllRefreshSessions(req.userId);
     await this.authRedis.bumpTokenVersion(req.userId);
-    this.logger.debug(`logout(default) → cleared RT for user=${req.userId}`);
+    this.logger.debug(
+      `logout(default) → revoked sessions for user=${req.userId}`,
+    );
   }
 
   // ---------------- Helpers ----------------
 
-  private async getUserWithHash(
-    userId: string,
-  ): Promise<GetUserWithHashResponse> {
-    const getReq: GetUserWithHashRequest = userv1.GetUserWithHashRequest.create(
-      { id: userId },
-    );
-    // Propagate userId for auditing/authorization downstream
-    return this.grpc.getUserWithHash(getReq, userId);
+  private issueTokenPair(
+    user: AuthUserDto,
+    tokenVersion: number,
+    sessionId: string,
+  ): IssuedTokenPair {
+    const accessPayload: AccessTokenPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tv: tokenVersion,
+      sid: sessionId,
+      jti: randomUUID(),
+      typ: 'access',
+    };
+    const refreshPayload: RefreshTokenPayload = {
+      ...accessPayload,
+      jti: randomUUID(),
+      typ: 'refresh',
+    };
+    const accessToken = this.jwt.sign(accessPayload);
+    const refreshToken = this.jwt.sign(refreshPayload, {
+      secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.cfg.get<string>('JWT_REFRESH_EXPIRATION'),
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      refreshTokenId: refreshPayload.jti,
+      refreshTokenHash: this.hashToken(refreshToken),
+      refreshTtlSeconds: this.refreshTtlSeconds(refreshToken),
+    };
   }
 
-  private async clearStoredRefreshToken(userId: string): Promise<void> {
-    const clearReq: SetRefreshTokenRequest =
-      userv1.SetRefreshTokenRequest.create({
-        userId,
-        refreshToken: '',
+  private verifyRefreshToken(token: string): RefreshTokenPayload | null {
+    try {
+      const verified: unknown = this.jwt.verify(token, {
+        secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
       });
-    await this.grpc.setRefreshToken(clearReq); // S2S + x-user-id
+      return isRefreshTokenPayload(verified) ? verified : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private refreshTtlSeconds(token: string): number {
+    const decoded: unknown = this.jwt.decode(token);
+    if (
+      typeof decoded !== 'object' ||
+      decoded === null ||
+      typeof (decoded as Record<string, unknown>).exp !== 'number'
+    ) {
+      throw new Error('refresh_token_expiration_missing');
+    }
+
+    const expiresAt = (decoded as { exp: number }).exp;
+    return Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
   }
 }

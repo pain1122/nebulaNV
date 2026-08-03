@@ -1,287 +1,872 @@
-﻿# TODO: NebulaNV Stabilization Board
+# TODO: NebulaNV Platform Roadmap
 
-Last updated: 2026-07-02
-Current mode: stabilize, document, verify, then ship in controlled slices.
-Scope source of truth: `site essentials.md`
-Developer docs index: `docs/README.md`
-Boot/runbook: `docs/architecture/local-dev-and-docker-boot.md`
+Last reviewed: 2026-07-11
 
-## Completed Baseline (Do Not Reopen Without A Reason)
+## Mission
 
-- [x] Enforce `@Public` flag semantics (`gatewayOnly` / `optionalAuth`).
-- [x] Enforce `@RequireUserId` centrally.
-- [x] Canonicalize S2S `svc` propagation.
-- [x] Unify S2S payload/signature contract.
-- [x] Enforce access-vs-refresh token boundaries in auth-service.
-- [x] Tighten secret boundary policy (`S2S_SECRET` vs `GATEWAY_SECRET`).
-- [x] Fix guard wiring mismatches in service bootstraps.
-- [x] Fix taxonomy-service gRPC bootstrap wiring.
-- [x] Correct wrong client fallback gRPC ports.
-- [x] Remove unsafe caller-supplied identity usage in order-service gRPC handlers.
-- [x] Fix web build blockers (`lord-icon` typing and Next build issues).
-- [x] Remove workspace lockfile conflict in web app.
-- [x] Replace frontend refresh dev stub with real refresh route.
-- [x] Remove refresh-token persistence from active `localStorage` path.
-- [x] Dockerize core stack with postgres/redis/minio/minio-init.
-- [x] Improve Docker build speed with shared backend image flow.
-- [x] Add developer docs under `docs/` for type shapes, naming, service boundaries, and service notes.
-- [x] Add local dev / Docker boot runbook.
-- [x] Update backend startup scripts so services wait for required gRPC dependencies.
-- [x] Verify local backend services start with `pnpm dev:backend`.
-- [x] Resolve product-service source ESLint errors from unsafe `any` cleanup.
-- [x] Verify product-service build after cleanup.
+Build a secure, tenant-aware, channel-aware, media-capable, API-first, modular, and Kubernetes-ready platform foundation before expanding product features.
 
-## Priority 0 - Current Stabilization
+Milestone order:
 
-### P0-0 Media Security + Access Classes
+1. Complete the platform foundation.
+2. Deliver a usable commerce demo across admin, storefront, and React Native.
+3. Build advanced capabilities as independent modules.
+4. Productize the proven platform as a parent/subordinate multi-tenant SaaS.
 
-Design note: Supabase Storage is used for its clean storage UI, self-contained file management features, S3-compatible API, and future portability. It is not the final privacy authority. `media-service` remains the security boundary: it owns media metadata, ownership, access classes, auth checks, short-lived URL generation, and app-facing file actions. Supabase/MinIO/AWS store bytes; media-service decides who may upload, list, read, edit, or delete.
+## Sources Of Truth
 
-Storage/rendering rule: admin filemanager access and website rendering access are separate contracts. Filemanager endpoints stay `admin/root-admin`. Public website rendering must use approved variants and policy-aware render URLs, not permanent storage credentials or raw originals.
+- Current execution: `docs/current-focus.md`
+- Technical audit: `docs/audit/NebulaNV-technical-audit-2026-07-08.md`
+- Platform target: `docs/architecture/tenant-package-channel-platform.md`
+- Service boundaries: `docs/architecture/system-relationships.md`
+- Contract rules: `docs/architecture/contracts-and-boundaries.md`
+- Media contract: `docs/services/media-service.md`
+- Composition target: `docs/frontend/block-and-theme-system.md`
 
-Lane-aware media rule: the admin filemanager should become one reusable UI shell backed by separate backend route families for `PUBLIC`, `PROTECTED`, and `STRICT` lanes. Public media uses descriptive keys under `MEDIA_PUBLIC_FOLDER`. Protected and strict media use opaque keys under `MEDIA_PRIVATE_FOLDER`, list by owner/scope/business context instead of S3 folders, and use policy-checked short-lived read paths. Strict media adds stronger privacy/audit rules and should not leak sensitive original filenames through storage keys or casual metadata views.
+## Non-Negotiable Rules
 
-#### P0-0A Storage Baseline - MinIO/S3 Compatibility
+- Do not start advanced features before the Foundation Definition of Done passes.
+- External clients call one public gateway, never internal services directly.
+- Internal service calls require verified S2S identity.
+- Raw user, role, tenant, site, app, or service headers are never trusted identity.
+- Every applicable resource, cache key, job, event, and storage path is tenant/site scoped.
+- Each service owns its database and domain.
+- Cross-service access uses versioned HTTP/gRPC contracts.
+- Media-service owns media policy; object storage owns bytes only.
+- Frontends never become the security, identity, or entitlement authority.
+- Premium backend implementations live in separate module services or workers.
+- Core schemas must not accumulate fields belonging to premium modules.
+- Every migration, deployment, contract change, and parent action is auditable.
+- Planned behavior must not be documented as implemented.
 
-- [x] Split S3-compatible config into internal storage endpoint and public/client upload endpoint.
-- [x] Add AWS-compatible env contract: provider, region, bucket, access key, secret key, force path style, internal endpoint, public endpoint.
-- [x] Validate S3/MinIO env at startup when `MEDIA_STORAGE_DRIVER=s3`.
-- [x] Verify real MinIO storage round trip: presign -> PUT object -> finalize -> DB row -> read/list/delete.
-- [x] Ensure generated upload/read URLs use the public endpoint, not Docker-internal `minio:9000`.
-- [x] Add configurable media folder roots: `MEDIA_PUBLIC_FOLDER`, `MEDIA_PRIVATE_FOLDER`, and `MEDIA_SYSTEM_FOLDER`.
-- [x] Normalize configured folder roots to S3-safe `/` paths and reject `..`, leading slash, and ambiguous backslashes.
-- [x] Define two-lane storage key strategy: human paths under public filemanager root, opaque generated keys under private/system roots.
-- [x] Implement public filemanager storage keys under `MEDIA_PUBLIC_FOLDER/{folderPath}/{displayName}`.
-- [x] Use descriptive physical storage keys only for approved public library assets and public SEO/render variants.
-- [x] Use opaque storage keys for `PROTECTED` and `STRICT` originals.
+---
 
-#### P0-0B Admin Filemanager Contract
+# Verified Starting Point
 
-- [x] Freeze media HTTP contract for health, admin list/get/create/delete, browse, presign, finalize, admin read-url, lane wrappers, and public delete preview/confirm behavior.
-- [x] Freeze media gRPC contract for Ping, Create, GetById, List, DeleteById, PresignUpload, and FinalizeUpload.
-- [x] Add public-library HTTP route family wrappers for browse, presign, finalize, read-url, and delete.
-- [x] Define protected-library and strict-library route families.
-- [x] Define protected/strict context metadata requirements: ownerId, scope, entity type/id, and allowed actor roles.
-- [x] Define strict privacy behavior for display names, original filename handling, read path, audit, and encryption direction.
-- [x] Keep current media management endpoints restricted to `admin/root-admin` in controller/guard wiring.
-- [x] Limit public filemanager browse/presign/finalize actions to `MEDIA_PUBLIC_FOLDER`.
-- [x] Decide whether global admin delete stays admin/root-admin maintenance or narrows to root-admin only.
-- [x] Treat filemanager uploads as public media-library assets by default.
-- [x] Support arbitrary virtual folder structures under `MEDIA_PUBLIC_FOLDER` through uploaded media `folderPath` metadata.
-- [x] Decide whether empty folder creation is needed or whether folders remain virtual DB-derived prefixes.
-- [x] Add public bulk delete and recursive folder delete preview/confirm contracts.
-- [x] Add admin browse endpoint returning `{ folders, files }` for a selected public-library folder path.
-- [x] Add browse/search filters for public filemanager: folder, q, media type, MIME type, status, scanStatus, and accessClass.
-- [x] Add stronger media health response with DB and S3-compatible storage checks.
-- [x] Add focused tests for public descriptive paths vs protected/strict opaque path rejection.
-- [x] Add browse tests for Supabase-style folder/file/search output.
-- [x] Enforce public finalize path/metadata consistency so `path`, `folderPath`, and `displayName` cannot disagree.
-- [x] Forbid direct S3 row creation through legacy HTTP `POST /media` and gRPC `Create`; keep direct create as legacy non-S3 compatibility only if needed.
-- [x] Add missing admin/root-admin restriction tests for browse, read-url, and delete.
-- [x] Add public-library read-url/delete wrapper tests for public media and non-public rejection.
-- [x] Add filemanager actions checklist: create folder, rename folder/file, move/copy file, metadata update, soft-delete or hard-delete decision.
-- [x] Define public library collision behavior for `(scope, folderPath, displayName)`: presign auto-renames duplicates with numeric suffixes, and finalize rejects exact already-taken names.
-- [x] Fix stale gRPC e2e test title that says `Create` while the test now uses `FinalizeUpload`.
-- [x] Add lane-specific media gRPC route families for public/protected/strict list, presign, finalize, read-url, and delete.
-- [x] Harden public delete confirmation: use `GATEWAY_SECRET`, bind preview token to the same actor user/role, and expire it through `MEDIA_DELETE_CONFIRM_TTL_SECONDS`.
-- [x] Cap synchronous public bulk/recursive delete through `MEDIA_SYNC_DELETE_MAX_FILES`; reserve oversized destructive plans for workers/queues.
+- [x] pnpm/Turborepo monorepo exists.
+- [x] Auth, user, settings, taxonomy, media, product, blog, and order services exist.
+- [x] Per-service Prisma ownership exists.
+- [x] HTTP and gRPC foundations exist.
+- [x] Protobuf generation exists.
+- [x] Docker Compose includes PostgreSQL, Redis, MinIO, and backend services.
+- [x] S3-compatible presign/finalize foundation exists.
+- [x] Public/protected/strict media access classes exist.
+- [x] Public media render-by-ID foundation exists.
+- [x] Focused auth and media tests exist.
+- [x] Full workspace build passes as of 2026-07-11.
+- [x] Docker Compose configuration parses as of 2026-07-11.
+- [x] Full workspace lint passes.
+- [ ] Full infrastructure-backed integration suite passes.
+- [ ] Dedicated external API gateway exists.
+- [ ] Tenant/site/channel ownership exists.
+- [ ] Media promotion and variant workers exist.
+- [ ] Public storefront exists.
+- [ ] React Native application exists.
+- [ ] Kubernetes/Helm deployment exists.
 
-#### Later Admin Filemanager Implementation Follow-Ups
+---
 
-- [ ] Add durable strict media audit storage for reads/deletes beyond service logs.
-- [ ] Decide and implement strict media encryption layer: provider SSE first, app-level envelope encryption later, or both.
-- [ ] Add worker/queue execution for oversized public delete plans and stale/orphan reconciliation.
-- [ ] Add explicit public media folder records for old-school empty folder support.
-- [ ] Make public browse merge explicit folder records with file-derived folders.
-- [ ] Add public folder create/rename/move/delete implementation.
-- [ ] Before UI implementation, analyze Salar's uploaded Vite admin panel and its built-in Velzon filemanager template; adapt Nebula's filemanager UX to that panel instead of designing it separately.
+# FOUNDATION
 
-#### P0-0C Access Classes and Render Policy
+## F0 — Close Current Media Policy
 
-- [x] Complete base `accessClass` wiring (`PUBLIC|PROTECTED|STRICT`) in DTO/proto/controller/service.
-- [x] Freeze read/access behavior for `PUBLIC`, `PROTECTED`, and `STRICT` media in contract docs and tests.
-- [x] Add tests that `visibility=public` maps to `accessClass=PUBLIC`.
-- [x] Add tests that `visibility=private` maps to `accessClass=PROTECTED`.
-- [x] Add tests that `accessClass` overrides old visibility compatibility when both are supplied.
-- [x] Add tests that `STRICT` read URLs use `MEDIA_STRICT_READ_TTL_SECONDS`.
-- [x] Add tests that `PUBLIC` and `PROTECTED` read URLs use `MEDIA_SIGNED_READ_TTL_SECONDS`.
-- [x] Decide and implement website-facing render URL endpoint separately from admin filemanager endpoints.
-- [x] Define protected/strict filemanager lane upload/read contracts using context-scoped backend routes.
-- [x] Add protected/strict filemanager lane upload flows using opaque storage keys and required business context.
-- [x] Require feature context for sensitive uploads: ownerId, scope, accessClass, and business entity id when needed.
-- [x] Add protected/strict context fields to media proto and gRPC controller mappings.
-- [x] Add deeper protected/strict gRPC lane tests for finalize, list, read-url denial while pending, and lane delete wrappers.
-- [x] Ensure protected files are only listed/read from their owning feature page by requiring `ownerId + scope + entityType + entityId` on user-panel protected routes.
-- [x] Ensure client-side user panels can only see their own protected files through `my/protected-library` browse/read-url routes.
-- [x] Run focused protected/strict HTTP and gRPC media e2e tests once the backend stack is up.
-- [x] Add ID-based public render URL resolution that uses media-service policy checks.
-- [x] Drop path-based render resolution from launch scope; filemanager thumbnails and website rendering should use media IDs.
-- [x] Ensure render endpoint blocks unapproved assets (`PENDING`, `QUEUED`, `INFECTED`, `BLOCKED`) from public website use.
-- [x] Tighten admin read-url availability to `READY/CLEAN` only, blocking pending, queued, blocked, deleted, infected, failed, and unscanned rows.
-- [x] Keep `STRICT` out of public rendering unless a later explicit audited flow is designed.
-- [x] Wire gRPC `ListReq.status` and `ListReq.scanStatus` through the controller or remove them from the frozen contract.
+Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 
-#### P0-0D Download Resistance and SEO Media Strategy
+- [x] Freeze CORS/origin matrix for storefront, admin, direct uploads, CDN, and signed reads.
+- [x] Document canvas, WebGL, overlays, and UI restrictions as casual-copy resistance, not DRM.
+- [x] Freeze temporary protected/strict preview behavior.
+- [x] Record the future trigger for downsized or watermarked sensitive previews.
+- [x] Update media and web documentation with the final decisions.
+- [x] Mark F0 complete.
+- [x] Move active focus to F1 Security And Trust Integrity.
 
-- [x] Define stable SEO/public media URL policy for approved `PUBLIC` variants.
-- [x] Define short-lived render URL policy for `PROTECTED` and `STRICT` assets.
-- [x] Do not expose original files to public website rendering by default.
-- [x] Define `variant=web` as the launch public optimized-variant contract; defer actual generated derivatives to the media worker phase.
-- [x] Add image sitemap plan: approved public `variant=web` media is index-eligible by default, sitemap output comes from indexable public content records, and semantic image metadata belongs to product/blog/page/settings records instead of the filemanager.
-- [x] Add response header policy: public render is `inline` with conservative public caching; signed read URLs are `inline` by default, `private, no-store`, and `attachment` only for explicit download flows.
-- [ ] Add CORS/origin policy for render URLs and storage/CDN access.
-- [ ] Document canvas/WebGL rendering as a download-resistance layer, not a foolproof DRM layer.
-- [ ] Decide watermark/downsized preview behavior for sensitive previews.
+### F0 Exit Gate
 
-#### P0-0E Lifecycle, Ownership, and Future Variants
+- [x] Public, protected, and strict delivery policies are unambiguous.
+- [x] Website, mobile, admin, storage, and CDN origin rules do not conflict.
+- [x] No documentation promises unimplemented DRM or media variants.
 
-- [ ] Define media scan/promotion lifecycle from `PENDING/QUEUED` to `READY/CLEAN` or blocked states.
-- [ ] Validate owner enforcement with auth-service as identity source-of-truth.
-- [ ] Reserve DB/API model for immutable originals and derived variants without implementing full editing yet.
-- [ ] Define public variant vs protected original relationship before frontend filemanager work starts.
-- [x] Add DB metadata for public library paths and display names: folderPath, displayName, originalFilename; keep existing `path` as physical storage key for now.
+---
 
+## F1 — Security And Trust Integrity
 
-### P0-1 Contract Freeze and Build Stability
+### S2S Enforcement
 
-- [ ] Create launch API contract freeze notes for auth, user club, blog, settings, media, product, taxonomy, and order.
-- [x] Freeze auth-service launch HTTP/gRPC contract.
-- [x] Freeze user-service launch HTTP/gRPC contract.
-- [x] Freeze settings-service launch HTTP/gRPC contract.
-- [ ] Freeze media-service launch HTTP/gRPC contract.
-- [ ] Freeze taxonomy-service launch HTTP/gRPC contract.
-- [ ] Freeze blog-service launch HTTP/gRPC contract.
-- [ ] Freeze product-service launch HTTP/gRPC contract.
-- [ ] Freeze order-service launch HTTP/gRPC contract.
-- [ ] Revisit P0-0 media closeout findings before freezing the media-service launch contract.
-- [ ] Harden media gRPC validation so invalid enum-like contract values fail loudly instead of being silently ignored: `accessClass`, `status`, and `scanStatus`.
-- [ ] Decide whether Prisma `Media.accessClass` should default to `PROTECTED` instead of `PUBLIC`, then add the migration or document why DB-level public default is intentional.
-- [ ] Expand public render denial tests so the completed checklist claim is explicit for pending, queued, blocked, deleted, infected, failed, and unscanned media, not only the broad `READY/CLEAN` implementation.
-- [ ] Mark older media reports as historical/superseded where current lane-aware filemanager direction differs from the earlier public-only filemanager direction.
-- [ ] Clean media-service docs structure so verification facts are not listed under Known Gaps.
-- [ ] Refresh Docker boot docs/reports that still mention the old `full` profile if current Compose keeps all backend services in the default stack.
-- [ ] Decide system-initializer settings write contract for product/blog default taxonomy IDs. Current settings gRPC writes require `admin/root-admin` JWT context; product/blog default taxonomy initializers must not rely on `x-user-id` alone. Choose a safe internal/system RPC, seed step, or admin-authenticated startup path.
-- [ ] Enforce consistent API response/error shape across launch services.
-- [x] Ensure `pnpm -w proto:gen` passes from a clean state.
-- [ ] Ensure `pnpm -w build` passes from a clean state.
-- [x] Ensure `docker compose up -d --build` boots the full backend stack reliably.
+- [x] Apply `S2SGuard` consistently to auth-service internal calls.
+- [x] Apply `S2SGuard` consistently to media-service gRPC calls.
+- [x] Apply `S2SGuard` consistently to order-service gRPC calls.
+- [x] Audit every service's HTTP and gRPC guard chain.
+- [x] Standardize enforced guard order: service identity before user/JWT identity.
+- [x] Reject unsigned internal calls in every service.
+- [x] Reject unauthorized gateway-only calls.
+- [x] Separate gateway secrets from inter-service secrets.
+- [x] Bind S2S signatures to method, path/RPC, timestamp, body, nonce, and request identity.
+- [x] Add replay resistance using bounded server time and atomic nonce tracking.
+- [x] Add secret rotation with current and time-limited previous key support.
 
-### P0-2 Source Lint Cleanup
+### User And Actor Context
 
-- [x] Product-service source lint errors removed.
-- [ ] Clean remaining product-service test warnings where they hide useful failures.
-- [x] Verify auth-service source lint/build state after recent strict cleanup.
-- [ ] Re-verify media-service source lint/build state after current media contract edits and the planned `lint:fix` pass.
-- [ ] Verify blog-service source lint/build state after recent strict cleanup.
-- [ ] Verify order-service source lint/build state after recent strict cleanup.
-- [ ] Verify taxonomy-service source lint/build state after recent strict cleanup.
-- [ ] Verify user-service source lint/build state after recent strict cleanup.
-- [ ] Verify settings-service source lint/build state after recent strict cleanup.
+- [x] Remove raw `x-user-id` fallback from trusted identity resolution.
+- [x] Remove raw `x-user-role` fallback from trusted authorization.
+- [x] Attach user context only after verified JWT processing; keep S2S identity separate.
+- [x] Keep current actor, owner, target, and service identities separate; reserve tenant, site, and app as distinct future context.
+- [x] Reject caller-supplied owner IDs when ownership must come from context.
+- [x] Standardize trusted context carriers and user shape across HTTP and gRPC.
 
-### P0-3 Boot, Docker, and Environment Hygiene
+### Authorization And Tokens
 
-- [x] Document local startup dependency graph and ports.
-- [x] Document Docker Compose default backend stack behavior.
-- [ ] Critical: make auth/S2S request time validation server-runtime authoritative. Do not trust client/caller machine time to extend validity windows; clamp any timestamp/bucket checks to receiving server time with a small allowed skew so clock drift is visible and client clock freezing cannot create infinite valid buckets.
-- [ ] Add MinIO healthcheck or document why Compose shows plain `Up` for MinIO.
-- [ ] Add Docker/Kubernetes env notes for internal service URLs vs public/browser URLs.
-- [ ] Keep release Compose compatible with future Kubernetes: no app state in containers, secrets from env, DB/media in volumes/services, migrations as jobs.
-- [ ] Confirm all `.env.example` files match required runtime variables.
-- [ ] Confirm root Prisma scripts cover every Prisma-backed service or document why they do not.
-- [ ] Confirm Dockerfile `EXPOSE` ports match service `.env.example` ports.
-- [ ] Add smoke checks for HTTP `/health` and gRPC readiness per service.
+- [x] Require admin authorization for gRPC order-status changes.
+- [x] Verify HTTP/gRPC role parity for every service.
+- [x] Ensure public routes cannot bypass internal-only requirements.
+- [x] Add resource-level authorization after route-level role checks.
+- [x] Centralize token-version validation.
+- [x] Define refresh-token replay handling.
+- [x] Invalidate affected sessions after confirmed refresh replay.
+- [x] Define multi-device refresh-session families for web and mobile clients.
+- [x] Test current-session logout and all-device invalidation.
+- [x] Redact authentication and security logs.
 
-### P0-4 Public Website Launch
+### Security Tests
 
-- [ ] Deliver `SITE-01..07` from `site essentials.md`.
-- [ ] Ensure dynamic header/footer/menu render from settings.
-- [ ] Ensure static/legal pages are present and linked.
+- [x] Unsigned gRPC calls fail through the shared guard installed by every internal service.
+- [x] Forged user metadata fails without verified context.
+- [x] Forged role metadata cannot elevate permissions.
+- [x] Non-admin order status updates fail.
+- [x] Gateway-only endpoints reject ordinary service signatures.
+- [x] Expired/replayed S2S requests fail.
+- [x] Refresh replay behavior is deterministic.
+- [x] Protected/strict media cannot be reached through public routes.
+- [x] Live Docker auth session lifecycle smoke test passes.
 
-### P0-5 User Club Launch
+### F1 Exit Gate
 
-- [ ] Deliver `USER-01..06`.
-- [ ] Validate login/refresh/logout/profile/favorites in real UI flows.
+- [x] No service trusts raw caller identity.
+- [x] Every protected internal route verifies service identity.
+- [x] HTTP and gRPC produce equivalent authorization decisions.
+- [x] Focused security denial tests pass locally with reproducible commands.
 
-### P0-6 Blog/CMS Launch
+---
 
-- [ ] Deliver `BLOG-01..08`.
-- [ ] Ensure slug uniqueness and publish workflow works from admin.
+## F2 — Code Quality And Reproducibility
 
-### P0-7 Product Baseline Launch
+### Formatting, Lint, Types, And Contracts
 
-- [ ] Deliver `PROD-01..04`, `PROD-08..09`, `PROD-11`, `PROD-13`, `PROD-15`, `PROD-17..20`.
-- [ ] Confirm taxonomy support for category/tag/brand at API level.
-- [ ] Ensure product list/detail is stable for public and admin use.
+- [x] Make CI run focused security unit suites without depending on live service containers; keep live e2e verification in a separately provisioned job. Local and CI use `pnpm test:security`; live tests use the separate provisioned `pnpm test:e2e` job.
+- [x] Format `packages/grpc-auth`.
+- [x] Rerun full lint and expose failures hidden by the first failed package.
+- [x] Fix web TypeScript/React lint errors.
+- [x] Make lint pass in every workspace.
+- [x] Add meaningful `check-types` scripts to every workspace.
+- [x] Make workspace type checking pass.
+- [x] Correct malformed source comments when encountered.
+- [x] Export generated order contracts from `@nebula/protos`.
+- [x] Use generated/shared contract types where available.
+- [x] Remove unnecessary local proto-type duplicates.
+- [x] Make proto checks ignore unrelated working-tree changes.
+- [x] Define backward-compatible API/proto versioning rules.
 
-### P0-8 Settings, SEO, and Index Hygiene
+### Standard Service Bootstrap
 
-- [ ] Deliver `SET-01..08`.
-- [ ] Deliver `SEO-01..12`.
-- [ ] Add index hygiene controls for duplicate/parameter/preview/admin URLs.
-- [ ] Add redirect management for slug/path changes.
-- [ ] Run pre-release crawl and fix canonical/404/duplicate issues.
+- [x] Replace product/blog initializer `x-user-id` metadata with an explicit service-only settings bootstrap contract; never create a fake human actor.
+- [x] Verify the product initializer end-to-end and decide whether to register the currently unwired blog initializer.
+- [x] Standardize validation pipes.
+- [x] Standardize CORS configuration.
+- [x] Standardize security headers.
+- [x] Standardize HTTP/gRPC error translation.
+- [x] Standardize health, readiness, and shutdown behavior.
+- [x] Standardize environment validation.
+- [x] Standardize logging bootstrap; auth request bodies are already fully excluded from logs.
+- [x] Remove service-specific guard/bootstrap drift.
 
-### P0-9 Admin Panel Core
+### Database And Migrations
 
-- [ ] Deliver `ADM-01..09`.
-- [ ] Enforce `ADM-11` role boundaries (`admin` vs `editor`).
+- [x] Remove the legacy user refresh-token storage path coherently: delete the unused auth gRPC wrapper, `SetRefreshToken` proto/user-service contract, response fields, tests, and `User.refreshToken` column through a migration.
+- [x] Add root commands for every Prisma-backed service.
+- [x] Generate every Prisma client through one command.
+- [x] Deploy every service migration through one command.
+- [x] Define deterministic migration order.
+- [x] Add migration status verification.
+- [x] Add deterministic development/demo seed data.
+- [x] Verify clean-database boot from migrations only.
+- [x] Define backup and restore procedures.
+- [x] Test migration failure and recovery policy.
 
-### P0-10 Release Operations
+### Docker And Local Runtime
 
-- [ ] Deliver `OPS-01..06`.
-- [ ] Execute release smoke checks for core public and admin flows.
-- [ ] Freeze new feature intake after P0 checks begin.
+- [x] Make Bake the official backend image build graph.
+- [x] Exclude documentation, audits, tests, reports, and local env files from the backend Docker context.
+- [x] Replace broad source copies with explicit backend service/package inputs.
+- [x] Persist pnpm and Turbo caches for normal builds.
+- [x] Replace eight isolated `pnpm deploy` trees with one reusable production dependency layer.
+- [x] Keep all eight service images independently runnable while sharing universal foundation layers.
+- [x] Verify every image resolves its declared internal packages without another container or network access.
+- [ ] Add gateway/web/admin runtimes to the complete stack when available.
+- [x] Add reliable healthchecks for infrastructure and services.
+- [x] Make services wait for readiness rather than process start.
+- [x] Run migrations before accepting traffic.
+- [x] Confirm ports and `.env.example` files agree.
+- [x] Remove stale Docker-profile documentation.
+- [x] Provide one-command boot, seed, health, and shutdown workflows.
+- [ ] Verify the complete stack from a clean checkout.
 
-## Priority 1 - Should If Time Holds
+### CI
 
-- [ ] Product depth: variable products, variants, discount campaign entity, backorders, variant matrix, downloads, draft preview.
-- [ ] Preview and audit: page preview workflow, signed preview-token endpoints, admin audit log.
-- [ ] Media provider integration: document and verify Supabase Storage S3 mode beside local MinIO and future AWS S3.
-- [ ] Media variants: add DB/API support for original files, thumbnails, optimized images, edited versions, and derived files.
-- [ ] Media editing baseline: define safe edit workflow where originals are immutable and edits create variants.
-- [ ] Media asset bundles: define metadata model for grouped assets needed by future 3D showroom files.
+- [ ] Verify formatting, lint, types, protos, tests, and builds.
+- [ ] Start required databases and storage.
+- [ ] Run migrations and seeds.
+- [ ] Run integration/e2e tests.
+- [ ] Build container images.
+- [ ] Verify Compose configuration.
+- [ ] Add dependency, image, and secret scanning.
+- [ ] Preserve useful build/test artifacts.
 
-## Priority 2 - Post-Launch
+### F2 Exit Gate
 
-- [ ] Realtime sessions/classroom streaming.
-- [ ] 3D showroom feature: GLB/GLTF/USDZ asset bundles, texture handling, preview image, and scene manifest flow.
-- [ ] Streaming media pipeline: video ingest, transcode jobs, thumbnails, HLS/DASH outputs, and signed playback.
-- [ ] Go media-worker: metadata extraction, checksums, image variants, and scan/promotion orchestration.
-- [ ] Go showroom-asset-worker: 3D asset validation, texture optimization, and manifest generation.
-- [ ] Go streaming-worker: ffmpeg/HLS/DASH packaging and video thumbnails.
-- [ ] Full queue/agent/event-driven overhaul.
-- [ ] Evaluate Rust for performance-critical media/codecs/security components only after Go worker boundaries are proven.
-- [ ] Use Python for AI/ML/offline media intelligence only when a concrete model/data workflow exists.
-- [ ] Deep analytics and observability stack expansion.
-- [ ] Large backend architecture rewrites not needed for launch flows.
+- [ ] Clean install, lint, type check, build, migrate, seed, and test pass.
+- [ ] No manual database repair is required.
+- [ ] Local and CI verification use the same commands.
+- [ ] Verification leaves tracked source files clean.
 
-## Observability / Logging
+---
 
-- [ ] Add structured logger across services.
-- [ ] Include service name, layer, transport, context, requestId/traceId, actor user, and source module.
-- [ ] Keep container logs on stdout/stderr for Docker/Kubernetes compatibility.
-- [ ] Add log routing later for DB, HTTP, gRPC, and app-level logs.
-- [ ] Add request correlation so one user/API action can be traced across services.
-- [ ] Gate noisy Prisma query logs behind an env flag like `PRISMA_QUERY_LOGS=true`.
-- [ ] Decide later whether local dev also writes per-service log files.
+## F3 — External API Gateway
 
-## Verification Commands
+### Gateway Boundary
 
-```powershell
-pnpm -w proto:gen
-pnpm -w build
-docker compose config
-docker compose --progress=plain build --provenance=false --sbom=false
-docker compose up -d --force-recreate
-docker compose ps -a
+- [ ] Create a dedicated gateway application.
+- [ ] Expose versioned external routes under `/api/v1`.
+- [ ] Keep internal service ports private.
+- [ ] Route admin, storefront, mobile, and partner traffic through the gateway.
+- [ ] Authenticate calling application and user.
+- [ ] Resolve trusted tenant, site, channel, and actor context.
+- [ ] Sign forwarded internal context.
+- [ ] Apply rate limits and request-size limits.
+- [ ] Add request/trace IDs.
+- [ ] Add gateway health and dependency readiness.
+
+### API Standards
+
+- [ ] Define success and error envelopes.
+- [ ] Define validation-error shape.
+- [ ] Define pagination, filtering, and sorting.
+- [ ] Define idempotency for create, checkout, upload, and contract operations.
+- [ ] Define retry-safe operations.
+- [ ] Define API versioning and deprecation.
+- [ ] Generate API documentation.
+- [ ] Provide typed web/mobile clients.
+
+### Client Types
+
+- [ ] Define anonymous storefront clients.
+- [ ] Define authenticated user clients.
+- [ ] Define admin clients.
+- [ ] Define registered mobile applications.
+- [ ] Reserve partner credentials for future integrations.
+- [ ] Ensure partner credentials never reuse S2S secrets.
+- [ ] Define OAuth/API-key direction without implementing a partner marketplace.
+
+### Current Integration Corrections
+
+- [ ] Fix web refresh helper to use POST.
+- [ ] Fix refresh-cookie rotation.
+- [ ] Add product POST gateway/proxy route.
+- [ ] Align product create payload with backend DTOs.
+- [ ] Remove frontend assumptions about individual service URLs.
+
+### F3 Exit Gate
+
+- [ ] External clients need only the gateway URL.
+- [ ] Internal services are not publicly reachable.
+- [ ] Gateway context cannot be forged by an ordinary client.
+- [ ] Typed clients and documentation match runtime behavior.
+
+---
+
+## F4 — Tenant, Site, Channel, And Application Foundation
+
+### Ownership
+
+- [ ] Decide service ownership for tenant, site, channel, membership, app registration, and entitlement records.
+- [ ] Freeze tenant and site identifiers.
+- [ ] Define site status lifecycle.
+- [ ] Define web, Android, and iOS channels.
+- [ ] Define app registration and package identity.
+- [ ] Define parent/subordinate-ready relationships without commercial SaaS screens.
+
+### Membership And Roles
+
+- [ ] Separate identity/profile ownership from tenant/site membership.
+- [ ] Define tenant-wide and site-specific roles.
+- [ ] Define parent-management authorization context.
+- [ ] Ensure role changes refresh active authorization.
+- [ ] Audit cross-site and parent actions.
+
+### Domain Scoping
+
+- [ ] Add tenant/site ownership to products.
+- [ ] Add tenant/site ownership to media.
+- [ ] Add tenant/site ownership to blogs and pages.
+- [ ] Add tenant/site ownership to settings.
+- [ ] Add tenant/site ownership to orders and carts.
+- [ ] Define taxonomy ownership/sharing.
+- [ ] Add tenant/site-aware unique constraints and indexes.
+- [ ] Scope caches, jobs, events, storage, and search documents.
+- [ ] Prevent cross-site content/media references.
+
+### Default Development Context
+
+- [ ] Create one default tenant and site.
+- [ ] Create web, Android, and iOS channel records.
+- [ ] Seed platform admin, site admin, editor, and user memberships.
+- [ ] Migrate existing data into the default site.
+- [ ] Preserve current flows in tenant-aware single-site mode.
+
+### Isolation Tests
+
+- [ ] Cross-tenant reads and writes fail.
+- [ ] Cross-site media attachment fails.
+- [ ] Forged tenant/site context fails.
+- [ ] Parent authority does not imply sibling access.
+- [ ] Cache keys cannot leak data between sites.
+- [ ] Background work retains authoritative tenant/site context.
+
+### F4 Exit Gate
+
+- [ ] All applicable data belongs to a verified tenant/site.
+- [ ] One default tenant supports normal development.
+- [ ] Adding another tenant does not require schema redesign.
+- [ ] Isolation tests pass across transports, jobs, caches, and storage.
+
+---
+
+## F5 — Media Processing And CDN Foundation
+
+### Upload Safety
+
+- [ ] Bind upload authorization to tenant, site, actor, access class, MIME, and maximum size.
+- [ ] Verify object size and metadata during finalize.
+- [ ] Add MIME sniffing.
+- [ ] Define checksum behavior.
+- [ ] Preserve immutable upload facts.
+- [ ] Reject unsafe or mismatched storage paths.
+- [ ] Define abandoned-presign cleanup.
+
+### Lifecycle Worker
+
+- [ ] Implement a queue or reliable poller for `PENDING/QUEUED` media.
+- [ ] Verify stored objects.
+- [ ] Extract MIME, dimensions, duration, size, and checksum.
+- [ ] Add malware-scanner interface.
+- [ ] Promote valid media to `READY/CLEAN`.
+- [ ] Block infected or invalid media.
+- [ ] Add retry-safe failure state.
+- [ ] Add retries and dead-letter handling.
+- [ ] Make lifecycle work idempotent.
+
+### Originals And Variants
+
+- [ ] Model immutable originals.
+- [ ] Model derived variants separately.
+- [ ] Generate public web, thumbnail, and mobile variants.
+- [ ] Version variant outputs.
+- [ ] Record processor/source version.
+- [ ] Prevent public rendering of raw originals.
+- [ ] Regenerate variants without replacing originals.
+
+### Content Integration
+
+- [ ] Replace product thumbnail/gallery URLs with media IDs.
+- [ ] Replace blog cover URLs with media IDs.
+- [ ] Define page/settings media references.
+- [ ] Define roles, ordering, alt text, captions, and channel overrides.
+- [ ] Validate content/media site ownership.
+- [ ] Keep semantic media usage in the owning content service.
+
+### CDN Routes
+
+- [ ] Freeze site-aware canonical media routes.
+- [ ] Include immutable variant/version identity in cacheable URLs.
+- [ ] Keep media-service as CDN origin authority.
+- [ ] Define cache-control and ETag behavior.
+- [ ] Define replacement, invalidation, deletion, and revocation.
+- [ ] Define public-media CORS.
+- [ ] Define signed protected/strict delivery.
+- [ ] Prevent CDN bypass of site, status, scan, or access policy.
+
+### Consistency And Strict Media
+
+- [ ] Add orphan-object cleanup.
+- [ ] Add missing-object and DB/storage drift reconciliation.
+- [ ] Define outbox/reconciliation for destructive operations.
+- [ ] Add explicit folder records if empty folders remain required.
+- [ ] Add worker-backed oversized deletion.
+- [ ] Separate strict preview from full-original download and enforce default-deny strict download.
+- [ ] Add durable strict-media audit records.
+- [ ] Define provider versus app-level encryption.
+- [ ] Define strict retention and secure deletion.
+
+### Provider Boundary
+
+- [ ] Define storage adapter interface.
+- [ ] Keep MinIO implementation.
+- [ ] Verify Supabase Storage S3 compatibility.
+- [ ] Reserve AWS S3/CDN implementation.
+- [ ] Add provider contract tests.
+
+### F5 Exit Gate
+
+- [ ] Upload becomes renderable without manual DB edits.
+- [ ] Web, thumbnail, and mobile variants are generated.
+- [ ] Content uses media IDs.
+- [ ] CDN routes are stable, versioned, and site-aware.
+- [ ] Orphans and drift are detectable and recoverable.
+- [ ] Public/protected/strict denial tests pass.
+
+---
+
+## F6 — Modular Feature And Entitlement Foundation
+
+### Core Boundary
+
+- [ ] Define what exists in every installation.
+- [ ] Define optional module boundaries.
+- [ ] Keep premium code out of unrelated core schemas.
+- [ ] Move 3D/showroom product fields behind a module contract.
+- [ ] Avoid arbitrary runtime npm plugin loading.
+- [ ] Keep shared packages limited to contracts, clients, context, configuration, errors, observability, tests, and module SDKs.
+
+### Feature Catalog And Entitlements
+
+- [ ] Define feature keys and versions.
+- [ ] Define boolean, metered, allocated, and non-delegable capabilities.
+- [ ] Define site/channel allocations.
+- [ ] Define user-permission intersection.
+- [ ] Define server-authoritative capability checks.
+- [ ] Define signed app capability manifest.
+
+### Module Manifest
+
+- [ ] Define image digest and core-version compatibility.
+- [ ] Define HTTP/gRPC contracts and migrations.
+- [ ] Define health/readiness contract.
+- [ ] Define service account and network needs.
+- [ ] Define CPU, memory, storage, and GPU requirements.
+- [ ] Define feature limits.
+- [ ] Define rollback, uninstall, and retention policy.
+- [ ] Define shared, dedicated, and edge-worker modes.
+
+### License Foundation
+
+- [ ] Define signed deployment-bound entitlement manifests.
+- [ ] Use server-authoritative time.
+- [ ] Define `ACTIVE -> EXPIRING -> GRACE -> SUSPENDED -> TERMINATED`.
+- [ ] Define one-month grace period and warning schedule.
+- [ ] Define read/export behavior after suspension.
+- [ ] Separate emergency revocation from normal expiry.
+- [ ] Define contract/version/change identifiers.
+- [ ] Never use a client-visible boolean as license authority.
+
+### Proof Module
+
+- [ ] Build one small independent backend module.
+- [ ] Give it a separate container and health endpoint.
+- [ ] Register it through the feature catalog.
+- [ ] Protect it through gateway and entitlement checks.
+- [ ] Add a matching optional web/mobile capability.
+- [ ] Enable and disable it without editing core domain code.
+- [ ] Test install, migration, rollback, and removal.
+
+### F6 Exit Gate
+
+- [ ] One module operates outside core.
+- [ ] Module deployment and tenant entitlement are separate.
+- [ ] Disabling the module cannot corrupt core data.
+- [ ] Future premium features have a proven pattern.
+
+---
+
+## F7 — Web And Admin Foundation
+
+### Application Split
+
+- Admin implementation is postponed until the Vite-based admin project/template is ready; current `apps/web` does not gate backend-only stabilization work.
+- [ ] Freeze `apps/storefront` as public Next.js.
+- [ ] Freeze `apps/admin` as Vite React admin.
+- [ ] Decide how current `apps/web` code is reused or migrated.
+- [ ] Share only appropriate UI primitives and typed clients.
+- [ ] Prevent frontend templates from defining backend contracts.
+
+### Shared Frontend
+
+- [ ] Typed gateway client.
+- [ ] Authentication and refresh handling.
+- [ ] Tenant/site/channel context.
+- [ ] Capability manifest handling.
+- [ ] Consistent loading, empty, denied, expired, offline, and error states.
+- [ ] Localization, RTL, accessibility, and theme-token foundations.
+- [ ] Frontend unit and integration test setup.
+
+### Admin Shell
+
+- [ ] Login/logout/refresh and protected routes.
+- [ ] Role-aware and capability-aware navigation.
+- [ ] Site context display.
+- [ ] Media picker shell.
+- [ ] Reusable list, form, filter, and pagination components.
+- [ ] Parent-management context banner.
+- [ ] Safe error boundaries.
+
+### Storefront Shell
+
+- [ ] Site/domain resolution.
+- [ ] Site identity and theme loading.
+- [ ] Public API client.
+- [ ] SEO/canonical/robots foundation.
+- [ ] CDN media component.
+- [ ] Product-list and product-detail skeleton.
+- [ ] Error and not-found behavior.
+
+### F7 Exit Gate
+
+- [ ] Admin and storefront are separate deployable applications.
+- [ ] Both use gateway and shared context contracts.
+- [ ] Neither depends on Prisma or internal service URLs.
+- [ ] Frontend tests run in CI.
+
+---
+
+## F8 — React Native Foundation
+
+### Project And Build
+
+- [ ] Create private React Native/Expo workspace.
+- [ ] Define Android/iOS identities and build profiles.
+- [ ] Keep signing credentials outside source control.
+- [ ] Add Android build verification.
+- [ ] Add controlled macOS/iOS build verification.
+- [ ] Define release and runtime-version policy.
+
+### Site Dependency
+
+- [ ] Register each app to one owning site.
+- [ ] Resolve site from verified app registration.
+- [ ] Prevent arbitrary site selection.
+- [ ] Load site branding, locale, theme, and navigation.
+- [ ] Load signed capability manifest.
+- [ ] Apply site contract and channel restrictions.
+
+### App Runtime
+
+- [ ] Authentication, refresh, and secure token storage.
+- [ ] Typed gateway client and request IDs.
+- [ ] Navigation and route protection.
+- [ ] Public and authenticated sessions.
+- [ ] Cache/offline boundaries.
+- [ ] Update/version compatibility.
+- [ ] Push-registration and deep-link foundations.
+
+### Mobile Modules And Media
+
+- [ ] Define mobile core and optional feature packages.
+- [ ] Entitlement-lock included small features.
+- [ ] Rebuild for physically absent native features.
+- [ ] Require backend enforcement for protected operations.
+- [ ] Keep S2S, registry, storage, and signing secrets out of the app.
+- [ ] Use site-aware mobile CDN variants.
+- [ ] Respect public/protected/strict policy.
+- [ ] Define cache expiry and invalidation.
+
+### F8 Exit Gate
+
+- [ ] Signed app resolves its owning site.
+- [ ] Login and refresh work.
+- [ ] Site configuration and capabilities load.
+- [ ] Public mobile media renders through CDN routes.
+- [ ] Disabled capabilities remain unusable through APIs.
+- [ ] Android/iOS builds are reproducible.
+
+---
+
+## F9 — Kubernetes, Delivery, And Operations Foundation
+
+### Kubernetes
+
+- [ ] Create core and optional-module Helm chart patterns.
+- [ ] Define namespaces, service accounts, and default-deny network policies.
+- [ ] Define resources, quotas, probes, migration jobs, and persistent storage.
+- [ ] Define GPU/node-selection pattern.
+
+### Images And Secrets
+
+- [ ] Create private registry policy.
+- [ ] Pin production images by digest.
+- [ ] Define image signing and verification.
+- [ ] Restrict pull credentials.
+- [ ] Generate SBOMs and scan images.
+- [ ] Keep secrets outside images.
+- [ ] Define Kubernetes Secret encryption/KMS and rotation.
+- [ ] Prevent modules from receiving unrelated secrets.
+
+### Networking And Delivery
+
+- [ ] Expose only gateway and approved media/CDN origins.
+- [ ] Keep internal gRPC private.
+- [ ] Define ingress, TLS, DNS, and domain mapping.
+- [ ] Define CDN origin/cache behavior.
+- [ ] Define internal/external storage endpoints.
+- [ ] Define sensitive-workload egress restrictions.
+
+### Observability And Reliability
+
+- [ ] Add structured logs and trace propagation.
+- [ ] Add safe service, tenant, site, actor, and module labels.
+- [ ] Add metrics, dashboards, and alerts.
+- [ ] Test database and media recovery.
+- [ ] Test deployment rollback and migration failure recovery.
+- [ ] Add worker retry/dead-letter monitoring.
+- [ ] Add graceful shutdown and draining.
+- [ ] Add basic load/noisy-neighbor tests.
+- [ ] Create staging and disaster-recovery runbooks.
+
+### F9 Exit Gate
+
+- [ ] Core runs in reproducible Kubernetes.
+- [ ] Proof module deploys separately.
+- [ ] Only approved routes are externally reachable.
+- [ ] Backups, rollback, probes, monitoring, and alerts are verified.
+- [ ] Clients have no cluster, node, registry, or internal-service access.
+
+---
+
+# FOUNDATION DEFINITION OF DONE
+
+Foundation is complete only when this flow works:
+
+```text
+create and seed tenant/site/channels
+→ authenticate through gateway
+→ propagate verified actor/tenant/site/app/service/request context
+→ reject forged and cross-tenant access
+→ upload public/protected/strict media
+→ scan and promote media
+→ generate web/thumbnail/mobile variants
+→ serve approved media through site-aware CDN routes
+→ load configuration and capabilities in web/admin/mobile
+→ enable and disable a proof module
+→ pass CI, Docker, Kubernetes, backup, rollback, and smoke checks
 ```
 
-Targeted examples:
+- [ ] All F0-F9 exit gates pass.
+- [ ] Documentation separates implemented and planned behavior.
+- [ ] No advanced feature work began before this gate.
 
-```powershell
-pnpm --filter @nebula/product-service build
-pnpm --filter @nebula/product-service exec eslint "{src,apps,libs,test}/**/*.ts"
-pnpm --filter @nebula/media-service build
-pnpm --filter @nebula/auth-service build
-pnpm --filter web build
+---
+
+# COMMERCE DEMO
+
+## D1 — Commerce Domain
+
+- [ ] Finalize site-scoped product model.
+- [ ] Remove premium 3D/showroom fields from core product ownership.
+- [ ] Support draft, active, and archived products.
+- [ ] Support title, slug, excerpt, description, SKU, price, and currency.
+- [ ] Support category, tag, and brand taxonomy.
+- [ ] Support thumbnail/gallery through media IDs.
+- [ ] Support basic stock and availability.
+- [ ] Ensure HTTP/gRPC parity.
+- [ ] Add site-scoped product tests.
+
+## D2 — Cart And Order
+
+- [ ] Site-scoped cart and items.
+- [ ] Snapshot product identity, price, and currency into order items.
+- [ ] Basic checkout without production payment.
+- [ ] User and admin order list/detail.
+- [ ] Admin-authorized status changes.
+- [ ] Idempotent checkout.
+- [ ] Integration tests.
+
+## D3 — Admin Demo
+
+- [ ] Authenticate admin.
+- [ ] List, create, edit, publish, and filter products.
+- [ ] Select taxonomy.
+- [ ] Upload/select site-owned media.
+- [ ] Set price and stock.
+- [ ] View and update orders.
+- [ ] Display site and capability context.
+
+## D4 — Storefront Demo
+
+- [ ] Resolve site/domain.
+- [ ] Product listing and detail.
+- [ ] CDN media rendering.
+- [ ] Basic SEO metadata.
+- [ ] Login/register, cart, checkout, and confirmation.
+
+## D5 — Mobile Demo
+
+- [ ] Resolve owning site.
+- [ ] Load theme and capabilities.
+- [ ] Login/register/refresh.
+- [ ] Product listing/detail and mobile media.
+- [ ] Cart, checkout, and order history.
+- [ ] Capability denial behavior.
+
+## Commerce Demo Exit Gate
+
+```text
+admin uploads media
+→ media becomes READY/CLEAN
+→ admin creates and publishes product
+→ storefront and mobile display product
+→ user adds product to cart and checks out
+→ admin views and updates order
 ```
+
+- [ ] Entire flow is tenant/site scoped.
+- [ ] Entire flow uses gateway APIs.
+- [ ] Media uses IDs and CDN routes.
+- [ ] Web and mobile use the same contracts.
+- [ ] CI/staging smoke tests cover the flow.
+- [ ] Demo resets and reseeds reliably.
+
+---
+
+# ADVANCED FEATURE MODULES
+
+Implement only after the foundation and commerce demo pass.
+
+## M1 — Commerce Expansion
+
+- [ ] Payment abstraction, confirmation, refunds, and reconciliation.
+- [ ] Variable products and variants.
+- [ ] Discount campaigns.
+- [ ] Advanced inventory and backorders.
+- [ ] Shipping, downloads, invoices, and previews.
+
+## M2 — Blog, CMS, And Composition
+
+- [ ] Complete blog publishing and resolve taxonomy duplication.
+- [ ] Blog media IDs and SEO.
+- [ ] Custom pages and menu builder.
+- [ ] Theme tokens and versioned block registry.
+- [ ] Draft/preview/publish.
+- [ ] Web/mobile renderer capabilities and fallbacks.
+- [ ] Accessibility, RTL, sanitization, and performance tests.
+
+## M3 — Advanced Media
+
+- [ ] Rich variants and non-destructive editing.
+- [ ] Watermarked previews.
+- [ ] Video metadata and thumbnails.
+- [ ] Asset bundles.
+- [ ] Advanced provider adapters.
+- [ ] Strict encryption/audit.
+- [ ] Automated CDN invalidation.
+
+## M4 — Streaming And Realtime
+
+- [ ] Streaming module and ingest authorization.
+- [ ] Transcoding, HLS/DASH, playback tokens, and recordings.
+- [ ] Viewer limits and classroom/session model.
+- [ ] Realtime presence/messaging.
+- [ ] Shared and dedicated GPU modes.
+
+## M5 — 3D Showroom
+
+- [ ] Showroom module outside product core.
+- [ ] GLB/GLTF/USDZ bundles and validation.
+- [ ] Texture/geometry optimization and LODs.
+- [ ] Scene manifests and product bindings.
+- [ ] Web/native renderers.
+- [ ] Worker/GPU deployment and access policy.
+
+## M6 — State, Search, Events, And Workers
+
+- [ ] Transactional outbox and versioned event contracts.
+- [ ] Queue retry/dead-letter policy.
+- [ ] Tenant-scoped state/cache/search.
+- [ ] Worker scheduling, monitoring, and reconciliation.
+- [ ] Avoid event-driven rewrites without concrete consumers.
+
+## M7 — AI And Analytics
+
+- [ ] Tenant-scoped analytics events.
+- [ ] Recommendations, tagging, search enrichment, and insights.
+- [ ] Model/version audit and privacy/retention policy.
+- [ ] Use Python only for concrete ML/data workflows.
+
+## M8 — Extended Mobile
+
+- [ ] Offline catalog/cart rules.
+- [ ] Push, deep links, and background sync.
+- [ ] Streaming and 3D modules.
+- [ ] App-specific content overrides.
+- [ ] Parent-managed configuration.
+- [ ] Store-release and compatibility automation.
+
+---
+
+# FULL MULTI-TENANT SAAS PRODUCTIZATION
+
+Begin only after the platform and major feature modules are proven.
+
+## S1 — Plans, Pricing, And Contracts
+
+- [ ] Versioned commercial catalog, plans, pricing, contracts, limits, and billing.
+- [ ] Upgrade/downgrade change orders, impact reports, acknowledgement, and effective dates.
+- [ ] One-month grace, suspension, termination, retention, and deletion.
+
+## S2 — Parent And Subordinate Product
+
+- [ ] Require complete suite for parent/reseller eligibility.
+- [ ] Provision and manage subordinate tenants/sites.
+- [ ] Add parent dashboard, monitoring, package assignment, and usage.
+- [ ] Preserve sibling isolation.
+- [ ] Require a subordinate's own full contract before parent upgrade.
+
+## S3 — White-Label Delivery
+
+- [ ] Custom domains, DNS/TLS, branding, and themes.
+- [ ] Website deployment pipeline.
+- [ ] Private Android/iOS build and store workflow.
+- [ ] Capability-aware app packages and version upgrades.
+
+## S4 — Licensed Module Operations
+
+- [ ] Signed leases, renewals, cached grace, and warnings.
+- [ ] Shared and dedicated enforcement.
+- [ ] Scale dedicated modules to zero after suspension where applicable.
+- [ ] Module health/digest reporting.
+- [ ] Audited activation, deployment, and removal.
+- [ ] Add Kubernetes Operator only after manual lifecycle is proven.
+
+## S5 — Production Scale And Compliance
+
+- [ ] Usage accounting and noisy-neighbor controls.
+- [ ] Dedicated database/storage options.
+- [ ] Regional deployment and high availability.
+- [ ] Disaster recovery and incident response.
+- [ ] Security review and penetration testing.
+- [ ] Privacy/export/deletion workflows.
+- [ ] SLA, support, capacity, and cost reporting.
+
+---
+
+# Documentation Maintenance
+
+- [ ] Keep `docs/current-focus.md` limited to one active slice.
+- [ ] Keep `TODO.md` milestone-oriented.
+- [ ] Move detailed feature specifications into dedicated documents.
+- [ ] Keep architecture documents focused on stable boundaries.
+- [ ] Keep audit reports immutable and historical.
+- [ ] Mark obsolete reports as superseded.
+- [ ] Correct README roadmap claims after verified milestones.
+- [ ] Never mark a phase complete merely because code exists; verify its exit gate.
+
+# Current Next Action
+
+1. F1 Security And Trust Integrity is complete; preserve its contracts.
+2. Continue F2 with deterministic verification, lint/types, contracts, bootstrap, migrations, and runtime consistency.
+3. Do not begin gateway or new feature work before the F2 exit gate.

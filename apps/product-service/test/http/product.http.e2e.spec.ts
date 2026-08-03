@@ -3,6 +3,7 @@ import { httpJson } from "../utils/http";
 
 const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL ?? "http://127.0.0.1:3003";
 const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
+const MISSING_ID = "11111111-1111-4111-8111-111111111111";
 
 type LoginResp = { accessToken: string };
 
@@ -75,6 +76,21 @@ describe("product-service HTTP (admin writes, public reads)", () => {
       { authorization: `Bearer ${admin}` },
     );
     expect(res.data.title).toBe("E2E Widget Pro");
+  });
+
+  it("PATCH /products/:id returns 404 for a missing product", async () => {
+    const res = await fetch(`${PRODUCT_HTTP}/products/${MISSING_ID}`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${admin}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ patch: { title: "Missing product" } }),
+    });
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(404);
+    expect(body.message).toBe("product_not_found");
   });
 
   it("GET /products lists includes the product", async () => {

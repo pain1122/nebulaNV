@@ -186,24 +186,4 @@ export class UserService {
       throw mapPrisma(err);
     }
   }
-
-  // -------------------------------------------------------------------
-  // Refresh token management
-  // -------------------------------------------------------------------
-  async setRefreshToken(userId: string, refreshToken: string | null) {
-    const next =
-      refreshToken && refreshToken.trim().length > 0 ? refreshToken : null;
-
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: next },
-      select: { id: true, email: true, role: true },
-    });
-
-    return {
-      id: updated.id,
-      email: updated.email ?? '',
-      role: updated.role,
-    };
-  }
 }

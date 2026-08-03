@@ -16,7 +16,7 @@ Blog-service does not currently own media uploads. It stores `coverImageUrl` as 
 - Admin blog post updates.
 - Admin soft-delete by marking posts `ARCHIVED`.
 - Blog taxonomy facade over taxonomy-service.
-- DB-backed `/health`.
+- Shared liveness plus Postgres/S2S-backed `/health/ready`; `/health` remains a readiness alias.
 
 ## Current HTTP Contract
 
@@ -31,7 +31,7 @@ Blog routes:
 Access:
 
 - Blog reads are public.
-- Blog writes require `admin`.
+- Blog writes require `admin` or `root-admin`.
 
 Taxonomy routes exposed by blog-service:
 
@@ -44,7 +44,7 @@ Taxonomy routes exposed by blog-service:
 Access:
 
 - Taxonomy reads are public.
-- Taxonomy writes require `admin`.
+- Taxonomy writes require `admin` or `root-admin`.
 
 ## Current gRPC Contract
 
@@ -73,6 +73,14 @@ Blog taxonomy methods:
 
 ## Current DB Shape
 
+The root Prisma commands include this service after product-service. Its base
+seed intentionally performs no writes. `pnpm backend:seed` creates one stable
+published development post through this service's HTTP API and leaves a
+matching post unchanged. The blog default-taxonomy initializer remains a
+separate service-owned path. See
+[Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
+
 Main Prisma models:
 
 - `BlogPost`
@@ -98,9 +106,10 @@ Important note:
 - Blog taxonomy facade hard-locks `scope = "blog"`.
 - `kind` comes from the route/request, for example `category.default`.
 - Reads are public.
-- Writes require admin.
+- Writes require `admin` or `root-admin`.
 - Scope mismatch is rejected defensively.
 - Taxonomy data should flow through typed taxonomy client shapes, not raw `any` values.
+- The facade uses the shared downstream gRPC translator, so taxonomy status and availability failures retain their HTTP meaning without a local status table.
 
 ## Service Relationships
 
@@ -113,7 +122,9 @@ Uses:
 Partially present:
 
 - Settings-service client is imported.
-- `DefaultBlogTaxonomyInitializer` exists and is designed to store a default blog category ID in settings-service, but it currently appears not wired as an active provider.
+- `DefaultBlogTaxonomyInitializer` remains blog-service-owned but is intentionally absent from `AppModule` providers.
+
+Automatic default blog taxonomy initialization is deferred because current post creation stores optional category strings and does not read `blog/default_blog_category`. Register the initializer only when an omitted post category is resolved through that setting, or when a separately approved launch requirement makes the default mandatory. Until then, no inactive feature flag or speculative startup dependency is added.
 
 Does not currently use:
 
@@ -136,11 +147,14 @@ HTTP:
 - Admin can update posts.
 - List filtering by query finds created post.
 - Blog taxonomy HTTP create/get/list/update/delete works through blog-service facade.
+- Missing blog taxonomy records return `404 taxonomy_not_found`.
 
 gRPC:
 
 - Blog create/get/list/update/delete covered.
 - Blog taxonomy create/get/list/update/delete covered.
+- Missing blog taxonomy records return `NOT_FOUND` with `taxonomy_not_found`.
+- The unwired initializer is covered in isolation for blog scope/key ownership, log-and-continue failure behavior, and safe repeated invocation.
 - Some gRPC admin enforcement needs review because one test currently allows `CreatePost` without metadata.
 
 ## Related Files
@@ -186,6 +200,7 @@ Tests:
 - `apps/blog-service/test/grpc/blog.e2e.spec.ts`
 - `apps/blog-service/test/http/taxonomy.http.e2e.spec.ts`
 - `apps/blog-service/test/grpc/taxonomy.e2e.spec.ts`
+- `apps/blog-service/test/default-blog-taxonomy.initializer.unit.spec.ts`
 - `apps/blog-service/test/setup/wait-for-services.ts`
 - `apps/blog-service/test/jest.env.ts`
 

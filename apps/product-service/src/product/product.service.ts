@@ -17,6 +17,7 @@ import { SETTINGS_SERVICE } from "../settings-client.module";
 import { getSettings, type SettingsProxy } from "@nebula/clients";
 import { TAXONOMY_SERVICE } from "../taxonomy-client.module";
 import { getTaxonomy, type TaxonomyProxy } from "@nebula/clients";
+import { wrapGrpc } from "@nebula/grpc-auth";
 import { isRecord } from "../error.utils";
 import { DiscountTypeDto, type ProductInputDto } from "./dto/product-input.dto";
 import { type ApplyDiscountBulkDto } from "./dto/apply-discount-bulk.dto";
@@ -47,7 +48,11 @@ type ListProductsInput = {
   includeDeleted?: boolean | null;
 };
 
-function mapPrisma(e: unknown): Error {
+type PrismaMappingOptions = {
+  missingTarget?: string;
+};
+
+function mapPrisma(e: unknown, options?: PrismaMappingOptions): Error {
   if (isRecord(e) && e.code === "P2002") {
     const meta = isRecord(e.meta) ? e.meta : undefined;
     const rawTarget = meta?.target;
@@ -64,6 +69,10 @@ function mapPrisma(e: unknown): Error {
   }
 
   if (isRecord(e) && e.code === "P2025") {
+    if (options?.missingTarget) {
+      return new NotFoundException(options.missingTarget);
+    }
+
     return new BadRequestException("Related record not found");
   }
 
@@ -253,8 +262,8 @@ export class ProductServiceImpl {
 
   private async assertCategoryExists(categoryId: string) {
     try {
-      const res = await firstValueFrom(
-        this.taxonomy().GetTaxonomy({ id: categoryId }),
+      const res = await wrapGrpc(
+        firstValueFrom(this.taxonomy().GetTaxonomy({ id: categoryId })),
       );
 
       const t = res?.data;
@@ -268,7 +277,7 @@ export class ProductServiceImpl {
         );
       }
     } catch (e: unknown) {
-      if (isRecord(e) && (e.code === 5 || e.details === "taxonomy_not_found")) {
+      if (e instanceof NotFoundException) {
         throw new BadRequestException(`Category ${categoryId} does not exist`);
       }
       throw e;
@@ -460,7 +469,7 @@ export class ProductServiceImpl {
       });
       return { data: this.toDto(data) };
     } catch (e) {
-      throw mapPrisma(e);
+      throw mapPrisma(e, { missingTarget: "product_not_found" });
     }
   }
 

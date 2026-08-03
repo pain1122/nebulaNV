@@ -71,7 +71,8 @@ export class MediaGrpcController {
       visibility:
         overrides.visibility ??
         (req.visibility?.trim() ? req.visibility.trim() : undefined),
-      scope: overrides.scope ?? (req.scope?.trim() ? req.scope.trim() : undefined),
+      scope:
+        overrides.scope ?? (req.scope?.trim() ? req.scope.trim() : undefined),
       entityType:
         overrides.entityType ??
         (req.entityType?.trim() ? req.entityType.trim() : undefined),
@@ -81,7 +82,9 @@ export class MediaGrpcController {
       folderPath:
         overrides.folderPath ??
         (req.folderPath?.trim() ? req.folderPath.trim() : undefined),
-      status: overrides.status ?? (req.status?.trim() ? req.status.trim() : undefined),
+      status:
+        overrides.status ??
+        (req.status?.trim() ? req.status.trim() : undefined),
       scanStatus:
         overrides.scanStatus ??
         (req.scanStatus?.trim() ? req.scanStatus.trim() : undefined),
@@ -99,15 +102,15 @@ export class MediaGrpcController {
       actorUserId: ctx.userId ?? null,
       actorRole: ctx.role ?? null,
       ownerId:
-        overrides.ownerId ??
-        (this.resolveOwnerId(ctx, req.ownerId) ?? undefined),
+        overrides.ownerId ?? this.resolveOwnerId(ctx, req.ownerId) ?? undefined,
       accessClass:
         overrides.accessClass ??
         (req.accessClass?.trim() ? req.accessClass.trim() : undefined),
       visibility:
         overrides.visibility ??
         (req.visibility?.trim() ? req.visibility.trim() : undefined),
-      scope: overrides.scope ?? (req.scope?.trim() ? req.scope.trim() : "panel"),
+      scope:
+        overrides.scope ?? (req.scope?.trim() ? req.scope.trim() : "panel"),
       folderPath:
         overrides.folderPath ??
         (req.folderPath?.trim() ? req.folderPath.trim() : undefined),
@@ -152,9 +155,7 @@ export class MediaGrpcController {
       scope: overrides.scope ?? (req.scope?.trim() || undefined),
       actorUserId: ctx.userId ?? null,
       actorRole: ctx.role ?? null,
-      ownerId:
-        overrides.ownerId ??
-        this.resolveOwnerId(ctx, req.ownerId),
+      ownerId: overrides.ownerId ?? this.resolveOwnerId(ctx, req.ownerId),
       sha256: req.sha256?.trim() ? req.sha256.trim() : null,
       entityType:
         overrides.entityType ??
@@ -187,7 +188,9 @@ export class MediaGrpcController {
     });
   }
 
-  private readUrlResponse(out: Awaited<ReturnType<MediaService["createReadUrl"]>>) {
+  private readUrlResponse(
+    out: Awaited<ReturnType<MediaService["createReadUrl"]>>,
+  ) {
     return media.ReadUrlRes.create({
       url: out.url,
       expiresIn: out.expiresIn,
@@ -239,9 +242,7 @@ export class MediaGrpcController {
 
     const created = await this.svc.create(input);
 
-    this.log.debug(
-      `[MediaService] Create id=${created.id} filename=${created.filename}`,
-    );
+    this.log.debug(`media_created id=${created.id}`);
     return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
@@ -281,7 +282,7 @@ export class MediaGrpcController {
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
     const deleted = await this.svc.deleteById(req.id);
-    this.log.debug(`[MediaService] DeleteById id=${req.id} -> ${deleted}`);
+    this.log.debug(`media_deleted id=${req.id} deleted=${deleted}`);
     return media.DeleteRes.create({ deleted });
   }
 
@@ -320,7 +321,10 @@ export class MediaGrpcController {
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ListPublicLibrary")
-  async listPublicLibrary(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+  async listPublicLibrary(
+    req: media.ListReq,
+    meta: Metadata,
+  ): Promise<media.ListRes> {
     const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
@@ -336,7 +340,10 @@ export class MediaGrpcController {
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ListProtectedLibrary")
-  async listProtectedLibrary(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+  async listProtectedLibrary(
+    req: media.ListReq,
+    meta: Metadata,
+  ): Promise<media.ListRes> {
     const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 
@@ -353,7 +360,10 @@ export class MediaGrpcController {
 
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ListStrictLibrary")
-  async listStrictLibrary(req: media.ListReq, meta: Metadata): Promise<media.ListRes> {
+  async listStrictLibrary(
+    req: media.ListReq,
+    meta: Metadata,
+  ): Promise<media.ListRes> {
     const ctx = resolveCtxUser(meta);
     if (!ctx) throw toRpc(status.UNAUTHENTICATED, "Missing user context");
 

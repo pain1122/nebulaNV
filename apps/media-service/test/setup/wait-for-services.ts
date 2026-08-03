@@ -1,7 +1,6 @@
 // apps/media-service/test/setup/wait-for-services.ts
 import waitPort from "wait-port";
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
+import { call, loadClient, mdS2S } from "../grpc/helpers";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -40,31 +39,27 @@ async function waitHttpOk(baseUrl: string, timeoutMs: number) {
 async function waitGrpcPing(grpcUrl: string, timeoutMs: number) {
   const start = Date.now();
   const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
-
-  const def = protoLoader.loadSync(MEDIA_PROTO, {
-    keepCase: false,
-    longs: String,
-    enums: String,
-    defaults: true,
-    oneofs: true,
+  const client = loadClient({
+    url: grpcUrl,
+    protoPath: MEDIA_PROTO,
+    pkg: ["media"],
+    svc: "MediaService",
   });
-  const loaded = grpc.loadPackageDefinition(def) as any;
-  const MediaService = loaded.media.MediaService;
-
-  const client = new MediaService(grpcUrl, grpc.credentials.createInsecure());
+  let lastError: unknown;
 
   while (Date.now() - start < timeoutMs) {
     try {
-      await new Promise<void>((resolve, reject) => {
-        client.Ping({}, (err: Error | null) => (err ? reject(err) : resolve()));
-      });
+      await call(client, "Ping", {}, mdS2S());
       return;
-    } catch {
+    } catch (error) {
+      lastError = error;
       await sleep(200);
     }
   }
 
-  throw new Error(`Timed out waiting for gRPC Ping at ${grpcUrl}`);
+  const reason =
+    lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`Timed out waiting for gRPC Ping at ${grpcUrl}: ${reason}`);
 }
 
 export default async function () {

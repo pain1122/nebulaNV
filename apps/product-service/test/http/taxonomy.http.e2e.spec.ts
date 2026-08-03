@@ -56,6 +56,16 @@ describe("Product taxonomy HTTP (category.default kind)", () => {
     expect(typeof res.data.hasChildren).toBe("boolean");
   });
 
+  it("GET /taxonomies/:kind/:id returns 404 for a missing item", async () => {
+    const res = await fetch(
+      `${BASE}/${KIND}/00000000-0000-0000-0000-000000000000`,
+    );
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(404);
+    expect(body.message).toBe("taxonomy_not_found");
+  });
+
   it("GET /taxonomies/:kind lists and finds the created item", async () => {
     // no search filter here; just list page 1 and make sure our item is present
     const res = await httpJson<any>("GET", `${BASE}/${KIND}?page=1&limit=50`);

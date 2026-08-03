@@ -9,6 +9,7 @@ service TaxonomyService {
   rpc CreateTaxonomy (CreateTaxonomyRequest) returns (TaxonomyResponse);
   rpc UpdateTaxonomy (UpdateTaxonomyRequest) returns (TaxonomyResponse);
   rpc DeleteTaxonomy (DeleteTaxonomyRequest) returns (BasicResponse);
+  rpc EnsureSystemTaxonomy (EnsureSystemTaxonomyRequest) returns (TaxonomyResponse);
 }
 
 message Taxonomy {
@@ -74,6 +75,14 @@ message GetBySlugRequest {
 
 message CreateTaxonomyRequest {
   TaxonomyInput data = 1;
+}
+
+message EnsureSystemTaxonomyRequest {
+  string scope       = 1;
+  string kind        = 2;
+  string slug        = 3;
+  string title       = 4;
+  string description = 5;
 }
 
 message UpdateTaxonomyRequest {

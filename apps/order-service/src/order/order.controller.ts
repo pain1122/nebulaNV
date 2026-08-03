@@ -17,7 +17,7 @@ import {
   AddToCartDto,
   CheckoutDto,
   UpdateCartItemDto,
-  OrderStatusDto,
+  UpdateOrderStatusDto,
 } from "./dto/order.dto";
 import { OrderStatus } from "../../prisma/generated/client";
 
@@ -108,14 +108,14 @@ export class OrderController {
 
   // ---------- Admin status update ----------
 
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Patch(":id/status")
   async updateStatusAdmin(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
-    @Body("status") status: OrderStatusDto,
+    @Body() dto: UpdateOrderStatusDto,
   ) {
     // Map DTO enum to Prisma OrderStatus enum (same strings)
     // If they differ, map explicitly.
-    return this.svc.updateOrderStatusAdmin(id, status as OrderStatus);
+    return this.svc.updateOrderStatusAdmin(id, dto.status as OrderStatus);
   }
 }

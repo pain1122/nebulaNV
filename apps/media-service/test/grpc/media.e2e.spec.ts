@@ -1,12 +1,25 @@
 // apps/media-service/test/grpc/media.e2e.spec.ts
-import { loadClient, call, mdS2S } from "./helpers";
+import { httpJson } from "../utils/http";
+import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
 
 const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
 const MEDIA_GRPC_URL = process.env.MEDIA_GRPC_URL || "127.0.0.1:50058";
+const AUTH_HTTP_URL = process.env.AUTH_HTTP_URL || "http://127.0.0.1:3001";
+
+type LoginResponse = { accessToken: string };
 
 describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.SVC_NAME = "bucket";
+    const login = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP_URL}/auth/login`,
+      {
+        identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
+        password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
+      },
+    );
+    setS2STestActorToken(login.accessToken);
   });
 
   const client = loadClient<any>({

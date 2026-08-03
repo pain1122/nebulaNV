@@ -5,6 +5,7 @@ service SettingsService {
   rpc GetString   (GetReq)      returns (GetStringRes);
   rpc SetString   (SetStringReq) returns (SetStringRes);
   rpc DeleteString(DeleteReq)   returns (DeleteRes);
+  rpc EnsureBootstrapString(SetStringReq) returns (SetStringRes);
 }
 
 message GetReq {

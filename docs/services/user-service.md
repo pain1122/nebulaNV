@@ -11,7 +11,6 @@ Auth-service owns token lifecycle and uses user-service as the user data authori
 - Phone lookup.
 - Password hash storage.
 - Role string storage.
-- Refresh-token hash storage.
 - Profile update rules.
 - Self/admin access checks for profile reads and updates.
 
@@ -19,6 +18,7 @@ Auth-service owns token lifecycle and uses user-service as the user data authori
 
 - JWT issuing.
 - Token refresh/rotation logic.
+- Active refresh-session storage.
 - Token versioning.
 - Redis invalidation.
 - Disabled-user Redis state.
@@ -45,7 +45,6 @@ Auth-service uses user-service for:
 
 - Registering users through gRPC `CreateUser`.
 - Looking up users with password hash through `FindUserWithHash`.
-- Storing refresh-token hash through `SetRefreshToken`.
 - Fetching profile data through `GetUser` or `GetUserWithHash`.
 
 User-service should not trust caller-supplied user IDs by themselves. User-facing reads and writes must use auth-verified context from guards.
@@ -56,15 +55,15 @@ Base controller: `/users`
 
 Current routes:
 
-- `GET /health`
+- `GET /health`, `/health/live`, `/health/ready`
 - `GET /users`
 - `GET /users/:id`
 - `PUT /users/me`
 
 Access policy:
 
-- `GET /health` is public and checks DB.
-- `GET /users` requires `admin`.
+- Health routes are public; readiness checks Postgres and the S2S replay store.
+- `GET /users` requires `admin` or `root-admin`.
 - `GET /users/:id` requires `user`, `admin`, or `root-admin`.
 - Normal users can only read themselves.
 - Admin/root-admin can read other users.
@@ -86,7 +85,6 @@ Current methods:
 - `UpdateProfile`
 - `CreateUser`
 - `FindUserWithHash`
-- `SetRefreshToken`
 - `GetUserWithHash`
 
 Access policy:
@@ -94,21 +92,28 @@ Access policy:
 - `GetUser` requires `user`, `admin`, or `root-admin`; self or admin only.
 - `FindUser` requires `admin` or `root-admin`.
 - `UpdateProfile` requires `user`, `admin`, or `root-admin`; self or admin only.
-- `CreateUser` is internal S2S gateway-only and requires user ID metadata.
-- `FindUserWithHash` is internal S2S gateway-only for auth flows.
-- `SetRefreshToken` is internal S2S gateway-only and requires user ID metadata.
-- `GetUserWithHash` is internal S2S gateway-only and requires user ID metadata.
+- `CreateUser` is internal-only and accepts only verified `auth-service` S2S calls. Its signed request body is the registration target; it always creates the normal `user` role.
+- `FindUserWithHash` is internal-only for verified `auth-service` auth flows.
+- `GetUserWithHash` is internal-only for verified `auth-service`; its signed request body identifies the target user.
 
 Security behavior:
 
 - `GetUser` and `UpdateProfile` use verified guard context.
 - Spoofed role metadata must not override the signed bearer token.
-- `CreateUser` ignores requested admin role unless the verified caller is admin/root-admin.
-- Self-register style `CreateUser` creates normal `user` role.
+- Internal auth methods do not create a fake human actor from service identity or raw metadata.
+- Self-register style `CreateUser` creates normal `user` role even if its request contains another role.
 
 ## Storage Model
 
 Database model: `User`
+
+The root Prisma commands include this service first. Its current base seed
+upserts the configurable development admin and normal-user accounts; it does
+not store refresh tokens and refuses to run when `NODE_ENV=production`. The
+ordinary seeded admin is used by the separate API demo seed; no default
+`root-admin` is created. See
+[Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
 
 Current fields:
 
@@ -117,7 +122,6 @@ Current fields:
 - `phone`
 - `password`
 - `role`
-- `refreshToken`
 - `createdAt`
 - `updatedAt`
 
@@ -126,8 +130,9 @@ Notes:
 - `email` is unique and nullable.
 - `phone` is unique and nullable.
 - `password` stores a password hash.
-- `refreshToken` stores the refresh-token hash/string provided by auth-service.
 - `role` is currently a string, not a DB enum.
+- Active refresh sessions, rotation, replay handling, and revocation belong to
+  auth-service Redis state; user-service does not persist refresh tokens.
 
 ## Normalization And Validation
 
@@ -148,7 +153,7 @@ HTTP test file:
 
 Covered behavior:
 
-- Health returns `ok` and DB `up`.
+- Health readiness returns `ok` with database and S2S replay checks.
 - Normal users cannot list users.
 - Admin can list users.
 - Admin can read another user.
@@ -169,9 +174,10 @@ Covered behavior:
 - Admin can `FindUser` by email.
 - Normal user cannot `FindUser`.
 - Internal `CreateUser` creates normal user even if role `admin` is requested.
-- Internal hash lookup returns password hash and refresh token.
+- Internal hash lookups return only the user identity and password hash fields
+  required by auth-service.
 - Created gRPC user can log in through auth-service.
-- `SetRefreshToken` stores refresh-token hash.
+- `GetUserWithHash` does not expose a refresh token.
 - User can update own email through gRPC.
 - Spoofed admin metadata is rejected when bearer token is a normal user.
 - User can get self.
@@ -187,37 +193,29 @@ Test setup waits for:
 
 ## Health
 
-Current health route:
+Health routes:
 
 ```txt
+GET /health/live
+GET /health/ready
 GET /health
 ```
 
-It is public and checks Postgres with:
+They are public. Liveness is dependency-free; the two readiness routes check
+Postgres with:
 
 ```sql
 SELECT 1
 ```
 
-Healthy response shape:
+Readiness also checks the S2S replay store. It returns HTTP `200` when ready and
+a sanitized HTTP `503` when either required dependency fails. See
+[Testing And Health](../architecture/testing-and-health.md) for the shared
+response schema.
 
-```ts
-{
-  status: "ok";
-  db: "up";
-  time: string;
-}
-```
+## Bootstrap Ports
 
-Degraded response shape:
-
-```ts
-{
-  status: "degraded";
-  db: "down";
-  error: string;
-}
-```
+HTTP bind resolution is `USER_HTTP_PORT`, then generic `PORT`, then `3100`. The gRPC listener binds to `0.0.0.0` and resolves `GRPC_PORT`, then `50051`. This keeps the service-local `.env.example`, root environment, and Compose port contract aligned.
 
 ## Known Gaps
 
@@ -228,8 +226,6 @@ Degraded response shape:
 - No tenant ID yet.
 - No audit trail for profile, email, or role changes.
 - HTTP only exposes self-update, not admin profile update.
-- `main.ts` reads `USER_HTTP_PORT` for HTTP, but `.env.example` shows `PORT`.
-- gRPC bind is hard-coded to `0.0.0.0:50051`, not currently reading `GRPC_PORT`.
 - `AuthClientModule` exists because guards need auth-service validation.
 - `apps/user-service/README.md` is still Nest boilerplate, not service-specific documentation.
 

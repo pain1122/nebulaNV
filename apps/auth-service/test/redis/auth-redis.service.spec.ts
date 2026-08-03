@@ -78,4 +78,78 @@ describe('AuthRedisService', () => {
 
     expect(versionAfterLogout).toBe(versionBeforeLogout + 1);
   });
+
+  it('rotates a refresh session exactly once under concurrent reuse', async () => {
+    const sessionId = 'session-concurrent';
+    await service.createRefreshSession({
+      userId,
+      sessionId,
+      tokenId: 'refresh-1',
+      tokenHash: 'hash-1',
+      ttlSeconds: 60,
+    });
+
+    const attempts = await Promise.all([
+      service.rotateRefreshSession({
+        userId,
+        sessionId,
+        expectedTokenId: 'refresh-1',
+        expectedTokenHash: 'hash-1',
+        nextTokenId: 'refresh-2a',
+        nextTokenHash: 'hash-2a',
+        ttlSeconds: 60,
+      }),
+      service.rotateRefreshSession({
+        userId,
+        sessionId,
+        expectedTokenId: 'refresh-1',
+        expectedTokenHash: 'hash-1',
+        nextTokenId: 'refresh-2b',
+        nextTokenHash: 'hash-2b',
+        ttlSeconds: 60,
+      }),
+    ]);
+
+    expect(attempts.sort()).toEqual(['replayed', 'rotated']);
+    expect(await service.hasRefreshSession(userId, sessionId)).toBe(false);
+  });
+
+  it('revokes one refresh session without affecting another device', async () => {
+    await service.createRefreshSession({
+      userId,
+      sessionId: 'session-a',
+      tokenId: 'refresh-a',
+      tokenHash: 'hash-a',
+      ttlSeconds: 60,
+    });
+    await service.createRefreshSession({
+      userId,
+      sessionId: 'session-b',
+      tokenId: 'refresh-b',
+      tokenHash: 'hash-b',
+      ttlSeconds: 60,
+    });
+
+    await service.revokeRefreshSession(userId, 'session-a');
+
+    expect(await service.hasRefreshSession(userId, 'session-a')).toBe(false);
+    expect(await service.hasRefreshSession(userId, 'session-b')).toBe(true);
+  });
+
+  it('revokes every refresh session for all-device logout', async () => {
+    for (const sessionId of ['session-a', 'session-b']) {
+      await service.createRefreshSession({
+        userId,
+        sessionId,
+        tokenId: `refresh-${sessionId}`,
+        tokenHash: `hash-${sessionId}`,
+        ttlSeconds: 60,
+      });
+    }
+
+    await service.revokeAllRefreshSessions(userId);
+
+    expect(await service.hasRefreshSession(userId, 'session-a')).toBe(false);
+    expect(await service.hasRefreshSession(userId, 'session-b')).toBe(false);
+  });
 });

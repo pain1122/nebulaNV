@@ -1,7 +1,22 @@
 import { Controller } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
+import { Metadata, status } from "@grpc/grpc-js";
 import { taxonomy } from "@nebula/protos";
+import {
+  AllowedS2SCallers,
+  getContextService,
+  InternalOnly,
+  Public,
+  Roles,
+  toRpc,
+  type RpcContextWithContext,
+} from "@nebula/grpc-auth";
 import { TaxonomyService, type TaxonomyDto } from "../taxonomy.service";
+
+const SYSTEM_TAXONOMY_SCOPE_BY_CALLER = {
+  "product-service": "product",
+  "blog-service": "blog",
+} as const;
 
 @Controller()
 export class TaxonomyGrpcController {
@@ -37,6 +52,7 @@ export class TaxonomyGrpcController {
   // ---------------------------------
   // ListTaxonomies
   // ---------------------------------
+  @Public()
   @GrpcMethod("TaxonomyService", "ListTaxonomies")
   async list(
     req: taxonomy.ListTaxonomiesRequest,
@@ -63,6 +79,7 @@ export class TaxonomyGrpcController {
   // ---------------------------------
   // GetTaxonomy
   // ---------------------------------
+  @Public()
   @GrpcMethod("TaxonomyService", "GetTaxonomy")
   async get(
     req: taxonomy.GetTaxonomyRequest,
@@ -77,6 +94,7 @@ export class TaxonomyGrpcController {
   // ---------------------------------
   // GetBySlug
   // ---------------------------------
+  @Public()
   @GrpcMethod("TaxonomyService", "GetBySlug")
   async getBySlug(
     req: taxonomy.GetBySlugRequest,
@@ -88,9 +106,53 @@ export class TaxonomyGrpcController {
     });
   }
 
+  @Public()
+  @InternalOnly()
+  @AllowedS2SCallers("product-service", "blog-service")
+  @GrpcMethod("TaxonomyService", "EnsureSystemTaxonomy")
+  async ensureSystemTaxonomy(
+    req: taxonomy.EnsureSystemTaxonomyRequest,
+    _meta: Metadata,
+    call: RpcContextWithContext,
+  ): Promise<taxonomy.TaxonomyResponse> {
+    const caller = getContextService(call);
+    if (!caller) {
+      throw toRpc(status.UNAUTHENTICATED, "Missing service context");
+    }
+
+    const expectedScope =
+      SYSTEM_TAXONOMY_SCOPE_BY_CALLER[
+        caller as keyof typeof SYSTEM_TAXONOMY_SCOPE_BY_CALLER
+      ];
+    const scope = req.scope.trim().toLowerCase();
+    const kind = req.kind.trim().toLowerCase();
+    const slug = req.slug.trim().toLowerCase();
+    const title = req.title.trim();
+
+    if (!expectedScope || scope !== expectedScope) {
+      throw toRpc(status.PERMISSION_DENIED, "Taxonomy scope not allowed");
+    }
+    if (kind !== "category.default" || slug !== "uncategorized" || !title) {
+      throw toRpc(status.INVALID_ARGUMENT, "Invalid system taxonomy");
+    }
+
+    const res = await this.svc.ensureSystemTaxonomy({
+      scope,
+      kind,
+      slug,
+      title,
+      description: req.description,
+    });
+
+    return taxonomy.TaxonomyResponse.create({
+      data: this.toProtoTaxonomy(res.data),
+    });
+  }
+
   // ---------------------------------
   // CreateTaxonomy
   // ---------------------------------
+  @Roles("admin", "root-admin")
   @GrpcMethod("TaxonomyService", "CreateTaxonomy")
   async create(
     req: taxonomy.CreateTaxonomyRequest,
@@ -107,6 +169,7 @@ export class TaxonomyGrpcController {
   // ---------------------------------
   // UpdateTaxonomy
   // ---------------------------------
+  @Roles("admin", "root-admin")
   @GrpcMethod("TaxonomyService", "UpdateTaxonomy")
   async update(
     req: taxonomy.UpdateTaxonomyRequest,
@@ -123,6 +186,7 @@ export class TaxonomyGrpcController {
   // ---------------------------------
   // DeleteTaxonomy
   // ---------------------------------
+  @Roles("admin", "root-admin")
   @GrpcMethod("TaxonomyService", "DeleteTaxonomy")
   async del(
     req: taxonomy.DeleteTaxonomyRequest,

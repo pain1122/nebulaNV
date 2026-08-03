@@ -8,8 +8,13 @@ import * as path from 'path';
 import { envSchema } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
+import { createServiceLifecycleProvider } from '@packages/config';
 
-import { GrpcTokenAuthGuard, AUTH_SERVICE } from '@nebula/grpc-auth';
+import {
+  AUTH_SERVICE,
+  GRPC_SECURITY_PROVIDERS,
+  GrpcTokenAuthGuard,
+} from '@nebula/grpc-auth';
 
 export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
@@ -62,8 +67,10 @@ export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
   ],
   controllers: [HealthController],
   providers: [
+    createServiceLifecycleProvider('auth-service'),
+    ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+    { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },
   ],
 })
 export class AppModule {}

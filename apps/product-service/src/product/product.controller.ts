@@ -6,8 +6,6 @@ import {
   Patch,
   Post,
   Query,
-  UsePipes,
-  ValidationPipe,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import { ProductServiceImpl } from "./product.service";
@@ -19,15 +17,7 @@ import {
   ListProductsRequestDto,
 } from "./dto/product-input.dto";
 
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
-
 @Controller("products")
-@UsePipes(Pipe)
 export class ProductController {
   constructor(private readonly svc: ProductServiceImpl) {}
 
@@ -53,13 +43,13 @@ export class ProductController {
     return this.svc.get(id);
   }
 
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Post()
   create(@Body() body: CreateProductRequestDto) {
     return this.svc.create(body.data);
   }
 
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Patch(":id")
   update(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,

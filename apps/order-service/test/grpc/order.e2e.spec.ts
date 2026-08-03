@@ -1,13 +1,14 @@
 // apps/order-service/test/grpc/order.e2e.spec.ts
 import * as grpc from "@grpc/grpc-js";
-import { randomUUID } from "crypto";
-import { call, loadClient, mdS2S } from "./helpers";
+import * as jwt from "jsonwebtoken";
+import { call, loadClient, mdBearer, mdS2S, mergeMd } from "./helpers";
 import { httpJson } from "../utils/http";
 
 const ORDER_GRPC = process.env.ORDER_GRPC_URL || "127.0.0.1:50056";
 const ORDER_PROTO = require.resolve("@nebula/protos/order.proto");
 const AUTH_HTTP = process.env.AUTH_HTTP_URL!;
 const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL!;
+const MISSING_ID = "11111111-1111-4111-8111-111111111111";
 
 type LoginResp = { accessToken: string };
 
@@ -30,7 +31,8 @@ type OrderClient = grpc.Client & {
 
 describe("OrderService gRPC (cart + checkout + orders)", () => {
   let client: OrderClient;
-  const userId = randomUUID();
+  let userId: string;
+  let userToken: string;
   let orderId: string;
   let cartItemId: string;
   let productId: string;
@@ -51,6 +53,17 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     });
     adminToken = a.accessToken;
 
+    const user = await httpJson<LoginResp>("POST", `${AUTH_HTTP}/auth/login`, {
+      identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
+      password: process.env.SEED_USER_PASS ?? "User123!",
+    });
+    userToken = user.accessToken;
+    const payload = jwt.decode(userToken);
+    if (!payload || typeof payload !== "object" || !payload.sub) {
+      throw new Error("seed user token is missing sub");
+    }
+    userId = String(payload.sub);
+
     // create product via product-service HTTP
     const p = await httpJson<any>(
       "POST",
@@ -61,16 +74,40 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     productId = p.data.id;
   });
 
+  it("GetCart rejects a signed request body without a verified actor", async () => {
+    await expect(
+      call<any>(client, "GetCart", { userId }, mdS2S()),
+    ).rejects.toMatchObject({ code: grpc.status.UNAUTHENTICATED });
+  });
+
   it("GetCart returns an empty cart for a new user", async () => {
     const res = await call<any>(
       client,
       "GetCart",
       { userId },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
     expect(res.data).toBeTruthy();
     expect(res.data.userId).toBe(userId);
     expect(Array.isArray(res.data.items)).toBe(true);
+  });
+
+  it("AddToCart returns NOT_FOUND for a missing product", async () => {
+    await expect(
+      call<any>(
+        client,
+        "AddToCart",
+        {
+          userId,
+          productId: MISSING_ID,
+          quantity: 1,
+        },
+        mergeMd(mdS2S(), mdBearer(userToken)),
+      ),
+    ).rejects.toMatchObject({
+      code: grpc.status.NOT_FOUND,
+      details: "product_not_found",
+    });
   });
 
   it("AddToCart adds an item", async () => {
@@ -78,7 +115,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "AddToCart",
       { userId, productId, quantity: 2 },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
 
     expect(res.data).toBeTruthy();
@@ -94,7 +131,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "UpdateCartItem",
       { userId, itemId: cartItemId, quantity: 3 },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
 
     const item = res.data.items.find((i: any) => i.id === cartItemId);
@@ -107,7 +144,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "Checkout",
       { userId, note: "gRPC checkout" },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
 
     expect(res.data).toBeTruthy();
@@ -122,7 +159,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "GetCart",
       { userId },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
     expect(cart.data.items.length).toBe(0);
   });
@@ -132,7 +169,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "ListOrders",
       { userId },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
 
     expect(res.data.length).toBeGreaterThan(0);
@@ -145,7 +182,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "GetOrder",
       { userId, id: orderId },
-      mdS2S({ svc: "order-service" }),
+      mergeMd(mdS2S(), mdBearer(userToken)),
     );
 
     expect(res.data.id).toBe(orderId);
@@ -158,10 +195,24 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "UpdateOrderStatus",
       { id: orderId, status: "PAID" },
-      mdS2S({ svc: "order-service", role: "admin" }),
+      mergeMd(mdS2S(), mdBearer(adminToken)),
     );
 
     expect(res.data.id).toBe(orderId);
     expect(res.data.status).toBe("PAID");
+  });
+
+  it("UpdateOrderStatus returns NOT_FOUND for a missing order", async () => {
+    await expect(
+      call<any>(
+        client,
+        "UpdateOrderStatus",
+        { id: MISSING_ID, status: "PAID" },
+        mergeMd(mdS2S(), mdBearer(adminToken)),
+      ),
+    ).rejects.toMatchObject({
+      code: grpc.status.NOT_FOUND,
+      details: "order_not_found",
+    });
   });
 });

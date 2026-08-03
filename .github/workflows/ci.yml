@@ -1,14 +1,53 @@
 name: ci
 on: [push, pull_request]
 jobs:
-  build:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.17.1 }
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: 'pnpm' }
-      - run: corepack enable
+        with: { node-version: 22, cache: "pnpm" }
+      - uses: arduino/setup-protoc@v3
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint backend workspaces
+        run: pnpm lint:backend
+      - name: Check backend types
+        run: pnpm check-types:backend
+      - name: Verify generated proto contracts
+        run: pnpm proto:check
+      - name: Run focused container-free security tests
+        run: pnpm test:security
+      - name: Build backend sources
+        run: pnpm build:backend
+      - name: Validate local and release Compose configurations
+        run: |
+          docker compose config --quiet
+          docker compose --env-file deploy/.env.production.example -f docker-compose.release.yml config --quiet
+      - name: Verify checks leave tracked files unchanged
+        run: git diff --exit-code
+
+  live-e2e:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.17.1 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: "pnpm" }
       - run: pnpm i --frozen-lockfile
-      - run: pnpm -w turbo lint
-      - run: pnpm -w turbo test
-      - run: pnpm -w turbo build
+      - name: Provision live integration services
+        run: pnpm backend:boot
+      - name: Run live integration and e2e tests
+        run: pnpm test:e2e
+      - name: Show container state after a failure
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --tail=200
+      - name: Remove live integration resources
+        if: always()
+        run: docker compose down -v

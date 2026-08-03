@@ -2,7 +2,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
-import { APP_GUARD, Reflector } from "@nestjs/core";
+import { APP_GUARD } from "@nestjs/core";
 import * as path from "path";
 
 import { envSchema } from "./config/env.validation";
@@ -10,7 +10,9 @@ import { OrderModule } from "./order/order.module";
 import { SettingsClientModule } from "./settings-client.module";
 import { AuthClientModule } from "./auth-client.module";
 import { ProductClientModule } from "./product-client.module";
-import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { GRPC_SECURITY_PROVIDERS, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { HealthController } from "./health.controller";
+import { createServiceLifecycleProvider } from "@packages/config";
 
 // Safe proto resolution – we won't actually use this until order.proto exists
 export const ORDER_PROTO: string = (() => {
@@ -45,12 +47,12 @@ export const ORDER_PROTO: string = (() => {
     AuthClientModule,
     ProductClientModule,
   ],
+  controllers: [HealthController],
   providers: [
-    Reflector,
-    GrpcTokenAuthGuard,
-    // global guards: auth first, then throttler
-    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+    createServiceLifecycleProvider("order-service"),
+    ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },
   ],
 })
 export class AppModule {}

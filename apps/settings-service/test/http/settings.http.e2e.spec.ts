@@ -1,7 +1,6 @@
 import { httpJson } from "../utils/http";
 
-const SETTINGS_HTTP =
-  process.env.SETTINGS_HTTP_URL ?? "http://127.0.0.1:3010";
+const SETTINGS_HTTP = process.env.SETTINGS_HTTP_URL ?? "http://127.0.0.1:3010";
 const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
 
 type LoginResponse = {
@@ -45,10 +44,14 @@ describe("settings-service HTTP (public reads, admin writes)", () => {
   const value = "contract-red";
 
   beforeAll(async () => {
-    const user = await httpJson<LoginResponse>("POST", `${AUTH_HTTP}/auth/login`, {
-      identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
-      password: process.env.SEED_USER_PASS ?? "User123!",
-    });
+    const user = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP}/auth/login`,
+      {
+        identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
+        password: process.env.SEED_USER_PASS ?? "User123!",
+      },
+    );
     userAccess = user.accessToken;
 
     const admin = await httpJson<LoginResponse>(
@@ -75,9 +78,14 @@ describe("settings-service HTTP (public reads, admin writes)", () => {
     const body = { namespace, environment, key, value };
 
     await expect(
-      httpJson<SetStringResponse>("PUT", `${SETTINGS_HTTP}/settings/string`, body, {
-        authorization: `Bearer ${userAccess}`,
-      }),
+      httpJson<SetStringResponse>(
+        "PUT",
+        `${SETTINGS_HTTP}/settings/string`,
+        body,
+        {
+          authorization: `Bearer ${userAccess}`,
+        },
+      ),
     ).rejects.toBeTruthy();
 
     const res = await httpJson<SetStringResponse>(

@@ -4,6 +4,7 @@ export const IS_PUBLIC_KEY = "isPublic";
 export const PUBLIC_FLAGS_KEY = "publicFlags";
 export const INTERNAL_ONLY_KEY = "internalOnly";
 export const REQUIRE_USER_ID_KEY = "requireUserId";
+export const ALLOWED_S2S_CALLERS_KEY = "allowedS2SCallers";
 
 export type PublicFlags = {
   /** Allow calls without JWT (client may still send JWT). */
@@ -36,11 +37,12 @@ export function InternalOnly() {
   return SetMetadata(INTERNAL_ONLY_KEY, true);
 }
 
-/**
- * Require the presence of x-user-id (identity propagation).
- * Use on downstream endpoints that rely on per-user authorization
- * without requiring a full JWT at that hop.
- */
+/** Restrict a signed RPC/route to named service callers. */
+export function AllowedS2SCallers(...callers: string[]) {
+  return SetMetadata(ALLOWED_S2S_CALLERS_KEY, callers);
+}
+
+/** Require user context previously attached by verified authentication. */
 export function RequireUserId() {
   return SetMetadata(REQUIRE_USER_ID_KEY, true);
 }

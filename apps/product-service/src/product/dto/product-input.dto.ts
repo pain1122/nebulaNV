@@ -2,6 +2,7 @@ import {
   IsArray,
   ArrayMaxSize,
   IsBoolean,
+  IsDefined,
   IsEnum,
   IsISO8601,
   IsNumber,
@@ -220,6 +221,7 @@ export class ProductInputDto {
 }
 
 export class CreateProductRequestDto {
+  @IsDefined()
   @ValidateNested()
   @Type(() => ProductInputDto)
   data!: ProductInputDto;

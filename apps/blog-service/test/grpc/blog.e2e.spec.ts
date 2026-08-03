@@ -1,8 +1,13 @@
 // apps/blog-service/test/grpc/blog.e2e.spec.ts
-import { loadClient, call, mdS2S } from "./helpers";
+import * as grpc from "@grpc/grpc-js";
+import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
+import { httpJson } from "../utils/http";
 
 const BLOG_PROTO = require.resolve("@nebula/protos/blog.proto");
 const URL = process.env.BLOG_GRPC_URL || "127.0.0.1:50055";
+const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
+
+type LoginResponse = { accessToken: string };
 
 const input = {
   title: "E2E Blog Post gRPC",
@@ -21,9 +26,27 @@ describe("BlogService gRPC (admin required on writes)", () => {
   let id = "";
   let slug = "";
 
-  it("CreatePost works without metadata (internal call)", async () => {
-    const res = await call<any>(client, "CreatePost", { data: input });
-    expect(res.data.title).toBe(input.title);
+  beforeAll(async () => {
+    const login = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP}/auth/login`,
+      {
+        identifier: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com",
+        password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
+      },
+    );
+    setS2STestActorToken(login.accessToken);
+  });
+
+  it("CreatePost rejects a signed call without an actor JWT", async () => {
+    await expect(
+      call<any>(
+        client,
+        "CreatePost",
+        { data: input },
+        mdS2S({ accessToken: "" }),
+      ),
+    ).rejects.toMatchObject({ code: grpc.status.UNAUTHENTICATED });
   });
 
   it("CreatePost succeeds with S2S admin metadata", async () => {

@@ -1,43 +1,134 @@
 import * as Joi from "joi";
 
-export const rootEnvSchema = Joi.object({
-  // ------------------------------------------
-  // 🌍 Environment and Global Behavior
-  // ------------------------------------------
+const port = Joi.number().integer().min(1).max(65_535);
+const host = Joi.alternatives().try(
+  Joi.string()
+    .trim()
+    .ip({ version: ["ipv4", "ipv6"] }),
+  Joi.string().trim().hostname(),
+);
+
+export const runtimeEnvSchema = {
   NODE_ENV: Joi.string()
+    .lowercase()
     .valid("development", "test", "production")
-    .default("default"),
-  PUBLIC_MODE: Joi.string()
-    .valid("OPEN", "OPTIONAL_AUTH", "GATEWAY_ONLY")
-    .default("OPEN"),
+    .default("development"),
+};
 
-  // ------------------------------------------
-  // 🔐 Gateway + S2S Security
-  // ------------------------------------------
-  S2S_SECRET: Joi.string().min(32).required(),
-  S2S_SECRET_OLD: Joi.string().min(32).required(),
-  GATEWAY_HEADER: Joi.string().default("x-gateway-sign"),
+export const bcryptEnvSchema = {
+  BCRYPT_ROUNDS: Joi.number().integer().min(8).max(15).default(10),
+};
 
-  // ------------------------------------------
-  // 🧩 Internal gRPC Service Registry
-  // ------------------------------------------
-  USER_GRPC_URL: Joi.string().hostname().default("127.0.0.1:50051"),
-  AUTH_GRPC_URL: Joi.string().hostname().default("127.0.0.1:50052"),
-  PRODUCT_GRPC_URL: Joi.string().hostname().default("127.0.0.1:50053"),
-  SETTINGS_GRPC_URL: Joi.string().hostname().default("127.0.0.1:50054"),
-  BLOG_GRPC_URL: Joi.string().hostname().default("127.0.0.1:50055"),
+export const jwtAccessVerificationEnvSchema = {
+  JWT_ACCESS_SECRET: Joi.string().min(32).optional(),
+};
 
-  USER_HTTP_PORT: Joi.number().default(3100),
-  AUTH_HTTP_PORT: Joi.number().default(3001),
-  PRODUCT_HTTP_PORT: Joi.number().default(3003),
-  SETTINGS_HTTP_PORT: Joi.number().default(3010),
-  BLOG_HTTP_PORT: Joi.number().default(3004),
+export function serviceBindEnvSchema(
+  servicePrefix: string,
+): Record<string, Joi.Schema> {
+  const prefix = servicePrefix.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]*$/.test(prefix)) {
+    throw new Error(`Invalid service environment prefix: ${servicePrefix}`);
+  }
 
-  // ------------------------------------------
-  // 🔑 JWT Tokens (Shared by All Services)
-  // ------------------------------------------
-  JWT_ACCESS_EXPIRATION: Joi.string().default("15m"),
-  JWT_REFRESH_EXPIRATION: Joi.string().default("7d"),
-  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
-});
+  return {
+    PORT: port.optional(),
+    GRPC_HOST: host.optional(),
+    GRPC_PORT: port.optional(),
+    [`${prefix}_HTTP_PORT`]: port.optional(),
+    [`${prefix}_GRPC_HOST`]: host.optional(),
+    [`${prefix}_GRPC_PORT`]: port.optional(),
+  };
+}
+
+function grpcTarget(): Joi.StringSchema {
+  return Joi.string()
+    .trim()
+    .custom((value: string, helpers) => {
+      const match =
+        /^(\[[0-9a-fA-F:]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?):([0-9]{1,5})$/.exec(
+          value,
+        );
+      const parsedPort = match ? Number(match[2]) : 0;
+
+      if (!match || parsedPort < 1 || parsedPort > 65_535) {
+        return helpers.error("any.custom", {
+          message: "must be a host:port gRPC target without a URL scheme",
+        });
+      }
+
+      return value;
+    });
+}
+
+export function grpcTargetEnvSchema(
+  ...envNames: string[]
+): Record<string, Joi.Schema> {
+  return Object.fromEntries(
+    envNames.map((envName) => [envName, grpcTarget().optional()]),
+  );
+}
+
+export interface ServiceBindOptions {
+  servicePrefix: string;
+  defaultHttpPort: number;
+  defaultGrpcPort: number;
+  defaultGrpcHost?: string;
+}
+
+export interface ServiceBind {
+  httpPort: number;
+  grpcHost: string;
+  grpcPort: number;
+  grpcUrl: string;
+}
+
+type Environment = Readonly<Record<string, string | number | null | undefined>>;
+
+function selectedNumber(
+  env: Environment,
+  names: readonly string[],
+  fallback: number,
+): number {
+  for (const name of names) {
+    const value = env[name];
+    if (value !== undefined && value !== null && value !== "") {
+      return Number(value);
+    }
+  }
+  return fallback;
+}
+
+export function resolveServiceBind(
+  env: Environment,
+  options: ServiceBindOptions,
+): ServiceBind {
+  const prefix = options.servicePrefix.trim().toUpperCase();
+  const httpPort = selectedNumber(
+    env,
+    [`${prefix}_HTTP_PORT`, "PORT"],
+    options.defaultHttpPort,
+  );
+  const grpcPort = selectedNumber(
+    env,
+    [`${prefix}_GRPC_PORT`, "GRPC_PORT"],
+    options.defaultGrpcPort,
+  );
+  const grpcHost = String(
+    env[`${prefix}_GRPC_HOST`] ??
+      env.GRPC_HOST ??
+      options.defaultGrpcHost ??
+      "0.0.0.0",
+  );
+  const printableGrpcHost =
+    grpcHost.includes(":") && !grpcHost.startsWith("[")
+      ? `[${grpcHost}]`
+      : grpcHost;
+
+  return {
+    httpPort,
+    grpcHost,
+    grpcPort,
+    grpcUrl: `${printableGrpcHost}:${grpcPort}`,
+  };
+}

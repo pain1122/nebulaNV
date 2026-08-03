@@ -1,62 +1,78 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule, BLOG_PROTO } from "./app.module";
-import { ValidationPipe } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import helmet from "helmet";
+import { Logger } from "@nestjs/common";
 import compression from "compression";
-import { GrpcTokenAuthGuard, S2SGuard } from "@nebula/grpc-auth";
+import { blogv1 } from "@nebula/protos";
+import {
+  startSecuredGrpc,
+  grpcS2SProtoLoaderOptions,
+  grpcS2SServerChannelOptions,
+} from "@nebula/grpc-auth";
+import {
+  createHttpRequestLoggingMiddleware,
+  createHttpCorsOptionsDelegate,
+  createHttpSecurityHeadersMiddleware,
+  createHttpValidationPipe,
+  logFatalStartup,
+  logServiceReady,
+  resolveServiceBind,
+  serviceLogLevels,
+} from "@packages/config";
 
-function getHttpPort(cfg: ConfigService): number {
-  const p =
-    cfg.get<string>("PORT") || cfg.get<string>("BLOG_HTTP_PORT") || "3004";
-  return Number(p);
-}
-
-function getGrpcBind(cfg: ConfigService): string {
-  const grpcPort = cfg.get<string>("GRPC_PORT");
-  if (grpcPort) return `0.0.0.0:${grpcPort}`;
-  return cfg.get<string>("BLOG_GRPC_URL") || "0.0.0.0:50055";
-}
+const SERVICE_NAME = "blog-service";
+const logger = new Logger(SERVICE_NAME);
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false });
-  const cfg = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule, {
+    cors: false,
+    logger: serviceLogLevels(),
+  });
+  app.enableShutdownHooks();
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
+  app.use(
+    createHttpRequestLoggingMiddleware(logger, {
+      serviceName: SERVICE_NAME,
+    }),
+  );
+  app.useGlobalPipes(createHttpValidationPipe());
+  app.use(createHttpSecurityHeadersMiddleware());
+  app.use(compression());
+  app.enableCors(
+    createHttpCorsOptionsDelegate({
+      origins: process.env.HTTP_CORS_ORIGINS,
     }),
   );
 
-  app.use(helmet({ crossOriginResourcePolicy: false }));
-  app.use(compression());
-
-  app.enableCors({
-    origin: [/^https?:\/\/localhost(:\d+)?$/],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-gateway-sign"],
-    maxAge: 600,
+  const { httpPort, grpcUrl } = resolveServiceBind(process.env, {
+    servicePrefix: "BLOG",
+    defaultHttpPort: 3004,
+    defaultGrpcPort: 50055,
   });
-
-  const grpcUrl = getGrpcBind(cfg);
-  const micro = app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: { package: "blog", protoPath: BLOG_PROTO, url: grpcUrl },
-  });
-
-  micro.useGlobalGuards(app.get(S2SGuard), app.get(GrpcTokenAuthGuard)); // for future gRPC endpoints
-
-  await app.startAllMicroservices();
-
-  const httpPort = getHttpPort(cfg);
-  await app.listen(httpPort, "0.0.0.0");
-  console.log(
-    `[blog-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
+  const micro = app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: "blog",
+        protoPath: BLOG_PROTO,
+        loader: grpcS2SProtoLoaderOptions(),
+        url: grpcUrl,
+        channelOptions: grpcS2SServerChannelOptions(
+          blogv1.BlogServiceService,
+          blogv1.BlogTaxonomyServiceService,
+        ),
+      },
+    },
+    { deferInitialization: true },
   );
+
+  await startSecuredGrpc(app, micro);
+
+  await app.listen(httpPort, "0.0.0.0");
+  logServiceReady(logger, SERVICE_NAME);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  logFatalStartup(logger, SERVICE_NAME, error);
+  process.exitCode = 1;
+});

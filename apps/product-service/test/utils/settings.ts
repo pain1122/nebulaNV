@@ -24,7 +24,7 @@ export async function getDefaultProductCategoryGrpc(): Promise<string> {
       key: "default_product_category",
       environment: env,
     },
-    undefined, // @Public, no mdS2S / auth metadata needed
+    mdS2S(),
   );
 
   // Extra visibility while things are flaky

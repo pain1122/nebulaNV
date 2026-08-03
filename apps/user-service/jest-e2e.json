@@ -1,20 +1,22 @@
 {
-    "rootDir": ".",
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": ["<rootDir>/test"],
-    "testMatch": ["<rootDir>/test/user.grpc.e2e.spec.ts"],
-    "moduleFileExtensions": ["ts", "js", "json"],
-    "transform": {
-      "^.+\\.(t|j)s$": [
-        "ts-jest",
-        { "tsconfig": "tsconfig.json" }
-      ]
-    },
-    "setupFiles": ["dotenv/config"],
-    "transformIgnorePatterns": [
-      "<rootDir>/../../packages/(grpc-auth|protos)/dist/.*",
-      "<rootDir>/prisma/generated/.*"
+  "rootDir": ".",
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>/test"],
+  "testMatch": [
+    "<rootDir>/test/http/user.http.e2e.spec.ts",
+    "<rootDir>/test/grpc/user.e2e.spec.ts"
+  ],
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "transform": {
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "tsconfig": "tsconfig.json"
+      }
     ]
-  }
-  
+  },
+  "globalSetup": "<rootDir>/test/setup/wait-for-services.ts",
+  "setupFiles": ["dotenv/config", "<rootDir>/test/jest.env.ts"],
+  "clearMocks": true
+}

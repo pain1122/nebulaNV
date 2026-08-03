@@ -2,7 +2,13 @@
 import type { CallOptions, Metadata } from "@grpc/grpc-js";
 import type { ClientGrpc } from "@nestjs/microservices";
 import type { Observable } from "rxjs";
-import { buildS2SMetadata } from "@nebula/grpc-auth";
+import {
+  TAXONOMY_SERVICE_TARGET,
+  buildGrpcS2SMetadata,
+  invokeGrpcUnary,
+  mergeSignedMetadata,
+} from "@nebula/grpc-auth";
+import { taxonomy } from "@nebula/protos";
 
 import type {
   TaxonomyProxy,
@@ -11,6 +17,7 @@ import type {
   CreateTaxonomyReq,
   UpdateTaxonomyReq,
   DeleteTaxonomyReq,
+  EnsureSystemTaxonomyReq,
   ListTaxonomiesReq,
   TaxonomyRes,
   TaxonomyListRes,
@@ -27,6 +34,12 @@ type Raw = {
 
   GetBySlug(
     req: GetBySlugReq,
+    meta?: Metadata,
+    opts?: CallOptions,
+  ): Observable<TaxonomyRes>;
+
+  EnsureSystemTaxonomy(
+    req: EnsureSystemTaxonomyReq,
     meta?: Metadata,
     opts?: CallOptions,
   ): Observable<TaxonomyRes>;
@@ -58,29 +71,116 @@ type Raw = {
 
 export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
   const raw = client.getService<Raw>("TaxonomyService");
-  const defaultMeta = () =>
-    buildS2SMetadata({ serviceName: process.env.SVC_NAME });
 
   return {
     GetTaxonomy: (req, m, opts) =>
-      raw.GetTaxonomy(req, m ?? defaultMeta(), opts),
+      invokeGrpcUnary(
+        raw.GetTaxonomy.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.getTaxonomy,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
 
-    GetBySlug: (req, m, opts) => raw.GetBySlug(req, m ?? defaultMeta(), opts),
+    GetBySlug: (req, m, opts) =>
+      invokeGrpcUnary(
+        raw.GetBySlug.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.getBySlug,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
 
-    CreateTaxonomy: (req, m, opts) =>
-      // Wrap flat input into { data: ... } as required by CreateTaxonomyRequest
-      raw.CreateTaxonomy({ data: req }, m ?? defaultMeta(), opts),
+    EnsureSystemTaxonomy: (req, m, opts) =>
+      invokeGrpcUnary(
+        raw.EnsureSystemTaxonomy.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.ensureSystemTaxonomy,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
+
+    CreateTaxonomy: (req, m, opts) => {
+      const request = { data: req };
+      return invokeGrpcUnary(
+        raw.CreateTaxonomy.bind(raw),
+        request,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.createTaxonomy,
+            request,
+          }),
+        ),
+        opts,
+      );
+    },
 
     UpdateTaxonomy: (req, m, opts) => {
       const { id, ...patch } = req;
-      // Map flat shape into { id, patch } as required by UpdateTaxonomyRequest
-      return raw.UpdateTaxonomy({ id, patch }, m ?? defaultMeta(), opts);
+      const request = { id, patch };
+      return invokeGrpcUnary(
+        raw.UpdateTaxonomy.bind(raw),
+        request,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.updateTaxonomy,
+            request,
+          }),
+        ),
+        opts,
+      );
     },
 
     DeleteTaxonomy: (req, m, opts) =>
-      raw.DeleteTaxonomy(req, m ?? defaultMeta(), opts),
+      invokeGrpcUnary(
+        raw.DeleteTaxonomy.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.deleteTaxonomy,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
 
     ListTaxonomies: (req, m, opts) =>
-      raw.ListTaxonomies(req, m ?? defaultMeta(), opts),
+      invokeGrpcUnary(
+        raw.ListTaxonomies.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: TAXONOMY_SERVICE_TARGET,
+            definition: taxonomy.TaxonomyServiceService.listTaxonomies,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
   };
 }

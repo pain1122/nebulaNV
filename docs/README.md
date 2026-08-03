@@ -11,16 +11,21 @@ For most backend tasks, read in this order:
 1. [Current Focus](current-focus.md)
 2. [System Relationships](architecture/system-relationships.md)
 3. [Contracts And Boundaries](architecture/contracts-and-boundaries.md)
-4. The relevant service note under [Service Notes](#service-notes)
-5. The relevant package note under [Package Notes](#package-notes) if touching shared packages
-6. [Testing And Health](architecture/testing-and-health.md) if changing behavior or verification
-7. [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md) if running services or Docker
-8. [Docker Configs](docker-configs.md) if changing Compose, images, env, Dockerfiles, or release packaging
+4. [Actor Context Contract](architecture/actor-context-contract.md) for identity or authorization work
+5. The relevant service note under [Service Notes](#service-notes)
+6. The relevant package note under [Package Notes](#package-notes) if touching shared packages
+7. [Testing And Health](architecture/testing-and-health.md) if changing behavior or verification
+8. [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md) if running services or Docker
+9. [Docker Configs](docker-configs.md) if changing Compose, images, env, Dockerfiles, or release packaging
 
 ## Architecture Notes
 
 - [System Relationships](architecture/system-relationships.md): ownership, valid service connections, forbidden paths.
 - [Contracts And Boundaries](architecture/contracts-and-boundaries.md): DTO/proto/service/Prisma/mapper rules, naming, identity, cross-service clients.
+- [API And Proto Versioning](architecture/api-and-proto-versioning.md): additive-change rules, breaking-change triggers, deprecation, and compatibility verification.
+- [S2S Security Contract](architecture/s2s-security-contract.md): implemented v2 envelope, pairwise keys, replay defense, rotation, and canonical service bootstrap.
+- [Actor Context Contract](architecture/actor-context-contract.md): implemented service/user identity provenance, forbidden raw-header fallbacks, and actor/target separation.
+- [Tenant, Package, Channel, And Kubernetes Platform](architecture/tenant-package-channel-platform.md): target tenant hierarchy, parent contracts, site/app ownership, modular Kubernetes features, licensing, isolation, and pre-admin prerequisites.
 - [Testing And Health](architecture/testing-and-health.md): build/lint/test layers, health model, readiness gaps, verification checklist.
 - [Local Dev And Docker Boot](architecture/local-dev-and-docker-boot.md): ports, Docker/runtime URLs, DB migration patterns, WSL/Docker clock drift.
 - [Docker Configs](docker-configs.md): Compose files, backend Dockerfile, release image flow, env boundaries, Docker guardrails.

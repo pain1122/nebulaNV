@@ -1,5 +1,6 @@
 import { Inject, Injectable, BadRequestException } from "@nestjs/common";
 import { ClientGrpc } from "@nestjs/microservices";
+import type { Metadata } from "@grpc/grpc-js";
 import { firstValueFrom } from "rxjs";
 
 import { TAXONOMY_SERVICE } from "../taxonomy-client.module";
@@ -8,6 +9,7 @@ import {
   type TaxonomyProxy,
   type UpdateTaxonomyReq,
 } from "@nebula/clients";
+import { wrapGrpc } from "@nebula/grpc-auth";
 import { CreateTaxonomyDto, UpdateTaxonomyDto } from "./dto/taxonomy.dto";
 
 export type ListTaxonomyQuery = {
@@ -39,15 +41,17 @@ export class TaxonomyService {
     const search = q?.q ?? "";
     const parentId = q?.parentId ?? undefined;
 
-    const res = await firstValueFrom(
-      this.taxonomy().ListTaxonomies({
-        scope: this.scope,
-        kind,
-        page,
-        limit,
-        q: search,
-        parentId,
-      }),
+    const res = await wrapGrpc(
+      firstValueFrom(
+        this.taxonomy().ListTaxonomies({
+          scope: this.scope,
+          kind,
+          page,
+          limit,
+          q: search,
+          parentId,
+        }),
+      ),
     );
 
     return {
@@ -62,7 +66,9 @@ export class TaxonomyService {
   // Get (by ID only)
   // ---------------------------
   async get(id: string) {
-    const res = await firstValueFrom(this.taxonomy().GetTaxonomy({ id }));
+    const res = await wrapGrpc(
+      firstValueFrom(this.taxonomy().GetTaxonomy({ id })),
+    );
 
     if (!res.data || res.data.scope !== this.scope) {
       throw new BadRequestException("taxonomy_not_in_product_scope");
@@ -74,22 +80,27 @@ export class TaxonomyService {
   // ---------------------------
   // Create (needs kind)
   // ---------------------------
-  async create(kind: string, dto: CreateTaxonomyDto) {
-    const res = await firstValueFrom(
-      this.taxonomy().CreateTaxonomy({
-        scope: this.scope,
-        kind,
-        slug: dto.slug,
-        title: dto.title,
-        description: dto.description ?? "",
-        isTree: !!dto.parentId,
-        parentId: dto.parentId ?? "",
-        path: dto.slug,
-        isHidden: dto.isHidden ?? false,
-        isSystem: false,
-        sortOrder: dto.sortOrder ?? 0,
-        meta: {},
-      }),
+  async create(kind: string, dto: CreateTaxonomyDto, metadata?: Metadata) {
+    const res = await wrapGrpc(
+      firstValueFrom(
+        this.taxonomy().CreateTaxonomy(
+          {
+            scope: this.scope,
+            kind,
+            slug: dto.slug,
+            title: dto.title,
+            description: dto.description ?? "",
+            isTree: !!dto.parentId,
+            parentId: dto.parentId ?? "",
+            path: dto.slug,
+            isHidden: dto.isHidden ?? false,
+            isSystem: false,
+            sortOrder: dto.sortOrder ?? 0,
+            meta: {},
+          },
+          metadata,
+        ),
+      ),
     );
 
     if (!res.data || res.data.scope !== this.scope || res.data.kind !== kind) {
@@ -103,9 +114,11 @@ export class TaxonomyService {
   // ---------------------------
   // Update (by ID only)
   // ---------------------------
-  async update(id: string, dto: UpdateTaxonomyDto) {
+  async update(id: string, dto: UpdateTaxonomyDto, metadata?: Metadata) {
     // First make sure this taxonomy belongs to product scope
-    const existing = await firstValueFrom(this.taxonomy().GetTaxonomy({ id }));
+    const existing = await wrapGrpc(
+      firstValueFrom(this.taxonomy().GetTaxonomy({ id }, metadata)),
+    );
     if (!existing.data || existing.data.scope !== this.scope) {
       throw new BadRequestException("taxonomy_not_in_product_scope");
     }
@@ -123,11 +136,16 @@ export class TaxonomyService {
       patch.parentId = dto.parentId === null ? null : dto.parentId;
     }
 
-    const res = await firstValueFrom(
-      this.taxonomy().UpdateTaxonomy({
-        id,
-        ...patch,
-      }),
+    const res = await wrapGrpc(
+      firstValueFrom(
+        this.taxonomy().UpdateTaxonomy(
+          {
+            id,
+            ...patch,
+          },
+          metadata,
+        ),
+      ),
     );
 
     return { data: res.data };
@@ -136,13 +154,17 @@ export class TaxonomyService {
   // ---------------------------
   // Delete (by ID only)
   // ---------------------------
-  async remove(id: string) {
-    const existing = await firstValueFrom(this.taxonomy().GetTaxonomy({ id }));
+  async remove(id: string, metadata?: Metadata) {
+    const existing = await wrapGrpc(
+      firstValueFrom(this.taxonomy().GetTaxonomy({ id }, metadata)),
+    );
     if (!existing.data || existing.data.scope !== this.scope) {
       throw new BadRequestException("taxonomy_not_in_product_scope");
     }
 
-    await firstValueFrom(this.taxonomy().DeleteTaxonomy({ id }));
+    await wrapGrpc(
+      firstValueFrom(this.taxonomy().DeleteTaxonomy({ id }, metadata)),
+    );
     return { data: true };
   }
 }

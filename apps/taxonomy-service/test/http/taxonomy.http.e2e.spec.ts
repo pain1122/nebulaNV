@@ -111,6 +111,16 @@ describe("taxonomy-service HTTP (admin writes, public reads)", () => {
     expect(t.depth).toBe(1);
   });
 
+  it("GET /taxonomies/:id returns 404 for a missing taxonomy", async () => {
+    const res = await fetch(
+      `${TAXONOMY_HTTP}/taxonomies/00000000-0000-0000-0000-000000000000`,
+    );
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(404);
+    expect(body.message).toBe("taxonomy_not_found");
+  });
+
   it("DELETE /taxonomies/:id fails if taxonomy has children", async () => {
     await expect(
       httpJson<any>(

@@ -7,5 +7,6 @@ import { BlogGrpcController } from "./grpc/blog-grpc.controller";
 @Module({
   controllers: [BlogController, BlogGrpcController],
   providers: [BlogService, PrismaService],
+  exports: [PrismaService],
 })
 export class BlogModule {}

@@ -1,60 +1,78 @@
 // src/main.ts
 import { NestFactory } from "@nestjs/core";
 import { AppModule, TAXONOMY_PROTO } from "./app.module";
-import { ValidationPipe } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import helmet from "helmet";
+import { Logger } from "@nestjs/common";
+import {
+  createHttpRequestLoggingMiddleware,
+  createHttpCorsOptionsDelegate,
+  createHttpSecurityHeadersMiddleware,
+  createHttpValidationPipe,
+  logFatalStartup,
+  logServiceReady,
+  resolveServiceBind,
+  serviceLogLevels,
+} from "@packages/config";
 import compression from "compression";
+import { taxonomy } from "@nebula/protos";
+import {
+  startSecuredGrpc,
+  grpcS2SProtoLoaderOptions,
+  grpcS2SServerChannelOptions,
+} from "@nebula/grpc-auth";
 
-function getHttpPort(cfg: ConfigService): number {
-  const p =
-    cfg.get<string>("PORT") || cfg.get<string>("TAXONOMY_HTTP_PORT") || "3006";
-  return Number(p);
-}
-
-function getGrpcBind(cfg: ConfigService): string {
-  const grpcPort =
-    cfg.get<string>("GRPC_PORT") ||
-    cfg.get<string>("TAXONOMY_GRPC_PORT") ||
-    "50057";
-  const host = cfg.get<string>("TAXONOMY_GRPC_HOST") || "0.0.0.0";
-  return `${host}:${grpcPort}`;
-}
+const SERVICE_NAME = "taxonomy-service";
+const logger = new Logger(SERVICE_NAME);
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const cfg = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule, {
+    logger: serviceLogLevels(),
+  });
+  app.enableShutdownHooks();
 
-  app.use(helmet());
+  app.use(
+    createHttpRequestLoggingMiddleware(logger, {
+      serviceName: SERVICE_NAME,
+    }),
+  );
+  app.useGlobalPipes(createHttpValidationPipe());
+  app.use(createHttpSecurityHeadersMiddleware());
   app.use(compression());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
+  app.enableCors(
+    createHttpCorsOptionsDelegate({
+      origins: process.env.HTTP_CORS_ORIGINS,
     }),
   );
 
-  const grpcUrl = getGrpcBind(cfg);
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package: "taxonomy",
-      protoPath: TAXONOMY_PROTO,
-      url: grpcUrl,
-    },
+  const { httpPort, grpcUrl } = resolveServiceBind(process.env, {
+    servicePrefix: "TAXONOMY",
+    defaultHttpPort: 3006,
+    defaultGrpcPort: 50057,
   });
 
-  await app.startAllMicroservices();
+  const micro = app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: "taxonomy",
+        protoPath: TAXONOMY_PROTO,
+        loader: grpcS2SProtoLoaderOptions(),
+        url: grpcUrl,
+        channelOptions: grpcS2SServerChannelOptions(
+          taxonomy.TaxonomyServiceService,
+        ),
+      },
+    },
+    { deferInitialization: true },
+  );
+  await startSecuredGrpc(app, micro);
 
-  const httpPort = getHttpPort(cfg);
   await app.listen(httpPort, "0.0.0.0");
 
-  console.log(
-    `[taxonomy-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
-  );
+  logServiceReady(logger, SERVICE_NAME);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  logFatalStartup(logger, SERVICE_NAME, error);
+  process.exitCode = 1;
+});

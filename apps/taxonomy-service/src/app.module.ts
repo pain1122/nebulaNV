@@ -9,8 +9,9 @@ import { envSchema } from "./config/env.validation";
 import { HealthController } from "./health.controller";
 import { AuthClientModule } from "./auth-client.module";
 import { SettingsClientModule } from "./settings-client.module";
-import { S2SGuard, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { GRPC_SECURITY_PROVIDERS, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
 import { TaxonomyModule } from "./taxonomy/taxonomy.module";
+import { createServiceLifecycleProvider } from "@packages/config";
 
 export const TAXONOMY_PROTO = require.resolve("@nebula/protos/taxonomy.proto");
 
@@ -39,10 +40,10 @@ export const TAXONOMY_PROTO = require.resolve("@nebula/protos/taxonomy.proto");
   ],
   controllers: [HealthController],
   providers: [
-    // global guards: auth first, then throttler
-    { provide: APP_GUARD, useClass: S2SGuard },
-    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+    createServiceLifecycleProvider("taxonomy-service"),
+    ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },
   ],
 })
 export class AppModule {}

@@ -1,5 +1,6 @@
 // packages/clients/src/settings.types.ts
 import type { Metadata, CallOptions } from "@grpc/grpc-js";
+import type { settings } from "@nebula/protos";
 import type { Observable } from "rxjs";
 
 export type GetStringReq = {
@@ -34,6 +35,9 @@ export type DeleteStringRes = {
   deleted: boolean;
 };
 
+export type EnsureBootstrapStringReq = Omit<settings.SetStringReq, "$type">;
+export type EnsureBootstrapStringRes = settings.SetStringRes;
+
 export interface SettingsProxy {
   GetString(
     req: GetStringReq,
@@ -52,4 +56,10 @@ export interface SettingsProxy {
     meta?: Metadata,
     opts?: CallOptions,
   ): Observable<DeleteStringRes>;
+
+  EnsureBootstrapString(
+    req: EnsureBootstrapStringReq,
+    meta?: Metadata,
+    opts?: CallOptions,
+  ): Observable<EnsureBootstrapStringRes>;
 }

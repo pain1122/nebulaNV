@@ -17,9 +17,8 @@ process.env.SEED_USER_PASS ||= "User123!";
 process.env.PUBLIC_MODE ||= "OPTIONAL_AUTH";
 
 // S2S / Gateway signing
-process.env.GATEWAY_HEADER ||= "x-gateway-sign";
-process.env.SVC_NAME ||= "blog-service";
+process.env.S2S_SIGNATURE_HEADER ||= "x-s2s-signature";
+process.env.SVC_NAME ||= "gateway";
 
 // IMPORTANT: tests sign gRPC metadata directly (gateway-style)
-process.env.S2S_SECRET ||= ":n}T>QYq}G*m0_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
-process.env.S2S_SECRET_OLD ||= ":n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG";
+process.env.S2S_TEST_GATEWAY_KEY ||= "dev-only-gateway-to-blog-s2s-key-00001";

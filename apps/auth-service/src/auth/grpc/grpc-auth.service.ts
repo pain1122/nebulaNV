@@ -3,10 +3,8 @@ import { ClientGrpc } from '@nestjs/microservices';
 import { Metadata } from '@grpc/grpc-js';
 import { firstValueFrom, timeout } from 'rxjs';
 import { userv1 as user } from '@nebula/protos';
-import { authAndS2S } from '@nebula/grpc-auth';
-import { isAuthRole } from '../auth.types';
-import { errorCode, errorMessage } from '../error.utils';
-import * as jwt from 'jsonwebtoken'; // 👈 add
+import { USER_SERVICE_TARGET, authAndS2S } from '@nebula/grpc-auth';
+import { safeErrorName } from '@packages/config';
 
 // ----- Types -----
 type GetUserRequest = user.GetUserRequest;
@@ -14,7 +12,6 @@ type FindUserRequest = user.FindUserRequest;
 type UpdateProfileRequest = user.UpdateProfileRequest;
 type CreateUserRequest = user.CreateUserRequest;
 type FindUserWithHashRequest = user.FindUserWithHashRequest;
-type SetRefreshTokenRequest = user.SetRefreshTokenRequest;
 
 type UserResponse = user.UserResponse;
 type FindUserWithHashResponse = user.FindUserWithHashResponse;
@@ -41,10 +38,6 @@ interface UserServiceProxy {
     req: FindUserRequest,
     md?: Metadata,
   ): import('rxjs').Observable<UserResponse>;
-  setRefreshToken(
-    req: SetRefreshTokenRequest,
-    md?: Metadata,
-  ): import('rxjs').Observable<UserResponse>;
   getUserWithHash(
     req: user.GetUserWithHashRequest,
     md?: Metadata,
@@ -67,7 +60,6 @@ export class GrpcAuthService implements OnModuleInit {
         'updateProfile',
         'getUser',
         'findUser',
-        'setRefreshToken',
         'getUserWithHash',
       ].join(', ')}`,
     );
@@ -79,45 +71,32 @@ export class GrpcAuthService implements OnModuleInit {
     label: string,
     ms = 12000,
   ): Promise<T> {
-    console.time(label);
+    const startedAt = performance.now();
     try {
-      return await firstValueFrom(obs.pipe(timeout(ms)));
+      const result = await firstValueFrom(obs.pipe(timeout(ms)));
+      this.logger.debug(
+        `grpc_client_completed operation=${label} durationMs=${Math.max(0, Math.round(performance.now() - startedAt))}`,
+      );
+      return result;
     } catch (err: unknown) {
       this.logger.error(
-        `[${label}] gRPC error ${errorCode(err)}: ${errorMessage(err)}`,
+        `grpc_client_failed operation=${label} durationMs=${Math.max(0, Math.round(performance.now() - startedAt))} cause=${safeErrorName(err)}`,
       );
       throw err;
-    } finally {
-      console.timeEnd(label);
     }
-  }
-
-  /** 👇 Attach role from access token so user-service can authorize admin actions */
-  private withRole(md: Metadata, accessToken?: string): Metadata {
-    if (!accessToken) return md;
-    try {
-      const payload: unknown = jwt.decode(accessToken);
-      if (typeof payload === 'object' && payload !== null) {
-        const role = (payload as Record<string, unknown>).role;
-        if (isAuthRole(role)) {
-          md.set('x-user-role', role);
-          md.set('x-role', role); // alias used in some places
-        }
-      }
-    } catch {
-      // ignore decode errors; still return md
-    }
-    return md;
   }
 
   // ---------------- RPCs ----------------
 
-  /** Registration path → internal-only & @RequireUserId; use a sentinel user id */
+  /** Registration path: verified auth-service caller plus signed request body. */
   async createUser(req: CreateUserRequest): Promise<UserResponse> {
     this.logger.debug('gRPC → createUser');
     const msg = user.CreateUserRequest.create(req);
-    // satisfy @RequireUserId without a JWT during signup
-    const md = authAndS2S(undefined, { userId: 'self-register' });
+    const md = authAndS2S(undefined, {
+      target: USER_SERVICE_TARGET,
+      definition: user.UserServiceService.createUser,
+      request: msg,
+    });
     return this.await$(this.svc.createUser(msg, md), 'grpc.client::createUser');
   }
 
@@ -127,74 +106,74 @@ export class GrpcAuthService implements OnModuleInit {
   ): Promise<FindUserWithHashResponse> {
     this.logger.debug('gRPC → findUserWithHash');
     const msg = user.FindUserWithHashRequest.create(req);
-    const md = authAndS2S(); // S2S signature only
+    const md = authAndS2S(undefined, {
+      target: USER_SERVICE_TARGET,
+      definition: user.UserServiceService.findUserWithHash,
+      request: msg,
+    });
     return this.await$(
       this.svc.findUserWithHash(msg, md),
       'grpc.client::findUserWithHash',
     );
   }
 
-  /** Authenticated profile update → JWT + S2S + x-user-id (owner/admin id) */
+  /** Authenticated profile update: JWT actor plus verified S2S caller. */
   async updateProfile(
     req: UpdateProfileRequest,
     accessToken: string,
   ): Promise<UserResponse> {
     this.logger.debug('gRPC → updateProfile');
     const msg = user.UpdateProfileRequest.create(req);
-    const base = authAndS2S(accessToken, { userId: req.id });
-    const md = this.withRole(base, accessToken); // 👈 add role
+    const md = authAndS2S(accessToken, {
+      target: USER_SERVICE_TARGET,
+      definition: user.UserServiceService.updateProfile,
+      request: msg,
+    });
     return this.await$(
       this.svc.updateProfile(msg, md),
       'grpc.client::updateProfile',
     );
   }
 
-  /** Read profile → JWT + S2S + x-user-id (initiator: owner/admin) */
-  async getUser(
-    id: string,
-    accessToken: string,
-    initiatorId?: string,
-  ): Promise<UserResponse> {
+  /** Read profile: JWT actor plus verified S2S caller. */
+  async getUser(id: string, accessToken: string): Promise<UserResponse> {
     this.logger.debug('gRPC → getUser');
     const msg: GetUserRequest = user.GetUserRequest.create({ id });
-    const base = authAndS2S(accessToken, { userId: initiatorId });
-    const md = this.withRole(base, accessToken); // 👈 add role
-    this.logger.debug(`gRPC → getUser for ${id}, initiatorId=${initiatorId}`);
+    const md = authAndS2S(accessToken, {
+      target: USER_SERVICE_TARGET,
+      definition: user.UserServiceService.getUser,
+      request: msg,
+    });
+    this.logger.debug(`gRPC → getUser for ${id}`);
     return this.await$(this.svc.getUser(msg, md), 'grpc.client::getUser');
   }
 
-  /** Admin lookups → JWT + S2S + x-user-id (admin id) */
+  /** Admin lookup: JWT role is validated by user-service. */
   async findUser(
     obj: FindUserRequest,
     accessToken: string,
-    adminId: string,
   ): Promise<UserResponse> {
     this.logger.debug('gRPC → findUser');
     const msg = user.FindUserRequest.create(obj);
-    const base = authAndS2S(accessToken, { userId: adminId });
-    const md = this.withRole(base, accessToken); // 👈 add role
+    const md = authAndS2S(accessToken, {
+      target: USER_SERVICE_TARGET,
+      definition: user.UserServiceService.findUser,
+      request: msg,
+    });
     return this.await$(this.svc.findUser(msg, md), 'grpc.client::findUser');
   }
 
-  /** Token rotation → internal-only + @RequireUserId */
-  async setRefreshToken(req: SetRefreshTokenRequest): Promise<UserResponse> {
-    this.logger.debug('gRPC → setRefreshToken');
-    const msg = user.SetRefreshTokenRequest.create(req);
-    const md = authAndS2S(undefined, { userId: req.userId });
-    return this.await$(
-      this.svc.setRefreshToken(msg, md),
-      'grpc.client::setRefreshToken',
-    );
-  }
-
-  /** Refresh flow → internal-only + @RequireUserId (subject id) */
+  /** Refresh flow: auth-service-only method with a signed request body. */
   async getUserWithHash(
     req: user.GetUserWithHashRequest,
-    initiatorId?: string,
   ): Promise<user.GetUserWithHashResponse> {
     this.logger.debug('gRPC → getUserWithHash');
     const msg = user.GetUserWithHashRequest.create(req);
-    const md = authAndS2S(undefined, { userId: initiatorId ?? req.id });
+    const md = authAndS2S(undefined, {
+      target: USER_SERVICE_TARGET,
+      definition: user.UserServiceService.getUserWithHash,
+      request: msg,
+    });
     return this.await$(
       this.svc.getUserWithHash(msg, md),
       'grpc.client::getUserWithHash',

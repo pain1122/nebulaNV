@@ -1,208 +1,155 @@
-﻿
 # Config Package
 
-## Purpose
+`@packages/config` provides shared HTTP policy, validation, health, structured
+logging, lifecycle logging, and small environment-schema primitives. Each
+service-local Joi schema remains the runtime source of truth.
 
-`@packages/config` is intended to be the shared configuration package for NebulaNV services.
+The unused monolithic root schema and its Nest wrapper were removed during
+Standard Service Bootstrap Batch 6. No service imported them, and retaining
+them would have created a second, incomplete configuration path.
 
-It currently provides:
+## Environment Primitives
 
-- A reusable NestJS `ConfigModule` wrapper.
-- A shared Joi root environment schema.
-- A small public export surface through `src/index.ts`.
+The shared environment helpers cover fields that have the same meaning in
+every applicable service:
 
-Important: this package is not yet the active config standard across services. Current services mostly import `@nestjs/config` directly and use service-local `src/config/env.validation.ts` files.
+- `runtimeEnvSchema` validates `NODE_ENV`;
+- `serviceBindEnvSchema()` validates generic and service-specific HTTP/gRPC
+  listener host and port fields;
+- `resolveServiceBind()` applies service-specific, then generic, then default
+  listener precedence;
+- `grpcTargetEnvSchema()` validates downstream `host:port` client targets;
+- `bcryptEnvSchema` bounds bcrypt work factors used by auth and user;
+- `jwtAccessVerificationEnvSchema` validates an optional local access-token
+  verification secret.
 
-## Location
+HTTP CORS settings remain in `httpPolicyEnvSchema`. S2S identity, trust-map,
+replay, and Redis settings remain in `s2sEnvSchema()` from
+`@nebula/grpc-auth`.
 
-Package root:
+Database, media storage, token signing, and other service-owned requirements
+stay in the owning service schema. In particular, auth-service requires its
+separate access and refresh signing secrets and token durations. Other services
+do not require refresh-token secrets.
 
-`packages/config`
+## Listener And Target Rules
 
-Important files:
+HTTP listener precedence is:
 
-- `packages/config/src/index.ts`
-- `packages/config/src/config.module.ts`
-- `packages/config/src/env.validation.ts`
-- `packages/config/package.json`
-- `packages/config/tsconfig.json`
-- `packages/config/eslint.config.mjs`
+1. `<SERVICE>_HTTP_PORT`
+2. `PORT`
+3. the service default
 
-## Package Name
+gRPC listener precedence is:
 
-The package is currently named:
+1. `<SERVICE>_GRPC_HOST` / `<SERVICE>_GRPC_PORT`
+2. `GRPC_HOST` / `GRPC_PORT`
+3. `0.0.0.0` and the service default port
 
-`@packages/config`
+`*_GRPC_URL` fields are client targets only and are never reused as server bind
+addresses. Targets use `host:port` syntax without an HTTP URL scheme.
 
-It is not named:
+## HTTP Validation Contract
 
-`@nebula/config`
+`createHttpValidationPipe()` is the shared HTTP boundary. It enables DTO
+transformation, removes no declared fields, and rejects unknown fields through
+`whitelist: true` plus `forbidNonWhitelisted: true`.
 
-This matters because services that want to use this package must import from `@packages/config`, unless the package is renamed later.
+Implicit conversion is disabled. A query, path, or body value changes type only
+when its DTO declares an explicit transform such as `@Type(() => Number)`.
+Missing required fields, unknown fields, and wrong types therefore fail instead
+of being silently accepted or guessed.
 
-## Public Exports
+This HTTP policy must not be copied into gRPC controllers. gRPC uses a separate
+factory so its error type and coercion rules remain transport-correct.
 
-`packages/config/src/index.ts` exports:
+## HTTP CORS And Security Headers
 
-- `ConfigModule`
-- `rootEnvSchema`
+`createHttpCorsOptionsDelegate()` classifies each request as a browser API,
+internal health route, or public-render route. Browser APIs allow only exact
+HTTP(S) origins from `HTTP_CORS_ORIGINS`; wildcards, credentials, paths, query
+strings, and fragments are rejected. CORS credentials are disabled, and the
+browser header allowlist contains only `Authorization` and `Content-Type`.
 
-## Current Status
+Health and public-render routes do not inherit browser API CORS. Media's
+public-render path keeps its narrow resource-header exception, but future CDN
+or render CORS remains a separate decision.
 
-`@packages/config` builds, but it is not ready to be used inter-service-wide yet.
+`createHttpSecurityHeadersMiddleware()` supplies the shared Helmet baseline.
+HSTS is active in production and disabled outside production so local HTTP
+development is not forced into HTTPS. CORS and security headers reduce browser
+exposure; neither mechanism authenticates a caller.
 
-The current blockers are practical rather than conceptual:
+## Environment File Loading
 
-- Services do not currently import `@packages/config` in source code.
-- Auth-service and user-service do not currently declare `@packages/config` as a dependency.
-- The package entrypoint is not aligned with the emitted build output.
-- The config package build currently emits files from `packages/clients`, which means its TypeScript project is not cleanly isolated.
-- Importing the built package can trigger Nest config validation immediately because the exported module is decorated at module load time.
-- The shared gRPC URL schema uses hostname validation, but project values are host-port strings like `user-service:50051`.
-- The shared schema expects `S2S_SECRET` and JWT secrets, while most service-local schemas currently validate `GATEWAY_SECRET` and database URLs.
+Direct service runs load the service-local `.env` first and the repository root
+`.env` second. A service-local duplicate therefore overrides the root value.
 
-Treat this package as a shared config foundation, not as the current source of truth.
+Local Compose also loads both files, then applies its explicit `environment`
+values. Shared `HTTP_CORS_ORIGINS` configuration belongs only in the root
+`.env` and `.env.example`; service-local files should contain only
+service-owned overrides. Release Compose receives the same shared value through
+`deploy/.env.production`.
 
-## ConfigModule Behavior
+Release Compose injects JWT signing secrets only into auth-service. A
+non-auth service may perform the existing optional local access-signature
+precheck when `JWT_ACCESS_SECRET` is deliberately supplied, but auth-service
+remains the source of truth for token validity and revocation.
 
-`packages/config/src/config.module.ts` wraps NestJS `ConfigModule.forRoot`.
+## Logging Contract
 
-It does the following:
+`createHttpRequestLoggingMiddleware` emits one JSON completion record per HTTP
+request. Its allowlist contains the service, method, route template, status,
+duration, direct socket peer IP, generated request ID, and any actor/caller
+identifiers already verified and attached by guards. It never reads bodies,
+authorization or cookie headers, query values, forwarded-IP headers, or raw
+URLs. An unmatched route is recorded as `unmatched`.
 
-- Loads env files from guessed local/root paths.
-- Sets `isGlobal: true`.
-- Enables variable expansion with `expandVariables: true`.
-- Uses `rootEnvSchema`.
-- Allows service-specific unknown env keys with `allowUnknown: true`.
-- Allows optional `PORT` and `GRPC_PORT`.
+`serviceLogLevels()` fixes production levels to `error`, `warn`, and `log`;
+development/test also enables `debug`. There is intentionally no log-level
+environment override.
 
-The env file guessing checks:
+`createServiceLifecycleProvider`, `logServiceReady`, and `logFatalStartup`
+provide the shared ready, shutdown, and sanitized startup-failure events.
+Fatal events include only a cleaned error type, never its message or stack.
+Logging failures are swallowed because observability must not change request or
+lifecycle behavior.
 
-- Current working directory `.env`
-- Repo root-ish `../../.env`
-- Safety fallback `../../../.env`
+The current IP field is `peerIp`, taken only from the direct socket. Do not
+enable Express `trust proxy` or consume `X-Forwarded-For` until the deployed
+gateway/proxy hops are explicitly known and tested.
 
-This was designed to support local service development and Docker-style runtime env injection.
+## Health Contract
 
-## Shared Root Env Schema
+`StandardHealthController` provides the common public routes:
 
-`packages/config/src/env.validation.ts` defines `rootEnvSchema`.
+- `/health/live` for dependency-free process liveness;
+- `/health/ready` for required dependency readiness;
+- `/health` as the readiness compatibility alias.
 
-Current shared keys include:
+Services supply named probes using their existing module-owned clients. A
+failed probe is sanitized and produces HTTP `503`; probe error messages are
+never returned. The shared helper does not decide which dependencies a service
+requires.
 
-- `NODE_ENV`
-- `PUBLIC_MODE`
-- `S2S_SECRET`
-- `S2S_SECRET_OLD`
-- `GATEWAY_HEADER`
-- `USER_GRPC_URL`
-- `AUTH_GRPC_URL`
-- `PRODUCT_GRPC_URL`
-- `SETTINGS_GRPC_URL`
-- `BLOG_GRPC_URL`
-- `USER_HTTP_PORT`
-- `AUTH_HTTP_PORT`
-- `PRODUCT_HTTP_PORT`
-- `SETTINGS_HTTP_PORT`
-- `BLOG_HTTP_PORT`
-- `JWT_ACCESS_EXPIRATION`
-- `JWT_REFRESH_EXPIRATION`
-- `JWT_ACCESS_SECRET`
-- `JWT_REFRESH_SECRET`
+## Rules
 
-## Current Usage Status
-
-Current source usage check:
-
-- No service source currently imports `@packages/config`.
-- Services still import `ConfigModule` and `ConfigService` from `@nestjs/config`.
-- Services still use local validation schemas from `apps/<service>/src/config/env.validation.ts`.
-
-Services that currently list `@packages/config` as a dependency:
-
-- `apps/blog-service`
-- `apps/order-service`
-- `apps/media-service`
-- `apps/settings-service`
-- `apps/taxonomy-service`
-- `apps/product-service`
-
-This means the package is present as a workspace dependency, but it is not yet the runtime source of truth.
-
-## Current Service-Local Env Validation
-
-Most service-local schemas validate:
-
-- `SVC_NAME`
-- `GATEWAY_SECRET`
-- `DATABASE_URL`
-- `SHADOW_DATABASE_URL`
-
-Auth-service validates:
-
-- `SVC_NAME`
-- `GATEWAY_SECRET`
-
-Media-service has the most detailed local schema and validates:
-
-- `DATABASE_URL`
-- `SHADOW_DATABASE_URL`
-- `MEDIA_STORAGE_DRIVER`
-- `MEDIA_STORAGE_PROVIDER`
-- `MEDIA_S3_ENDPOINT`
-- `MEDIA_S3_INTERNAL_ENDPOINT`
-- `MEDIA_S3_PUBLIC_ENDPOINT`
-- `MEDIA_S3_REGION`
-- `MEDIA_S3_BUCKET`
-- `MEDIA_S3_ACCESS_KEY`
-- `MEDIA_S3_SECRET_KEY`
-- `MEDIA_S3_FORCE_PATH_STYLE`
-- `MEDIA_SIGNED_UPLOAD_TTL_SECONDS`
-- `MEDIA_SIGNED_READ_TTL_SECONDS`
-- `MEDIA_STRICT_READ_TTL_SECONDS`
-- `MEDIA_PUBLIC_FOLDER`
-- `MEDIA_PRIVATE_FOLDER`
-- `MEDIA_SYSTEM_FOLDER`
-
-## Keep In Mind
-
-The clean direction is probably not a single magic config module that every service imports blindly.
-
-A safer pattern is:
-
-- Keep pure shared schema helpers in `@packages/config`.
-- Let each service compose shared keys with service-specific keys.
-- Keep media storage configuration local or expose it as a dedicated helper.
-- Validate gRPC addresses as host-port values, not plain hostnames.
-- Decide whether `GATEWAY_SECRET` and `S2S_SECRET` are separate concepts or aliases before migration.
-- Avoid package-level imports that trigger env validation as a side effect.
-
-This keeps config consistent without making every service depend on every env key.
-
-## Build And Lint
-
-Package scripts:
+- Never restore a shared S2S master secret.
+- Never copy gateway keys into service trust maps.
+- Never put pairwise service secrets in the root/browser/mobile environment.
+- Keep shared `HTTP_CORS_ORIGINS` in the root/deployment environment rather
+  than duplicating it in every service file.
+- Production replay storage is Redis; memory mode is test-only.
+- Release secrets come from `deploy/.env.production`, not tracked service
+  `.env` files.
 
 ```powershell
-pnpm --filter @packages/config build
-pnpm --filter @packages/config lint
+pnpm --filter @packages/config test
 pnpm --filter @packages/config check-types
+pnpm --filter @packages/config build
 ```
 
-Package build uses:
-
-```powershell
-tsc -p tsconfig.json
-```
-
-## Known Watch Points
-
-- `@packages/config` is not currently imported by service source code.
-- Service-local env schemas are still the real validators.
-- Shared schema does not include all active service env keys.
-- Shared schema currently omits newer services like `ORDER_GRPC_URL`, `TAXONOMY_GRPC_URL`, and `MEDIA_GRPC_URL`.
-- Shared schema does not include media S3/Supabase/AWS settings.
-- Shared schema uses `S2S_SECRET`, while service-local schemas still use `GATEWAY_SECRET`.
-- `packages/config/tsconfig.json` includes `../clients`, which is unusual for a config package and should be reviewed before treating this package as cleanly isolated.
-- `package.json` has `"main": "index.js"`, while TypeScript output currently emits under `dist/packages/config/src`.
-- The shared URL validation should not reject valid project values like `127.0.0.1:50051` or `user-service:50051`.
+The package test suite also contains health, HTTP-policy, and logging wiring
+checks for every backend service. Those checks read the canonical
+`nebula.backendServices` inventory from the root `package.json`; they do not
+maintain a second service list.

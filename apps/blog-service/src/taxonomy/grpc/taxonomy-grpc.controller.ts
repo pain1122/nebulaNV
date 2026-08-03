@@ -1,19 +1,13 @@
 // apps/blog-service/src/taxonomy/grpc/taxonomy-grpc.controller.ts
-import { Controller, Logger, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { Roles, Public } from "@nebula/grpc-auth";
+import type { Metadata } from "@grpc/grpc-js";
+import { bearerFromMeta, Roles, Public } from "@nebula/grpc-auth";
 import { blogv1 as blog } from "@nebula/protos";
 
 import { TaxonomyService } from "../taxonomy.service";
 import { CreateTaxonomyDto, UpdateTaxonomyDto } from "../dto/taxonomy.dto";
 import { type BlogTaxonomyRecord, dateishToString } from "../taxonomy.types";
-
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
 
 @Controller()
 export class TaxonomyGrpcController {
@@ -47,7 +41,6 @@ export class TaxonomyGrpcController {
   // List (needs kind)
   // -----------------------------
   @Public()
-  @UsePipes(Pipe)
   @GrpcMethod("BlogTaxonomyService", "List")
   async list(
     req: blog.ListBlogTaxonomiesRequest,
@@ -74,7 +67,6 @@ export class TaxonomyGrpcController {
   // Get (by ID only)
   // -----------------------------
   @Public()
-  @UsePipes(Pipe)
   @GrpcMethod("BlogTaxonomyService", "Get")
   async get(
     req: blog.GetBlogTaxonomyRequest,
@@ -88,11 +80,11 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Create (needs kind)
   // -----------------------------
-  @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("BlogTaxonomyService", "Create")
   async create(
     req: blog.CreateBlogTaxonomyRequest,
+    metadata: Metadata,
   ): Promise<blog.BlogTaxonomyResponse> {
     const dto: CreateTaxonomyDto = {
       slug: req.slug,
@@ -103,7 +95,11 @@ export class TaxonomyGrpcController {
       sortOrder: req.sortOrder,
     };
 
-    const { data } = await this.svc.create(req.kind, dto);
+    const { data } = await this.svc.create(
+      req.kind,
+      dto,
+      bearerFromMeta(metadata),
+    );
 
     return blog.BlogTaxonomyResponse.create({
       data: this.toProto(data),
@@ -113,11 +109,11 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Update (by ID only)
   // -----------------------------
-  @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("BlogTaxonomyService", "Update")
   async update(
     req: blog.UpdateBlogTaxonomyRequest,
+    metadata: Metadata,
   ): Promise<blog.BlogTaxonomyResponse> {
     const patch: UpdateTaxonomyDto = {
       slug: req.slug || undefined,
@@ -128,7 +124,11 @@ export class TaxonomyGrpcController {
       sortOrder: typeof req.sortOrder === "number" ? req.sortOrder : undefined,
     };
 
-    const { data } = await this.svc.update(req.id, patch);
+    const { data } = await this.svc.update(
+      req.id,
+      patch,
+      bearerFromMeta(metadata),
+    );
 
     return blog.BlogTaxonomyResponse.create({
       data: this.toProto(data),
@@ -138,13 +138,13 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Delete (by ID only)
   // -----------------------------
-  @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("BlogTaxonomyService", "Delete")
   async delete(
     req: blog.DeleteBlogTaxonomyRequest,
+    metadata: Metadata,
   ): Promise<blog.DeleteBlogTaxonomyResponse> {
-    const ok = await this.svc.remove(req.id);
+    const ok = await this.svc.remove(req.id, bearerFromMeta(metadata));
     return blog.DeleteBlogTaxonomyResponse.create({ success: !!ok });
   }
 }

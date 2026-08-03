@@ -50,13 +50,17 @@ describe('UserService HTTP (seeded users)', () => {
   });
 
   it('GET /health returns ok', async () => {
-    const res = await httpJson<{ status: string; db: string }>(
-      'GET',
-      `${USER_HTTP}/health`,
-    );
+    const res = await httpJson<{
+      status: string;
+      checks: {
+        database: { status: string };
+        s2sReplay: { status: string };
+      };
+    }>('GET', `${USER_HTTP}/health`);
 
     expect(res.status).toBe('ok');
-    expect(res.db).toBe('up');
+    expect(res.checks.database.status).toBe('ok');
+    expect(res.checks.s2sReplay.status).toBe('ok');
   });
 
   it('GET /users rejects normal users', async () => {

@@ -1,4 +1,11 @@
-import { loadClient, call, mdAuth, CODES } from "./helpers";
+import {
+  loadClient,
+  call,
+  mdAuth,
+  mdProductService,
+  mdS2S,
+  CODES,
+} from "./helpers";
 import { httpJson } from "../utils/http";
 
 const SETTINGS_PROTO = require.resolve("@nebula/protos/settings.proto");
@@ -26,10 +33,14 @@ describe("SettingsService gRPC (public reads, admin writes)", () => {
   const key = `theme_color_${Math.random().toString(36).slice(2, 8)}`;
 
   beforeAll(async () => {
-    const user = await httpJson<LoginResponse>("POST", `${AUTH_HTTP}/auth/login`, {
-      identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
-      password: process.env.SEED_USER_PASS ?? "User123!",
-    });
+    const user = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP}/auth/login`,
+      {
+        identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
+        password: process.env.SEED_USER_PASS ?? "User123!",
+      },
+    );
     userAccess = user.accessToken;
 
     const admin = await httpJson<LoginResponse>(
@@ -44,11 +55,12 @@ describe("SettingsService gRPC (public reads, admin writes)", () => {
   });
 
   it("GetString is public and returns a miss for an unknown key", async () => {
-    const get = await call<any>(client, "GetString", {
-      namespace: ns,
-      environment: env,
-      key,
-    });
+    const get = await call<any>(
+      client,
+      "GetString",
+      { namespace: ns, environment: env, key },
+      mdS2S(),
+    );
 
     expect(get).toEqual({ value: "", found: false });
   });
@@ -64,6 +76,64 @@ describe("SettingsService gRPC (public reads, admin writes)", () => {
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
 
+  it("SetString rejects service identity with forged user headers", async () => {
+    const metadata = mdProductService();
+    metadata.set("x-user-id", "forged-root-admin");
+    metadata.set("x-user-role", "root-admin");
+
+    await expect(
+      call<any>(
+        client,
+        "SetString",
+        { namespace: ns, environment: env, key, value: "forged" },
+        metadata,
+      ),
+    ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
+  });
+
+  it("EnsureBootstrapString rejects keys outside the caller allowlist", async () => {
+    await expect(
+      call<any>(
+        client,
+        "EnsureBootstrapString",
+        {
+          namespace: "product",
+          environment: "default",
+          key: "unapproved_bootstrap_key",
+          value: "x",
+        },
+        mdProductService(),
+      ),
+    ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
+  });
+
+  it("EnsureBootstrapString rejects gateway callers", async () => {
+    await expect(
+      call<any>(
+        client,
+        "EnsureBootstrapString",
+        {
+          namespace: "product",
+          environment: "default",
+          key: "default_product_category",
+          value: "x",
+        },
+        mdS2S(),
+      ),
+    ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
+  });
+
+  it("EnsureBootstrapString rejects unsigned callers", async () => {
+    await expect(
+      call<any>(client, "EnsureBootstrapString", {
+        namespace: "product",
+        environment: "default",
+        key: "default_product_category",
+        value: "x",
+      }),
+    ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
+  });
+
   it("SetString then GetString succeeds for admins", async () => {
     const set = await call<any>(
       client,
@@ -73,11 +143,12 @@ describe("SettingsService gRPC (public reads, admin writes)", () => {
     );
     expect(set).toEqual({ value: "red" });
 
-    const get = await call<any>(client, "GetString", {
-      namespace: ns,
-      environment: env,
-      key,
-    });
+    const get = await call<any>(
+      client,
+      "GetString",
+      { namespace: ns, environment: env, key },
+      mdS2S(),
+    );
     expect(get).toEqual({ value: "red", found: true });
   });
 
@@ -101,11 +172,12 @@ describe("SettingsService gRPC (public reads, admin writes)", () => {
     );
     expect(del).toEqual({ deleted: true });
 
-    const get = await call<any>(client, "GetString", {
-      namespace: ns,
-      environment: env,
-      key,
-    });
+    const get = await call<any>(
+      client,
+      "GetString",
+      { namespace: ns, environment: env, key },
+      mdS2S(),
+    );
     expect(get).toEqual({ value: "", found: false });
   });
 

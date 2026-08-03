@@ -11,7 +11,7 @@ const config: Config = {
   },
   collectCoverageFrom: ["src/**/*.ts", "!src/main.ts", "!src/**/*.spec.ts"],
   watchPathIgnorePatterns: ["/dist/", "/node_modules/"],
-  transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
+  transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
   globalSetup: '<rootDir>/test/setup/wait-for-services.ts',
   setupFiles: ['dotenv/config', '<rootDir>/test/jest.env.ts'],
   clearMocks: true,

@@ -1,66 +1,78 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
-import { ValidationPipe } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import helmet from "helmet";
+import { Logger } from "@nestjs/common";
+import {
+  createHttpRequestLoggingMiddleware,
+  createHttpCorsOptionsDelegate,
+  createHttpSecurityHeadersMiddleware,
+  createHttpValidationPipe,
+  logFatalStartup,
+  logServiceReady,
+  resolveServiceBind,
+  serviceLogLevels,
+} from "@packages/config";
 import compression from "compression";
+import { orderv1 } from "@nebula/protos";
+import {
+  startSecuredGrpc,
+  grpcS2SProtoLoaderOptions,
+  grpcS2SServerChannelOptions,
+} from "@nebula/grpc-auth";
 
 const ORDER_PROTO = require.resolve("@nebula/protos/order.proto");
-
-function getHttpPort(cfg: ConfigService): number {
-  const p =
-    cfg.get<string>("PORT") || cfg.get<string>("ORDER_HTTP_PORT") || "3005";
-  return Number(p);
-}
-
-function getGrpcBind(cfg: ConfigService): string {
-  const grpcPort = cfg.get<string>("GRPC_PORT");
-  if (grpcPort) return `0.0.0.0:${grpcPort}`;
-  return cfg.get<string>("ORDER_GRPC_URL") || "0.0.0.0:50056";
-}
+const SERVICE_NAME = "order-service";
+const logger = new Logger(SERVICE_NAME);
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false });
-  const cfg = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule, {
+    cors: false,
+    logger: serviceLogLevels(),
+  });
+  app.enableShutdownHooks();
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
+  app.use(
+    createHttpRequestLoggingMiddleware(logger, {
+      serviceName: SERVICE_NAME,
+    }),
+  );
+  app.useGlobalPipes(createHttpValidationPipe());
+  app.use(createHttpSecurityHeadersMiddleware());
+  app.use(compression());
+  app.enableCors(
+    createHttpCorsOptionsDelegate({
+      origins: process.env.HTTP_CORS_ORIGINS,
     }),
   );
 
-  app.use(helmet({ crossOriginResourcePolicy: false }));
-  app.use(compression());
-
-  app.enableCors({
-    origin: [/^https?:\/\/localhost(:\d+)?$/],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-gateway-sign"],
-    maxAge: 600,
+  const { httpPort, grpcUrl } = resolveServiceBind(process.env, {
+    servicePrefix: "ORDER",
+    defaultHttpPort: 3005,
+    defaultGrpcPort: 50056,
   });
 
-  const grpcUrl = getGrpcBind(cfg);
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package: "order",
-      protoPath: ORDER_PROTO,
-      url: grpcUrl,
+  const micro = app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: "order",
+        protoPath: ORDER_PROTO,
+        loader: grpcS2SProtoLoaderOptions(),
+        url: grpcUrl,
+        channelOptions: grpcS2SServerChannelOptions(
+          orderv1.OrderServiceService,
+        ),
+      },
     },
-  });
-
-  await app.startAllMicroservices();
-  const httpPort = getHttpPort(cfg);
+    { deferInitialization: true },
+  );
+  await startSecuredGrpc(app, micro);
   await app.listen(httpPort, "0.0.0.0");
 
-  console.log(
-    `[order-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
-  );
+  logServiceReady(logger, SERVICE_NAME);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  logFatalStartup(logger, SERVICE_NAME, error);
+  process.exitCode = 1;
+});

@@ -1,55 +1,59 @@
-// apps/user-service/test/grpc/helpers.ts
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { buildS2SMetadata } from '@nebula/grpc-auth';
+import { userv1 } from '@nebula/protos';
+import {
+  copyS2SSigningIntent,
+  finalizeS2SClientMetadata,
+  markS2SMetadata,
+  registerS2SClientDefinition,
+} from '@nebula/grpc-auth';
 
 export const CODES = grpc.status;
 
-// --------- metadata helpers ---------
-export function mdAuth(
-  opts: { access?: string; userId?: string; role?: string } = {},
-) {
+export function mdAuth(opts: { access?: string } = {}) {
   const md = mdS2S();
   if (opts.access) md.set('authorization', `Bearer ${opts.access}`);
-  if (opts.userId) md.set('x-user-id', opts.userId);
-  if (opts.role) md.set('x-user-role', opts.role);
   return md;
 }
 
-export function mdUser(userId: string, role?: string) {
+/** Test-only hostile metadata; production helpers must never create this. */
+export function mdForgedActor(userId: string, role: string) {
   const md = new grpc.Metadata();
   md.set('x-user-id', userId);
-  if (role) md.set('x-user-role', role);
+  md.set('x-user-role', role);
   return md;
 }
 
-export function mdS2S(
-  opts: { userId?: string; role?: string; serviceName?: string } = {},
-) {
-  const md = buildS2SMetadata({
+export function mdS2S(opts: { serviceName?: string } = {}) {
+  const md = markS2SMetadata(new grpc.Metadata(), {
+    kind: 'service',
     serviceName: opts.serviceName ?? 'auth-service',
+    key: {
+      id: 'auth-user-v1',
+      secret:
+        process.env.S2S_TEST_SERVICE_KEY ??
+        'dev-only-auth-to-user-s2s-key-00000001',
+    },
   });
-
-  if (opts.userId) md.set('x-user-id', opts.userId);
-  if (opts.role) md.set('x-user-role', opts.role);
-
   return md;
 }
 
-export function mergeMd(...mds: grpc.Metadata[]) {
+export function mergeMd(...sources: grpc.Metadata[]) {
   const out = new grpc.Metadata();
-  for (const md of mds) {
-    for (const [k, v] of md.getMap() as any) out.set(k, String(v));
+  for (const source of sources) {
+    for (const [key, value] of Object.entries(source.getMap())) {
+      out.set(key, value);
+    }
+    copyS2SSigningIntent(source, out);
   }
   return out;
 }
 
-// --------- client loader & invoker ---------
 export function loadClient<T>(opts: {
   url: string;
   protoPath: string;
-  pkg: string[]; // e.g. ['user','userv1']
-  svc: string; // e.g. 'UserService'
+  pkg: string[];
+  svc: string;
 }): T {
   const def = protoLoader.loadSync(opts.protoPath, {
     longs: String,
@@ -58,22 +62,24 @@ export function loadClient<T>(opts: {
     oneofs: true,
   });
   const root = grpc.loadPackageDefinition(def) as any;
-  const ns = opts.pkg.reduce((acc, k) => acc?.[k], root);
-  const Ctor = ns?.[opts.svc];
-  if (!Ctor)
-    throw new Error(
-      `Service ${opts.pkg.join('.')}#${opts.svc} not found in ${opts.protoPath}`,
-    );
-  return new Ctor(opts.url, grpc.credentials.createInsecure());
+  const namespace = opts.pkg.reduce(
+    (current: any, key) => current?.[key],
+    root,
+  );
+  const Ctor = namespace?.[opts.svc];
+  if (!Ctor) throw new Error(`Service ${opts.svc} not found`);
+  const client = new Ctor(opts.url, grpc.credentials.createInsecure());
+  registerS2SClientDefinition(client, userv1.UserServiceService);
+  return client as T;
 }
 
-function resolveMethodName(client: any, m: string) {
-  if (typeof client[m] === 'function') return m;
-  const alt = Object.keys(client).find(
-    (k) => k.toLowerCase() === m.toLowerCase(),
+function resolveMethodName(client: any, method: string) {
+  if (typeof client[method] === 'function') return method;
+  const alternate = Object.keys(client).find(
+    (key) => key.toLowerCase() === method.toLowerCase(),
   );
-  if (!alt) throw new Error(`Method ${m} not found on client`);
-  return alt;
+  if (!alternate) throw new Error(`Method ${method} not found on client`);
+  return alternate;
 }
 
 export async function call<TResp>(
@@ -82,11 +88,19 @@ export async function call<TResp>(
   req: any,
   md?: grpc.Metadata,
 ): Promise<TResp> {
-  const m = resolveMethodName(client, method);
-  const metadata = md ?? new grpc.Metadata();
+  const resolved = resolveMethodName(client, method);
+  const metadata = finalizeS2SClientMetadata({
+    client,
+    method: resolved,
+    request: req,
+    metadata: md,
+  });
   return new Promise<TResp>((resolve, reject) => {
-    client[m](req, metadata, (err: grpc.ServiceError | null, res: TResp) =>
-      err ? reject(err) : resolve(res),
+    client[resolved](
+      req,
+      metadata,
+      (err: grpc.ServiceError | null, response: TResp) =>
+        err ? reject(err) : resolve(response),
     );
   });
 }

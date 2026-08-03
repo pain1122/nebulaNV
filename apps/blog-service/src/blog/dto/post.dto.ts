@@ -8,6 +8,9 @@ import {
   IsInt,
   Min,
   Max,
+  IsDefined,
+  IsUUID,
+  ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
 
@@ -120,6 +123,25 @@ export class UpdatePostDto {
   @IsString()
   @MaxLength(512)
   metaKeywords?: string;
+}
+
+export class CreatePostRequestDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => CreatePostDto)
+  data!: CreatePostDto;
+}
+
+export class UpdatePostRequestDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => UpdatePostDto)
+  patch!: UpdatePostDto;
+}
+
+export class UpdatePostGrpcRequestDto extends UpdatePostRequestDto {
+  @IsUUID("4")
+  id!: string;
 }
 
 export class ListPostsQueryDto {

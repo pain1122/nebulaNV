@@ -10,11 +10,11 @@ Media-service is the app privacy authority for media. MinIO, Supabase Storage, a
 
 ## Current Storage Model
 
-| Provider | Role |
-| --- | --- |
-| MinIO | Current local S3-compatible storage |
+| Provider            | Role                                            |
+| ------------------- | ----------------------------------------------- |
+| MinIO               | Current local S3-compatible storage             |
 | Supabase Storage S3 | Planned storage/filemanager-compatible provider |
-| AWS S3 | Future production object storage |
+| AWS S3              | Future production object storage                |
 
 The service uses AWS S3 SDK commands against S3-compatible providers.
 
@@ -61,11 +61,11 @@ The UI may look consistent across lanes, but each lane has different backend lis
 
 Future UI reference: when the Vite admin panel is uploaded, design the media filemanager relative to that panel instead of starting from a blank UI. Salar likes the built-in Velzon panel filemanager template because it is clean, light, customizable, and practical. Treat Velzon's dashboard shell, folder/sidebar area, main file area, right preview/details panel, clean density, and old-school filemanager behavior as a visual/interaction reference; keep Nebula's own media-service APIs as the backend contract.
 
-| Lane | Listing model | Storage key model | Main use |
-| --- | --- | --- | --- |
-| `PUBLIC` | Folder-style browse with `folderPath` and `displayName` | Descriptive keys under `MEDIA_PUBLIC_FOLDER` | Product/blog/site/public assets |
-| `PROTECTED` | Context-scoped list by owner/scope/entity metadata | Opaque keys under `MEDIA_PRIVATE_FOLDER` | Private business files tied to a product/order/course/etc. |
-| `STRICT` | Context-scoped list with stricter view/audit rules | Opaque keys under `MEDIA_PRIVATE_FOLDER` | Personal/sensitive documents and high-privacy material |
+| Lane        | Listing model                                           | Storage key model                            | Main use                                                   |
+| ----------- | ------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| `PUBLIC`    | Folder-style browse with `folderPath` and `displayName` | Descriptive keys under `MEDIA_PUBLIC_FOLDER` | Product/blog/site/public assets                            |
+| `PROTECTED` | Context-scoped list by owner/scope/entity metadata      | Opaque keys under `MEDIA_PRIVATE_FOLDER`     | Private business files tied to a product/order/course/etc. |
+| `STRICT`    | Context-scoped list with stricter view/audit rules      | Opaque keys under `MEDIA_PRIVATE_FOLDER`     | Personal/sensitive documents and high-privacy material     |
 
 Supabase/MinIO/AWS storage UIs may remain useful for trusted raw storage inspection, but the Nebula admin panel should use media-service route families, not raw storage APIs.
 
@@ -83,7 +83,7 @@ Target behavior:
 - Delete preview should return affected file count, folder count, total size, paths, warnings, and a short-lived confirmation token.
 - Delete confirm should re-check the plan before deleting media rows, explicit folder rows, and storage objects.
 - Current delete preview/confirm support covers selected public files and file-derived public folder paths. Explicit `MediaFolder` row deletion will be added when folder records are implemented.
-- Delete confirmation tokens are signed with `GATEWAY_SECRET`, expire through `MEDIA_DELETE_CONFIRM_TTL_SECONDS`, and are bound to the same actor user/role that requested the preview.
+- Delete confirmation tokens are signed with the media-only `MEDIA_DELETE_CONFIRM_SECRET`, expire through `MEDIA_DELETE_CONFIRM_TTL_SECONDS`, and are bound to the same actor user/role that requested the preview.
 - Sync delete execution is capped by `MEDIA_SYNC_DELETE_MAX_FILES`; larger plans return a worker/queue warning and are not deleted inline.
 - Worker/queue-based retries, oversized delete execution, and stale/orphan reconciliation remain a later lifecycle phase.
 
@@ -154,6 +154,107 @@ Frozen launch contract:
 - Long immutable CDN caching is deferred until generated variant URLs are versioned, content-addressed, or otherwise safe to cache independently from approval/deletion/scan state changes.
 - Actual generated derivatives are deferred to the media worker phase. Until that exists, `variant=web` means the approved public render object, not a promise that thumbnails or immutable originals already exist.
 
+## CORS And Origin Policy
+
+Status: frozen target policy. The shared exact-origin API CORS and security-header baseline is implemented for directly runnable services. Gateway, storage, and CDN ownership remains deferred to the later foundation phases.
+
+CORS controls which browser origins may read cross-origin responses. It is not authentication, tenant authorization, or protection from mobile/server clients.
+
+| Surface                         | Allowed browser origins                                                            | Credentials                       | Methods                 |
+| ------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------- | ----------------------- |
+| Public CDN/render media         | Any origin (`*`)                                                                   | No                                | `GET`, `HEAD`           |
+| Public storefront API           | Verified active origins registered to the owning site                              | No for anonymous reads            | Required public methods |
+| Authenticated storefront API    | Verified active origins registered to the owning site                              | Only when cookie auth is used     | Required API methods    |
+| Admin API                       | Exact verified admin origins                                                       | Yes when cookie auth is used      | Required CRUD methods   |
+| Direct presigned storage upload | Exact verified site/admin upload origins                                           | No browser cookies                | `PUT`, `HEAD`           |
+| Protected signed preview        | Exact verified site/admin origins only when JavaScript-readable access is required | No browser cookies                | `GET`, `HEAD`           |
+| Strict signed preview           | Exact verified admin origin only when required                                     | No browser cookies                | `GET`, `HEAD`           |
+| React Native and server clients | CORS does not apply                                                                | Bearer/application authentication | API policy              |
+| Internal HTTP/gRPC services     | No browser CORS                                                                    | Verified S2S                      | Internal contracts      |
+
+Frozen rules:
+
+- Public CDN/render media may return `Access-Control-Allow-Origin: *` only because the response is already approved `PUBLIC`, `READY`, `CLEAN` media. It must never enable credentials.
+- Public JSON APIs use verified site origins rather than a global wildcard.
+- Credentialed responses return the exact approved origin, include `Vary: Origin`, and never combine credentials with a wildcard origin.
+- Cookie-authenticated state changes require CSRF protection in addition to CORS.
+- Direct uploads use presigned authorization and `credentials: omit`. Storage CORS permits only required upload headers and exposes only required response metadata such as `ETag` and supported checksum headers.
+- Protected media never uses wildcard CORS. Exact site/admin origins are added only when browser JavaScript must read the response.
+- Strict media never uses wildcard CORS. Cross-origin browser-readable access is limited to the verified admin origin and remains subject to strict TTL, audit, and access policy.
+- Ordinary cross-origin image display does not automatically grant JavaScript readable access; canvas/editor use requires an explicitly approved readable origin.
+- React Native, native apps, server clients, and direct navigation are not secured by CORS. They require normal authentication, application registration, tenant/site resolution, rate limits, and resource authorization.
+- Custom origins are stored as exact scheme/host/port values tied to a verified active site. Arbitrary wildcard subdomains are not accepted.
+- Requests without an `Origin` header are not treated as trusted; they continue through normal authentication and authorization without browser CORS headers.
+- Browser clients may use public headers such as `Authorization`, `Content-Type`, `Idempotency-Key`, `X-Request-ID`, and a non-authoritative app identifier where required.
+- Browser clients must never receive or submit internal S2S envelope headers such as `x-s2s-signature`, `x-svc`, `x-user-id`, `x-user-role`, `x-tenant-id`, or `x-site-id`.
+- Production origins come from verified site/admin configuration. Development origins use explicit environment allowlists; broad localhost-port regexes are not production policy.
+- In the target architecture, the public gateway owns API CORS, storage owns presigned-upload CORS, CDN/render delivery owns public-media CORS, and internal services expose no public browser CORS.
+
+Implementation is deliberately deferred:
+
+- F1 removes browser exposure of internal signing/context headers.
+- F2 standardizes temporary exact-origin API configuration while services remain directly runnable. Health and public render are excluded from API CORS. The public render route overrides Helmet's resource policy to `cross-origin` so the shared baseline does not block ordinary embedding.
+- F3 implements dynamic verified-origin resolution at the gateway.
+- F5 implements storage and CDN/render CORS plus the corresponding preflight and denial tests.
+
+## Download Resistance Policy
+
+Status: frozen product and documentation policy.
+
+NebulaNV reduces casual media copying by hiding raw originals, serving approved derived variants through policy-aware render routes, using short-lived signed URLs for protected content, and optionally adding lower-resolution or watermarked previews in a later media-processing phase.
+
+Anything delivered to a browser or native application can ultimately be captured. Screenshots, screen recording, browser developer tools, modified clients, and direct inspection of delivered bytes cannot be eliminated by ordinary UI controls.
+
+Frozen rules:
+
+- §PUBLIC§ media is intentionally viewable and must be treated as capturable after delivery.
+- §PROTECTED§ and §STRICT§ access checks decide who may receive media; they cannot guarantee that an authorized recipient will not retain it.
+- Public render should serve approved derived variants rather than raw originals when the variant pipeline exists.
+- Short-lived signed URLs reduce the reuse window but do not revoke bytes already received by a client.
+- Disabling right-click, hiding URLs, overlays, canvas/WebGL rendering, and similar techniques are optional usability friction only.
+- These techniques must not be described as DRM, encryption, or a security boundary.
+- Watermarks and reduced-resolution previews may discourage redistribution but do not prevent capture.
+- Strong playback DRM for licensed streaming content is a separate future module and is not part of the current media render contract.
+
+## Sensitive Preview Policy
+
+Status: frozen target policy. Current signed-read behavior remains usable while F5 adds derived previews, explicit strict-download enforcement, and durable audit storage.
+
+### Protected Preview
+
+- An authorized owner or admin may preview a `PROTECTED` file after the owner, site, scope, entity type, and entity ID checks applicable to the route.
+- The temporary foundation behavior may return the full stored file through a signed URL.
+- Protected preview uses `MEDIA_SIGNED_READ_TTL_SECONDS`, currently defaulting to 300 seconds.
+- Preview is `inline` with `private, no-store`.
+- Download is a separate explicit user action and must not be triggered by ordinary preview UI.
+- A signed URL limits the access window but cannot revoke bytes already received by an authorized client.
+
+### Strict Preview
+
+- The temporary foundation behavior permits full-file `STRICT` preview only for `admin` or `root-admin`.
+- Strict preview uses `MEDIA_STRICT_READ_TTL_SECONDS`, currently defaulting to 30 seconds.
+- Preview is `inline` with `private, no-store`.
+- Strict download is disabled by default in the target policy. Future full-original download requires a separately authorized and durably audited action.
+- Every strict preview attempt must eventually produce a durable audit record containing actor, tenant/site, media, business context, action, result, request ID, application/client context, and timestamp. Signed URLs and secrets must never be stored.
+- Current service logs are transitional and do not satisfy the durable audit requirement.
+
+### Derived Preview Trigger
+
+When the F5 variant worker and immutable original/variant model exist:
+
+- protected features may opt into downsized previews according to business risk;
+- strict previews default to downsized and/or watermarked derivatives;
+- full protected/strict originals remain outside ordinary preview flows;
+- full-original strict access requires explicit permission, a dedicated action, and durable audit;
+- preview variants retain the owning tenant/site, access class, source relationship, and lifecycle state.
+
+Current implementation mismatch:
+
+- `createReadUrl()` already applies protected/strict TTL and `private, no-store` behavior.
+- Current strict read-url routes accept the generic `download=true` option and do not enforce the target default-deny strict-download rule.
+- Strict access currently produces service logs only.
+- F5 must close these gaps before strict media is described as durably audited or derivative-preview protected.
+
 ## SEO Image Policy
 
 Frozen launch contract:
@@ -169,13 +270,14 @@ Frozen launch contract:
 
 ## Current HTTP Contract
 
-All current media management HTTP actions require `admin/root-admin`. `GET /health` and `GET /media/render/:id` are public.
+All current media management HTTP actions require `admin/root-admin`. The
+`/health` routes and `GET /media/render/:id` are public.
 
 Global admin delete remains available to both `admin` and `root-admin` because admins are the main site maintenance layer. Lane-specific delete wrappers still exist so the filemanager UI can call safer lane-aware endpoints.
 
 Routes:
 
-- `GET /health`
+- `GET /health`, `/health/live`, `/health/ready`
 - `GET /media`
 - `GET /media/browse`
 - `GET /media/public-library/browse`
@@ -207,7 +309,9 @@ Routes:
 
 Notes:
 
-- `GET /health` checks DB and S3-compatible storage reachability.
+- Readiness checks DB, S3-compatible storage, and the S2S replay store;
+  liveness is dependency-free.
+- HTTP bind resolution is `MEDIA_HTTP_PORT`, then generic `PORT`, then `3007`; gRPC resolves `GRPC_PORT`, then `MEDIA_GRPC_PORT`, then `50058`.
 - `GET /media/browse` and `GET /media/public-library/browse` return Supabase-style `{ folders, files, items }` output for public filemanager navigation under `MEDIA_PUBLIC_FOLDER`.
 - `POST /media` exists for direct non-S3 metadata creation and is legacy-compatible; S3-compatible rows are rejected and must use finalize.
 - `POST /media/presign` and `POST /media/public-library/presign` return a public filemanager upload URL and storage metadata. If the requested display name already exists in the same scope/folder, it returns the next numeric name.
@@ -289,7 +393,6 @@ Notes:
 - `MEDIA_SYNC_DELETE_MAX_FILES`
 - `MEDIA_PUBLIC_FOLDER`
 - `MEDIA_PRIVATE_FOLDER`
-- `MEDIA_SYSTEM_FOLDER`
 
 Folder env rules:
 
@@ -299,7 +402,15 @@ Folder env rules:
 - No double slashes.
 - No `.` or `..` path segments.
 
+Production S3 startup also requires `MEDIA_S3_PUBLIC_ENDPOINT`, because signed
+browser URLs cannot use a container-only storage address.
+
 ## Current DB Shape
+
+The root Prisma commands include this service after settings-service. Its seed
+is intentionally empty because media-service currently requires no base rows.
+See [Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
 
 Important Prisma fields:
 
@@ -344,7 +455,8 @@ pnpm --filter @nebula/media-service prisma:migrate:deploy
 
 HTTP:
 
-- `GET /health` reports DB and S3-compatible storage checks.
+- `GET /health/ready` reports DB, S3-compatible storage, and S2S replay checks;
+  `/health` is the compatibility alias.
 - `POST /media/presign` denies normal user and allows admin.
 - Presign uses browser-usable URL and does not expose Docker-only `minio`.
 - Public filemanager storage key is `uploads/<folderPath>/<displayName>`.
@@ -373,6 +485,7 @@ Unit:
 - `STRICT` read URLs use `MEDIA_STRICT_READ_TTL_SECONDS`.
 - Protected list queries are scoped by owner and feature context.
 - Protected feature read URLs require matching owner, scope, entity type, and entity id.
+- Public render rejects both `PROTECTED` and `STRICT` media before opening a storage stream.
 
 gRPC:
 
@@ -442,7 +555,8 @@ Tests:
 ## Latest Verification
 
 - `pnpm --filter @nebula/media-service build` passes as of 2026-07-01.
-- `pnpm --filter @nebula/media-service test:unit -- --runTestsByPath test/media.service.access.spec.ts` passes with 11 tests as of 2026-07-01.
+- `pnpm --filter @nebula/media-service test:unit` passes with 13 tests as of 2026-07-15, including explicit public-render denial for `PROTECTED` and `STRICT` media.
 - `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/http/media.http.e2e.spec.ts --runInBand` passes with 20 tests as of 2026-07-01 when `DATABASE_URL` points at Docker Postgres on `127.0.0.1:15432`.
+- The HTTP e2e suite now includes a strict-media public-render denial assertion; its updated live run is queued for the later Docker-backed verification step.
 - `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand` passes with 9 tests as of 2026-07-01.
 - `pnpm --filter @nebula/media-service lint` is intentionally left for the later `lint:fix` cleanup pass and currently fails on Prettier formatting in modified media files.

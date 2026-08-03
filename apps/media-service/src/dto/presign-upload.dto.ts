@@ -1,7 +1,7 @@
 import { Transform, type TransformFnParams } from "class-transformer";
 import { IsIn, IsOptional, IsString, IsUUID, Matches } from "class-validator";
 
-const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._()\-]*$/;
+const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._()-]*$/;
 const SAFE_CONTEXT_VALUE = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 const trim = ({ value }: TransformFnParams): unknown =>
   typeof value === "string" ? value.trim() : value;

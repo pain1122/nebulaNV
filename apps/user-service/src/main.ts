@@ -1,34 +1,69 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule, USER_PROTO } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { Logger } from '@nestjs/common';
+import { userv1 } from '@nebula/protos';
+import {
+  startSecuredGrpc,
+  grpcS2SProtoLoaderOptions,
+  grpcS2SServerChannelOptions,
+} from '@nebula/grpc-auth';
+import {
+  createHttpRequestLoggingMiddleware,
+  createHttpCorsOptionsDelegate,
+  createHttpSecurityHeadersMiddleware,
+  createHttpValidationPipe,
+  logFatalStartup,
+  logServiceReady,
+  resolveServiceBind,
+  serviceLogLevels,
+} from '@packages/config';
+
+const SERVICE_NAME = 'user-service';
+const logger = new Logger(SERVICE_NAME);
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const port = app.get(ConfigService).get<number>('USER_HTTP_PORT') ?? 3100;
+  const app = await NestFactory.create(AppModule, {
+    logger: serviceLogLevels(),
+  });
+  app.enableShutdownHooks();
+  const { httpPort, grpcUrl } = resolveServiceBind(process.env, {
+    servicePrefix: 'USER',
+    defaultHttpPort: 3100,
+    defaultGrpcPort: 50051,
+  });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
+  app.use(
+    createHttpRequestLoggingMiddleware(logger, {
+      serviceName: SERVICE_NAME,
+    }),
+  );
+  app.useGlobalPipes(createHttpValidationPipe());
+  app.use(createHttpSecurityHeadersMiddleware());
+  app.enableCors(
+    createHttpCorsOptionsDelegate({
+      origins: process.env.HTTP_CORS_ORIGINS,
     }),
   );
 
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package: 'user',
-      protoPath: USER_PROTO,
-      url: '0.0.0.0:50051',
+  const micro = app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: 'user',
+        protoPath: USER_PROTO,
+        loader: grpcS2SProtoLoaderOptions(),
+        url: grpcUrl,
+        channelOptions: grpcS2SServerChannelOptions(userv1.UserServiceService),
+      },
     },
-  });
-
-  await app.startAllMicroservices();
-  await app.listen(port);
-  console.log(
-    `[user-service] HTTP listening on http://127.0.0.1:${port}  |  gRPC on 0.0.0.0:50051`,
+    { deferInitialization: true },
   );
+  await startSecuredGrpc(app, micro);
+  await app.listen(httpPort);
+  logServiceReady(logger, SERVICE_NAME);
 }
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  logFatalStartup(logger, SERVICE_NAME, error);
+  process.exitCode = 1;
+});

@@ -58,41 +58,47 @@ Use the check form when you want to confirm generated files are current:
 pnpm -w proto:check
 ```
 
-## 5) Start Infrastructure
+## 5) Start The Docker Backend
 
-Default Docker infrastructure includes Postgres, Redis, MinIO, and MinIO bucket initialization:
+Use the supported complete boot command for a clean setup or after backend
+source changes:
 
 ```powershell
-docker compose up -d postgres redis minio minio-init
+pnpm backend:boot
 ```
 
-To start the default app stack too:
+It waits for PostgreSQL, Redis, and MinIO; verifies all seven databases; runs
+migration deploy and status; applies the base seeds; builds the eight images
+through the sequential inventory-backed Bake runner; starts Compose without
+rebuilding; waits for all readiness endpoints; and applies the idempotent API
+demo seed.
+
+When the databases and images are already prepared, restart the existing stack
+without rebuilding:
 
 ```powershell
-docker compose up -d --build
+docker compose up -d --no-build
 ```
 
-To start the full backend Docker profile:
+Check or stop the stack without deleting named volumes:
 
 ```powershell
-docker compose --profile full up -d --build
+pnpm backend:health
+pnpm backend:down
 ```
 
 ## 6) Run Prisma Migrations
 
-Run migrations per Prisma-backed service:
+Run all Prisma-backed services sequentially in the repository-defined order:
 
 ```powershell
-pnpm --filter ./apps/user-service prisma:migrate:dev
-pnpm --filter ./apps/product-service prisma:migrate:dev
-pnpm --filter ./apps/settings-service prisma:migrate:dev
-pnpm --filter ./apps/blog-service prisma:migrate:dev
-pnpm --filter ./apps/order-service prisma:migrate:dev
-pnpm --filter ./apps/taxonomy-service prisma:migrate:dev
-pnpm --filter ./apps/media-service prisma:migrate:dev
+pnpm prisma:migrate:dev
+pnpm prisma:migrate:status
 ```
 
-If a service lacks the command, check that service's `package.json` before adding a root-level shortcut.
+For a deployed/non-development database, use `pnpm prisma:migrate:deploy`
+instead of `prisma:migrate:dev`. The root inventory and runner stop at the first
+failed service.
 
 ## 7) Run Backend Locally
 
@@ -138,7 +144,7 @@ Broad checks when the workspace is ready:
 pnpm -w proto:gen
 pnpm -w build
 docker compose config
-docker compose --profile full up -d --build
+pnpm backend:health
 ```
 
 ## 10) Useful Runtime Checks

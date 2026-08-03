@@ -1,10 +1,9 @@
 // apps/auth-service/test/e2e/auth.http-grpc.flow.e2e.spec.ts
-import * as jwt from 'jsonwebtoken';
 import {
   loadClient,
   call,
   mdS2S,
-  mdUser,
+  mdForgedActor,
   mdAuth,
   mergeMd,
   CODES,
@@ -21,11 +20,6 @@ const authClient = loadClient<any>({
 });
 
 const skipIfUnavailable = (e: any) => e?.code === CODES.UNAVAILABLE;
-
-function roleFromJwt(token: string): string | undefined {
-  const payload = jwt.decode(token) as jwt.JwtPayload | null;
-  return (payload?.role as string | undefined) ?? undefined;
-}
 
 function tamperToken(token: string): string {
   const replacement = token.endsWith('a') ? 'b' : 'a';
@@ -181,7 +175,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         authClient,
         'validateToken',
         { token: userTokens.accessToken },
-        mdS2S(),
+        mdS2S({ kind: 'service' }),
       );
       expect(res.isValid).toBe(true);
       expect(res.userId).toBe(userId);
@@ -197,7 +191,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         authClient,
         'validateToken',
         { token: tamperToken(userTokens.accessToken) },
-        mdS2S(),
+        mdS2S({ kind: 'service' }),
       );
       expect(res.isValid).toBe(false);
       expect(res.userId ?? '').toBe('');
@@ -207,14 +201,13 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     }
   });
 
-  it('gRPC getTokens mints tokens with S2S + x-user-id', async () => {
+  it('gRPC getTokens mints tokens from a gateway-signed request body', async () => {
     try {
-      const md = mergeMd(mdS2S(), mdUser(userId, 'user'));
       const tk = await call<{ accessToken: string; refreshToken: string }>(
         authClient,
         'getTokens',
-        {},
-        md,
+        { userId },
+        mdS2S(),
       );
       expect(tk.accessToken).toBeTruthy();
       expect(tk.refreshToken).toBeTruthy();
@@ -225,7 +218,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
     }
   });
 
-  it('gRPC getTokens rejects S2S calls without user context', async () => {
+  it('gRPC getTokens rejects a signed request without a login user id', async () => {
     try {
       await expect(
         call<any>(authClient, 'getTokens', {}, mdS2S()),
@@ -243,7 +236,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
           authClient,
           'getProfile',
           { userId },
-          mergeMd(mdS2S(), mdUser(userId, 'user')),
+          mergeMd(mdS2S(), mdForgedActor(userId, 'user')),
         ),
       ).rejects.toMatchObject({ code: CODES.UNAUTHENTICATED });
     } catch (e: any) {
@@ -259,7 +252,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         authClient,
         'getProfile',
         { userId },
-        mdAuth({ access: userTokens.accessToken, userId, role: 'user' }),
+        mdAuth({ access: userTokens.accessToken }),
       );
       expect(self).toHaveProperty('id', userId);
 
@@ -270,7 +263,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
             authClient,
             'getProfile',
             { userId: adminId },
-            mdAuth({ access: userTokens.accessToken, userId, role: 'user' }),
+            mdAuth({ access: userTokens.accessToken }),
           ),
         ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
       }
@@ -289,11 +282,10 @@ describe('Auth HTTP + gRPC end-to-end', () => {
           authClient,
           'getProfile',
           { userId: adminId },
-          mdAuth({
-            access: userTokens.accessToken,
-            userId: adminId,
-            role: 'admin',
-          }),
+          mergeMd(
+            mdAuth({ access: userTokens.accessToken }),
+            mdForgedActor(adminId, 'admin'),
+          ),
         ),
       ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
     } catch (e: any) {
@@ -304,24 +296,34 @@ describe('Auth HTTP + gRPC end-to-end', () => {
 
   it('gRPC getProfile admin->user succeeds', async () => {
     if (!haveRealAdmin) return;
-    const adminRole = roleFromJwt(adminTokens.accessToken) ?? 'user';
-
     try {
       const res = await call<any>(
         authClient,
         'getProfile',
         { userId },
-        mdAuth({
-          access: adminTokens.accessToken,
-          userId: adminId,
-          role: adminRole,
-        }),
+        mdAuth({ access: adminTokens.accessToken }),
       );
       expect(res).toHaveProperty('id', userId);
     } catch (e: any) {
       if (skipIfUnavailable(e)) return;
       throw e;
     }
+  });
+
+  it('gRPC getProfile preserves user-service NOT_FOUND', async () => {
+    if (!haveRealAdmin) return;
+
+    await expect(
+      call<any>(
+        authClient,
+        'getProfile',
+        { userId: '11111111-1111-4111-8111-111111111111' },
+        mdAuth({ access: adminTokens.accessToken }),
+      ),
+    ).rejects.toMatchObject({
+      code: CODES.NOT_FOUND,
+      details: 'User not found',
+    });
   });
 
   it('POST /auth/refresh rotates tokens (user & admin)', async () => {
@@ -346,7 +348,12 @@ describe('Auth HTTP + gRPC end-to-end', () => {
       // old RT revoked on rotation – also fine
     }
 
-    userTokens = newUserTokens; // continue with latest tokens
+    // Replaying the old token revokes that refresh session by design.
+    // Use a new session for the separate logout behavior below.
+    userTokens = await httpJson('POST', `${AUTH_HTTP}/auth/login`, {
+      identifier: userEmail,
+      password: userPass1,
+    });
 
     // ---- ADMIN ----
     if (haveRealAdmin) {
@@ -369,7 +376,10 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         // rotation revokes old RT – also acceptable
       }
 
-      adminTokens = newAdminTokens;
+      adminTokens = await httpJson('POST', `${AUTH_HTTP}/auth/login`, {
+        identifier: adminEmail,
+        password: adminPass,
+      });
     }
   });
 

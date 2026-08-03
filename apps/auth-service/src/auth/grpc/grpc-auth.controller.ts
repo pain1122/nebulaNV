@@ -1,25 +1,22 @@
 import { Controller, UseGuards, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { Metadata, status } from '@grpc/grpc-js';
 import { GrpcAuthService } from './grpc-auth.service';
-import { AuthRedisService } from '../redis/auth-redis.service';
 import { AuthService } from '../auth.service';
-import { JwtService } from '@nestjs/jwt';
 import { authv1, userv1 } from '@nebula/protos';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import {
   Public,
   Roles,
-  wrapGrpc,
   toRpc,
   resolveCtxUser,
-  RequireUserId,
+  InternalOnly,
+  AllowedS2SCallers,
   type RpcContextWithContext,
 } from '@nebula/grpc-auth';
-import * as jsonwebtoken from 'jsonwebtoken';
-import { AuthUserDto, isAuthTokenPayload, toAuthRole } from '../auth.types';
+import { AuthUserDto, toAuthRole } from '../auth.types';
 import { errorMessage } from '../error.utils';
+import { AccessTokenValidationService } from '../token/access-token-validation.service';
 
 type ValidateUserRequest = authv1.ValidateUserRequest;
 type ValidateUserResponse = authv1.ValidateUserResponse;
@@ -37,10 +34,8 @@ export class AuthGrpcController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly jwtService: JwtService,
-    private readonly cfg: ConfigService,
     private readonly grpc: GrpcAuthService,
-    private readonly authRedis: AuthRedisService,
+    private readonly accessTokens: AccessTokenValidationService,
   ) {}
 
   /** Utility: read Bearer from gRPC metadata */
@@ -70,25 +65,14 @@ export class AuthGrpcController {
     meta: Metadata,
     call: RpcContextWithContext,
   ): Promise<UserResponse> {
-    try {
-      const token = this.requireBearer(meta);
-      const ctx = resolveCtxUser(meta, call);
-      if (!ctx) throw toRpc(status.UNAUTHENTICATED, 'missing_user_context');
-      const isAdmin = ctx.role === 'admin' || ctx.role === 'root-admin';
-      if (!isAdmin && ctx.userId !== data.userId) {
-        throw toRpc(status.PERMISSION_DENIED, 'not_owner_or_admin');
-      }
-      return await wrapGrpc(
-        this.authService.getProfile(data.userId, token, ctx.userId),
-      );
-    } catch (err: unknown) {
-      throw err instanceof RpcException
-        ? err
-        : new RpcException({
-            code: status.UNAUTHENTICATED,
-            message: errorMessage(err, 'Unauthenticated'),
-          });
+    const token = this.requireBearer(meta);
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx) throw toRpc(status.UNAUTHENTICATED, 'missing_user_context');
+    const isAdmin = ctx.role === 'admin' || ctx.role === 'root-admin';
+    if (!isAdmin && ctx.userId !== data.userId) {
+      throw toRpc(status.PERMISSION_DENIED, 'not_owner_or_admin');
     }
+    return this.authService.getProfile(data.userId, token);
   }
 
   // ---------------------- PUBLIC ----------------------
@@ -113,25 +97,27 @@ export class AuthGrpcController {
   }
 
   @Public({ gatewayOnly: true })
-  @RequireUserId()
   @GrpcMethod('AuthService', 'GetTokens')
-  async getTokens(
-    _data: GetTokensRequest,
-    meta: Metadata,
-    call: RpcContextWithContext,
-  ): Promise<GetTokensResponse> {
-    // never trust input.userId; take it from the (guarded) context
-    const ctx = resolveCtxUser(meta, call);
-    if (!ctx?.userId) {
+  async getTokens(data: GetTokensRequest): Promise<GetTokensResponse> {
+    // S2SGuard verifies a gateway caller and binds this request body to its
+    // signature. Unlike the removed metadata fallback, this assertion is
+    // method-specific and integrity-protected during the pre-JWT login flow.
+    const userId = data.userId?.trim();
+    if (!userId) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,
-        message: 'Missing user context',
+        message: 'Missing login user id',
       });
     }
 
-    // fetch & mint for the *context* user
-    const req = userv1.GetUserWithHashRequest.create({ id: ctx.userId });
-    const uw = await this.grpc.getUserWithHash(req, ctx.userId);
+    const req = userv1.GetUserWithHashRequest.create({ id: userId });
+    const uw = await this.grpc.getUserWithHash(req);
+    if (!uw.id || uw.id !== userId) {
+      throw new RpcException({
+        code: status.UNAUTHENTICATED,
+        message: 'Invalid login user id',
+      });
+    }
 
     const user: AuthUserDto = {
       id: uw.id,
@@ -160,54 +146,25 @@ export class AuthGrpcController {
   }
 
   // PUBLIC: used by guards/services to validate AT
-  @Public({ gatewayOnly: true })
+  @Public()
+  @InternalOnly()
+  @AllowedS2SCallers(
+    'auth-service',
+    'user-service',
+    'settings-service',
+    'blog-service',
+    'product-service',
+    'media-service',
+    'taxonomy-service',
+    'order-service',
+  )
   @GrpcMethod('AuthService', 'ValidateToken')
   async validateToken(
     data: ValidateTokenRequest,
   ): Promise<ValidateTokenResponse> {
-    const accessSecret =
-      this.cfg.get<string>('JWT_ACCESS_SECRET') ??
-      this.cfg.get<string>('JWT_SECRET');
-
-    if (!accessSecret) {
-      console.error('[ValidateToken] missing JWT secrets in environment');
-      return authv1.ValidateTokenResponse.create({
-        isValid: false,
-        userId: '',
-        email: '',
-        role: '',
-      });
-    }
-
     try {
-      const verified: unknown = jsonwebtoken.verify(
-        data.token,
-        accessSecret as jsonwebtoken.Secret,
-      );
-      if (!isAuthTokenPayload(verified)) {
-        return authv1.ValidateTokenResponse.create({
-          isValid: false,
-          userId: '',
-          email: '',
-          role: '',
-        });
-      }
-
-      const payload = verified;
-
-      // 🔒 Redis-based freshness checks (authoritative)
-      if (await this.authRedis.isUserDisabled(payload.sub)) {
-        return authv1.ValidateTokenResponse.create({
-          isValid: false,
-          userId: '',
-          email: '',
-          role: '',
-        });
-      }
-
-      const currentVersion = await this.authRedis.getTokenVersion(payload.sub);
-
-      if (payload.tv !== currentVersion) {
+      const validation = await this.accessTokens.validate(data.token);
+      if (!validation.valid) {
         return authv1.ValidateTokenResponse.create({
           isValid: false,
           userId: '',
@@ -218,12 +175,13 @@ export class AuthGrpcController {
 
       return authv1.ValidateTokenResponse.create({
         isValid: true,
-        userId: payload.sub,
-        email: payload.email,
-        role: payload.role,
+        userId: validation.payload.sub,
+        email: validation.payload.email,
+        role: validation.payload.role,
+        sessionRef: validation.sessionRef,
       });
-    } catch (err: unknown) {
-      console.error('[ValidateToken] failed:', errorMessage(err));
+    } catch {
+      this.logger.error('validateToken() failed: validation unavailable');
       return authv1.ValidateTokenResponse.create({
         isValid: false,
         userId: '',

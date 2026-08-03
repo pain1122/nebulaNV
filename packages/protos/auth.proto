@@ -45,6 +45,7 @@ message ValidateTokenResponse {
   string userId  = 2;
   string email   = 3;
   string role    = 4;
+  string sessionRef = 5; // non-secret HMAC reference; never the raw session id
 }
 
 message GetProfileRequest {

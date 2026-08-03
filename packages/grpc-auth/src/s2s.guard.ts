@@ -1,136 +1,339 @@
-import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { RpcException } from "@nestjs/microservices";
-import { status } from "@grpc/grpc-js";
+import { status, type Metadata } from "@grpc/grpc-js";
 import {
-  firstMetadataValue,
   type ContextCarrier,
+  type GrpcServerCallWithContext,
   type HttpRequestWithContext,
   type MetadataWithContext,
   type RpcContextWithContext,
 } from "./context";
 import {
-  PublicFlags,
-  PUBLIC_FLAGS_KEY,
+  ALLOWED_S2S_CALLERS_KEY,
+  INTERNAL_ONLY_KEY,
   IS_PUBLIC_KEY,
+  PUBLIC_FLAGS_KEY,
+  type PublicFlags,
 } from "./public.decorator";
 import {
-  resolveS2SSignHeader,
-  resolveAllowedServices,
-  X_SVC_HEADER,
-  resolveInboundInterserviceSecrets,
-  resolveInboundGatewaySecrets,
-  resolveGatewayServiceNames,
-} from "./tokens";
-import {
-  deriveServiceSecret,
-  signS2S,
-  minuteBucket,
-  S2S_METHOD_CANONICAL,
-  S2S_PATH_CANONICAL,
+  S2S_PROTOCOL_VERSION,
+  verifyS2SSignature,
+  type S2SCallerKind,
+  type S2SSignedEnvelope,
 } from "./s2s.crypto";
+import { S2SReplayStore } from "./s2s-replay.store";
+import { getS2SServerContext } from "./s2s.transport";
+import {
+  X_REQUEST_ID_HEADER,
+  X_S2S_BODY_SHA256_HEADER,
+  X_S2S_ISSUED_AT_HEADER,
+  X_S2S_KEY_ID_HEADER,
+  X_S2S_KIND_HEADER,
+  X_S2S_METHOD_HEADER,
+  X_S2S_NONCE_HEADER,
+  X_S2S_PATH_HEADER,
+  X_S2S_TARGET_HEADER,
+  X_S2S_VERSION_HEADER,
+  X_SVC_HEADER,
+  requireServiceName,
+  resolveInboundS2SKeySet,
+  resolveS2SMaxClockSkewMs,
+  resolveS2SSignHeader,
+  type S2SKey,
+} from "./tokens";
+
+type HttpRequest = HttpRequestWithContext & {
+  method?: string;
+  path?: string;
+  originalUrl?: string;
+  body?: unknown;
+};
+
+const SAFE_FIELD = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$/;
+const SAFE_PATH = /^\/[A-Za-z0-9][A-Za-z0-9._:@/-]{0,254}$/;
+const HEX_64 = /^[a-f0-9]{64}$/i;
 
 @Injectable()
 export class S2SGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly replayStore: S2SReplayStore,
+  ) {}
 
-  canActivate(ctx: ExecutionContext): boolean {
-    // 1️⃣ Skip if marked @Public()
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    const isRpc = ctx.getType<"http" | "rpc">() === "rpc";
     const isPublic =
       this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
         ctx.getHandler?.(),
         ctx.getClass?.(),
       ]) ?? false;
-
     const publicFlags =
       this.reflector.getAllAndOverride<PublicFlags>(PUBLIC_FLAGS_KEY, [
         ctx.getHandler?.(),
         ctx.getClass?.(),
       ]) ?? {};
+    const internalOnly =
+      this.reflector.getAllAndOverride<boolean>(INTERNAL_ONLY_KEY, [
+        ctx.getHandler?.(),
+        ctx.getClass?.(),
+      ]) ?? false;
 
-    const requireS2S = !isPublic || publicFlags.gatewayOnly === true;
+    // Every gRPC method is an internal transport boundary. @Public only makes
+    // the end-user JWT optional; it never disables caller authentication.
+    const requireS2S =
+      isRpc || internalOnly || publicFlags.gatewayOnly === true || !isPublic;
     if (!requireS2S) return true;
 
-    const meta = ctx.getArgByIndex<MetadataWithContext | undefined>(1);
-    if (!meta) return this.deny(ctx, "missing_metadata");
+    const metadata = ctx.getArgByIndex<MetadataWithContext | undefined>(1);
+    if (!metadata) return this.unauthenticated(ctx, "s2s_metadata_missing");
 
-    const header = resolveS2SSignHeader();
-    const sig = firstMetadataValue(meta, header) ?? "";
-    if (!sig) return this.deny(ctx, "missing_signature");
-    const svc = firstMetadataValue(meta, X_SVC_HEADER) ?? "";
-    if (!svc) return this.deny(ctx, "missing_service_name");
-
-    const allowed = resolveAllowedServices();
-    if (allowed.length > 0 && !allowed.includes(svc)) {
-      return this.deny(ctx, "service_not_allowed");
-    }
-    const gatewayCallers = resolveGatewayServiceNames();
-    const isGatewayCaller = gatewayCallers.includes(svc);
-
-    const secrets = isGatewayCaller
-      ? resolveInboundGatewaySecrets()
-      : resolveInboundInterserviceSecrets();
-
-    if (!secrets.length) {
-      return this.deny(
-        ctx,
-        isGatewayCaller
-          ? "gateway_secret_not_configured"
-          : "s2s_not_configured",
-      );
+    const signatureHeader = this.safeConfig(ctx, () => resolveS2SSignHeader());
+    const requiredHeaders = [
+      signatureHeader,
+      X_SVC_HEADER,
+      X_S2S_VERSION_HEADER,
+      X_S2S_KIND_HEADER,
+      X_S2S_TARGET_HEADER,
+      X_S2S_METHOD_HEADER,
+      X_S2S_PATH_HEADER,
+      X_S2S_ISSUED_AT_HEADER,
+      X_S2S_NONCE_HEADER,
+      X_REQUEST_ID_HEADER,
+      X_S2S_KEY_ID_HEADER,
+      X_S2S_BODY_SHA256_HEADER,
+    ];
+    const values = new Map<string, string>();
+    for (const header of requiredHeaders) {
+      const value = this.singleHeader(metadata, header);
+      if (!value) {
+        return this.unauthenticated(ctx, `s2s_${header}_missing_or_duplicate`);
+      }
+      values.set(header, value);
     }
 
-    const now = minuteBucket();
+    const version = values.get(X_S2S_VERSION_HEADER)!;
+    if (version !== S2S_PROTOCOL_VERSION) {
+      return this.unauthenticated(ctx, "s2s_version_unsupported");
+    }
 
-    for (const master of secrets) {
-      const derived = deriveServiceSecret(master, svc);
+    const kindValue = values.get(X_S2S_KIND_HEADER)!;
+    if (kindValue !== "service" && kindValue !== "gateway") {
+      return this.unauthenticated(ctx, "s2s_kind_invalid");
+    }
+    const kind: S2SCallerKind = kindValue;
+    const caller = values.get(X_SVC_HEADER)!;
+    const target = values.get(X_S2S_TARGET_HEADER)!;
+    const method = values.get(X_S2S_METHOD_HEADER)!;
+    const path = values.get(X_S2S_PATH_HEADER)!;
+    const nonce = values.get(X_S2S_NONCE_HEADER)!;
+    const requestId = values.get(X_REQUEST_ID_HEADER)!;
+    const keyId = values.get(X_S2S_KEY_ID_HEADER)!;
+    const bodySha256 = values.get(X_S2S_BODY_SHA256_HEADER)!;
+    const signature = values.get(signatureHeader)!;
 
-      const candidates = [
-        signS2S(derived, svc, S2S_METHOD_CANONICAL, S2S_PATH_CANONICAL, now),
-        signS2S(
-          derived,
-          svc,
-          S2S_METHOD_CANONICAL,
-          S2S_PATH_CANONICAL,
-          now - 1,
-        ),
-      ];
-      if (candidates.includes(sig)) {
-        this.attachSvc(ctx, svc);
-        return true;
+    for (const [label, value] of [
+      ["caller", caller],
+      ["target", target],
+      ["method", method],
+      ["nonce", nonce],
+      ["request_id", requestId],
+      ["key_id", keyId],
+    ] as const) {
+      if (!SAFE_FIELD.test(value)) {
+        return this.unauthenticated(ctx, `s2s_${label}_invalid`);
+      }
+    }
+    if (!SAFE_PATH.test(path)) {
+      return this.unauthenticated(ctx, "s2s_path_invalid");
+    }
+    if (!HEX_64.test(bodySha256) || !HEX_64.test(signature)) {
+      return this.unauthenticated(ctx, "s2s_digest_or_signature_invalid");
+    }
+
+    const issuedAtMs = Number(values.get(X_S2S_ISSUED_AT_HEADER));
+    const now = Date.now();
+    const maxSkewMs = this.safeConfig(ctx, () => resolveS2SMaxClockSkewMs());
+    if (
+      !Number.isSafeInteger(issuedAtMs) ||
+      issuedAtMs <= 0 ||
+      Math.abs(now - issuedAtMs) > maxSkewMs
+    ) {
+      return this.unauthenticated(ctx, "s2s_timestamp_out_of_bounds");
+    }
+
+    const expectedTarget = this.safeConfig(ctx, () => requireServiceName());
+    if (target !== expectedTarget) {
+      return this.unauthenticated(ctx, "s2s_target_mismatch");
+    }
+
+    if (isRpc) {
+      const trusted = getS2SServerContext(metadata);
+      const call = ctx.getArgByIndex<GrpcServerCallWithContext | undefined>(2);
+      if (!trusted) {
+        return this.unavailable(ctx, "s2s_server_interceptor_missing");
+      }
+      if (!call || call.getPath() !== trusted.path) {
+        return this.unavailable(ctx, "s2s_server_call_context_invalid");
+      }
+      if (trusted.requestStream) {
+        return this.unauthenticated(ctx, "s2s_request_stream_not_supported");
+      }
+      if (method !== trusted.method || path !== trusted.path) {
+        return this.unauthenticated(ctx, "s2s_rpc_binding_mismatch");
+      }
+      if (!trusted.bodySha256 || bodySha256 !== trusted.bodySha256) {
+        return this.unauthenticated(ctx, "s2s_body_binding_mismatch");
+      }
+    } else {
+      const request = ctx.switchToHttp().getRequest<HttpRequest | undefined>();
+      const expectedMethod = request?.method?.toUpperCase();
+      const expectedPath = request?.path ?? request?.originalUrl;
+      if (!expectedMethod || !expectedPath) {
+        return this.unavailable(ctx, "s2s_http_route_context_missing");
+      }
+      if (method !== expectedMethod || path !== expectedPath) {
+        return this.unauthenticated(ctx, "s2s_http_binding_mismatch");
       }
     }
 
-    return this.deny(ctx, "invalid_s2s_signature");
+    const keySet = this.safeConfig(ctx, () =>
+      resolveInboundS2SKeySet(kind, caller),
+    );
+    if (!keySet) {
+      return this.unauthenticated(ctx, "s2s_caller_not_trusted");
+    }
+
+    const key = this.selectKey(keySet.current, keySet.previous, keyId, now);
+    if (!key) return this.unauthenticated(ctx, "s2s_key_unknown_or_expired");
+
+    const envelope: S2SSignedEnvelope = {
+      version: S2S_PROTOCOL_VERSION,
+      kind,
+      caller,
+      target,
+      method,
+      path,
+      issuedAtMs,
+      nonce,
+      requestId,
+      keyId,
+      bodySha256,
+    };
+    if (!verifyS2SSignature(key.secret, envelope, signature)) {
+      return this.unauthenticated(ctx, "s2s_signature_invalid");
+    }
+
+    if (publicFlags.gatewayOnly && kind !== "gateway") {
+      return this.forbidden(ctx, "s2s_gateway_caller_required");
+    }
+    if (internalOnly && kind !== "service") {
+      return this.forbidden(ctx, "s2s_service_caller_required");
+    }
+
+    const allowedCallers =
+      this.reflector.getAllAndOverride<string[]>(ALLOWED_S2S_CALLERS_KEY, [
+        ctx.getHandler?.(),
+        ctx.getClass?.(),
+      ]) ?? [];
+    if (allowedCallers.length > 0 && !allowedCallers.includes(caller)) {
+      return this.forbidden(ctx, "s2s_caller_not_allowed_for_route");
+    }
+
+    const replayTtlMs = Math.max(1_000, issuedAtMs + maxSkewMs - now + 1_000);
+    let claimed: boolean;
+    try {
+      claimed = await this.replayStore.claim(
+        [kind, caller, target, keyId, nonce].join("|"),
+        replayTtlMs,
+      );
+    } catch {
+      return this.unavailable(ctx, "s2s_replay_store_unavailable");
+    }
+    if (!claimed) return this.unauthenticated(ctx, "s2s_request_replayed");
+
+    this.attachVerifiedCaller(ctx, caller, kind, requestId);
+    return true;
   }
 
-  /**
-   * Utility: throw context-appropriate exceptions
-   */
-  private deny(ctx: ExecutionContext, message: string): never {
-    const type = ctx.getType<"http" | "rpc">();
-    if (type === "rpc") {
+  private singleHeader(metadata: Metadata, key: string): string | undefined {
+    const values = metadata.get(key);
+    if (values.length !== 1 || typeof values[0] !== "string") return undefined;
+    return values[0];
+  }
+
+  private selectKey(
+    current: S2SKey,
+    previous: (S2SKey & { notAfterMs: number }) | undefined,
+    keyId: string,
+    now: number,
+  ): S2SKey | undefined {
+    if (current.id === keyId) return current;
+    if (previous?.id === keyId && previous.notAfterMs >= now) return previous;
+    return undefined;
+  }
+
+  private safeConfig<T>(ctx: ExecutionContext, resolve: () => T): T {
+    try {
+      return resolve();
+    } catch {
+      return this.unavailable(ctx, "s2s_configuration_invalid");
+    }
+  }
+
+  private unauthenticated(ctx: ExecutionContext, message: string): never {
+    if (ctx.getType<"http" | "rpc">() === "rpc") {
       throw new RpcException({ code: status.UNAUTHENTICATED, message });
     }
-    throw new RpcException({
-      code: status.UNAUTHENTICATED,
-      message: "invalid_s2s_signature",
-    });
+    throw new UnauthorizedException(message);
   }
 
-  private attachSvc(ctx: ExecutionContext, svc: string): void {
-    const req = ctx
-      .switchToHttp()
-      .getRequest<HttpRequestWithContext | undefined>();
-    if (req) req.svc = svc;
+  private forbidden(ctx: ExecutionContext, message: string): never {
+    if (ctx.getType<"http" | "rpc">() === "rpc") {
+      throw new RpcException({ code: status.PERMISSION_DENIED, message });
+    }
+    throw new ForbiddenException(message);
+  }
 
-    const meta = ctx.getArgByIndex<MetadataWithContext | undefined>(1);
-    if (meta) meta.svc = svc;
+  private unavailable(ctx: ExecutionContext, message: string): never {
+    if (ctx.getType<"http" | "rpc">() === "rpc") {
+      throw new RpcException({ code: status.UNAVAILABLE, message });
+    }
+    throw new ServiceUnavailableException(message);
+  }
 
-    const call = ctx
-      .switchToRpc()
-      .getContext<RpcContextWithContext | undefined>();
-    if (call) call.svc = svc;
-    (ctx as ExecutionContext & ContextCarrier).svc = svc;
+  private attachVerifiedCaller(
+    ctx: ExecutionContext,
+    svc: string,
+    svcKind: S2SCallerKind,
+    requestId: string,
+  ): void {
+    const attach = (carrier: ContextCarrier | undefined) => {
+      if (!carrier) return;
+      carrier.svc = svc;
+      carrier.svcKind = svcKind;
+      carrier.requestId = requestId;
+    };
+
+    if (ctx.getType<"http" | "rpc">() === "http") {
+      attach(
+        ctx.switchToHttp().getRequest<HttpRequestWithContext | undefined>(),
+      );
+    } else {
+      // In Nest RPC contexts switchToHttp().getRequest() can alias the decoded
+      // protobuf body. Never attach trusted transport context to application
+      // data; class-validator correctly treats those fields as untrusted.
+      attach(ctx.getArgByIndex<MetadataWithContext | undefined>(1));
+      attach(ctx.switchToRpc().getContext<RpcContextWithContext | undefined>());
+      attach(ctx.getArgByIndex<GrpcServerCallWithContext | undefined>(2));
+    }
+    attach(ctx as ExecutionContext & ContextCarrier);
   }
 }

@@ -1,16 +1,19 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { status } from '@grpc/grpc-js';
+import {
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
 import { AuthService } from '../../src/auth/auth.service';
 import { GrpcAuthService } from '../../src/auth/grpc/grpc-auth.service';
-import type { AuthTokenPayload, AuthUserDto } from '../../src/auth/auth.types';
+import type {
+  AuthUserDto,
+  RefreshTokenPayload,
+} from '../../src/auth/auth.types';
 import { AuthRedisService } from '../../src/auth/redis/auth-redis.service';
-
-type StoredUserWithHash = Awaited<
-  ReturnType<GrpcAuthService['getUserWithHash']>
->;
 
 describe('AuthService security behaviors', () => {
   let authService: AuthService;
@@ -24,23 +27,15 @@ describe('AuthService security behaviors', () => {
     role: 'user',
   };
 
-  const refreshPayload: AuthTokenPayload = {
+  const refreshPayload: RefreshTokenPayload = {
     sub: user.id,
     email: user.email,
     role: user.role,
     tv: 1,
+    sid: 'session-1',
+    jti: 'refresh-1',
+    typ: 'refresh',
   };
-
-  async function storedUserWithHash(
-    refreshToken: string,
-  ): Promise<StoredUserWithHash> {
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      refreshToken: await bcrypt.hash(refreshToken, 10),
-    } as StoredUserWithHash;
-  }
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
@@ -49,31 +44,42 @@ describe('AuthService security behaviors', () => {
         {
           provide: AuthRedisService,
           useValue: {
-            getTokenVersion: jest.fn(),
+            getTokenVersion: jest.fn().mockResolvedValue(1),
             bumpTokenVersion: jest.fn(),
-            isUserDisabled: jest.fn(),
-            disableUser: jest.fn(),
-            enableUser: jest.fn(),
+            isUserDisabled: jest.fn().mockResolvedValue(false),
+            createRefreshSession: jest.fn(),
+            rotateRefreshSession: jest.fn().mockResolvedValue('rotated'),
+            revokeRefreshSession: jest.fn(),
+            revokeAllRefreshSessions: jest.fn(),
           },
         },
         {
           provide: JwtService,
           useValue: {
-            sign: jest.fn().mockReturnValue('jwt-token'),
+            sign: jest.fn((payload: { typ?: string }) =>
+              payload.typ === 'refresh' ? 'new-refresh-token' : 'access-token',
+            ),
             verify: jest.fn(),
+            decode: jest.fn().mockReturnValue({
+              exp: Math.floor(Date.now() / 1000) + 3600,
+            }),
           },
         },
         {
           provide: GrpcAuthService,
           useValue: {
+            getUser: jest.fn(),
             getUserWithHash: jest.fn(),
-            setRefreshToken: jest.fn(),
           },
         },
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn(),
+            get: jest.fn((key: string) => {
+              if (key === 'JWT_REFRESH_SECRET') return 'refresh-secret';
+              if (key === 'JWT_REFRESH_EXPIRATION') return '7d';
+              return undefined;
+            }),
           },
         },
       ],
@@ -98,21 +104,61 @@ describe('AuthService security behaviors', () => {
     });
   });
 
-  describe('Refresh token rotation', () => {
-    it('does not bump token version during refreshTokens', async () => {
-      jwt.verify.mockReturnValue(refreshPayload);
-      redis.getTokenVersion.mockResolvedValue(1);
-      grpc.getUserWithHash.mockResolvedValue(
-        await storedUserWithHash('valid-refresh-token'),
+  describe('Profile translation', () => {
+    it('preserves missing access token as unauthorized', async () => {
+      await expect(authService.getProfile(user.id, '')).rejects.toBeInstanceOf(
+        UnauthorizedException,
       );
-
-      await authService.refreshTokens('valid-refresh-token');
-
-      expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
-      expect(grpc.setRefreshToken).toHaveBeenCalledTimes(1);
+      expect(grpc.getUser).not.toHaveBeenCalled();
     });
 
-    it('rejects a refresh token with an incomplete payload before user lookup', async () => {
+    it.each([
+      {
+        code: status.NOT_FOUND,
+        details: 'user_not_found',
+        exception: NotFoundException,
+      },
+      {
+        code: status.UNAVAILABLE,
+        details: 'user_unavailable',
+        exception: ServiceUnavailableException,
+      },
+    ])(
+      'maps user-service status $code without collapsing it',
+      async ({ code, details, exception }) => {
+        grpc.getUser.mockRejectedValue({ code, details });
+
+        await expect(
+          authService.getProfile(user.id, 'access-token'),
+        ).rejects.toBeInstanceOf(exception);
+      },
+    );
+  });
+
+  describe('Refresh token rotation', () => {
+    beforeEach(() => {
+      jwt.verify.mockReturnValue(refreshPayload);
+      grpc.getUserWithHash.mockResolvedValue({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      } as Awaited<ReturnType<GrpcAuthService['getUserWithHash']>>);
+    });
+
+    it('rotates one session without bumping the global token version', async () => {
+      await authService.refreshTokens('valid-refresh-token');
+
+      expect(redis.rotateRefreshSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: user.id,
+          sessionId: refreshPayload.sid,
+          expectedTokenId: refreshPayload.jti,
+        }),
+      );
+      expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
+    });
+
+    it('rejects a structurally invalid refresh payload before user lookup', async () => {
       jwt.verify.mockReturnValue({ sub: user.id });
 
       await expect(
@@ -120,7 +166,7 @@ describe('AuthService security behaviors', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(grpc.getUserWithHash).not.toHaveBeenCalled();
-      expect(grpc.setRefreshToken).not.toHaveBeenCalled();
+      expect(redis.rotateRefreshSession).not.toHaveBeenCalled();
     });
 
     it('rejects a refresh token whose signature cannot be verified', async () => {
@@ -133,61 +179,43 @@ describe('AuthService security behaviors', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(grpc.getUserWithHash).not.toHaveBeenCalled();
-      expect(grpc.setRefreshToken).not.toHaveBeenCalled();
+      expect(redis.rotateRefreshSession).not.toHaveBeenCalled();
     });
 
-    it('rejects a stolen refresh token when the stored hash does not match', async () => {
-      jwt.verify.mockReturnValue(refreshPayload);
-      grpc.getUserWithHash.mockResolvedValue(
-        await storedUserWithHash('different-refresh-token'),
-      );
+    it('rejects stale token versions before rotating the session', async () => {
+      redis.getTokenVersion.mockResolvedValue(refreshPayload.tv + 1);
 
       await expect(
-        authService.refreshTokens('stolen-refresh-token'),
+        authService.refreshTokens('stale-refresh-token'),
       ).rejects.toBeInstanceOf(UnauthorizedException);
 
-      expect(redis.getTokenVersion).not.toHaveBeenCalled();
-      expect(grpc.setRefreshToken).not.toHaveBeenCalled();
+      expect(grpc.getUserWithHash).not.toHaveBeenCalled();
+      expect(redis.rotateRefreshSession).not.toHaveBeenCalled();
     });
 
-    it('rejects refresh when there is no stored refresh token hash', async () => {
-      jwt.verify.mockReturnValue(refreshPayload);
-      grpc.getUserWithHash.mockResolvedValue({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        refreshToken: '',
-      } as StoredUserWithHash);
+    it('rejects a detected replay after the session family is revoked', async () => {
+      redis.rotateRefreshSession.mockResolvedValue('replayed');
 
       await expect(
-        authService.refreshTokens('valid-looking-refresh-token'),
+        authService.refreshTokens('replayed-refresh-token'),
       ).rejects.toBeInstanceOf(UnauthorizedException);
 
-      expect(redis.getTokenVersion).not.toHaveBeenCalled();
-      expect(grpc.setRefreshToken).not.toHaveBeenCalled();
+      expect(redis.rotateRefreshSession).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Logout behavior', () => {
-    it('clears stored refresh token and bumps token version on global logout', async () => {
-      await authService.logout({
-        userId: user.id,
-        allDevices: true,
-      });
+    it('revokes every session and bumps token version on all-device logout', async () => {
+      await authService.logout({ userId: user.id, allDevices: true });
 
-      expect(grpc.setRefreshToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: user.id,
-          refreshToken: '',
-        }),
-      );
+      expect(redis.revokeAllRefreshSessions).toHaveBeenCalledWith(user.id);
       expect(redis.bumpTokenVersion).toHaveBeenCalledWith(user.id);
     });
 
-    it('does not clear or bump when single-device logout gets the wrong refresh token', async () => {
-      grpc.getUserWithHash.mockResolvedValue(
-        await storedUserWithHash('real-refresh-token'),
-      );
+    it('does not revoke a session when the supplied refresh token is invalid', async () => {
+      jwt.verify.mockImplementation(() => {
+        throw new Error('invalid');
+      });
 
       await authService.logout({
         userId: user.id,
@@ -195,14 +223,12 @@ describe('AuthService security behaviors', () => {
         allDevices: false,
       });
 
-      expect(grpc.setRefreshToken).not.toHaveBeenCalled();
+      expect(redis.revokeRefreshSession).not.toHaveBeenCalled();
       expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
     });
 
-    it('clears and bumps on single-device logout only when the refresh token matches', async () => {
-      grpc.getUserWithHash.mockResolvedValue(
-        await storedUserWithHash('real-refresh-token'),
-      );
+    it('revokes only the matching session on current-session logout', async () => {
+      jwt.verify.mockReturnValue(refreshPayload);
 
       await authService.logout({
         userId: user.id,
@@ -210,13 +236,12 @@ describe('AuthService security behaviors', () => {
         allDevices: false,
       });
 
-      expect(grpc.setRefreshToken).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: user.id,
-          refreshToken: '',
-        }),
+      expect(redis.revokeRefreshSession).toHaveBeenCalledWith(
+        user.id,
+        refreshPayload.sid,
       );
-      expect(redis.bumpTokenVersion).toHaveBeenCalledWith(user.id);
+      expect(redis.revokeAllRefreshSessions).not.toHaveBeenCalled();
+      expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
     });
   });
 });

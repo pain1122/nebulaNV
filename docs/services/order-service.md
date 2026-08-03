@@ -1,6 +1,6 @@
 # Order Service
 
-Last reviewed: 2026-06-17
+Last reviewed: 2026-07-21
 
 ## Purpose
 
@@ -18,7 +18,7 @@ Order-service does not own product catalog data. It fetches product details from
 - List current user's orders.
 - Get current user's order by ID.
 - Admin order status update.
-- DB-backed `/health`.
+- Shared liveness plus Postgres/S2S-backed `/health/ready`; `/health` remains a readiness alias.
 
 ## Current HTTP Contract
 
@@ -36,7 +36,7 @@ Routes:
 Access:
 
 - Cart, checkout, and user order reads require `user`.
-- Status update requires `admin`.
+- Status update requires `admin` or `root-admin`.
 
 Identity rule:
 
@@ -46,6 +46,8 @@ Identity rule:
 ## Current gRPC Contract
 
 Proto: `packages/protos/order.proto`
+
+Generated controller types: `orderv1` from `@nebula/protos`. The gRPC controller derives its request shapes from these types, removing generated-only `$type` and preserving the transport's optional-scalar omission behavior instead of maintaining local proto-shaped duplicates.
 
 Service: `OrderService`
 
@@ -64,9 +66,18 @@ Methods:
 Identity rule:
 
 - User-owned gRPC operations use `@RequireUserId()` and resolve actor identity from guarded metadata/context.
-- Request `userId` should not override the authenticated context user.
+- Request `userId` does not override the authenticated context user.
+- `UpdateOrderStatus` requires verified `admin` or `root-admin` actor context, matching the HTTP policy.
+- Product lookup failures retain product-service status through the shared downstream translator.
+- Updating the status of a missing order returns `404 order_not_found` over HTTP and `NOT_FOUND` over gRPC.
+- Settings-service failure while reading cart TTL keeps the intentional 30-minute fallback.
 
 ## Current DB Shape
+
+The root Prisma commands include this service last. Its seed is intentionally
+empty because order-service currently requires no base rows. See
+[Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
 
 Main Prisma models:
 
@@ -142,6 +153,7 @@ HTTP:
 - User can list orders.
 - User can get own order.
 - Admin can update order status.
+- Missing product cart input and missing admin status-update targets return their domain `404` messages.
 
 gRPC:
 
@@ -152,6 +164,8 @@ gRPC:
 - ListOrders includes created order.
 - GetOrder returns created order.
 - UpdateOrderStatus changes status to `PAID`.
+- Missing product cart input and missing status-update targets return `NOT_FOUND` with their domain messages.
+- Shared guard tests prove a verified normal user is denied from admin-only RPC policy and verify that `UpdateOrderStatus` carries that policy.
 
 ## Related Files
 
@@ -193,8 +207,6 @@ Tests:
 - Currency policy is not fully standardized yet.
 - Current code derives cart currency from product data; target behavior is settings-service-driven shop currency.
 - Current cart TTL fallback is 30 minutes; target launch default should be 6 hours.
-- gRPC `UpdateOrderStatus` needs stronger explicit admin enforcement review.
-- gRPC tests pass admin S2S metadata for status update, but the controller currently does not visibly check admin role.
 - Order response shape currently relies on Prisma-shaped service return objects; there is no dedicated order mapper yet.
 - No payment flow exists yet; checkout only creates a `PENDING` order.
 - Final payment/customer identity verification is not implemented yet.

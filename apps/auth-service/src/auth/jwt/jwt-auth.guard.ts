@@ -5,8 +5,6 @@ import {
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
@@ -21,7 +19,7 @@ import type {
   AuthenticatedRequestUser,
   MetadataWithAuthUser,
 } from '../auth.types';
-import { isAuthTokenPayload } from '../auth.types';
+import { AccessTokenValidationService } from '../token/access-token-validation.service';
 
 type ExecutionContextWithAuthUser = ExecutionContext & {
   user?: AuthenticatedRequestUser;
@@ -30,8 +28,7 @@ type ExecutionContextWithAuthUser = ExecutionContext & {
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private readonly jwt: JwtService,
-    private readonly cfg: ConfigService,
+    private readonly accessTokens: AccessTokenValidationService,
     private readonly reflector: Reflector,
   ) {}
 
@@ -61,7 +58,7 @@ export class JwtAuthGuard implements CanActivate {
     throw new ForbiddenException(message);
   }
 
-  canActivate(ctx: ExecutionContext): boolean {
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
     // 0) Public routes → allow
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       ctx.getHandler?.(),
@@ -88,23 +85,18 @@ export class JwtAuthGuard implements CanActivate {
     }
     if (!token) this.unauthenticated(ctx, 'Missing Bearer token');
 
-    // 3) Verify locally with ACCESS secret (+ small skew tolerance)
-    const secret = this.cfg.get<string>('JWT_ACCESS_SECRET');
-    let user: AuthenticatedRequestUser;
-    try {
-      const verified: unknown = this.jwt.verify(token, { secret });
-      if (!isAuthTokenPayload(verified)) {
-        this.unauthenticated(ctx, 'Invalid token payload');
-      }
-      user = {
-        userId: verified.sub,
-        email: verified.email,
-        role: verified.role,
-      };
-      // (Optional small skew check is handled by jwt.verify already)
-    } catch {
+    // 3) Use the same signature, disabled-user, and token-version decision as
+    // the public ValidateToken gRPC contract.
+    const validation = await this.accessTokens.validate(token);
+    if (!validation.valid) {
       this.unauthenticated(ctx, 'Invalid or expired token');
     }
+    const user: AuthenticatedRequestUser = {
+      userId: validation.payload.sub,
+      email: validation.payload.email,
+      role: validation.payload.role,
+      sessionRef: validation.sessionRef,
+    };
 
     // 4) Attach user back to context (HTTP + gRPC)
     if (isHttpRequest && req) {

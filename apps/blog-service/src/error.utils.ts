@@ -15,18 +15,3 @@ export function errorMessage(
 
   return fallback;
 }
-
-export function grpcErrorMessage(
-  error: unknown,
-  fallback = "gRPC error",
-): string {
-  if (isRecord(error)) {
-    const details = error.details;
-    if (typeof details === "string") return details;
-
-    const message = error.message;
-    if (typeof message === "string") return message;
-  }
-
-  return errorMessage(error, fallback);
-}

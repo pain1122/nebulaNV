@@ -11,16 +11,14 @@ x-internal-grpc: &internal-grpc
 x-common-service-env: &common-service-env
   NODE_ENV: ${NODE_ENV:-production}
   PUBLIC_MODE: ${PUBLIC_MODE:-GATEWAY_ONLY}
-  GATEWAY_HEADER: ${GATEWAY_HEADER:-x-gateway-sign}
-  GATEWAY_SECRET: ${GATEWAY_SECRET:?GATEWAY_SECRET is required}
-  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
-  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
-  JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
-  JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
-  S2S_SECRET: ${S2S_SECRET:?S2S_SECRET is required}
-  S2S_SECRET_OLD: ${S2S_SECRET_OLD:-}
-  S2S_ALLOWED_SERVICES: ${S2S_ALLOWED_SERVICES:-auth-service,user-service,settings-service,blog-service,product-service,media-service,taxonomy-service,order-service}
-  S2S_GATEWAY_SERVICES: ${S2S_GATEWAY_SERVICES:-gateway,web}
+  S2S_SIGNATURE_HEADER: ${S2S_SIGNATURE_HEADER:-x-s2s-signature}
+  S2S_MAX_CLOCK_SKEW_MS: ${S2S_MAX_CLOCK_SKEW_MS:-30000}
+  S2S_REPLAY_STORE: redis
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+  BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+  HTTP_CORS_ORIGINS: ${HTTP_CORS_ORIGINS:-}
 
 services:
   postgres:
@@ -36,7 +34,11 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required}",
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -44,8 +46,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    ports:
-      - "${REDIS_HOST_PORT:-6379}:6379"
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "${REDIS_PASSWORD:?REDIS_PASSWORD is required}",
+      ]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -64,12 +72,17 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   minio-init:
     image: minio/mc:latest
     depends_on:
       minio:
-        condition: service_started
+        condition: service_healthy
     restart: "no"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
@@ -89,12 +102,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${USER_HTTP_PORT:-3100}:3100"
       - "${USER_GRPC_PORT:-50051}:50051"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: user-service
+      S2S_OUTBOUND_KEYS: ${USER_S2S_OUTBOUND_KEYS:?USER_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${USER_S2S_INBOUND_KEYS:?USER_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${USER_GATEWAY_INBOUND_KEYS:?USER_GATEWAY_INBOUND_KEYS is required}
       PORT: 3100
       GRPC_PORT: 50051
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_users?schema=public"
@@ -107,7 +125,7 @@ services:
       postgres:
         condition: service_healthy
       user-service:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
     ports:
@@ -116,11 +134,18 @@ services:
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: auth-service
+      S2S_OUTBOUND_KEYS: ${AUTH_S2S_OUTBOUND_KEYS:?AUTH_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${AUTH_S2S_INBOUND_KEYS:?AUTH_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${AUTH_GATEWAY_INBOUND_KEYS:?AUTH_GATEWAY_INBOUND_KEYS is required}
       PORT: 3001
       GRPC_PORT: 50052
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
 
   settings-service:
     image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-settings-service:${NEBULA_IMAGE_TAG:-latest}
@@ -128,12 +153,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${SETTINGS_HTTP_PORT:-3010}:3010"
       - "${SETTINGS_GRPC_PORT:-50054}:50054"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: settings-service
+      S2S_OUTBOUND_KEYS: ${SETTINGS_S2S_OUTBOUND_KEYS:?SETTINGS_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${SETTINGS_S2S_INBOUND_KEYS:?SETTINGS_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${SETTINGS_GATEWAY_INBOUND_KEYS:?SETTINGS_GATEWAY_INBOUND_KEYS is required}
       PORT: 3010
       GRPC_PORT: 50054
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_settings?schema=public"
@@ -146,15 +176,20 @@ services:
       postgres:
         condition: service_healthy
       auth-service:
-        condition: service_started
+        condition: service_healthy
       settings-service:
-        condition: service_started
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${TAXONOMY_HTTP_PORT:-3006}:3006"
       - "${TAXONOMY_GRPC_PORT:-50057}:50057"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: taxonomy-service
+      S2S_OUTBOUND_KEYS: ${TAXONOMY_S2S_OUTBOUND_KEYS:?TAXONOMY_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${TAXONOMY_S2S_INBOUND_KEYS:?TAXONOMY_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${TAXONOMY_GATEWAY_INBOUND_KEYS:?TAXONOMY_GATEWAY_INBOUND_KEYS is required}
       PORT: 3006
       GRPC_PORT: 50057
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_taxonomy?schema=public"
@@ -167,17 +202,22 @@ services:
       postgres:
         condition: service_healthy
       auth-service:
-        condition: service_started
+        condition: service_healthy
       settings-service:
-        condition: service_started
+        condition: service_healthy
       taxonomy-service:
-        condition: service_started
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${PRODUCT_HTTP_PORT:-3003}:3003"
       - "${PRODUCT_GRPC_PORT:-50053}:50053"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: product-service
+      S2S_OUTBOUND_KEYS: ${PRODUCT_S2S_OUTBOUND_KEYS:?PRODUCT_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${PRODUCT_S2S_INBOUND_KEYS:?PRODUCT_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${PRODUCT_GATEWAY_INBOUND_KEYS:?PRODUCT_GATEWAY_INBOUND_KEYS is required}
       PORT: 3003
       GRPC_PORT: 50053
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_products?schema=public"
@@ -190,17 +230,22 @@ services:
       postgres:
         condition: service_healthy
       auth-service:
-        condition: service_started
+        condition: service_healthy
       settings-service:
-        condition: service_started
+        condition: service_healthy
       taxonomy-service:
-        condition: service_started
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${BLOG_HTTP_PORT:-3004}:3004"
       - "${BLOG_GRPC_PORT:-50055}:50055"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: blog-service
+      S2S_OUTBOUND_KEYS: ${BLOG_S2S_OUTBOUND_KEYS:?BLOG_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${BLOG_S2S_INBOUND_KEYS:?BLOG_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${BLOG_GATEWAY_INBOUND_KEYS:?BLOG_GATEWAY_INBOUND_KEYS is required}
       PORT: 3004
       GRPC_PORT: 50055
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_blog?schema=public"
@@ -213,17 +258,22 @@ services:
       postgres:
         condition: service_healthy
       auth-service:
-        condition: service_started
+        condition: service_healthy
       settings-service:
-        condition: service_started
+        condition: service_healthy
       product-service:
-        condition: service_started
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${ORDER_HTTP_PORT:-3005}:3005"
       - "${ORDER_GRPC_PORT:-50056}:50056"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: order-service
+      S2S_OUTBOUND_KEYS: ${ORDER_S2S_OUTBOUND_KEYS:?ORDER_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${ORDER_S2S_INBOUND_KEYS:?ORDER_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${ORDER_GATEWAY_INBOUND_KEYS:?ORDER_GATEWAY_INBOUND_KEYS is required}
       PORT: 3005
       GRPC_PORT: 50056
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_order?schema=public"
@@ -236,17 +286,23 @@ services:
       postgres:
         condition: service_healthy
       auth-service:
-        condition: service_started
+        condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     ports:
       - "${MEDIA_HTTP_PORT:-3007}:3007"
       - "${MEDIA_GRPC_PORT:-50058}:50058"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: media-service
+      S2S_OUTBOUND_KEYS: ${MEDIA_S2S_OUTBOUND_KEYS:?MEDIA_S2S_OUTBOUND_KEYS is required}
+      S2S_INBOUND_KEYS: ${MEDIA_S2S_INBOUND_KEYS:?MEDIA_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${MEDIA_GATEWAY_INBOUND_KEYS:?MEDIA_GATEWAY_INBOUND_KEYS is required}
+      MEDIA_DELETE_CONFIRM_SECRET: ${MEDIA_DELETE_CONFIRM_SECRET:?MEDIA_DELETE_CONFIRM_SECRET is required}
       PORT: 3007
       GRPC_PORT: 50058
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_media?schema=public"
@@ -264,9 +320,9 @@ services:
       MEDIA_SIGNED_UPLOAD_TTL_SECONDS: ${MEDIA_SIGNED_UPLOAD_TTL_SECONDS:-600}
       MEDIA_SIGNED_READ_TTL_SECONDS: ${MEDIA_SIGNED_READ_TTL_SECONDS:-300}
       MEDIA_STRICT_READ_TTL_SECONDS: ${MEDIA_STRICT_READ_TTL_SECONDS:-30}
+      MEDIA_SYNC_DELETE_MAX_FILES: ${MEDIA_SYNC_DELETE_MAX_FILES:-500}
       MEDIA_PUBLIC_FOLDER: ${MEDIA_PUBLIC_FOLDER:-uploads}
       MEDIA_PRIVATE_FOLDER: ${MEDIA_PRIVATE_FOLDER:-private/objects}
-      MEDIA_SYSTEM_FOLDER: ${MEDIA_SYSTEM_FOLDER:-system}
 
 volumes:
   pgdata:

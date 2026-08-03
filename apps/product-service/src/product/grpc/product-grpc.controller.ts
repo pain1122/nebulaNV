@@ -1,8 +1,8 @@
-import { Controller, Logger, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Controller, Logger, UsePipes } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 
 import { ProductServiceImpl } from "../product.service";
-import { Public, Roles } from "@nebula/grpc-auth";
+import { createGrpcValidationPipe, Public, Roles } from "@nebula/grpc-auth";
 import { productv1 } from "@nebula/protos";
 
 import { CreateProductDto } from "../dto/create-product.dto";
@@ -15,12 +15,7 @@ import { ListGalleryDto } from "../dto/list-gallery.dto";
 import { ReorderImagesDto } from "../dto/reorder-images.dto";
 import { RemoveImageDto } from "../dto/remove-image.dto";
 
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
+const Pipe = createGrpcValidationPipe();
 
 @Controller()
 export class ProductGrpcController {
@@ -31,7 +26,7 @@ export class ProductGrpcController {
   // CreateProduct (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "CreateProduct")
   create(dto: CreateProductDto) {
     return this.svc.create(dto.data);
@@ -42,7 +37,7 @@ export class ProductGrpcController {
   // Admin-only (guard handles user JWT or signed S2S with injected role)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "UpdateProduct")
   async update(dto: UpdateProductDto) {
     return this.svc.update(dto.id, dto.patch);
@@ -79,7 +74,7 @@ export class ProductGrpcController {
   // DeleteProduct (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "DeleteProduct")
   del(req: IdDto) {
     return this.svc.softDelete(req.id);
@@ -89,7 +84,7 @@ export class ProductGrpcController {
   // RestoreProduct (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "RestoreProduct")
   restore(req: IdDto) {
     return this.svc.restore(req.id);
@@ -99,7 +94,7 @@ export class ProductGrpcController {
   // HardDeleteProduct (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "HardDeleteProduct")
   hardDelete(req: IdDto) {
     return this.svc.hardDelete(req.id);
@@ -109,7 +104,7 @@ export class ProductGrpcController {
   // ApplyDiscountBulk (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "ApplyDiscountBulk")
   applyDiscountBulk(req: ApplyDiscountBulkDto) {
     return this.svc.applyDiscountBulk(req);
@@ -119,7 +114,7 @@ export class ProductGrpcController {
   // AddImages (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "AddImages")
   async addImagesGrpc(req: AddImagesDto) {
     const imgs = await this.svc.addImages(req.productId, req.images ?? []);
@@ -160,7 +155,7 @@ export class ProductGrpcController {
   // ReorderImages (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "ReorderImages")
   async reorderImagesGrpc(req: ReorderImagesDto) {
     const imgs = await this.svc.reorderImages(req.productId, req.orders ?? []);
@@ -179,7 +174,7 @@ export class ProductGrpcController {
   // RemoveImage (Admin only)
   // ------------------------------------------------------
   @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "RemoveImage")
   async removeImageGrpc(req: RemoveImageDto) {
     const imgs = await this.svc.removeImage(

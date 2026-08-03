@@ -1,3 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Workspace packages are injected for deployable images. Refresh every injected
+# runtime copy immediately after its source package is built.
+injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build

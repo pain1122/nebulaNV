@@ -1,21 +1,14 @@
-// apps/order-service/test/grpc/helpers.ts
-import * as crypto from "crypto";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
+import { orderv1 } from "@nebula/protos";
+import {
+  copyS2SSigningIntent,
+  finalizeS2SClientMetadata,
+  markS2SMetadata,
+  registerS2SClientDefinition,
+} from "@nebula/grpc-auth";
 
 export const AUTHORIZATION_HEADER = "authorization";
-export const X_SVC_HEADER = "x-svc";
-export const X_USER_ID_HEADER = "x-user-id";
-export const X_ROLE_HEADER = "x-role";
-export const X_SIGN_HEADER = "x-gateway-sign";
-
-export function minuteBucket(): number {
-  return Math.floor(Date.now() / 60000);
-}
-
-export function hmac(secret: string, payload: string): string {
-  return crypto.createHmac("sha256", secret).update(payload).digest("hex");
-}
 
 export function mdBearer(token?: string): grpc.Metadata {
   const md = new grpc.Metadata();
@@ -23,25 +16,17 @@ export function mdBearer(token?: string): grpc.Metadata {
   return md;
 }
 
-export function mdS2S(opts?: {
-  svc?: string;
-  userId?: string;
-  role?: string;
-}): grpc.Metadata {
-  const md = new grpc.Metadata();
-  const svcName = opts?.svc || process.env.SVC_NAME || "order-service";
-  const header = process.env.GATEWAY_HEADER || X_SIGN_HEADER;
-  const secret = process.env.S2S_SECRET || "";
-
-  const payload = `${svcName}:${minuteBucket()}`;
-  const sign = hmac(secret, payload);
-
-  md.set(X_SVC_HEADER, svcName);
-  md.set(header, sign);
-
-  if (opts?.userId) md.set(X_USER_ID_HEADER, opts.userId);
-  if (opts?.role) md.set(X_ROLE_HEADER, opts.role);
-
+export function mdS2S(): grpc.Metadata {
+  const md = markS2SMetadata(new grpc.Metadata(), {
+    kind: "gateway",
+    serviceName: "gateway",
+    key: {
+      id: "gateway-order-v1",
+      secret:
+        process.env.S2S_TEST_GATEWAY_KEY ??
+        "dev-only-gateway-to-order-s2s-key-0001",
+    },
+  });
   return md;
 }
 
@@ -50,12 +35,14 @@ export function mergeMd(
   b?: grpc.Metadata,
 ): grpc.Metadata | undefined {
   if (!a && !b) return undefined;
-  if (!a) return b;
-  if (!b) return a;
-
   const merged = new grpc.Metadata();
-  for (const [k, v] of a.getMap() as any) merged.set(k, v);
-  for (const [k, v] of b.getMap() as any) merged.set(k, v);
+  for (const source of [a, b]) {
+    if (!source) continue;
+    for (const [key, value] of Object.entries(source.getMap())) {
+      merged.set(key, value);
+    }
+    copyS2SSigningIntent(source, merged);
+  }
   return merged;
 }
 
@@ -72,10 +59,13 @@ export function loadClient<T extends grpc.Client>(
     defaults: true,
     oneofs: true,
   });
-
   const proto = grpc.loadPackageDefinition(def) as any;
-  const ctor = pkg.split(".").reduce((acc, k) => acc[k], proto)[svc];
-  return new ctor(url, grpc.credentials.createInsecure()) as T;
+  const Ctor = pkg.split(".").reduce((current, key) => current[key], proto)[
+    svc
+  ];
+  const client = new Ctor(url, grpc.credentials.createInsecure()) as T;
+  registerS2SClientDefinition(client, orderv1.OrderServiceService);
+  return client;
 }
 
 export function call<T>(
@@ -84,13 +74,16 @@ export function call<T>(
   req: any,
   md?: grpc.Metadata,
 ): Promise<T> {
+  const metadata = finalizeS2SClientMetadata({
+    client,
+    method,
+    request: req,
+    metadata: md,
+  });
   return new Promise<T>((resolve, reject) => {
     const fn: any = (client as any)[method].bind(client);
-    const cb = (err: grpc.ServiceError | null, res: T) => {
-      if (err) return reject(err);
-      resolve(res);
-    };
-    if (md) fn(req, md, cb);
-    else fn(req, cb);
+    fn(req, metadata, (err: grpc.ServiceError | null, response: T) =>
+      err ? reject(err) : resolve(response),
+    );
   });
 }

@@ -197,9 +197,12 @@ console.log("safe multiline script")
 
 TL;DR:
 
-- All backend services expose `/health`.
-- Only some `/health` endpoints currently verify database connectivity.
-- Media-service has the strongest readiness setup right now: HTTP `/health` plus gRPC `Ping`.
+- All backend services expose dependency-free `/health/live`, explicit
+  `/health/ready`, and a `/health` readiness compatibility alias.
+- Readiness checks each service's required local database/Redis/storage
+  dependencies and returns sanitized HTTP `503` responses while degraded.
+- Docker and backend provisioning use `/health/ready`; existing media/order
+  gRPC `Ping` methods remain separate.
 - Most test setup files still prove only that ports are open, not that real gRPC calls work.
 - Full details live in `docs/architecture/testing-and-health.md`.
 
@@ -218,7 +221,8 @@ Preferred test types:
 - Unit/security tests for guards, auth decisions, Redis/session rules, and pure service logic.
 - HTTP e2e tests for public/admin/user-facing routes.
 - gRPC e2e tests for service-to-service contracts.
-- Smoke/health tests for `/health`, gRPC readiness, DB reachability, Redis, MinIO/S3, and S2S connectivity.
+- Smoke/health tests for `/health/ready`, gRPC readiness, DB reachability,
+  Redis, MinIO/S3, and S2S connectivity.
 
 Do not weaken tests just to make them pass. If a test fails, first decide whether the code is wrong, the test is stale, or the contract intentionally changed.
 

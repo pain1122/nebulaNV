@@ -53,6 +53,16 @@ describe("Blog taxonomy HTTP (category.default kind)", () => {
     expect(res.data.scope).toBe("blog");
   });
 
+  it("GET /taxonomies/:kind/:id returns 404 for a missing item", async () => {
+    const res = await fetch(
+      `${BASE}/${KIND}/11111111-1111-4111-8111-111111111111`,
+    );
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(404);
+    expect(body.message).toBe("taxonomy_not_found");
+  });
+
   it("GET /taxonomies/:kind lists and finds the created item", async () => {
     const res = await httpJson<any>(
       "GET",

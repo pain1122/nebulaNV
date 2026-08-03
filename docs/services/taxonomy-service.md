@@ -121,10 +121,9 @@ admin writes, public reads
 
 Current implementation note:
 
-- The direct taxonomy controller does not show explicit `@Public()` or `@Roles()` decorators.
-- Global guards are active from `AppModule`.
-- HTTP tests currently use an admin token for writes.
-- Direct route hardening should be reviewed before treating direct taxonomy HTTP as launch-frozen.
+- Direct list/get routes are explicitly public.
+- Direct create/update/delete routes require `admin` or `root-admin`.
+- Global guards remain active from `AppModule`.
 
 ## gRPC Contract
 
@@ -140,14 +139,18 @@ Current methods:
 - `CreateTaxonomy`
 - `UpdateTaxonomy`
 - `DeleteTaxonomy`
+- `EnsureSystemTaxonomy`
 
-Direct gRPC tests use S2S metadata.
+Direct gRPC requests require a valid S2S envelope.
 
 Current implementation note:
 
-- The direct gRPC controller does not show explicit role decorators.
-- Global guards are active from `AppModule`.
-- Direct gRPC write-role enforcement should be reviewed before final launch.
+- Direct list/get/get-by-slug methods are explicitly public after S2S verification.
+- Direct create/update/delete methods require a verified `admin` or `root-admin` actor.
+- `EnsureSystemTaxonomy` is service-only: product-service can ensure only `product/category.default:uncategorized`, and blog-service can ensure only the matching blog scope.
+- The ensure operation returns an existing record unchanged, creates a fixed system/root record when missing, and rereads the winner after a concurrent duplicate.
+- HTTP and gRPC write policies are kept equivalent by shared wiring tests.
+- Domain `NotFoundException` values keep HTTP `404` and are translated by the shared listener filter to gRPC `NOT_FOUND`.
 
 ## Shared Client Types
 
@@ -163,7 +166,7 @@ Important shared shapes:
 Preferred client helper:
 
 ```ts
-getTaxonomy(client)
+getTaxonomy(client);
 ```
 
 The shared client wraps create/update shapes to match the proto request envelope.
@@ -191,7 +194,15 @@ This prevents product records from accidentally storing blog taxonomy IDs, and v
 - Product-service default initializer ensures `product/category.default:uncategorized`.
 - Product-service stores that default taxonomy ID in settings-service key `product/default_product_category`.
 - Blog-service uses taxonomy-service through a blog-scoped facade.
-- Blog default taxonomy initializer exists, but appears not fully wired as an active provider.
+- Blog default taxonomy initialization is intentionally deferred and remains unwired until blog post creation consumes the default setting or a separately approved launch requirement makes it mandatory.
+
+## Database And Seed Participation
+
+The root Prisma commands include this service after media-service. Its seed is
+intentionally empty: product and blog own their separate default-taxonomy
+initializers and create taxonomy through taxonomy-service contracts. See
+[Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
 
 ## Current Tests
 
@@ -206,8 +217,10 @@ Covered behavior:
 - Child depth/path are computed from parent.
 - List can filter by scope/kind.
 - Get by ID returns taxonomy.
+- Missing ID returns HTTP `404` with `taxonomy_not_found`.
 - Parent with children cannot be deleted.
 - Child can be deleted, then parent can be deleted.
+- Focused unit coverage proves existing, missing, and concurrent ensure-system behavior.
 
 gRPC test file:
 
@@ -219,6 +232,7 @@ Covered behavior:
 - S2S caller can create child taxonomy.
 - List returns created items.
 - Get returns child taxonomy.
+- Missing ID returns gRPC `NOT_FOUND` with `taxonomy_not_found`.
 - Parent with children cannot be deleted.
 - Child can be deleted, then parent can be deleted.
 
@@ -232,43 +246,27 @@ The setup comment says taxonomy-service itself is not waited on there.
 
 ## Health
 
-Current health route:
+Health routes:
 
 ```txt
+GET /health/live
+GET /health/ready
 GET /health
 ```
 
-It is marked public and checks Postgres with:
+They are public. Liveness is dependency-free; readiness and its compatibility
+alias check Postgres with:
 
 ```sql
 SELECT 1
 ```
 
-Healthy response shape:
-
-```ts
-{
-  status: "ok";
-  db: "up";
-  time: string;
-}
-```
-
-Degraded response shape:
-
-```ts
-{
-  status: "degraded";
-  db: "down";
-  error: string;
-}
-```
+Readiness also checks the S2S replay store and returns sanitized HTTP `503`
+responses while degraded.
 
 ## Known Gaps
 
-- Direct taxonomy HTTP/gRPC write access needs explicit final review.
-- Direct tests do not yet prove normal users are denied on writes.
-- Direct tests do not clearly prove public reads without auth.
+- Direct service e2e tests do not yet prove normal-user write denial and anonymous read behavior after the policy alignment.
 - `SettingsClientModule` is imported in taxonomy-service, but no active taxonomy-service usage was found.
 - `meta` exists in service logic and DB, but the proto does not expose full meta.
 - Delete is hard delete; there is no soft delete.

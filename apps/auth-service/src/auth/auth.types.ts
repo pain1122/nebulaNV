@@ -28,15 +28,24 @@ export type TokenPair = {
   refreshToken: string;
 };
 
-export type AuthTokenPayload = {
+type AuthTokenPayloadBase = {
   sub: string;
   email: string;
   role: AuthRole;
   tv: number;
+  sid: string;
+  jti: string;
 };
 
-export type AccessTokenPayload = AuthTokenPayload;
-export type RefreshTokenPayload = AuthTokenPayload;
+export type AccessTokenPayload = AuthTokenPayloadBase & {
+  typ: 'access';
+};
+
+export type RefreshTokenPayload = AuthTokenPayloadBase & {
+  typ: 'refresh';
+};
+
+export type AuthTokenPayload = AccessTokenPayload | RefreshTokenPayload;
 
 export function isAuthTokenPayload(value: unknown): value is AuthTokenPayload {
   if (typeof value !== 'object' || value === null) return false;
@@ -46,14 +55,32 @@ export function isAuthTokenPayload(value: unknown): value is AuthTokenPayload {
     typeof payload.sub === 'string' &&
     typeof payload.email === 'string' &&
     isAuthRole(payload.role) &&
-    typeof payload.tv === 'number'
+    typeof payload.tv === 'number' &&
+    typeof payload.sid === 'string' &&
+    payload.sid.length > 0 &&
+    typeof payload.jti === 'string' &&
+    payload.jti.length > 0 &&
+    (payload.typ === 'access' || payload.typ === 'refresh')
   );
+}
+
+export function isAccessTokenPayload(
+  value: unknown,
+): value is AccessTokenPayload {
+  return isAuthTokenPayload(value) && value.typ === 'access';
+}
+
+export function isRefreshTokenPayload(
+  value: unknown,
+): value is RefreshTokenPayload {
+  return isAuthTokenPayload(value) && value.typ === 'refresh';
 }
 
 export type AuthenticatedRequestUser = {
   userId: string;
   email?: string;
   role: AuthRole;
+  sessionRef?: string;
 };
 
 export type AuthenticatedRequest = Request & {

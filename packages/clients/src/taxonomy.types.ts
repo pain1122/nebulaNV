@@ -1,5 +1,6 @@
 // packages/clients/src/taxonomy.types.ts
 import type { Metadata, CallOptions } from "@grpc/grpc-js";
+import type { taxonomy } from "@nebula/protos";
 import type { Observable } from "rxjs";
 
 export type TaxonomyMeta = Record<string, unknown>;
@@ -23,6 +24,10 @@ export type TaxonomyDto = {
 
 export type GetTaxonomyReq = { id: string };
 export type GetBySlugReq = { scope: string; kind: string; slug: string };
+export type EnsureSystemTaxonomyReq = Omit<
+  taxonomy.EnsureSystemTaxonomyRequest,
+  "$type"
+>;
 
 export type CreateTaxonomyReq = {
   scope: string;
@@ -78,6 +83,12 @@ export interface TaxonomyProxy {
   ): Observable<TaxonomyRes>;
   GetBySlug(
     req: GetBySlugReq,
+    meta?: Metadata,
+    opts?: CallOptions,
+  ): Observable<TaxonomyRes>;
+
+  EnsureSystemTaxonomy(
+    req: EnsureSystemTaxonomyReq,
     meta?: Metadata,
     opts?: CallOptions,
   ): Observable<TaxonomyRes>;

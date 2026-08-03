@@ -1,8 +1,20 @@
 import * as Joi from "joi";
+import { s2sEnvSchema } from "@nebula/grpc-auth";
+import {
+  grpcTargetEnvSchema,
+  httpPolicyEnvSchema,
+  jwtAccessVerificationEnvSchema,
+  runtimeEnvSchema,
+  serviceBindEnvSchema,
+} from "@packages/config";
 
 export const envSchema = Joi.object({
-  SVC_NAME: Joi.string().default("settings-service"),
-  GATEWAY_SECRET: Joi.string().min(32).required(),
+  ...runtimeEnvSchema,
+  ...serviceBindEnvSchema("SETTINGS"),
+  ...grpcTargetEnvSchema("AUTH_GRPC_URL"),
+  ...httpPolicyEnvSchema,
+  ...s2sEnvSchema("settings-service"),
+  ...jwtAccessVerificationEnvSchema,
   DATABASE_URL: Joi.string().uri().required(),
   SHADOW_DATABASE_URL: Joi.string().uri().required(),
 });

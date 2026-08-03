@@ -1,14 +1,18 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { APP_GUARD, Reflector } from '@nestjs/core';
+import { APP_GUARD } from '@nestjs/core';
 import { envSchema } from './config/env.validation';
-import { GrpcTokenAuthGuard, AUTH_SERVICE, S2SGuard } from '@nebula/grpc-auth';
+import {
+  AUTH_SERVICE,
+  GRPC_SECURITY_PROVIDERS,
+  GrpcTokenAuthGuard,
+} from '@nebula/grpc-auth';
 import { UserModule } from './user/user.module';
-import { PrismaService } from './prisma.service';
 import { HealthController } from './health.controller';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import * as path from 'path';
+import { createServiceLifecycleProvider } from '@packages/config';
 
 export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
 export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
@@ -45,12 +49,10 @@ export const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
   ],
   controllers: [HealthController],
   providers: [
-    Reflector,
-    PrismaService,
-    S2SGuard,
-    GrpcTokenAuthGuard,
+    createServiceLifecycleProvider('user-service'),
+    ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+    { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },
   ],
 })
 export class AppModule {}

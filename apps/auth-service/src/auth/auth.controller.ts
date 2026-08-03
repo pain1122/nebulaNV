@@ -8,7 +8,6 @@ import {
   UnauthorizedException,
   Get,
   Req,
-  Logger,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -31,8 +30,6 @@ function extractBearer(header?: string): string | undefined {
 
 @Controller('auth')
 export class AuthController {
-  private readonly logger = new Logger(AuthController.name);
-
   constructor(private readonly authService: AuthService) {}
 
   // ---------- PUBLIC ----------
@@ -40,10 +37,7 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
-    this.logger.log(`register() start email=${dto.email}`);
-    const res = await this.authService.register(dto.email, dto.password);
-    this.logger.log(`register() end -> id=${res.id}`);
-    return res;
+    return this.authService.register(dto.email, dto.password);
   }
 
   // ---------- PUBLIC ----------
@@ -51,25 +45,16 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginUserDto) {
-    this.logger.log(`login() start identifier=${dto.identifier}`);
-    console.time('login.validateUser');
     const user = await this.authService.validateUser(
       dto.identifier,
       dto.password,
     );
-    console.timeEnd('login.validateUser');
 
     if (!user) {
-      this.logger.warn(`login() failed for identifier=${dto.identifier}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    console.time('login.issueTokens');
-    const res = await this.authService.login(user);
-    console.timeEnd('login.issueTokens');
-
-    this.logger.log(`login() success for id=${user.id}`);
-    return res;
+    return this.authService.login(user);
   }
 
   // ---------- PUBLIC ----------
@@ -77,13 +62,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto) {
-    this.logger.log(`refresh() start`);
     try {
-      const res = await this.authService.refreshTokens(dto.refreshToken);
-      this.logger.log(`refresh() success`);
-      return res;
+      return await this.authService.refreshTokens(dto.refreshToken);
     } catch {
-      this.logger.warn(`refresh() failed`);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -107,10 +88,6 @@ export class AuthController {
   getProfile(@Req() req: AuthenticatedRequest) {
     const token = extractBearer(req.headers.authorization);
     if (!token) throw new UnauthorizedException('Missing access token');
-    return this.authService.getProfile(
-      req.user!.userId,
-      token,
-      req.user!.userId,
-    );
+    return this.authService.getProfile(req.user!.userId, token);
   }
 }

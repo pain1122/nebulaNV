@@ -1,4 +1,12 @@
 import * as Joi from "joi";
+import { s2sEnvSchema } from "@nebula/grpc-auth";
+import {
+  grpcTargetEnvSchema,
+  httpPolicyEnvSchema,
+  jwtAccessVerificationEnvSchema,
+  runtimeEnvSchema,
+  serviceBindEnvSchema,
+} from "@packages/config";
 
 const folderRoot = Joi.string()
   .trim()
@@ -36,8 +44,12 @@ const folderRoot = Joi.string()
   });
 
 export const envSchema = Joi.object({
-  SVC_NAME: Joi.string().default("media-service"),
-  GATEWAY_SECRET: Joi.string().min(32).required(),
+  ...runtimeEnvSchema,
+  ...serviceBindEnvSchema("MEDIA"),
+  ...grpcTargetEnvSchema("AUTH_GRPC_URL"),
+  ...httpPolicyEnvSchema,
+  ...s2sEnvSchema("media-service"),
+  ...jwtAccessVerificationEnvSchema,
   DATABASE_URL: Joi.string().uri().required(),
   SHADOW_DATABASE_URL: Joi.string().uri().required(),
   MEDIA_STORAGE_DRIVER: Joi.string().valid("s3", "local").default("s3"),
@@ -66,11 +78,15 @@ export const envSchema = Joi.object({
   MEDIA_SIGNED_UPLOAD_TTL_SECONDS: Joi.number().integer().min(1).default(600),
   MEDIA_SIGNED_READ_TTL_SECONDS: Joi.number().integer().min(1).default(300),
   MEDIA_STRICT_READ_TTL_SECONDS: Joi.number().integer().min(1).default(30),
+  MEDIA_DELETE_CONFIRM_SECRET: Joi.string().min(32).required(),
   MEDIA_DELETE_CONFIRM_TTL_SECONDS: Joi.number().integer().min(1).default(30),
-  MEDIA_SYNC_DELETE_MAX_FILES: Joi.number().integer().min(1).max(10_000).default(500),
+  MEDIA_SYNC_DELETE_MAX_FILES: Joi.number()
+    .integer()
+    .min(1)
+    .max(10_000)
+    .default(500),
   MEDIA_PUBLIC_FOLDER: folderRoot.default("uploads"),
   MEDIA_PRIVATE_FOLDER: folderRoot.default("private/objects"),
-  MEDIA_SYSTEM_FOLDER: folderRoot.default("system"),
 }).custom((env: Record<string, unknown>, helpers) => {
   if (
     env.MEDIA_STORAGE_DRIVER === "s3" &&
@@ -80,6 +96,17 @@ export const envSchema = Joi.object({
     return helpers.error("any.custom", {
       message:
         "MEDIA_S3_ENDPOINT or MEDIA_S3_INTERNAL_ENDPOINT is required when MEDIA_STORAGE_DRIVER=s3",
+    });
+  }
+
+  if (
+    env.NODE_ENV === "production" &&
+    env.MEDIA_STORAGE_DRIVER === "s3" &&
+    !env.MEDIA_S3_PUBLIC_ENDPOINT
+  ) {
+    return helpers.error("any.custom", {
+      message:
+        "MEDIA_S3_PUBLIC_ENDPOINT is required in production when MEDIA_STORAGE_DRIVER=s3",
     });
   }
 

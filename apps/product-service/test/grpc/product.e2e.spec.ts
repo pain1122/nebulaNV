@@ -1,10 +1,12 @@
 // apps/product-service/test/grpc/product.e2e.spec.ts
-import { loadClient, call, mdS2S } from "./helpers";
+import { status } from "@grpc/grpc-js";
+import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
 import { getDefaultProductCategoryGrpc } from "../utils/settings";
 
 const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto");
 const URL = process.env.PRODUCT_GRPC_URL || "127.0.0.1:50053";
 const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
+const MISSING_ID = "11111111-1111-4111-8111-111111111111";
 
 type LoginResp = { accessToken: string };
 
@@ -21,7 +23,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
 
   beforeAll(async () => {
     // (Optional) login admin – not strictly needed for S2S, but handy to ensure auth-service is alive
-    await fetch(`${AUTH_HTTP}/auth/login`, {
+    const login = await fetch(`${AUTH_HTTP}/auth/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -29,6 +31,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
         password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
       }),
     }).then((r) => r.json() as Promise<LoginResp>);
+    setS2STestActorToken(login.accessToken);
 
     // Read the default product category from settings via gRPC
     categoryId = await getDefaultProductCategoryGrpc();
@@ -74,5 +77,19 @@ describe("ProductService gRPC (admin required on writes)", () => {
       mdS2S({ role: "admin" }),
     );
     expect(res.data.title).toBe("E2E Widget gRPC Pro");
+  });
+
+  it("UpdateProduct returns NOT_FOUND for a missing product", async () => {
+    await expect(
+      call<any>(
+        client,
+        "UpdateProduct",
+        { id: MISSING_ID, data: { title: "Missing product" } },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.NOT_FOUND,
+      details: "product_not_found",
+    });
   });
 });

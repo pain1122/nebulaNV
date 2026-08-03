@@ -4,6 +4,7 @@ import { httpJson } from "../utils/http";
 const AUTH_HTTP = process.env.AUTH_HTTP_URL!;
 const PRODUCT_HTTP = process.env.PRODUCT_HTTP_URL!;
 const ORDER_HTTP = process.env.ORDER_HTTP_URL!;
+const MISSING_ID = "11111111-1111-4111-8111-111111111111";
 
 type LoginResp = { accessToken: string };
 
@@ -51,6 +52,24 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
     expect(res.data.id).toBeTruthy();
     expect(res.data.items).toBeDefined();
     expect(Array.isArray(res.data.items)).toBe(true);
+  });
+
+  it("POST /orders/cart/items returns 404 for a missing product", async () => {
+    const res = await fetch(`${ORDER_HTTP}/orders/cart/items`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${userToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        productId: MISSING_ID,
+        quantity: 1,
+      }),
+    });
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(404);
+    expect(body.message).toBe("product_not_found");
   });
 
   it("POST /orders/cart/items creates a cart item", async () => {
@@ -140,5 +159,20 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
 
     expect(res.data.id).toBe(orderId);
     expect(res.data.status).toBe("PAID");
+  });
+
+  it("PATCH /orders/:id/status returns 404 for a missing order", async () => {
+    const res = await fetch(`${ORDER_HTTP}/orders/${MISSING_ID}/status`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ status: "PAID" }),
+    });
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(404);
+    expect(body.message).toBe("order_not_found");
   });
 });

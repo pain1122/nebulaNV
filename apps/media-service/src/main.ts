@@ -1,42 +1,71 @@
 import { NestFactory } from "@nestjs/core";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
+import { Logger } from "@nestjs/common";
 import { MediaModule, MEDIA_PROTO } from "./media.module";
+import { media } from "@nebula/protos";
+import {
+  startSecuredGrpc,
+  grpcS2SProtoLoaderOptions,
+  grpcS2SServerChannelOptions,
+} from "@nebula/grpc-auth";
+import {
+  createHttpRequestLoggingMiddleware,
+  createHttpCorsOptionsDelegate,
+  createHttpSecurityHeadersMiddleware,
+  createHttpValidationPipe,
+  logFatalStartup,
+  logServiceReady,
+  resolveServiceBind,
+  serviceLogLevels,
+} from "@packages/config";
 
-function getGrpcBind(): string {
-  // Prefer an explicit port (bind to 0.0.0.0 for container reachability)
-  const port = process.env.GRPC_PORT ?? process.env.MEDIA_GRPC_PORT;
-  if (port) return `0.0.0.0:${port}`;
-
-  // Fallback: listen on 0.0.0.0:50054 (not 127.0.0.1)
-  return "0.0.0.0:50058";
-}
-
-function getHttpPort(): number {
-  // service-specific → generic → default
-  const p = process.env.MEDIA_HTTP_PORT ?? process.env.PORT ?? "3010";
-  return Number(p);
-}
+const SERVICE_NAME = "media-service";
+const logger = new Logger(SERVICE_NAME);
 
 async function bootstrap() {
-  const app = await NestFactory.create(MediaModule); // optional HTTP (health)
+  const app = await NestFactory.create(MediaModule, {
+    logger: serviceLogLevels(),
+  }); // optional HTTP (health)
+  app.enableShutdownHooks();
+  app.use(
+    createHttpRequestLoggingMiddleware(logger, {
+      serviceName: SERVICE_NAME,
+    }),
+  );
+  app.useGlobalPipes(createHttpValidationPipe());
+  app.use(createHttpSecurityHeadersMiddleware());
+  app.enableCors(
+    createHttpCorsOptionsDelegate({
+      origins: process.env.HTTP_CORS_ORIGINS,
+      publicRenderPaths: ["/media/render"],
+    }),
+  );
 
-  const grpcUrl = getGrpcBind();
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package: "media",
-      protoPath: MEDIA_PROTO,
-      url: grpcUrl,
-    },
+  const { httpPort, grpcUrl } = resolveServiceBind(process.env, {
+    servicePrefix: "MEDIA",
+    defaultHttpPort: 3007,
+    defaultGrpcPort: 50058,
   });
+  const micro = app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: "media",
+        protoPath: MEDIA_PROTO,
+        loader: grpcS2SProtoLoaderOptions(),
+        url: grpcUrl,
+        channelOptions: grpcS2SServerChannelOptions(media.MediaServiceService),
+      },
+    },
+    { deferInitialization: true },
+  );
+  await startSecuredGrpc(app, micro);
 
-  await app.startAllMicroservices();
-
-  const httpPort = getHttpPort();
   await app.listen(httpPort);
 
-  console.log(
-    `[media-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
-  );
+  logServiceReady(logger, SERVICE_NAME);
 }
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  logFatalStartup(logger, SERVICE_NAME, error);
+  process.exitCode = 1;
+});

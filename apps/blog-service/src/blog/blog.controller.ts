@@ -7,28 +7,18 @@ import {
   Post,
   Delete,
   Query,
-  UsePipes,
-  ValidationPipe,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import { BlogService } from "./blog.service";
 import { Public, Roles } from "@nebula/grpc-auth";
 import { Throttle } from "@nestjs/throttler";
 import {
-  CreatePostDto,
-  UpdatePostDto,
+  CreatePostRequestDto,
+  UpdatePostRequestDto,
   ListPostsQueryDto,
 } from "./dto/post.dto";
 
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
-
 @Controller("blog")
-@UsePipes(Pipe)
 export class BlogController {
   constructor(private readonly svc: BlogService) {}
 
@@ -46,22 +36,22 @@ export class BlogController {
     return this.svc.getBySlug(slug);
   }
 
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Post("posts")
-  create(@Body() body: { data: CreatePostDto }) {
+  create(@Body() body: CreatePostRequestDto) {
     return this.svc.create(body.data);
   }
 
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Patch("posts/:id")
   update(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
-    @Body() body: { patch: UpdatePostDto },
+    @Body() body: UpdatePostRequestDto,
   ) {
     return this.svc.update(id, body.patch);
   }
 
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Delete("posts/:id")
   remove(@Param("id", new ParseUUIDPipe({ version: "4" })) id: string) {
     return this.svc.softDelete(id);

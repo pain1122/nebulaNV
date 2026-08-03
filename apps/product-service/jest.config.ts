@@ -8,7 +8,7 @@ const config: Config = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   clearMocks: true,
   watchPathIgnorePatterns: ['/dist/', '/node_modules/'],
-  transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
+  transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }] },
   setupFiles: ['dotenv/config', '<rootDir>/test/jest.env.ts'],
   globalSetup: '<rootDir>/test/setup/wait-for-services.ts',
 };

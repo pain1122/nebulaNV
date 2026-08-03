@@ -7,10 +7,10 @@ process.env.AUTH_GRPC_URL ||= '127.0.0.1:50052';
 process.env.USER_GRPC_URL ||= '127.0.0.1:50051';
 
 // S2S signing (used by mdS2S in test helpers)
-process.env.GATEWAY_SECRET ||= '`)C@Z<MB)T[}Sb3!A/]45#ZL-P}@BF<4x8y';
-process.env.S2S_SECRET ||= ':n}T>QYq}G*m0_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG';
-process.env.S2S_SECRET_OLD ||= ':n}T>QYq}Gfji_A3@*YBT9)WoT>Aq_Tf%3F79Q:TG';
-process.env.SVC_NAME ||= 'user-service';
+process.env.S2S_SIGNATURE_HEADER ||= 'x-s2s-signature';
+process.env.S2S_TEST_GATEWAY_KEY ||= 'dev-only-gateway-to-user-s2s-key-00001';
+process.env.S2S_TEST_SERVICE_KEY ||= 'dev-only-auth-to-user-s2s-key-00000001';
+process.env.SVC_NAME ||= 'auth-service';
 
 // Seeded users (match your seeder defaults)
 process.env.SEED_ADMIN_EMAIL ||= 'admin@example.com';

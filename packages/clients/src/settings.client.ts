@@ -1,10 +1,18 @@
 import type { CallOptions, Metadata } from "@grpc/grpc-js";
 import type { ClientGrpc } from "@nestjs/microservices";
-import { buildS2SMetadata } from "@nebula/grpc-auth";
+import {
+  SETTINGS_SERVICE_TARGET,
+  buildGrpcS2SMetadata,
+  invokeGrpcUnary,
+  mergeSignedMetadata,
+} from "@nebula/grpc-auth";
+import { settings } from "@nebula/protos";
 import type { Observable } from "rxjs";
 import type {
   DeleteStringReq,
   DeleteStringRes,
+  EnsureBootstrapStringReq,
+  EnsureBootstrapStringRes,
   GetStringReq,
   GetStringRes,
   SettingsProxy,
@@ -28,14 +36,71 @@ type Raw = {
     meta?: Metadata,
     opts?: CallOptions,
   ): Observable<DeleteStringRes>;
+  EnsureBootstrapString(
+    req: EnsureBootstrapStringReq,
+    meta?: Metadata,
+    opts?: CallOptions,
+  ): Observable<EnsureBootstrapStringRes>;
 };
 
 export function getSettings(client: ClientGrpc): SettingsProxy {
   const raw = client.getService<Raw>("SettingsService");
-  const meta = () => buildS2SMetadata({ serviceName: process.env.SVC_NAME });
   return {
-    GetString: (req, m, opts) => raw.GetString(req, m ?? meta(), opts),
-    SetString: (req, m, opts) => raw.SetString(req, m ?? meta(), opts),
-    DeleteString: (req, m, opts) => raw.DeleteString(req, m ?? meta(), opts),
+    GetString: (req, m, opts) =>
+      invokeGrpcUnary(
+        raw.GetString.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: SETTINGS_SERVICE_TARGET,
+            definition: settings.SettingsServiceService.getString,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
+    SetString: (req, m, opts) =>
+      invokeGrpcUnary(
+        raw.SetString.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: SETTINGS_SERVICE_TARGET,
+            definition: settings.SettingsServiceService.setString,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
+    DeleteString: (req, m, opts) =>
+      invokeGrpcUnary(
+        raw.DeleteString.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: SETTINGS_SERVICE_TARGET,
+            definition: settings.SettingsServiceService.deleteString,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
+    EnsureBootstrapString: (req, m, opts) =>
+      invokeGrpcUnary(
+        raw.EnsureBootstrapString.bind(raw),
+        req,
+        mergeSignedMetadata(
+          m,
+          buildGrpcS2SMetadata({
+            target: SETTINGS_SERVICE_TARGET,
+            definition: settings.SettingsServiceService.ensureBootstrapString,
+            request: req,
+          }),
+        ),
+        opts,
+      ),
   };
 }

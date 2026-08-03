@@ -1,14 +1,18 @@
-import type { Metadata, MetadataValue } from "@grpc/grpc-js";
+import type { Metadata, MetadataValue, ServerUnaryCall } from "@grpc/grpc-js";
+import type { S2SCallerKind } from "./s2s.crypto";
 
 export type ContextUser = {
   userId: string | null;
   role?: string;
   email?: string;
+  sessionRef?: string;
 };
 
 export type ContextCarrier = {
   user?: ContextUser;
   svc?: string;
+  svcKind?: S2SCallerKind;
+  requestId?: string;
 };
 
 export type HeaderMap = Record<string, string | string[] | undefined>;
@@ -18,6 +22,8 @@ export type HttpRequestWithContext = ContextCarrier & {
 };
 
 export type RpcContextWithContext = ContextCarrier;
+export type GrpcServerCallWithContext = ServerUnaryCall<unknown, unknown> &
+  ContextCarrier;
 export type MetadataWithContext = Metadata & ContextCarrier;
 
 export function firstHeaderValue(
@@ -51,4 +57,12 @@ export function getContextService(
   carrier: ContextCarrier | undefined,
 ): string | null {
   return carrier?.svc ? String(carrier.svc) : null;
+}
+
+export function getContextServiceKind(
+  carrier: ContextCarrier | undefined,
+): S2SCallerKind | null {
+  return carrier?.svcKind === "service" || carrier?.svcKind === "gateway"
+    ? carrier.svcKind
+    : null;
 }

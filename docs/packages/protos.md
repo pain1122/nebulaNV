@@ -1,5 +1,4 @@
-﻿
-# Protos Package
+﻿# Protos Package
 
 ## Purpose
 
@@ -69,7 +68,7 @@ Check generated output with:
 pnpm proto:check
 ```
 
-Important: `proto:check` currently checks the full git working tree. Run it from a clean tree, otherwise unrelated dirty files can make it fail.
+`proto:check` regenerates into a temporary directory and compares only generated proto output. Unrelated working-tree changes do not affect it.
 
 ## Public Exports
 
@@ -82,12 +81,8 @@ Important: `proto:check` currently checks the full git working tree. Run it from
 - `blogv1`
 - `taxonomy`
 - `media`
-
-Known gap:
-
-- `generated/order.ts` exists, but `index.ts` does not export an `order` namespace yet.
-- This is not currently fatal because order-service uses the raw `order.proto` path for transport setup.
-- If order-service starts using generated request/response types from `@nebula/protos`, add an explicit `order` export.
+- `orderv1`
+- `messageTypeRegistry`
 
 ## How Services Use This Package
 
@@ -121,6 +116,7 @@ Examples:
 - `media` is used by media-service.
 - `productv1` is used by product-service.
 - `blogv1` is used by blog-service.
+- `orderv1` is used by order-service's gRPC controller boundary.
 
 ## Contract Change Checklist
 
@@ -134,11 +130,15 @@ When changing a proto contract:
 6. Run the focused service tests first.
 7. Run broader contract/e2e tests after the focused tests pass.
 
+Backward-compatibility and deprecation rules live in `docs/architecture/api-and-proto-versioning.md`.
+
 ## Known Watch Points
 
 - Do not hand-edit `packages/protos/generated`.
 - Do not treat proto fields as database truth; Prisma schemas still define persisted storage.
+- User-service no longer exposes refresh-token persistence or a token-update
+  RPC. Field number `5` and the name `refreshToken` remain reserved in both
+  hash-bearing user responses so they cannot be reused accidentally.
 - Keep proto contracts backward-aware because several services consume them directly.
-- `order.proto` has generated output but no package-level export yet.
 - `packages/protos/scripts/write-index-dts.cjs` appears stale because it only writes `authv1` and `userv1`.
 - If declaration generation starts using that script again, update it or remove it to avoid misleading package types.

@@ -6,3 +6,5 @@ export * as settings from "./generated/settings";
 export * as blogv1 from "./generated/blog";
 export * as taxonomy from "./generated/taxonomy";
 export * as media from "./generated/media";
+export * as orderv1 from "./generated/order";
+export { messageTypeRegistry } from "./generated/typeRegistry";

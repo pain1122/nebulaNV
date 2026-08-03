@@ -159,6 +159,19 @@ describe("MediaService access-class contract", () => {
     expect(data.visibility).toBe("private");
   });
 
+  it.each(["PROTECTED", "STRICT"] as const)(
+    "blocks %s media from the public render path",
+    async (accessClass) => {
+      prisma.media.findUnique.mockResolvedValue(readyS3Row(accessClass));
+
+      await expect(
+        service.openPublicRenderStream(`media-${accessClass.toLowerCase()}`, {
+          variant: "web",
+        }),
+      ).rejects.toThrow("media_not_renderable");
+    },
+  );
+
   it.each([
     ["PUBLIC", "123"],
     ["PROTECTED", "123"],
@@ -268,5 +281,16 @@ describe("MediaService access-class contract", () => {
     ).rejects.toThrow("media_context_mismatch");
 
     expect(mockedGetSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("destroys both lazily-created storage clients during shutdown", () => {
+    const internalS3 = { destroy: jest.fn() };
+    const publicS3 = { destroy: jest.fn() };
+    Object.assign(service, { internalS3, publicS3 });
+
+    service.onModuleDestroy();
+
+    expect(internalS3.destroy).toHaveBeenCalledTimes(1);
+    expect(publicS3.destroy).toHaveBeenCalledTimes(1);
   });
 });

@@ -5,9 +5,11 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
+import { safeErrorName } from "@packages/config";
 import { PrismaService } from "../prisma.service";
 import { Prisma, Taxonomy } from "../../prisma/generated";
 import type { CreateTaxonomyDto } from "./dto/create-taxonomy.dto";
+import type { ListTaxonomiesQueryDto } from "./dto/list-taxonomies-query.dto";
 import type { UpdateTaxonomyDto } from "./dto/update-taxonomy.dto";
 
 const SAFE = /^[a-z0-9][a-z0-9._-]*$/;
@@ -38,15 +40,6 @@ type UpdateTaxonomyInput = UpdateTaxonomyDto & {
   meta?: TaxonomyMetaInput;
 };
 
-export type ListTaxonomiesQuery = {
-  page?: string | number;
-  limit?: string | number;
-  scope?: string | null;
-  kind?: string | null;
-  parentId?: string | null;
-  q?: string | null;
-};
-
 type TaxonomyWithChildCount = Taxonomy & {
   _childCount?: number;
 };
@@ -75,6 +68,14 @@ type TaxonomyResponse = {
   data: TaxonomyDto;
 };
 
+export type EnsureSystemTaxonomyInput = {
+  scope: string;
+  kind: string;
+  slug: string;
+  title: string;
+  description?: string;
+};
+
 type TaxonomyListResponse = {
   data: TaxonomyDto[];
   page: number;
@@ -91,17 +92,6 @@ const prismaErrorDetails = (e: unknown): { code?: string; meta?: unknown } => {
     code: typeof record.code === "string" ? record.code : undefined,
     meta: record.meta,
   };
-};
-
-const logValue = (value: unknown): string => {
-  if (value instanceof Error) return value.message;
-  if (typeof value === "string") return value;
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return "Unknown error";
-  }
 };
 
 @Injectable()
@@ -161,7 +151,7 @@ export class TaxonomyService {
   // ---------------------------
   // List
   // ---------------------------
-  async list(q: ListTaxonomiesQuery): Promise<TaxonomyListResponse> {
+  async list(q: ListTaxonomiesQueryDto): Promise<TaxonomyListResponse> {
     const rawPage = Number(q.page ?? 0);
     const rawLimit = Number(q.limit ?? 0);
 
@@ -350,14 +340,48 @@ export class TaxonomyService {
 
       return { data: this.toDto(created) };
     } catch (e: unknown) {
-      const { code, meta } = prismaErrorDetails(e);
+      const { code } = prismaErrorDetails(e);
 
-      this.log.error(`createTaxonomy failed: ${logValue(meta ?? e)}`);
+      this.log.error(
+        `taxonomy_create_failed code=${code ?? "unknown"} cause=${safeErrorName(e)}`,
+      );
 
       if (code === "P2002") {
         throw new BadRequestException("taxonomy_duplicate_slug");
       }
 
+      throw e;
+    }
+  }
+
+  async ensureSystemTaxonomy(
+    input: EnsureSystemTaxonomyInput,
+  ): Promise<TaxonomyResponse> {
+    try {
+      return await this.getBySlug(input.scope, input.kind, input.slug);
+    } catch (e: unknown) {
+      if (!(e instanceof NotFoundException)) throw e;
+    }
+
+    try {
+      return await this.create({
+        scope: input.scope,
+        kind: input.kind,
+        slug: input.slug,
+        title: input.title,
+        description: input.description,
+        isTree: false,
+        isHidden: false,
+        isSystem: true,
+        sortOrder: 0,
+      });
+    } catch (e: unknown) {
+      if (
+        e instanceof BadRequestException &&
+        e.message === "taxonomy_duplicate_slug"
+      ) {
+        return this.getBySlug(input.scope, input.kind, input.slug);
+      }
       throw e;
     }
   }
@@ -460,9 +484,11 @@ export class TaxonomyService {
 
       return { data: this.toDto(updated) };
     } catch (e: unknown) {
-      const { code, meta } = prismaErrorDetails(e);
+      const { code } = prismaErrorDetails(e);
 
-      this.log.error(`updateTaxonomy failed id=${id}: ${logValue(meta ?? e)}`);
+      this.log.error(
+        `taxonomy_update_failed id=${id} code=${code ?? "unknown"} cause=${safeErrorName(e)}`,
+      );
 
       if (code === "P2002") {
         throw new BadRequestException("taxonomy_duplicate_slug");

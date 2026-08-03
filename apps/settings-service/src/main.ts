@@ -1,43 +1,73 @@
 import { NestFactory } from "@nestjs/core";
 import { MicroserviceOptions, Transport } from "@nestjs/microservices";
+import { Logger } from "@nestjs/common";
 import { SettingsModule, SETTINGS_PROTO } from "./settings.module";
+import { settings } from "@nebula/protos";
+import {
+  startSecuredGrpc,
+  grpcS2SProtoLoaderOptions,
+  grpcS2SServerChannelOptions,
+} from "@nebula/grpc-auth";
+import {
+  createHttpRequestLoggingMiddleware,
+  createHttpCorsOptionsDelegate,
+  createHttpSecurityHeadersMiddleware,
+  createHttpValidationPipe,
+  logFatalStartup,
+  logServiceReady,
+  resolveServiceBind,
+  serviceLogLevels,
+} from "@packages/config";
 
-function getGrpcBind(): string {
-  // Prefer an explicit port (bind to 0.0.0.0 for container reachability)
-  const port = process.env.GRPC_PORT ?? process.env.SETTINGS_GRPC_PORT;
-  if (port) return `0.0.0.0:${port}`;
-
-  // Fallback: listen on 0.0.0.0:50054 (not 127.0.0.1)
-  return "0.0.0.0:50054";
-}
-
-function getHttpPort(): number {
-  // service-specific -> generic -> default
-  const p = process.env.SETTINGS_HTTP_PORT ?? process.env.PORT ?? "3010";
-  return Number(p);
-}
+const SERVICE_NAME = "settings-service";
+const logger = new Logger(SERVICE_NAME);
 
 async function bootstrap() {
-  const app = await NestFactory.create(SettingsModule); // optional HTTP (health)
+  const app = await NestFactory.create(SettingsModule, {
+    logger: serviceLogLevels(),
+  }); // optional HTTP (health)
+  app.enableShutdownHooks();
+  app.use(
+    createHttpRequestLoggingMiddleware(logger, {
+      serviceName: SERVICE_NAME,
+    }),
+  );
+  app.useGlobalPipes(createHttpValidationPipe());
+  app.use(createHttpSecurityHeadersMiddleware());
+  app.enableCors(
+    createHttpCorsOptionsDelegate({
+      origins: process.env.HTTP_CORS_ORIGINS,
+    }),
+  );
 
-  const grpcUrl = getGrpcBind();
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package: "settings",
-      protoPath: SETTINGS_PROTO,
-      url: grpcUrl,
-    },
+  const { httpPort, grpcUrl } = resolveServiceBind(process.env, {
+    servicePrefix: "SETTINGS",
+    defaultHttpPort: 3010,
+    defaultGrpcPort: 50054,
   });
+  const micro = app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.GRPC,
+      options: {
+        package: "settings",
+        protoPath: SETTINGS_PROTO,
+        loader: grpcS2SProtoLoaderOptions(),
+        url: grpcUrl,
+        channelOptions: grpcS2SServerChannelOptions(
+          settings.SettingsServiceService,
+        ),
+      },
+    },
+    { deferInitialization: true },
+  );
+  await startSecuredGrpc(app, micro);
 
-  await app.startAllMicroservices();
-
-  const httpPort = getHttpPort();
   await app.listen(httpPort);
 
-  console.log(
-    `[settings-service] HTTP http://127.0.0.1:${httpPort} | gRPC ${grpcUrl}`,
-  );
+  logServiceReady(logger, SERVICE_NAME);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  logFatalStartup(logger, SERVICE_NAME, error);
+  process.exitCode = 1;
+});

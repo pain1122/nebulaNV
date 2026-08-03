@@ -16,13 +16,12 @@ const AUTH_PROTO = require.resolve('@nebula/protos/auth.proto');
         inject: [ConfigService],
         useFactory: (cfg: ConfigService) => {
           const url = cfg.get<string>('AUTH_GRPC_URL') ?? '127.0.0.1:50052';
-          console.log(`[GRPC CLIENT] AUTH_SERVICE url=${url} package=auth`);
           return {
             transport: Transport.GRPC,
             options: {
               package: 'auth',
               protoPath: AUTH_PROTO,
-              url: cfg.get<string>('AUTH_GRPC_URL') ?? '127.0.0.1:50052',
+              url,
             },
           };
         },

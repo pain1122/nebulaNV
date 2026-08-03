@@ -6,7 +6,9 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { ClientGrpc } from "@nestjs/microservices";
+import type { Metadata } from "@grpc/grpc-js";
 import { firstValueFrom, type Observable } from "rxjs";
+import { productv1 } from "@nebula/protos";
 
 import { PrismaService } from "../prisma.service";
 import { OrderStatus } from "../../prisma/generated/client";
@@ -14,6 +16,11 @@ import { AddToCartDto, UpdateCartItemDto } from "./dto/order.dto";
 import { PRODUCT_SERVICE } from "../product-client.module";
 import { SETTINGS_SERVICE } from "../settings-client.module";
 import { getSettings, type SettingsProxy } from "@nebula/clients";
+import {
+  PRODUCT_SERVICE_TARGET,
+  buildGrpcS2SMetadata,
+  wrapGrpc,
+} from "@nebula/grpc-auth";
 
 type PriceLike = number | string | { toString(): string } | null | undefined;
 
@@ -40,8 +47,20 @@ type ProductRecord = {
   currency?: string | null;
 };
 
+function hasPrismaCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === code
+  );
+}
+
 interface ProductGrpcService {
-  GetProduct(request: { id: string }): Observable<ProductGrpcResponse>;
+  GetProduct(
+    request: { id: string },
+    metadata?: Metadata,
+  ): Observable<ProductGrpcResponse>;
 }
 
 @Injectable()
@@ -66,8 +85,18 @@ export class OrderService implements OnModuleInit {
   // --------- Helpers ---------
 
   private async fetchProductOrThrow(productId: string): Promise<ProductRecord> {
-    const res = await firstValueFrom(
-      this.productSvc.GetProduct({ id: productId }),
+    const request = { id: productId };
+    const res = await wrapGrpc(
+      firstValueFrom(
+        this.productSvc.GetProduct(
+          request,
+          buildGrpcS2SMetadata({
+            target: PRODUCT_SERVICE_TARGET,
+            definition: productv1.ProductServiceService.getProduct,
+            request,
+          }),
+        ),
+      ),
     );
 
     // product-service typically returns: { data: { id, slug, title, sku, price, currency, ... } }
@@ -381,12 +410,20 @@ export class OrderService implements OnModuleInit {
   }
 
   async updateOrderStatusAdmin(id: string, status: OrderStatus) {
-    const order = await this.prisma.order.update({
-      where: { id },
-      data: { status },
-      include: { items: true },
-    });
+    try {
+      const order = await this.prisma.order.update({
+        where: { id },
+        data: { status },
+        include: { items: true },
+      });
 
-    return { data: order };
+      return { data: order };
+    } catch (error: unknown) {
+      if (hasPrismaCode(error, "P2025")) {
+        throw new NotFoundException("order_not_found");
+      }
+
+      throw error;
+    }
   }
 }

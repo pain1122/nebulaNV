@@ -1,40 +1,43 @@
-// apps/settings-service/test/grpc/helpers.ts
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
-import { buildS2SMetadata } from "@nebula/grpc-auth";
+import { settings } from "@nebula/protos";
+import {
+  finalizeS2SClientMetadata,
+  markS2SMetadata,
+  registerS2SClientDefinition,
+} from "@nebula/grpc-auth";
 
-export const X_SIGN_HEADER = process.env.GATEWAY_HEADER ?? "x-gateway-sign";
-export const X_SVC_HEADER = "x-svc";
 export const CODES = grpc.status;
 
-/**
- * Build service-to-service metadata.
- * Adds:
- *   - x-svc
- *   - signature header using the shared canonical S2S contract
- *   - x-user-id / x-user-role when a test needs to mimic forwarded context
- */
-export function mdS2S(opts?: {
-  serviceName?: string;
-  userId?: string;
-  role?: "user" | "admin" | "root-admin";
-}) {
-  const md = buildS2SMetadata({
-    serviceName: opts?.serviceName ?? "auth-service",
+export function mdS2S() {
+  const md = markS2SMetadata(new grpc.Metadata(), {
+    kind: "gateway",
+    serviceName: "gateway",
+    key: {
+      id: "gateway-settings-v1",
+      secret:
+        process.env.S2S_TEST_GATEWAY_KEY ??
+        "dev-only-gateway-to-settings-s2s-key-001",
+    },
   });
-
-  if (opts?.userId) md.set("x-user-id", opts.userId);
-  if (opts?.role) md.set("x-user-role", opts.role);
-
   return md;
 }
 
-export function mdAuth(opts: {
-  access: string;
-  userId?: string;
-  role?: "user" | "admin" | "root-admin";
-}) {
-  const md = mdS2S({ userId: opts.userId, role: opts.role });
+export function mdProductService() {
+  return markS2SMetadata(new grpc.Metadata(), {
+    kind: "service",
+    serviceName: "product-service",
+    key: {
+      id: "product-settings-v1",
+      secret:
+        process.env.S2S_TEST_PRODUCT_KEY ??
+        "dev-only-product-to-settings-s2s-key-0001",
+    },
+  });
+}
+
+export function mdAuth(opts: { access: string }) {
+  const md = mdS2S();
   md.set("authorization", `Bearer ${opts.access}`);
   return md;
 }
@@ -46,32 +49,38 @@ export function loadClient<T>(opts: {
   svc: string;
 }): T {
   const pkgDef = protoLoader.loadSync(opts.protoPath, {
-    // keep defaults; our protos are ts-proto friendly
     longs: String,
     enums: String,
     defaults: true,
     oneofs: true,
   });
-  const grpcObj = (grpc as any).loadPackageDefinition(pkgDef);
-  const ns = opts.pkg.reduce((acc: any, k: string) => acc?.[k], grpcObj);
+  const grpcObj = grpc.loadPackageDefinition(pkgDef) as any;
+  const ns = opts.pkg.reduce((acc: any, key: string) => acc?.[key], grpcObj);
   const Ctor = ns?.[opts.svc];
-  if (!Ctor)
-    throw new Error(
-      `Service ${opts.pkg.join(".")}#${opts.svc} not found in ${opts.protoPath}`,
-    );
-  return new Ctor(opts.url, grpc.credentials.createInsecure());
+  if (!Ctor) throw new Error(`Service ${opts.svc} not found`);
+  const client = new Ctor(opts.url, grpc.credentials.createInsecure());
+  registerS2SClientDefinition(client, settings.SettingsServiceService);
+  return client as T;
 }
 
 export async function call<TResp>(
   client: any,
-  m: string,
+  method: string,
   req: any,
   md?: grpc.Metadata,
 ): Promise<TResp> {
-  const metadata = md ?? new grpc.Metadata();
+  const metadata = finalizeS2SClientMetadata({
+    client,
+    method,
+    request: req,
+    metadata: md,
+  });
   return new Promise<TResp>((resolve, reject) => {
-    client[m](req, metadata, (err: grpc.ServiceError | null, res: TResp) =>
-      err ? reject(err) : resolve(res),
+    client[method](
+      req,
+      metadata,
+      (err: grpc.ServiceError | null, res: TResp) =>
+        err ? reject(err) : resolve(res),
     );
   });
 }

@@ -10,7 +10,7 @@ import {
   Max,
 } from "class-validator";
 
-const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._()\-]*$/;
+const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._()-]*$/;
 const SAFE_CONTEXT_VALUE = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 const MAX_INT_32 = 2_147_483_647;
 

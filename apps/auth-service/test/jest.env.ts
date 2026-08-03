@@ -3,8 +3,10 @@ process.env.AUTH_HTTP_URL ||= 'http://127.0.0.1:3001';
 process.env.AUTH_GRPC_URL ||= '127.0.0.1:50052';
 process.env.USER_GRPC_URL ||= '127.0.0.1:50051';
 
-process.env.SVC_NAME ||= 'auth-service';
-process.env.GATEWAY_SECRET ||= "T6ybIF'B2^E,y?CTOfZ!YW10c5hc]f&3mx^";
+process.env.S2S_SIGNATURE_HEADER ||= 'x-s2s-signature';
+process.env.SVC_NAME ||= 'gateway';
+process.env.S2S_TEST_GATEWAY_KEY ||= 'dev-only-gateway-to-auth-s2s-key-00001';
+process.env.S2S_TEST_SERVICE_KEY ||= 'dev-only-auth-to-auth-s2s-key-00000001';
 
 // Real admin (lets the admin→user & user→admin gRPC assertions run)
 process.env.SEED_ADMIN_EMAIL ||= 'admin@example.com';

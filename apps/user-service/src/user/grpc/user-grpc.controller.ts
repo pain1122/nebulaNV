@@ -1,21 +1,19 @@
-import { Controller, UseGuards } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { Metadata, status } from '@grpc/grpc-js';
 import { userv1 } from '@nebula/protos';
 import { UserService } from '../user.service';
 import {
   Roles,
-  RequireUserId,
   toRpc,
-  resolveCtxUser,
   Public,
-  S2SGuard,
-  GrpcTokenAuthGuard,
+  InternalOnly,
+  AllowedS2SCallers,
+  resolveCtxUser,
   type CtxUser,
   type RpcContextWithContext,
 } from '@nebula/grpc-auth';
 
-@UseGuards(S2SGuard, GrpcTokenAuthGuard)
 @Controller()
 export class UserGrpcController {
   constructor(private readonly users: UserService) {}
@@ -35,15 +33,7 @@ export class UserGrpcController {
     meta: Metadata,
     call: RpcContextWithContext,
   ): CtxUser | null {
-    const user = call?.user ?? (meta as Metadata & { user?: CtxUser }).user;
-
-    if (!user?.userId) return null;
-
-    return {
-      userId: user.userId,
-      role: user.role,
-      email: user.email,
-    };
+    return resolveCtxUser(meta, call);
   }
 
   @Roles('user', 'admin', 'root-admin')
@@ -117,22 +107,17 @@ export class UserGrpcController {
     });
   }
 
-  // Called by auth-service.register → internal (S2S) and must carry a user id
-  @Public({ gatewayOnly: true })
-  @RequireUserId()
+  // Called only by auth-service registration. The signed body is the target;
+  // registration never accepts a caller-provided administrative role.
+  @Public()
+  @InternalOnly()
+  @AllowedS2SCallers('auth-service')
   @GrpcMethod('UserService', 'CreateUser')
-  async createUser(
-    data: userv1.CreateUserRequest,
-    meta: Metadata,
-    call: RpcContextWithContext,
-  ) {
-    const ctxUser = resolveCtxUser(meta, call);
-    const isAdmin = ['admin', 'root-admin'].includes(ctxUser?.role ?? '');
-    const role = isAdmin && data.role ? data.role : 'user';
+  async createUser(data: userv1.CreateUserRequest) {
     const u = await this.users.createUserWithHash(
       data.email,
       data.password,
-      role,
+      'user',
     );
     return userv1.UserResponse.create({
       id: u.id,
@@ -142,7 +127,9 @@ export class UserGrpcController {
   }
 
   // Internal auth flows (no JWT required; S2S is enough)
-  @Public({ gatewayOnly: true })
+  @Public()
+  @InternalOnly()
+  @AllowedS2SCallers('auth-service')
   @GrpcMethod('UserService', 'FindUserWithHash')
   async findUserWithHash(
     data: userv1.FindUserWithHashRequest,
@@ -159,7 +146,6 @@ export class UserGrpcController {
         email: '',
         role: 'user',
         passwordHash: '',
-        refreshToken: '',
       });
     }
 
@@ -168,26 +154,12 @@ export class UserGrpcController {
       email: u.email ?? '',
       role: u.role,
       passwordHash: u.password,
-      refreshToken: u.refreshToken ?? '',
     });
   }
 
-  @Public({ gatewayOnly: true })
-  @RequireUserId()
-  @GrpcMethod('UserService', 'SetRefreshToken')
-  async setRefreshToken(
-    data: userv1.SetRefreshTokenRequest,
-  ): Promise<userv1.UserResponse> {
-    const u = await this.users.setRefreshToken(data.userId, data.refreshToken);
-    return userv1.UserResponse.create({
-      id: u.id,
-      email: u.email ?? '',
-      role: u.role,
-    });
-  }
-
-  @Public({ gatewayOnly: true })
-  @RequireUserId()
+  @Public()
+  @InternalOnly()
+  @AllowedS2SCallers('auth-service')
   @GrpcMethod('UserService', 'GetUserWithHash')
   async getUserWithHash(
     data: userv1.GetUserWithHashRequest,
@@ -199,7 +171,6 @@ export class UserGrpcController {
         email: '',
         role: 'user',
         passwordHash: '',
-        refreshToken: '',
       });
     }
 
@@ -208,7 +179,6 @@ export class UserGrpcController {
       email: u.email ?? '',
       role: u.role,
       passwordHash: u.password,
-      refreshToken: u.refreshToken ?? '',
     });
   }
 }

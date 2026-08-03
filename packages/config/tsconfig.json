@@ -4,9 +4,8 @@
   "compilerOptions": {
     "declaration": true,
     "emitDeclarationOnly": false,
+    "rootDir": "src",
     "outDir": "dist"
   },
-  "include": [
-    "src"
-, "../clients"  ]
+  "include": ["src/**/*.ts"]
 }

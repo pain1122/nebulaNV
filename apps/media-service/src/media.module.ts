@@ -12,8 +12,9 @@ import { HealthController } from "./health.controller";
 import { MediaService } from "./media.service";
 import { PrismaService } from "./prisma.service";
 import { envSchema } from "./config/env.validation";
+import { createServiceLifecycleProvider } from "@packages/config";
 
-import { GrpcTokenAuthGuard } from "@nebula/grpc-auth";
+import { GRPC_SECURITY_PROVIDERS, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
 
 const AUTH_PROTO = require.resolve("@nebula/protos/auth.proto");
 export const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
@@ -53,10 +54,12 @@ export const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
   ],
 
   providers: [
+    createServiceLifecycleProvider("media-service"),
     PrismaService,
     MediaService,
+    ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    { provide: APP_GUARD, useClass: GrpcTokenAuthGuard },
+    { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },
   ],
 })
 export class MediaModule {}

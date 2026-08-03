@@ -1,34 +1,38 @@
-// apps/blog-service/test/grpc/helpers.ts
-import * as crypto from "crypto";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
+import { blogv1 } from "@nebula/protos";
+import {
+  finalizeS2SClientMetadata,
+  markS2SMetadata,
+  registerS2SClientDefinition,
+  withBearer,
+} from "@nebula/grpc-auth";
 
-export const AUTHORIZATION_HEADER = "authorization";
-export const X_SVC_HEADER = "x-svc";
-export const X_SIGN_HEADER = process.env.GATEWAY_HEADER || "x-gateway-sign";
+let defaultActorAccessToken: string | undefined;
 
-export function minuteBucket(): number {
-  return Math.floor(Date.now() / 60000);
+export function setS2STestActorToken(accessToken: string) {
+  defaultActorAccessToken = accessToken;
 }
 
-export function hmac(secret: string, payload: string): string {
-  return crypto.createHmac("sha256", secret).update(payload).digest("hex");
-}
-
-export function mdS2S(opts?: { role?: string }) {
-  const md = new grpc.Metadata();
-  const secret = process.env.S2S_SECRET || "test-secret";
-  const svc = process.env.SVC_NAME || "blog-service";
-  const bucket = minuteBucket();
-  const sign = hmac(secret, `${svc}:${bucket}`);
-
-  md.set(X_SVC_HEADER, svc);
-  md.set(X_SIGN_HEADER, sign);
-
-  if (opts?.role) {
-    md.set("x-role", opts.role);
+export function mdS2S(opts?: {
+  accessToken?: string;
+  role?: "user" | "admin" | "root-admin";
+}) {
+  const md = markS2SMetadata(new grpc.Metadata(), {
+    kind: "gateway",
+    serviceName: "gateway",
+    key: {
+      id: "gateway-blog-v1",
+      secret:
+        process.env.S2S_TEST_GATEWAY_KEY ??
+        "dev-only-gateway-to-blog-s2s-key-00001",
+    },
+  });
+  const accessToken = opts?.accessToken ?? defaultActorAccessToken;
+  if (opts?.role && !accessToken) {
+    throw new Error(`blog_test_${opts.role}_jwt_missing`);
   }
-  return md;
+  return withBearer(md, accessToken);
 }
 
 export function loadClient<T = any>(opts: {
@@ -45,16 +49,21 @@ export function loadClient<T = any>(opts: {
     oneofs: true,
   });
   const grpcObj = grpc.loadPackageDefinition(pkgDef) as any;
-
   const pkgs = Array.isArray(opts.pkg) ? opts.pkg : [opts.pkg];
-  let cur: any = grpcObj;
-  for (const p of pkgs) cur = cur[p];
-
-  const ClientCtor = cur[opts.svc] as grpc.ServiceClientConstructor;
-  return new ClientCtor(
-    opts.url,
-    grpc.credentials.createInsecure(),
-  ) as unknown as T;
+  const namespace = pkgs.reduce((current: any, key) => current[key], grpcObj);
+  const Ctor = namespace[opts.svc] as grpc.ServiceClientConstructor;
+  const client = new Ctor(opts.url, grpc.credentials.createInsecure());
+  const signingDefinition =
+    opts.svc === "BlogService"
+      ? blogv1.BlogServiceService
+      : opts.svc === "BlogTaxonomyService"
+        ? blogv1.BlogTaxonomyServiceService
+        : undefined;
+  if (!signingDefinition) {
+    throw new Error(`Signing definition for ${opts.svc} not found`);
+  }
+  registerS2SClientDefinition(client, signingDefinition);
+  return client as unknown as T;
 }
 
 export function call<T = any>(
@@ -63,11 +72,15 @@ export function call<T = any>(
   req: any,
   md?: grpc.Metadata,
 ): Promise<T> {
+  const metadata = finalizeS2SClientMetadata({
+    client,
+    method,
+    request: req,
+    metadata: md,
+  });
   return new Promise((resolve, reject) => {
-    const fn = client[method].bind(client);
-    const cb = (err: grpc.ServiceError | null, res: T) =>
-      err ? reject(err) : resolve(res);
-    if (md) fn(req, md, cb);
-    else fn(req, cb);
+    client[method](req, metadata, (err: grpc.ServiceError | null, res: T) =>
+      err ? reject(err) : resolve(res),
+    );
   });
 }

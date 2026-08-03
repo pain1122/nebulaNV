@@ -220,7 +220,19 @@ Useful helpers:
 
 - `isRecord`
 - `errorMessage`
-- `grpcErrorMessage`
+- `toGrpcBoundaryException`
+- `fromRpcToHttp`
+- `wrapGrpc`
+
+Cross-transport errors have one shared translation point in `@nebula/grpc-auth`:
+
+- The shared gRPC listener filter maps intentional Nest HTTP exceptions to canonical gRPC statuses.
+- Explicit `RpcException` values from guards, validation, and controllers pass through unchanged.
+- Downstream HTTP/domain facades use `wrapGrpc` instead of inspecting numeric gRPC status codes.
+- Unexpected failures expose only `INTERNAL` / `internal_error`.
+- Prisma errors remain service-owned because the correct public meaning depends on the operation.
+
+Do not create service-local status tables or compare against numeric gRPC codes such as `code === 5`.
 
 ## Review Checklist
 

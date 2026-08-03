@@ -18,7 +18,7 @@ import {
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Roles('admin')
+  @Roles('admin', 'root-admin')
   @Get()
   async getAllUsers(@ReqUser() user: ReqUserType) {
     return this.userService.getAllUsers(user);

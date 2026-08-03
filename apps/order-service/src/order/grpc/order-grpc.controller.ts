@@ -1,50 +1,29 @@
 import { Controller } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { Metadata, status, type ServerUnaryCall } from "@grpc/grpc-js";
-import { RequireUserId, resolveCtxUser, toRpc } from "@nebula/grpc-auth";
+import {
+  Public,
+  RequireUserId,
+  Roles,
+  resolveCtxUser,
+  toRpc,
+  type RpcContextWithContext,
+} from "@nebula/grpc-auth";
+import type { orderv1 } from "@nebula/protos";
 import { OrderService } from "../order.service";
 import { OrderStatus } from "../../../prisma/generated/client";
 
-type GetCartRequest = { userId: string };
-
-type AddToCartRequest = {
-  userId: string;
-  productId: string;
-  quantity: number;
-};
-
-type UpdateCartItemRequest = {
-  userId: string;
-  itemId: string;
-  quantity: number;
-};
-
-type RemoveCartItemRequest = {
-  userId: string;
-  itemId: string;
-};
-
-type CheckoutRequest = {
-  userId: string;
-  note?: string;
-};
-
-type GetOrderRequest = {
-  userId: string;
-  id: string;
-};
-
-type ListOrdersRequest = {
-  userId: string;
-  status?: string;
-};
-
-type UpdateOrderStatusRequest = {
-  id: string;
-  status: string;
-};
-
-type GrpcCall<TReq> = ServerUnaryCall<TReq, unknown>;
+type ProtoLoaderRequest<T extends { $type: string }> = Omit<T, "$type">;
+type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+type CheckoutRequest = WithOptional<
+  ProtoLoaderRequest<orderv1.CheckoutRequest>,
+  "note"
+>;
+type ListOrdersRequest = WithOptional<
+  ProtoLoaderRequest<orderv1.ListOrdersRequest>,
+  "status"
+>;
+type GrpcCall<TReq> = ServerUnaryCall<TReq, unknown> & RpcContextWithContext;
 
 const ORDER_STATUS_VALUES = new Set<string>(Object.values(OrderStatus));
 
@@ -62,31 +41,34 @@ function toOrderStatus(value: string | undefined): OrderStatus | undefined {
 export class OrderGrpcController {
   constructor(private readonly svc: OrderService) {}
 
+  @Public()
   @GrpcMethod("OrderService", "Ping")
   ping() {
     return {};
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "GetCart")
   async getCart(
-    req: GetCartRequest,
+    req: ProtoLoaderRequest<orderv1.GetCartRequest>,
     meta: Metadata,
-    call: GrpcCall<GetCartRequest>,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.GetCartRequest>>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.getCartForUser(ctxUser.userId);
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "AddToCart")
   async addToCart(
-    req: AddToCartRequest,
+    req: ProtoLoaderRequest<orderv1.AddToCartRequest>,
     meta: Metadata,
-    call: GrpcCall<AddToCartRequest>,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.AddToCartRequest>>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.addToCart(ctxUser.userId, {
       productId: req.productId,
@@ -94,32 +76,35 @@ export class OrderGrpcController {
     });
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "UpdateCartItem")
   async updateCartItem(
-    req: UpdateCartItemRequest,
+    req: ProtoLoaderRequest<orderv1.UpdateCartItemRequest>,
     meta: Metadata,
-    call: GrpcCall<UpdateCartItemRequest>,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.UpdateCartItemRequest>>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.updateCartItem(ctxUser.userId, req.itemId, {
       quantity: req.quantity,
     });
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "RemoveCartItem")
   async removeCartItem(
-    req: RemoveCartItemRequest,
+    req: ProtoLoaderRequest<orderv1.RemoveCartItemRequest>,
     meta: Metadata,
-    call: GrpcCall<RemoveCartItemRequest>,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.RemoveCartItemRequest>>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.removeCartItem(ctxUser.userId, req.itemId);
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "Checkout")
   async checkout(
@@ -127,23 +112,25 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<CheckoutRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.checkout(ctxUser.userId, req.note);
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "GetOrder")
   async getOrder(
-    req: GetOrderRequest,
+    req: ProtoLoaderRequest<orderv1.GetOrderRequest>,
     meta: Metadata,
-    call: GrpcCall<GetOrderRequest>,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.GetOrderRequest>>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     return this.svc.getOrderForUser(ctxUser.userId, req.id);
   }
 
+  @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "ListOrders")
   async listOrders(
@@ -151,14 +138,17 @@ export class OrderGrpcController {
     meta: Metadata,
     call: GrpcCall<ListOrdersRequest>,
   ) {
-    const ctxUser = resolveCtxUser(meta);
+    const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
     const orderStatus = toOrderStatus(req.status);
     return this.svc.listOrdersForUser(ctxUser.userId, orderStatus);
   }
 
+  @Roles("admin", "root-admin")
   @GrpcMethod("OrderService", "UpdateOrderStatus")
-  async updateOrderStatus(req: UpdateOrderStatusRequest) {
+  async updateOrderStatus(
+    req: ProtoLoaderRequest<orderv1.UpdateOrderStatusRequest>,
+  ) {
     const orderStatus = toOrderStatus(req.status);
     if (!orderStatus)
       throw toRpc(status.INVALID_ARGUMENT, "missing_order_status");

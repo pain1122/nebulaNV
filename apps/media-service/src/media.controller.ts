@@ -8,8 +8,6 @@ import {
   Query,
   Req,
   UnauthorizedException,
-  UsePipes,
-  ValidationPipe,
 } from "@nestjs/common";
 import { Roles } from "@nebula/grpc-auth";
 import { MediaService } from "./media.service";
@@ -25,13 +23,6 @@ import {
   PublicLibraryDeletePreviewDto,
 } from "./dto";
 
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
-
 type AuthenticatedRequest = {
   user?: {
     userId?: string | null;
@@ -40,7 +31,6 @@ type AuthenticatedRequest = {
 };
 
 @Controller("media")
-@UsePipes(Pipe)
 export class MediaController {
   constructor(private readonly svc: MediaService) {}
 

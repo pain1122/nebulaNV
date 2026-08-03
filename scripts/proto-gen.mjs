@@ -69,7 +69,11 @@ const r = spawnSync(protocCmd, protocArgs, { cwd: repoRoot, stdio: "inherit", sh
 if (r.status !== 0) process.exit(r.status);
 
 if (checkOnly) {
-  const st = spawnSync("git", ["status", "--porcelain"], { stdio: "pipe" });
+  const st = spawnSync(
+    "git",
+    ["status", "--porcelain", "--", "packages/protos/generated"],
+    { stdio: "pipe" },
+  );
   if (st.status === 0 && st.stdout.toString().trim().length === 0) {
     console.log("✔ proto:check — working tree clean");
     process.exit(0);

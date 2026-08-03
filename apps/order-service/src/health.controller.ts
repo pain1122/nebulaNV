@@ -1,20 +1,30 @@
-import { Controller, Get } from "@nestjs/common";
-import { PrismaClient } from "../prisma/generated/client";
-import { Public } from "@nebula/grpc-auth";
-
-const prisma = new PrismaClient();
+import { Controller } from "@nestjs/common";
+import { type HealthProbe, StandardHealthController } from "@packages/config";
+import { Public, S2SReplayStore } from "@nebula/grpc-auth";
+import { PrismaService } from "./prisma.service";
 
 @Public()
 @Controller("health")
-export class HealthController {
-  @Get()
-  async check() {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      return { status: "ok", db: "up", time: new Date().toISOString() };
-    } catch (e: unknown) {
-      const error = e instanceof Error ? e.message : "unknown_error";
-      return { status: "degraded", db: "down", error };
-    }
+export class HealthController extends StandardHealthController {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly replayStore: S2SReplayStore,
+  ) {
+    super("order-service");
+  }
+
+  protected readinessProbes(): readonly HealthProbe[] {
+    return [
+      {
+        name: "database",
+        check: async () => {
+          await this.prisma.$queryRaw`SELECT 1`;
+        },
+      },
+      {
+        name: "s2sReplay",
+        check: () => this.replayStore.checkReadiness(),
+      },
+    ];
   }
 }

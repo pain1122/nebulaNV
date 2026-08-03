@@ -3,12 +3,18 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
   Query,
 } from "@nestjs/common";
-import { Public, Roles } from "@nebula/grpc-auth";
+import {
+  AUTHORIZATION_HEADER,
+  bearerFromAuthorization,
+  Public,
+  Roles,
+} from "@nebula/grpc-auth";
 
 import { TaxonomyService, ListTaxonomyQuery } from "./taxonomy.service";
 import { CreateTaxonomyDto, UpdateTaxonomyDto } from "./dto/taxonomy.dto";
@@ -55,29 +61,45 @@ export class TaxonomyController {
   // Create in a given kind
   // POST /taxonomies/:kind
   // ---------------------------
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Post(":kind")
-  create(@Param("kind") kind: string, @Body() dto: CreateTaxonomyDto) {
-    return this.service.create(kind, dto);
+  create(
+    @Param("kind") kind: string,
+    @Body() dto: CreateTaxonomyDto,
+    @Headers(AUTHORIZATION_HEADER) authorization?: string,
+  ) {
+    // Forward only the verified actor credential; the client signs the new RPC.
+    return this.service.create(
+      kind,
+      dto,
+      bearerFromAuthorization(authorization),
+    );
   }
 
   // ---------------------------
   // Update by ID
   // PATCH /taxonomies/:kind/:id
   // ---------------------------
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Patch(":kind/:id")
-  update(@Param("id") id: string, @Body() dto: UpdateTaxonomyDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param("id") id: string,
+    @Body() dto: UpdateTaxonomyDto,
+    @Headers(AUTHORIZATION_HEADER) authorization?: string,
+  ) {
+    return this.service.update(id, dto, bearerFromAuthorization(authorization));
   }
 
   // ---------------------------
   // Delete by ID
   // DELETE /taxonomies/:kind/:id
   // ---------------------------
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @Delete(":kind/:id")
-  remove(@Param("id") id: string) {
-    return this.service.remove(id);
+  remove(
+    @Param("id") id: string,
+    @Headers(AUTHORIZATION_HEADER) authorization?: string,
+  ) {
+    return this.service.remove(id, bearerFromAuthorization(authorization));
   }
 }

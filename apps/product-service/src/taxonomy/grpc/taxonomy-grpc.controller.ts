@@ -1,7 +1,8 @@
 // apps/product-service/src/taxonomy/grpc/taxonomy-grpc.controller.ts
-import { Controller, Logger, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { Roles, Public } from "@nebula/grpc-auth";
+import type { Metadata } from "@grpc/grpc-js";
+import { bearerFromMeta, Roles, Public } from "@nebula/grpc-auth";
 import { productv1 as product } from "@nebula/protos";
 import { type TaxonomyDto } from "@nebula/clients";
 import { TaxonomyService } from "../taxonomy.service";
@@ -17,13 +18,6 @@ const toDateString = (value: string | Date | undefined): string => {
   if (!value) return "";
   return value instanceof Date ? value.toISOString() : value;
 };
-
-const Pipe = new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true },
-});
 
 @Controller()
 export class TaxonomyGrpcController {
@@ -57,7 +51,6 @@ export class TaxonomyGrpcController {
   // List (needs kind)
   // -----------------------------
   @Public()
-  @UsePipes(Pipe)
   @GrpcMethod("ProductTaxonomyService", "List")
   async list(
     req: product.ListProductTaxonomiesRequest,
@@ -84,7 +77,6 @@ export class TaxonomyGrpcController {
   // Get (by ID only)
   // -----------------------------
   @Public()
-  @UsePipes(Pipe)
   @GrpcMethod("ProductTaxonomyService", "Get")
   async get(
     req: product.GetProductTaxonomyRequest,
@@ -98,11 +90,11 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Create (needs kind)
   // -----------------------------
-  @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductTaxonomyService", "Create")
   async create(
     req: product.CreateProductTaxonomyRequest,
+    metadata: Metadata,
   ): Promise<product.ProductTaxonomyResponse> {
     const dto: CreateTaxonomyDto = {
       slug: req.slug,
@@ -113,7 +105,11 @@ export class TaxonomyGrpcController {
       sortOrder: req.sortOrder,
     };
 
-    const { data } = await this.svc.create(req.kind, dto);
+    const { data } = await this.svc.create(
+      req.kind,
+      dto,
+      bearerFromMeta(metadata),
+    );
 
     return product.ProductTaxonomyResponse.create({
       data: this.toProto(data),
@@ -123,11 +119,11 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Update (by ID only)
   // -----------------------------
-  @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductTaxonomyService", "Update")
   async update(
     req: product.UpdateProductTaxonomyRequest,
+    metadata: Metadata,
   ): Promise<product.ProductTaxonomyResponse> {
     const patch: UpdateTaxonomyDto = {
       slug: req.slug || undefined,
@@ -138,7 +134,11 @@ export class TaxonomyGrpcController {
       sortOrder: typeof req.sortOrder === "number" ? req.sortOrder : undefined,
     };
 
-    const { data } = await this.svc.update(req.id, patch);
+    const { data } = await this.svc.update(
+      req.id,
+      patch,
+      bearerFromMeta(metadata),
+    );
 
     return product.ProductTaxonomyResponse.create({
       data: this.toProto(data),
@@ -148,13 +148,13 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Delete (by ID only)
   // -----------------------------
-  @UsePipes(Pipe)
-  @Roles("admin")
+  @Roles("admin", "root-admin")
   @GrpcMethod("ProductTaxonomyService", "Delete")
   async delete(
     req: product.DeleteProductTaxonomyRequest,
+    metadata: Metadata,
   ): Promise<product.DeleteProductTaxonomyResponse> {
-    const ok = await this.svc.remove(req.id);
+    const ok = await this.svc.remove(req.id, bearerFromMeta(metadata));
     return product.DeleteProductTaxonomyResponse.create({ success: !!ok });
   }
 }

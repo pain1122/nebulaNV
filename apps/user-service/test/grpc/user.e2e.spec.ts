@@ -1,18 +1,16 @@
-import * as jwt from 'jsonwebtoken';
-import { loadClient, call, mdAuth, mdS2S, CODES } from './helpers';
+import {
+  loadClient,
+  call,
+  mdAuth,
+  mdS2S,
+  mdForgedActor,
+  mergeMd,
+  CODES,
+} from './helpers';
 import { httpJson, AUTH_HTTP, subFromJwt, LoginResp } from '../utils/http';
 import * as bcrypt from 'bcryptjs';
 
 const USER_PROTO = require.resolve('@nebula/protos/user.proto');
-
-function roleFromJwt(token: string): string | undefined {
-  try {
-    const p = jwt.decode(token) as any | null;
-    return p?.role ? String(p.role) : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 describe('UserService gRPC (seeded users)', () => {
   const url = process.env.USER_GRPC_URL || '127.0.0.1:50051';
@@ -92,7 +90,6 @@ describe('UserService gRPC (seeded users)', () => {
       email: expect.any(String),
       role: expect.any(String),
       passwordHash: expect.any(String),
-      refreshToken: expect.any(String),
     });
     expect(res.id).toBe(''); // not found → empty id
   });
@@ -104,11 +101,7 @@ describe('UserService gRPC (seeded users)', () => {
       client,
       'findUser',
       { email: userEmail },
-      mdAuth({
-        access: adminAccess,
-        userId: adminId,
-        role: roleFromJwt(adminAccess) ?? 'admin',
-      }),
+      mdAuth({ access: adminAccess }),
     );
 
     expect(res).toMatchObject({
@@ -124,7 +117,7 @@ describe('UserService gRPC (seeded users)', () => {
         client,
         'findUser',
         { email: userEmail },
-        mdAuth({ access: userAccess, userId, role: 'user' }),
+        mdAuth({ access: userAccess }),
       ),
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
@@ -140,7 +133,7 @@ describe('UserService gRPC (seeded users)', () => {
         password: passwordHash,
         role: 'admin',
       },
-      mdS2S({ userId: 'self-register' }),
+      mdS2S(),
     );
 
     createdId = res.id;
@@ -178,29 +171,21 @@ describe('UserService gRPC (seeded users)', () => {
     expect(subFromJwt(createdAccess)).toBe(createdId);
   });
 
-  it('setRefreshToken stores refresh token hash for internal auth flows', async () => {
-    const refreshTokenHash = `stored-refresh-${run}`;
-
-    const res = await call<any>(
-      client,
-      'setRefreshToken',
-      {
-        userId: createdId,
-        refreshToken: refreshTokenHash,
-      },
-      mdS2S({ userId: createdId }),
-    );
-
-    expect(res.id).toBe(createdId);
-
+  it('getUserWithHash returns only the auth identity fields', async () => {
     const stored = await call<any>(
       client,
       'getUserWithHash',
       { id: createdId },
-      mdS2S({ userId: createdId }),
+      mdS2S(),
     );
 
-    expect(stored.refreshToken).toBe(refreshTokenHash);
+    expect(stored).toMatchObject({
+      id: createdId,
+      email: createdEmail,
+      role: 'user',
+      passwordHash: expect.any(String),
+    });
+    expect(stored).not.toHaveProperty('refreshToken');
   });
 
   it('updateProfile lets a user update their own email through gRPC', async () => {
@@ -211,7 +196,7 @@ describe('UserService gRPC (seeded users)', () => {
         id: createdId,
         email: createdUpdatedEmail,
       },
-      mdAuth({ access: createdAccess, userId: createdId }),
+      mdAuth({ access: createdAccess }),
     );
 
     expect(res).toMatchObject({
@@ -229,7 +214,10 @@ describe('UserService gRPC (seeded users)', () => {
         client,
         'getUser',
         { id: adminId },
-        mdAuth({ access: userAccess, userId, role: 'admin' }),
+        mergeMd(
+          mdAuth({ access: userAccess }),
+          mdForgedActor(adminId, 'admin'),
+        ),
       ),
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
@@ -239,7 +227,7 @@ describe('UserService gRPC (seeded users)', () => {
       client,
       'getUser',
       { id: userId },
-      mdAuth({ access: userAccess, userId }),
+      mdAuth({ access: userAccess }),
     );
     expect(res).toHaveProperty('id', userId);
   });
@@ -251,7 +239,7 @@ describe('UserService gRPC (seeded users)', () => {
         client,
         'getUser',
         { id: adminId },
-        mdAuth({ access: userAccess, userId }),
+        mdAuth({ access: userAccess }),
       ),
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
@@ -262,12 +250,11 @@ describe('UserService gRPC (seeded users)', () => {
       : 'getUser admin→user (no admin) skipped',
     async () => {
       if (!haveAdmin) return;
-      const adminRole = roleFromJwt(adminAccess) ?? 'admin';
       const res = await call<any>(
         client,
         'getUser',
         { id: userId },
-        mdAuth({ access: adminAccess, userId: adminId, role: adminRole }),
+        mdAuth({ access: adminAccess }),
       );
       expect(res).toHaveProperty('id', userId);
     },

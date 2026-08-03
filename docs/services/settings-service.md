@@ -94,19 +94,27 @@ Current methods:
 - `GetString`
 - `SetString`
 - `DeleteString`
+- `EnsureBootstrapString`
 
 Access policy:
 
 - `GetString` is public.
 - `SetString` requires valid S2S metadata plus admin/root-admin user context.
 - `DeleteString` requires valid S2S metadata plus admin/root-admin user context.
+- `EnsureBootstrapString` requires a verified service caller. Product-service is limited to `product/default_product_category`, blog-service is limited to `blog/default_blog_category`, and both require environment `default`.
 
 Use the typed client from `@nebula/clients` when another service calls settings-service.
 
-Prefer:
+Use the general admin write only for verified human-admin flows:
 
 ```ts
 this.settings().SetString(...)
+```
+
+Service-owned startup initialization uses the narrower typed method:
+
+```ts
+this.settings().EnsureBootstrapString(...)
 ```
 
 Avoid raw untyped stubs when a typed proxy exists:
@@ -120,6 +128,11 @@ this.settingsClient.getService<any>(...)
 Database table: `app_settings`
 
 Current Prisma model: `Setting`
+
+The root Prisma commands include this service after user-service. Its current
+base seed upserts settings-service-owned defaults. See
+[Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
 
 Important fields:
 
@@ -191,10 +204,10 @@ Example API shape:
 Current or intended consumers:
 
 - Product-service reads `pricing/default_currency`.
-- Product-service reads/writes `product/default_product_category`.
+- Product-service reads `product/default_product_category` and writes it through the service-only bootstrap contract.
 - Order-service reads `order/cart_ttl_minutes`.
 - Order-service should use settings-service as the source of store currency/display policy.
-- Blog-service has a default taxonomy initializer designed to use settings-service, but it currently appears not wired as an active provider.
+- Blog-service retains an unwired default-taxonomy initializer. Activation is deferred until blog post creation consumes `blog/default_blog_category` or a separately approved launch requirement makes it mandatory.
 - Admin/frontend can use settings-service for safe UI and business defaults.
 
 ## Current Tests
@@ -226,6 +239,7 @@ Covered behavior:
 - Normal users cannot `DeleteString`.
 - Admins can `DeleteString`.
 - `SetString` without S2S metadata is rejected.
+- Bootstrap writes enforce verified service identity, caller-specific key scope, and environment `default`.
 
 Test setup waits for:
 
@@ -235,22 +249,17 @@ Test setup waits for:
 
 ## Health
 
-Current health route:
+Health routes:
 
 ```txt
+GET /health/live
+GET /health/ready
 GET /health
 ```
 
-It returns process health:
-
-```ts
-{
-  status: "ok";
-  time: string;
-}
-```
-
-It does not currently verify DB connectivity.
+Liveness is dependency-free. Readiness and its `/health` compatibility alias
+check Postgres and the S2S replay store, returning HTTP `503` with sanitized
+check statuses when degraded.
 
 ## Known Gaps
 
@@ -261,7 +270,6 @@ It does not currently verify DB connectivity.
 - No typed settings registry exists yet, so invalid business-level values can still be inserted by an admin.
 - No audit/history exists for setting changes.
 - No settings cache exists yet.
-- `/health` does not check Postgres connectivity.
 - Settings-service must not be used for secrets, credentials, auth policy, or trust decisions.
 
 ## Related Files

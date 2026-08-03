@@ -18,15 +18,15 @@ if ($outputDir) {
   New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 }
 
-$images = @(
-  "$ImagePrefix-user-service:$ImageTag",
-  "$ImagePrefix-auth-service:$ImageTag",
-  "$ImagePrefix-settings-service:$ImageTag",
-  "$ImagePrefix-media-service:$ImageTag",
-  "$ImagePrefix-taxonomy-service:$ImageTag",
-  "$ImagePrefix-product-service:$ImageTag",
-  "$ImagePrefix-blog-service:$ImageTag",
-  "$ImagePrefix-order-service:$ImageTag",
+$backendImagesJson = & node (Join-Path $repoRoot "scripts\backend.mjs") images $ImagePrefix $ImageTag
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to resolve backend images from the repository inventory."
+}
+$backendImages = $backendImagesJson | ConvertFrom-Json
+
+$images = @()
+$images += $backendImages
+$images += @(
   "postgres:17",
   "redis:7-alpine",
   "minio/minio:latest",

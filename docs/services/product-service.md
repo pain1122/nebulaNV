@@ -19,7 +19,7 @@ Product-service does not own media storage. It currently stores media-related UR
 - gRPC product gallery add/list/reorder/remove.
 - Product taxonomy facade over taxonomy-service.
 - Default product category initialization through taxonomy-service and settings-service.
-- DB-backed `/health`.
+- Shared liveness plus Postgres/S2S-backed `/health/ready`; `/health` remains a readiness alias.
 
 ## Current HTTP Contract
 
@@ -33,7 +33,7 @@ Product routes:
 Access:
 
 - Product reads are public.
-- Product writes require `admin`.
+- Product writes require `admin` or `root-admin`.
 
 Taxonomy routes exposed by product-service:
 
@@ -46,7 +46,7 @@ Taxonomy routes exposed by product-service:
 Access:
 
 - Taxonomy reads are public.
-- Taxonomy writes require `admin`.
+- Taxonomy writes require `admin` or `root-admin`.
 
 Important note:
 
@@ -86,6 +86,14 @@ Product taxonomy methods:
 
 ## Current DB Shape
 
+The root Prisma commands include this service after taxonomy-service. Its base
+seed intentionally performs no writes. `pnpm backend:seed` creates the stable
+development product through this service's HTTP API and omits `categoryId`, so
+the service-owned default-taxonomy initializer remains authoritative and
+separate from blog-service. See
+[Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
+for the shared commands and complete database order.
+
 Main Prisma models:
 
 - `Product`
@@ -120,6 +128,8 @@ The DB already has fields for attributes, comments, product sets, VR hotspots, 3
 - Soft delete sets `deletedAt`.
 - Restore clears `deletedAt`.
 - Hard delete removes the DB row.
+- Updating a missing product returns `404 product_not_found` over HTTP and `NOT_FOUND` over gRPC.
+- A missing or invalid related category remains invalid product input and returns `400`/`INVALID_ARGUMENT`.
 
 ## Currency Rules
 
@@ -173,6 +183,8 @@ Product-service does not currently validate these URLs against media-service. Me
 - Writes require admin.
 - Scope/kind mismatch is rejected defensively.
 - Product records store only `categoryId`, not embedded category data.
+- Downstream taxonomy gRPC failures use the shared `wrapGrpc` translator. Missing taxonomy records remain HTTP `404` through the facade and gRPC `NOT_FOUND` through `ProductTaxonomyService`.
+- A missing category reference during product create/update remains invalid product input (`400` / `INVALID_ARGUMENT`), rather than becoming a product-resource `404`.
 
 ## Default Category Initialization
 
@@ -180,10 +192,15 @@ Product-service does not currently validate these URLs against media-service. Me
 
 On module init it tries to:
 
-- Ensure taxonomy-service has `product/category.default:uncategorized`.
-- Store that taxonomy ID in settings-service key `product/default_product_category`.
+- Call the service-only taxonomy contract to ensure `product/category.default:uncategorized`.
+- Store that taxonomy ID through the service-only settings bootstrap contract at `product/default_product_category` in environment `default`.
 
 This default is used when creating products without an explicit `categoryId`.
+
+Initializer failure is logged and startup continues. This preserves reads and
+explicitly categorized operations during a transient settings/taxonomy outage.
+The shared readiness contract checks product Postgres and the S2S replay store;
+it deliberately does not duplicate initializer or downstream domain calls.
 
 ## Service Relationships
 
@@ -214,15 +231,19 @@ HTTP:
 - Admin can create product.
 - Public get by ID works.
 - Admin can update product.
+- Missing product update returns `404 product_not_found`.
 - Public list finds created product.
 - Product taxonomy HTTP create/get/list/update/delete works through product-service facade.
+- Missing taxonomy lookup returns `404` through the product HTTP facade.
 
 gRPC:
 
 - Admin S2S can create product.
 - Public get/list product works.
 - Admin S2S can update product.
+- Missing product update returns `NOT_FOUND` with `product_not_found`.
 - Product taxonomy gRPC create/get/list/update/delete works through product-service facade.
+- Missing taxonomy lookup returns gRPC `NOT_FOUND`.
 
 ## Related Files
 
@@ -279,6 +300,8 @@ Tests:
 - `apps/product-service/test/http/taxonomy.http.e2e.spec.ts`
 - `apps/product-service/test/grpc/taxonomy.e2e.spec.ts`
 - `apps/product-service/test/utils/settings.ts`
+- `apps/product-service/test/default-product-taxonomy.initializer.unit.spec.ts`
+- `apps/product-service/test/product.error-translation.unit.spec.ts`
 - `apps/product-service/test/setup/wait-for-services.ts`
 - `apps/product-service/test/jest.env.ts`
 

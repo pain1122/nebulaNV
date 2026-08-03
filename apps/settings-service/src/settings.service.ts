@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
+import { safeErrorName } from "@packages/config";
 import type { Setting } from "../prisma/generated/client";
-import { errorMessage, prismaErrorCode } from "./error.utils";
+import { prismaErrorCode } from "./error.utils";
 import { PrismaService } from "./prisma.service";
 
 const SAFE = /^[a-z0-9][a-z0-9._-]*$/;
@@ -87,8 +88,7 @@ export class SettingsService {
       return value;
     } catch (e: unknown) {
       this.log.error(
-        `setString failed ns=${ns} key=${k} env=${env}`,
-        errorMessage(e),
+        `settings_string_set_failed namespace=${ns} key=${k} environment=${env} cause=${safeErrorName(e)}`,
       );
       throw e;
     }

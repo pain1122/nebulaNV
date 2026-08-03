@@ -1,18 +1,8 @@
 // apps/auth-service/test/grpc/user.e2e.spec.ts
-import * as jwt from 'jsonwebtoken';
 import { mdAuth, mdS2S, loadClient, call, CODES } from './helpers';
 import { httpJson, AUTH_HTTP, subFromJwt, LoginResp } from '../utils/http';
 
 const USER_PROTO = require.resolve('@nebula/protos/user.proto');
-
-function roleFromJwt(token: string): string | undefined {
-  try {
-    const p = jwt.decode(token) as any | null;
-    return p?.role ? String(p.role) : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 describe('UserService gRPC (e2e, TS)', () => {
   const url = process.env.USER_GRPC_URL || '127.0.0.1:50051';
@@ -78,7 +68,7 @@ describe('UserService gRPC (e2e, TS)', () => {
       client,
       'getUser',
       { id: userId },
-      mdAuth({ access: userAccess, userId }),
+      mdAuth({ access: userAccess }),
     );
     expect(res).toHaveProperty('id', userId);
   });
@@ -86,12 +76,7 @@ describe('UserService gRPC (e2e, TS)', () => {
   it('getUser user→admin is denied', async () => {
     if (!haveRealAdmin || !adminId) return; // soft-skip
     await expect(
-      call(
-        client,
-        'getUser',
-        { id: adminId },
-        mdAuth({ access: userAccess, userId }),
-      ),
+      call(client, 'getUser', { id: adminId }, mdAuth({ access: userAccess })),
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
 
@@ -101,12 +86,11 @@ describe('UserService gRPC (e2e, TS)', () => {
       : 'getUser admin→user (no real admin) skipped',
     async () => {
       if (!haveRealAdmin || !adminAccess) return;
-      const adminRole = roleFromJwt(adminAccess) ?? 'admin';
       const res = await call<any>(
         client,
         'getUser',
         { id: userId },
-        mdAuth({ access: adminAccess, userId: adminId, role: adminRole }),
+        mdAuth({ access: adminAccess }),
       );
       expect(res).toHaveProperty('id', userId);
     },

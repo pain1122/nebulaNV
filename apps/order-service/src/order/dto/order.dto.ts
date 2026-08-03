@@ -1,10 +1,22 @@
-import { IsInt, IsOptional, IsString, IsUUID, Min } from "class-validator";
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from "class-validator";
 
 export enum OrderStatusDto {
   PENDING = "PENDING",
   PAID = "PAID",
   FULFILLED = "FULFILLED",
   CANCELLED = "CANCELLED",
+}
+
+export class UpdateOrderStatusDto {
+  @IsEnum(OrderStatusDto)
+  status!: OrderStatusDto;
 }
 
 export class AddToCartDto {

@@ -5,14 +5,18 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('development_user_seed_refused_in_production');
+  }
+
   // 🔐 passwords for local/dev only (change in prod)
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
-  const adminPass  = process.env.SEED_ADMIN_PASS  ?? 'Admin123!';
-  const userEmail  = process.env.SEED_USER_EMAIL  ?? 'user@example.com';
-  const userPass   = process.env.SEED_USER_PASS   ?? 'User123!';
+  const adminPass = process.env.SEED_ADMIN_PASS ?? 'Admin123!';
+  const userEmail = process.env.SEED_USER_EMAIL ?? 'user@example.com';
+  const userPass = process.env.SEED_USER_PASS ?? 'User123!';
 
   const adminHash = await bcrypt.hash(adminPass, 10);
-  const userHash  = await bcrypt.hash(userPass, 10);
+  const userHash = await bcrypt.hash(userPass, 10);
 
   // Upsert Admin
   const admin = await prisma.user.upsert({
@@ -22,7 +26,6 @@ async function main() {
       email: adminEmail,
       password: adminHash,
       role: 'admin',
-      refreshToken: null,
     },
     select: { id: true, email: true, role: true },
   });
@@ -35,7 +38,6 @@ async function main() {
       email: userEmail,
       password: userHash,
       role: 'user',
-      refreshToken: null,
     },
     select: { id: true, email: true, role: true },
   });
