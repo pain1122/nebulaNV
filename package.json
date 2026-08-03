@@ -102,6 +102,7 @@
     "check-types": "turbo run check-types",
     "check-types:backend": "node ./scripts/backend.mjs quality check-types",
     "test:security": "pnpm --filter @nebula/grpc-auth test:security && pnpm --filter @nebula/auth-service test:security && pnpm --filter @nebula/media-service test:unit && pnpm --filter @nebula/order-service test:unit",
+    "backend:env": "node ./scripts/backend.mjs environment",
     "backend:boot": "node ./scripts/backend.mjs boot",
     "backend:health": "node ./scripts/backend.mjs health",
     "backend:down": "node ./scripts/backend.mjs down",

@@ -1339,7 +1339,7 @@ export function downBackend({
   logger.log("[backend] stack stopped; named volumes were preserved");
 }
 
-function ensureBackendEnvironment() {
+export function ensureBackendEnvironment() {
   ensureExample(".env", ".env.example");
   for (const service of backendServices) {
     ensureExample(
@@ -1539,6 +1539,7 @@ function usage() {
   return [
     "Usage:",
     "  node scripts/backend.mjs boot",
+    "  node scripts/backend.mjs environment",
     "  node scripts/backend.mjs provision  # compatibility alias",
     "  node scripts/backend.mjs health",
     "  node scripts/backend.mjs down",
@@ -1560,6 +1561,11 @@ export async function main(args = process.argv.slice(2)) {
 
   if ((command === "boot" || command === "provision") && !operation) {
     await provisionBackend();
+    return;
+  }
+  if (command === "environment" && !operation) {
+    ensureBackendEnvironment();
+    console.log("[backend] local environment files are ready");
     return;
   }
   if (command === "health" && !operation) {

@@ -24,6 +24,8 @@ jobs:
         run: pnpm test:security
       - name: Build backend sources
         run: pnpm build:backend
+      - name: Materialize tracked example environment files
+        run: pnpm backend:env
       - name: Validate local and release Compose configurations
         run: |
           docker compose config --quiet

@@ -28,16 +28,12 @@ pnpm install
 Create local env files from examples:
 
 ```powershell
-Copy-Item .env.example .env
-Copy-Item apps/auth-service/.env.example apps/auth-service/.env
-Copy-Item apps/user-service/.env.example apps/user-service/.env
-Copy-Item apps/product-service/.env.example apps/product-service/.env
-Copy-Item apps/settings-service/.env.example apps/settings-service/.env
-Copy-Item apps/blog-service/.env.example apps/blog-service/.env
-Copy-Item apps/order-service/.env.example apps/order-service/.env
-Copy-Item apps/taxonomy-service/.env.example apps/taxonomy-service/.env
-Copy-Item apps/media-service/.env.example apps/media-service/.env
+pnpm backend:env
 ```
+
+This inventory-backed command copies the root and eight backend service
+examples only when their local `.env` files do not already exist. It never
+overwrites existing local values.
 
 Rules:
 
