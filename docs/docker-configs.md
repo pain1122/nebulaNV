@@ -105,6 +105,12 @@ Purpose:
 - Overlays compiled universal internal packages in separate small layers after dependency installation.
 - Creates one runtime target per backend service.
 - Verifies every declared internal package entry point while building each runtime target.
+- Performs root-owned runtime setup once, then runs every service target as the
+  built-in unprivileged `node` user.
+
+The shared multi-target Dockerfile is the only backend image definition. The
+obsolete root diagnostic Dockerfile and per-service Dockerfile copies were
+removed; do not recreate them or maintain a parallel build path.
 
 The common layers provide storage reuse, not a runtime dependency between
 containers. Every image manifest contains its own copy of the required layer

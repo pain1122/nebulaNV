@@ -208,6 +208,10 @@ RUN --mount=from=shared-runtime-artifacts,source=/packages,target=/built-package
       fi; \
     done
 
+# Root is required only while preparing the shared runtime filesystem. Every
+# service target inherits this unprivileged runtime user.
+USER node
+
 FROM runtime-base AS user-runtime
 WORKDIR /workspace/apps/user-service
 COPY --link --from=prod-deps /app/apps/user-service/package.json ./package.json

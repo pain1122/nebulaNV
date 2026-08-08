@@ -198,8 +198,19 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     dockerfile,
     /COPY scripts\/docker\/verify-runtime-imports\.mjs \.\/scripts\/docker\/verify-runtime-imports\.mjs/,
   );
+  assert.match(dockerfile, /\nUSER node\n/);
+  assert.equal(
+    existsSync(path.join(repositoryRoot, "Dockerfile.debug")),
+    false,
+    "the obsolete root diagnostic Dockerfile must not return",
+  );
 
   for (const service of backendServices) {
+    assert.equal(
+      existsSync(path.join(repositoryRoot, service.directory, "Dockerfile")),
+      false,
+      `${service.name} must use docker/backend.Dockerfile`,
+    );
     for (const compose of [localCompose, releaseCompose]) {
       const block = serviceBlock(compose, service.dockerService);
       assert.match(block, new RegExp(`-${service.dockerService}:`));
