@@ -96,6 +96,11 @@ official Bake targets sequentially, starts Compose with `--no-build`, waits for
 healthy responses, and runs the API demo seed. A separate backend build or seed
 is therefore unnecessary immediately before provisioning.
 
+`pnpm test:e2e` first runs the existing inventory-backed `build:backend`
+command so a clean host workspace has the internal-package `dist` entry points
+required by Jest. It then runs the service e2e scripts sequentially. Do not add
+separate Jest aliases or maintain another shared-package list for this step.
+
 CI uses the same backend-only lint, type, source-build, proto, focused security,
 Compose-validation, `backend:boot`, and `test:e2e` entry points. The quality job
 also fails if generation or verification changes tracked files.

@@ -107,7 +107,7 @@
     "backend:health": "node ./scripts/backend.mjs health",
     "backend:down": "node ./scripts/backend.mjs down",
     "test:e2e:provision": "node ./scripts/backend.mjs boot",
-    "test:e2e": "pnpm -r --workspace-concurrency=1 --filter=./apps/* --if-present run test:e2e",
+    "test:e2e": "pnpm build:backend && pnpm -r --workspace-concurrency=1 --filter=./apps/* --if-present run test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,md,json}\"",
     "proto:gen": "pnpm --filter @nebula/protos generate",
     "proto:check": "pnpm --filter @nebula/protos check-generated",

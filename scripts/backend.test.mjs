@@ -368,6 +368,7 @@ test("root command names point at the consolidated backend tool", () => {
       sourceBuild: manifest.scripts["build:backend"],
       sourceLint: manifest.scripts["lint:backend"],
       sourceTypes: manifest.scripts["check-types:backend"],
+      e2e: manifest.scripts["test:e2e"],
     },
     {
       generate: "node ./scripts/backend.mjs prisma generate",
@@ -390,6 +391,7 @@ test("root command names point at the consolidated backend tool", () => {
       sourceBuild: "node ./scripts/backend.mjs quality build",
       sourceLint: "node ./scripts/backend.mjs quality lint",
       sourceTypes: "node ./scripts/backend.mjs quality check-types",
+      e2e: "pnpm build:backend && pnpm -r --workspace-concurrency=1 --filter=./apps/* --if-present run test:e2e",
     },
   );
   assert.equal(

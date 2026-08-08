@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-08-03
+Last updated: 2026-08-08
 
 ## Active Phase
 
@@ -33,7 +33,7 @@ same backend commands.
 | Demo seeds                        | complete                       | User/settings retain base ownership; product/blog base seeds perform no writes. The API demo seed uses the ordinary seeded admin, preserves initializer/service validation, refuses production, and was live-verified for create and safe-repeat behavior.               |
 | Database recovery                 | complete                       | All seven schemas were deployed and checked on disposable databases. Binary dump/restore, intentional migration failure/stop/recovery, and a maintenance backup/restore of the seven development databases were live-verified.                                           |
 | Legacy user refresh-token storage | complete                       | Active refresh sessions still use auth-service Redis session families. The unused single-value column, RPC, and response fields were removed; the migration, rebuilt services, migration status, and focused live tests were user-verified.                              |
-| CI                                | partial implementation         | The clean hosted quality lane passes frozen install, isolated proto generation, backend lint/types, focused security tests, source build, environment initialization, and both Compose validations. The live lane clean-built all eight images and completed infrastructure, migration, seed, startup, and readiness provisioning. `pnpm test:e2e` then failed during Jest compilation because the fresh host workspace lacked internal-package `dist` outputs; the full live e2e gate, image scans, secret scanning, and retained reports remain pending. |
+| CI                                | partial implementation         | Hosted quality and Docker provisioning pass. Root `test:e2e` now uses `build:backend` to prepare clean-run host `dist`; hosted live confirmation, scans, and retained reports remain pending.                                                                            |
 
 ## Active Work Order
 
@@ -125,7 +125,7 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 - [x] Validate both local and release Compose configurations in CI.
 - [x] Make ignored proto output reproducible from a clean checkout: one package-owned pinned generator serves local source builds and Docker, `proto:check` is non-mutating, and Turbo caches the generated package output.
 - [x] Reuse the existing inventory-backed environment initializer for clean local/CI Compose validation; do not duplicate the root/eight-service example list in workflow shell code.
-- [ ] Make the root `test:e2e` command prepare the host-side internal-package outputs required by Jest on a clean checkout. Reuse the existing inventory-backed `build:backend` owner; do not add duplicate Jest aliases or another package list.
+- [x] Make the root `test:e2e` command prepare the host-side internal-package outputs required by Jest on a clean checkout. Reuse the existing inventory-backed `build:backend` owner; do not add duplicate Jest aliases or another package list.
 - [ ] Build the eight backend images once through the sequential inventory-backed Bake runner and reuse them for live tests and scans.
 - [ ] User gate: the backend-only lint, type, proto, security, and source-build commands pass locally with no errors; observe the updated quality/live workflow in GitHub Actions.
 
@@ -180,16 +180,15 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 - Batch 3A backend-tooling tests passed 13/13. The first live `backend:seed` run created one product and one published blog post; the second reported both as existing without overwriting them.
 - Batch 3B backend-tooling tests passed 19/19. Clean migration deploy/status passed for all seven disposable databases; binary recovery and intentional migration-failure recovery passed; the seven-database maintenance backup/restore, post-restore migration status, service restart, and final seed all completed without errors.
 - Batch 4 backend-tooling tests pass 23/23. Local and release Compose configurations parse. On 2026-08-03 the supported `pnpm backend:boot` workflow completed in roughly 30 minutes: all eight images built sequentially, all backend services plus MinIO became healthy, and the idempotent API demo seed reported its product and blog records as existing.
-- Batch 5A tooling coverage passes 24/24. A Turbo dry run selected the eight backend services and four shared package dependencies, with `apps/web` absent. Local and release Compose validation also passes; the new quality commands and CI jobs still require their user/hosted-run gates.
+- Batch 5A tooling coverage passes 24/24. The root command contract now locks the `test:e2e` source-build prerequisite. A Turbo dry run selected the eight backend services and four shared package dependencies, with `apps/web` absent. Local and release Compose validation also passes; the updated live command still requires its hosted-run gate.
 - The user ran `lint:backend`, `check-types:backend`, `proto:check`, `test:security`, and `build:backend`; all completed without errors. The 943 lint warnings are entirely under `test/**`: 942 are unsafe-`any` warnings from e2e fixtures/response handling and one is an unused test variable. Production `src/**` reports no warnings. Per scope, test-warning cleanup is deferred while actual test failures remain blocking.
 - Hosted quality now passes frozen install, isolated proto generation, all backend lint/type tasks, focused security tests, backend source build, non-overwriting environment initialization, both Compose validations, and tracked-diff enforcement.
-- Hosted live provisioning now clean-builds all eight backend images and completes infrastructure startup, database inventory, migration deploy/status, base seed, service startup/readiness, and the API demo seed. The subsequent `pnpm test:e2e` step fails before most assertions run because Jest resolves internal packages through `tsconfig.base.json` `dist` aliases and the fresh host workspace has not built those outputs. Docker/runtime provisioning is not the failing mechanism. The deferred narrow correction is to make the existing root e2e command invoke the existing inventory-backed source build prerequisite.
+- Hosted live provisioning clean-builds all eight backend images and completes infrastructure startup, database inventory, migration deploy/status, base seed, service startup/readiness, and the API demo seed. The previous `pnpm test:e2e` failure occurred before most assertions because Jest resolves internal packages through `tsconfig.base.json` `dist` aliases and the fresh host workspace had not built those outputs. Docker/runtime provisioning was not the failing mechanism. The root command now invokes the existing inventory-backed source build prerequisite; the hosted rerun remains the proof gate.
 - Active refresh-token rotation/replay/logout behavior is covered by the existing auth Redis security tests and remains unchanged by the planned legacy cleanup.
 - The raw workspace production audit currently includes backend, tooling, and deferred web findings; its unclassified total must not be used as an F2 backend gate.
 
 ## Next Action
 
-Later, make `pnpm test:e2e` self-contained on a clean checkout by reusing the
-existing `build:backend` prerequisite, then rerun the hosted live lane. Keep
-`apps/web` and test-warning cleanup excluded; do not change Jest/package alias
-ownership or add another backend package list for this fix.
+Review and push the narrow `test:e2e` prerequisite patch, then observe the
+hosted quality/live rerun. Keep `apps/web` and test-warning cleanup excluded;
+do not change Jest/package alias ownership or add another backend package list.
