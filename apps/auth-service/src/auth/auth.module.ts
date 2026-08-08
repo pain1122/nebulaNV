@@ -1,7 +1,7 @@
 // apps/auth-service/src/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, type JwtSignOptions } from '@nestjs/jwt';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 import { AuthService } from './auth.service';
@@ -27,7 +27,10 @@ export const USER_PROTO = require.resolve('@nebula/protos/user.proto');
       useFactory: (cfg: ConfigService) => ({
         secret: cfg.get<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: cfg.get<string>('JWT_ACCESS_EXPIRATION') ?? '15m',
+          expiresIn:
+            cfg.get<NonNullable<JwtSignOptions['expiresIn']>>(
+              'JWT_ACCESS_EXPIRATION',
+            ) ?? '15m',
         },
       }),
     }),

@@ -127,6 +127,41 @@ export const prismaServices = Object.freeze(
   backendServices.filter((service) => service.database !== null),
 );
 
+export const SECURITY_REPORT_DIRECTORY = path.join(
+  repositoryRoot,
+  ".security-reports",
+);
+
+export const TRIVY_SOURCE_SKIP_DIRECTORIES = Object.freeze([
+  ".git",
+  "**/.git",
+  ".next",
+  "**/.next",
+  ".nebula-backups",
+  ".security-reports",
+  "apps/web",
+  "build",
+  "**/build",
+  "coverage",
+  "**/coverage",
+  "dist",
+  "**/dist",
+  "generated",
+  "**/generated",
+  "node_modules",
+  "**/node_modules",
+  "vendor",
+  "**/vendor",
+]);
+
+export const TRIVY_SOURCE_SKIP_FILES = Object.freeze([
+  ".env",
+  "**/.env",
+  ".env.local",
+  "**/.env.local",
+  "deploy/.env.production",
+]);
+
 export const DEMO_PRODUCT = Object.freeze({
   slug: "nebula-demo-product",
   sku: "NEBULA-DEMO-001",
@@ -351,6 +386,7 @@ function run(command, args, options = {}) {
     cwd: options.cwd ?? repositoryRoot,
     env: options.env ?? process.env,
     encoding: options.capture ? "utf8" : undefined,
+    maxBuffer: options.capture ? 64 * 1024 * 1024 : undefined,
     stdio: options.capture ? "pipe" : "inherit",
   });
 
@@ -1475,6 +1511,372 @@ export function runBackendQualityTask(
   logger.log(`[backend] ${task} complete for ${services.length} services`);
 }
 
+function packageManifest(directory) {
+  try {
+    return JSON.parse(
+      readFileSync(path.join(directory, "package.json"), "utf8"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function addDependencyVersion(versions, name, version) {
+  if (
+    typeof version !== "string" ||
+    version.startsWith("file:") ||
+    version.startsWith("link:")
+  ) {
+    return;
+  }
+  const values = versions.get(name) ?? new Set();
+  values.add(version);
+  versions.set(name, values);
+}
+
+function collectRuntimeDependencyInventory(
+  workspaces,
+  { readManifest = packageManifest } = {},
+) {
+  const versions = new Map();
+  const paths = new Map();
+
+  function visit(owner, dependencies, chain) {
+    if (!isRecord(dependencies)) return;
+    const manifest =
+      typeof owner?.path === "string" ? readManifest(owner.path) : {};
+    const optionalPeers = new Set(
+      Object.entries(manifest.peerDependenciesMeta ?? {})
+        .filter(([, metadata]) => metadata?.optional === true)
+        .map(([name]) => name),
+    );
+
+    for (const [name, dependency] of Object.entries(dependencies)) {
+      if (!isRecord(dependency) || optionalPeers.has(name)) continue;
+      addDependencyVersion(versions, name, dependency.version);
+      const nextChain = [...chain, `${name}@${dependency.version}`];
+      const key = `${name}@${dependency.version}`;
+      const dependencyPaths = paths.get(key) ?? new Set();
+      dependencyPaths.add(nextChain.join(" > "));
+      paths.set(key, dependencyPaths);
+      visit(dependency, dependency.dependencies, nextChain);
+      visit(dependency, dependency.optionalDependencies, nextChain);
+    }
+  }
+
+  for (const workspace of Array.isArray(workspaces) ? workspaces : []) {
+    const root = [workspace.name ?? workspace.path ?? "workspace"];
+    visit(workspace, workspace.dependencies, root);
+    visit(workspace, workspace.optionalDependencies, root);
+  }
+  return { paths, versions };
+}
+
+export function collectRuntimeDependencyVersions(workspaces, options = {}) {
+  return collectRuntimeDependencyInventory(workspaces, options).versions;
+}
+
+function dependencyInventoryArgs(services = backendServices) {
+  return [
+    ...services.map((service) => `--filter=${service.packageName}...`),
+    "list",
+    "--prod",
+    "--depth",
+    "Infinity",
+    "--json",
+  ];
+}
+
+function parseCommandJson(result, label, acceptedStatuses = [0]) {
+  if (!acceptedStatuses.includes(result.status)) {
+    throw new Error(`${label}_failed_exit_${result.status ?? "unknown"}`);
+  }
+  try {
+    return JSON.parse(result.stdout ?? "");
+  } catch {
+    throw new Error(`${label}_invalid_json`);
+  }
+}
+
+function dependencyVersionMatches(inventory, name, version) {
+  const versions = inventory.versions ?? inventory;
+  return versions.get(name)?.has(version) === true;
+}
+
+function dependencyPaths(inventory, name, versions) {
+  if (!(inventory.paths instanceof Map)) return [];
+  return [
+    ...new Set(
+      versions.flatMap((version) => [
+        ...(inventory.paths.get(`${name}@${version}`) ?? []),
+      ]),
+    ),
+  ].sort();
+}
+
+export function classifyDependencyAdvisories(
+  auditReport,
+  backendInventory,
+  webInventory,
+) {
+  const advisories = isRecord(auditReport?.advisories)
+    ? Object.values(auditReport.advisories)
+    : [];
+
+  return advisories
+    .filter((advisory) => ["high", "critical"].includes(advisory.severity))
+    .map((advisory) => {
+      const versions = [
+        ...new Set(
+          (Array.isArray(advisory.findings) ? advisory.findings : [])
+            .map((finding) => finding?.version)
+            .filter((version) => typeof version === "string"),
+        ),
+      ];
+      const classifications = [];
+      if (
+        versions.some((version) =>
+          dependencyVersionMatches(
+            backendInventory,
+            advisory.module_name,
+            version,
+          ),
+        )
+      ) {
+        classifications.push("backend-runtime");
+      }
+      if (
+        versions.some((version) =>
+          dependencyVersionMatches(webInventory, advisory.module_name, version),
+        )
+      ) {
+        classifications.push("deferred-web");
+      }
+      if (classifications.length === 0) classifications.push("backend-tooling");
+
+      return {
+        id: advisory.id,
+        package: advisory.module_name,
+        severity: advisory.severity,
+        title: advisory.title,
+        versions,
+        patchedVersions: advisory.patched_versions,
+        classifications,
+        auditPaths: [
+          ...new Set(
+            (Array.isArray(advisory.findings) ? advisory.findings : []).flatMap(
+              (finding) => (Array.isArray(finding?.paths) ? finding.paths : []),
+            ),
+          ),
+        ].sort(),
+        backendPaths: dependencyPaths(
+          backendInventory,
+          advisory.module_name,
+          versions,
+        ),
+        webPaths: dependencyPaths(webInventory, advisory.module_name, versions),
+      };
+    })
+    .sort((left, right) =>
+      `${left.classifications[0]}:${left.package}:${left.id}`.localeCompare(
+        `${right.classifications[0]}:${right.package}:${right.id}`,
+      ),
+    );
+}
+
+function ensureSecurityReportDirectory(directory = SECURITY_REPORT_DIRECTORY) {
+  mkdirSync(directory, { recursive: true });
+  return directory;
+}
+
+export function generateBackendDependencyReport({
+  env = process.env,
+  execute = runPnpm,
+  logger = console,
+  outputDirectory = SECURITY_REPORT_DIRECTORY,
+  services = backendServices,
+} = {}) {
+  const commandOptions = {
+    capture: true,
+    emitCaptured: false,
+    env,
+  };
+  const auditReport = parseCommandJson(
+    execute(["audit", "--prod", "--json"], commandOptions),
+    "backend_dependency_audit",
+    [0, 1],
+  );
+  const gatedPackages = [
+    ...new Set(
+      Object.values(auditReport.advisories ?? {})
+        .filter((advisory) => ["high", "critical"].includes(advisory.severity))
+        .map((advisory) => advisory.module_name),
+    ),
+  ].sort();
+  const backendWorkspaces = services.flatMap((service) =>
+    parseCommandJson(
+      execute(dependencyInventoryArgs([service]), commandOptions),
+      `backend_dependency_inventory_${service.name}`,
+    ),
+  );
+  const webWorkspaces = gatedPackages.flatMap((packageName) =>
+    parseCommandJson(
+      execute(
+        [
+          "--filter=./apps/web",
+          "list",
+          packageName,
+          "--prod",
+          "--depth",
+          "Infinity",
+          "--json",
+        ],
+        commandOptions,
+      ),
+      `web_dependency_inventory_${packageName}`,
+    ),
+  );
+  const findings = classifyDependencyAdvisories(
+    auditReport,
+    collectRuntimeDependencyInventory(backendWorkspaces),
+    collectRuntimeDependencyInventory(webWorkspaces),
+  );
+  const blockers = findings.filter((finding) =>
+    finding.classifications.includes("backend-runtime"),
+  );
+  const report = {
+    generatedAt: new Date().toISOString(),
+    policy: {
+      scope: "backend-runtime",
+      severities: ["HIGH", "CRITICAL"],
+      approvedAdvisories: [],
+    },
+    auditMetadata: auditReport.metadata ?? {},
+    summary: {
+      highCritical: findings.length,
+      backendRuntime: blockers.length,
+      backendTooling: findings.filter((finding) =>
+        finding.classifications.includes("backend-tooling"),
+      ).length,
+      deferredWeb: findings.filter((finding) =>
+        finding.classifications.includes("deferred-web"),
+      ).length,
+    },
+    findings,
+  };
+  const directory = ensureSecurityReportDirectory(outputDirectory);
+  const outputPath = path.join(directory, "backend-dependencies.json");
+  writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+
+  logger.log(
+    `[backend] dependency report: runtime=${report.summary.backendRuntime}, tooling=${report.summary.backendTooling}, deferred-web=${report.summary.deferredWeb}`,
+  );
+  if (blockers.length > 0) {
+    throw new Error(
+      `backend_dependency_gate_failed_${blockers.length}_high_or_critical`,
+    );
+  }
+  logger.log("[backend] dependency gate passed");
+  return report;
+}
+
+export function buildTrivySourceArgs(outputPath) {
+  return [
+    "fs",
+    "--scanners",
+    "secret,misconfig",
+    "--severity",
+    "HIGH,CRITICAL",
+    "--exit-code",
+    "1",
+    "--format",
+    "json",
+    "--output",
+    outputPath,
+    ...TRIVY_SOURCE_SKIP_DIRECTORIES.flatMap((directory) => [
+      "--skip-dirs",
+      directory,
+    ]),
+    ...TRIVY_SOURCE_SKIP_FILES.flatMap((file) => ["--skip-files", file]),
+    ".",
+  ];
+}
+
+export function buildTrivyImageArgs(image, outputPath) {
+  return [
+    "image",
+    "--scanners",
+    "vuln",
+    "--severity",
+    "HIGH,CRITICAL",
+    "--exit-code",
+    "1",
+    "--format",
+    "json",
+    "--output",
+    outputPath,
+    image,
+  ];
+}
+
+function printTrivyReport(outputPath, { env, execute }) {
+  const result = execute(
+    "trivy",
+    ["convert", "--format", "table", "--severity", "HIGH,CRITICAL", outputPath],
+    { env },
+  );
+  if (result.status !== 0) {
+    throw new Error(`trivy_report_failed_exit_${result.status ?? "unknown"}`);
+  }
+}
+
+export function runBackendSourceScan({
+  env = process.env,
+  execute = run,
+  logger = console,
+  outputDirectory = SECURITY_REPORT_DIRECTORY,
+} = {}) {
+  const directory = ensureSecurityReportDirectory(outputDirectory);
+  const outputPath = path.join(directory, "backend-source.json");
+  const result = execute("trivy", buildTrivySourceArgs(outputPath), { env });
+  printTrivyReport(outputPath, { env, execute });
+  if (result.status !== 0) {
+    throw new Error(
+      `backend_source_scan_failed_exit_${result.status ?? "unknown"}`,
+    );
+  }
+  logger.log("[backend] secret/config gate passed");
+}
+
+function safeReportName(image) {
+  return image.replace(/[^A-Za-z0-9._-]+/g, "-");
+}
+
+export function runBackendImageScans({
+  env = process.env,
+  execute = run,
+  logger = console,
+  outputDirectory = SECURITY_REPORT_DIRECTORY,
+  services = backendServices,
+} = {}) {
+  const directory = ensureSecurityReportDirectory(outputDirectory);
+  const failed = [];
+  for (const service of services) {
+    const image = service.defaultImage;
+    const outputPath = path.join(directory, `${safeReportName(image)}.json`);
+    logger.log(`[backend] image scan: ${image}`);
+    const result = execute("trivy", buildTrivyImageArgs(image, outputPath), {
+      env,
+    });
+    printTrivyReport(outputPath, { env, execute });
+    if (result.status !== 0) failed.push(service.dockerService);
+  }
+  if (failed.length > 0) {
+    throw new Error(`backend_image_gate_failed_${failed.join("_")}`);
+  }
+  logger.log(`[backend] image gate passed for ${services.length} images`);
+}
+
 function runBackendDev() {
   const result = runPnpm([
     "exec",
@@ -1544,6 +1946,7 @@ function usage() {
     "  node scripts/backend.mjs health",
     "  node scripts/backend.mjs down",
     "  node scripts/backend.mjs quality <lint|check-types|build>",
+    "  node scripts/backend.mjs security <dependencies|source|images>",
     "  node scripts/backend.mjs build-images [--pull|--clean]",
     "  node scripts/backend.mjs prisma <generate|migrate-dev|migrate-deploy|migrate-status|push|seed>",
     "  node scripts/backend.mjs seed",
@@ -1578,6 +1981,18 @@ export async function main(args = process.argv.slice(2)) {
   }
   if (command === "quality" && operation && !extra) {
     runBackendQualityTask(operation);
+    return;
+  }
+  if (command === "security" && operation === "dependencies" && !extra) {
+    generateBackendDependencyReport();
+    return;
+  }
+  if (command === "security" && operation === "source" && !extra) {
+    runBackendSourceScan();
+    return;
+  }
+  if (command === "security" && operation === "images" && !extra) {
+    runBackendImageScans();
     return;
   }
   if (command === "build-images" && !confirmationArg && !unexpected) {

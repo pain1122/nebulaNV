@@ -1,6 +1,6 @@
 ﻿# Testing And Health
 
-Last reviewed: 2026-08-03
+Last reviewed: 2026-08-08
 
 Purpose: define how NebulaNV proves each service is alive, connected, authorized correctly, and still honoring its HTTP/gRPC contract.
 
@@ -104,6 +104,40 @@ separate Jest aliases or maintain another shared-package list for this step.
 CI uses the same backend-only lint, type, source-build, proto, focused security,
 Compose-validation, `backend:boot`, and `test:e2e` entry points. The quality job
 also fails if generation or verification changes tracked files.
+
+## Backend Security Gates
+
+F2 keeps the postponed `apps/web` prototype outside the backend gates. The
+existing root backend inventory is also the source for dependency selection and
+the eight image tags; do not maintain a second service or image list.
+
+```powershell
+pnpm scan:dependencies:backend
+pnpm scan:source:backend
+pnpm scan:images:backend
+```
+
+- `scan:dependencies:backend` runs the pnpm production audit, classifies every
+  high/critical package-version finding as backend runtime, backend tooling, or
+  deferred web, and fails for any backend-runtime finding. Optional Prisma CLI
+  peers are tooling and are not misclassified as deployed runtime packages.
+- `scan:source:backend` uses pinned Trivy to detect high/critical secrets and
+  configuration defects. It excludes `apps/web`, materialized local env files,
+  dependencies, generated/build output, coverage, and vendored frontend assets;
+  tracked `.env.example` contracts remain in scope.
+- `scan:images:backend` uses the same Trivy installation and inventory image
+  tags to scan all eight previously built images. It does not rebuild, upload,
+  ignore unfixed findings, or stop after the first affected image.
+
+JSON output is written under ignored `.security-reports/`. Each command also
+prints a bounded table/summary and exits nonzero when its gate fails. F2 has no
+advisory allowlist: a backend-runtime `HIGH` or `CRITICAL` remains blocking
+until a reviewed compatible patch is applied. CI pins Trivy `v0.73.0` through
+the immutable `setup-trivy` action commit recorded in the workflow.
+
+The dependency and source gates run in the quality job. Image scanning runs in
+the live job after e2e tests and before the existing unconditional Compose
+cleanup, so it examines the exact images that passed the live tests.
 
 `pnpm backend:health` performs one read-only check of every `/health/ready`
 contract. `pnpm backend:down` runs Compose down without `-v`, so local database

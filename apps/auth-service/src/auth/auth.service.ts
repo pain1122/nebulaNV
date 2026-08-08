@@ -1,7 +1,7 @@
 // apps/auth-service/src/auth/auth.service.ts
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
 import { safeErrorName } from '@packages/config';
@@ -302,7 +302,9 @@ export class AuthService {
     const accessToken = this.jwt.sign(accessPayload);
     const refreshToken = this.jwt.sign(refreshPayload, {
       secret: this.cfg.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.cfg.get<string>('JWT_REFRESH_EXPIRATION'),
+      expiresIn: this.cfg.get<NonNullable<JwtSignOptions['expiresIn']>>(
+        'JWT_REFRESH_EXPIRATION',
+      ),
     });
 
     return {

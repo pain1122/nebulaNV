@@ -21,15 +21,22 @@ import {
   buildBackendImages,
   buildDevCommands,
   buildPrismaArgs,
+  buildTrivyImageArgs,
+  buildTrivySourceArgs,
   checkBackendHealth,
+  classifyDependencyAdvisories,
+  collectRuntimeDependencyVersions,
   disposableMigrationServices,
   downBackend,
+  generateBackendDependencyReport,
   missingExpectedDatabases,
   prismaServices,
   provisionBackend,
   releaseImages,
   repositoryRoot,
+  runBackendImageScans,
   runBackendQualityTask,
+  runBackendSourceScan,
   runPrismaOperation,
   sanitizeOutput,
   seedBackendDemo,
@@ -368,6 +375,9 @@ test("root command names point at the consolidated backend tool", () => {
       sourceBuild: manifest.scripts["build:backend"],
       sourceLint: manifest.scripts["lint:backend"],
       sourceTypes: manifest.scripts["check-types:backend"],
+      dependencyScan: manifest.scripts["scan:dependencies:backend"],
+      sourceScan: manifest.scripts["scan:source:backend"],
+      imageScan: manifest.scripts["scan:images:backend"],
       e2e: manifest.scripts["test:e2e"],
     },
     {
@@ -391,6 +401,9 @@ test("root command names point at the consolidated backend tool", () => {
       sourceBuild: "node ./scripts/backend.mjs quality build",
       sourceLint: "node ./scripts/backend.mjs quality lint",
       sourceTypes: "node ./scripts/backend.mjs quality check-types",
+      dependencyScan: "node ./scripts/backend.mjs security dependencies",
+      sourceScan: "node ./scripts/backend.mjs security source",
+      imageScan: "node ./scripts/backend.mjs security images",
       e2e: "pnpm build:backend && pnpm -r --workspace-concurrency=1 --filter=./apps/* --if-present run test:e2e",
     },
   );
@@ -425,7 +438,10 @@ test("backend quality tasks derive filters from the inventory and exclude web", 
     logger: { log() {} },
   });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].some((arg) => arg.includes("web")), false);
+  assert.equal(
+    calls[0].some((arg) => arg.includes("web")),
+    false,
+  );
 
   assert.throws(
     () =>
@@ -438,6 +454,257 @@ test("backend quality tasks derive filters from the inventory and exclude web", 
       }),
     /backend_check-types_failed_exit_6/,
   );
+});
+
+test("runtime dependency inventory excludes optional CLI peers", () => {
+  const workspaces = [
+    {
+      path: "service",
+      dependencies: {
+        "@prisma/client": {
+          path: "prisma-client",
+          version: "6.16.2",
+          dependencies: {
+            prisma: {
+              path: "prisma-cli",
+              version: "6.16.2",
+              dependencies: {
+                effect: { path: "effect", version: "3.16.12" },
+              },
+            },
+          },
+        },
+        "@grpc/grpc-js": {
+          path: "grpc",
+          version: "1.14.0",
+          dependencies: {
+            protobufjs: { path: "protobufjs", version: "7.5.4" },
+          },
+        },
+      },
+    },
+  ];
+  const manifests = new Map([
+    ["prisma-client", { peerDependenciesMeta: { prisma: { optional: true } } }],
+  ]);
+  const versions = collectRuntimeDependencyVersions(workspaces, {
+    readManifest: (directory) => manifests.get(directory) ?? {},
+  });
+
+  assert.equal(versions.get("@prisma/client").has("6.16.2"), true);
+  assert.equal(versions.has("prisma"), false);
+  assert.equal(versions.has("effect"), false);
+  assert.equal(versions.get("@grpc/grpc-js").has("1.14.0"), true);
+  assert.equal(versions.get("protobufjs").has("7.5.4"), true);
+});
+
+test("dependency findings are classified before the backend runtime gate", () => {
+  const audit = {
+    advisories: {
+      1: {
+        id: 1,
+        module_name: "protobufjs",
+        severity: "critical",
+        title: "runtime finding",
+        patched_versions: ">=7.5.5",
+        findings: [{ version: "7.5.4" }],
+      },
+      2: {
+        id: 2,
+        module_name: "effect",
+        severity: "high",
+        title: "tooling finding",
+        patched_versions: ">=3.20.0",
+        findings: [{ version: "3.16.12" }],
+      },
+      3: {
+        id: 3,
+        module_name: "next",
+        severity: "high",
+        title: "web finding",
+        patched_versions: ">=16.1.0",
+        findings: [{ version: "16.0.7" }],
+      },
+      4: {
+        id: 4,
+        module_name: "low-package",
+        severity: "low",
+        title: "not gated",
+        findings: [{ version: "1.0.0" }],
+      },
+    },
+  };
+  const backend = new Map([["protobufjs", new Set(["7.5.4"])]]);
+  const web = new Map([["next", new Set(["16.0.7"])]]);
+  const findings = classifyDependencyAdvisories(audit, backend, web);
+
+  assert.deepEqual(
+    Object.fromEntries(
+      findings.map((finding) => [finding.package, finding.classifications]),
+    ),
+    {
+      effect: ["backend-tooling"],
+      protobufjs: ["backend-runtime"],
+      next: ["deferred-web"],
+    },
+  );
+});
+
+test("dependency report writes classifications and blocks runtime findings", () => {
+  const temporary = mkdtempSync(path.join(tmpdir(), "nebula-security-"));
+  const audit = {
+    metadata: { vulnerabilities: { high: 2, critical: 1 } },
+    advisories: {
+      1: {
+        id: 1,
+        module_name: "protobufjs",
+        severity: "critical",
+        title: "runtime finding",
+        patched_versions: ">=7.5.5",
+        findings: [{ version: "7.5.4" }],
+      },
+      2: {
+        id: 2,
+        module_name: "next",
+        severity: "high",
+        title: "web finding",
+        patched_versions: ">=16.1.0",
+        findings: [{ version: "16.0.7" }],
+      },
+    },
+  };
+  const backendList = [
+    {
+      path: "service",
+      dependencies: {
+        protobufjs: { path: "protobufjs", version: "7.5.4" },
+      },
+    },
+  ];
+  const webList = [
+    {
+      path: "web",
+      dependencies: { next: { path: "next", version: "16.0.7" } },
+    },
+  ];
+
+  try {
+    assert.throws(
+      () =>
+        generateBackendDependencyReport({
+          execute(args) {
+            if (args[0] === "audit") {
+              return { status: 1, stdout: JSON.stringify(audit) };
+            }
+            if (args[0] === "--filter=./apps/web") {
+              return { status: 0, stdout: JSON.stringify(webList) };
+            }
+            return { status: 0, stdout: JSON.stringify(backendList) };
+          },
+          logger: { log() {} },
+          outputDirectory: temporary,
+          services: backendServices.slice(0, 1),
+        }),
+      /backend_dependency_gate_failed_1_high_or_critical/,
+    );
+    const report = JSON.parse(
+      readFileSync(path.join(temporary, "backend-dependencies.json"), "utf8"),
+    );
+    assert.deepEqual(report.summary, {
+      highCritical: 2,
+      backendRuntime: 1,
+      backendTooling: 0,
+      deferredWeb: 1,
+    });
+    assert.deepEqual(report.policy.approvedAdvisories, []);
+    assert.deepEqual(
+      report.findings.find((finding) => finding.package === "protobufjs")
+        .backendPaths,
+      ["service > protobufjs@7.5.4"],
+    );
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("Trivy source scope excludes web, env, generated, and vendor inputs", () => {
+  const args = buildTrivySourceArgs("source.json");
+  assert.deepEqual(args.slice(0, 11), [
+    "fs",
+    "--scanners",
+    "secret,misconfig",
+    "--severity",
+    "HIGH,CRITICAL",
+    "--exit-code",
+    "1",
+    "--format",
+    "json",
+    "--output",
+    "source.json",
+  ]);
+  for (const excluded of [
+    "apps/web",
+    "**/node_modules",
+    "**/dist",
+    "**/generated",
+    "**/vendor",
+  ]) {
+    assert.equal(args.includes(excluded), true);
+  }
+  assert.equal(args.includes(".env"), true);
+  assert.equal(args.includes("**/.env"), true);
+  assert.equal(args.includes("**/.env.local"), true);
+  assert.equal(args.includes("**/.env.*"), false);
+  assert.equal(args.includes("**/.env.example"), false);
+  assert.equal(args.at(-1), ".");
+
+  const calls = [];
+  runBackendSourceScan({
+    execute(command, commandArgs) {
+      calls.push({ command, commandArgs });
+      return { status: 0 };
+    },
+    logger: { log() {} },
+    outputDirectory: ".security-reports-test",
+  });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].command, "trivy");
+  assert.equal(calls[1].commandArgs[0], "convert");
+  rmSync(".security-reports-test", { recursive: true, force: true });
+});
+
+test("Trivy image scans reuse every inventory image and collect failures", () => {
+  const services = backendServices.slice(0, 3);
+  const args = buildTrivyImageArgs(services[0].defaultImage, "image.json");
+  assert.equal(args[0], "image");
+  assert.equal(args.includes("--ignore-unfixed"), false);
+  assert.equal(args.at(-1), services[0].defaultImage);
+
+  const calls = [];
+  assert.throws(
+    () =>
+      runBackendImageScans({
+        services,
+        execute(command, commandArgs) {
+          calls.push({ command, commandArgs });
+          const isScan = commandArgs[0] === "image";
+          return {
+            status:
+              isScan && commandArgs.at(-1) === services[1].defaultImage ? 1 : 0,
+          };
+        },
+        logger: { log() {} },
+        outputDirectory: ".security-reports-test",
+      }),
+    /backend_image_gate_failed_auth-service/,
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.commandArgs[0] === "image")
+      .map((call) => call.commandArgs.at(-1)),
+    services.map((service) => service.defaultImage),
+  );
+  rmSync(".security-reports-test", { recursive: true, force: true });
 });
 
 test("backend image targets build sequentially and stop on the first failure", () => {

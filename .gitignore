@@ -11,6 +11,7 @@ out/
 .cache/
 *.tsbuildinfo
 coverage/
+.security-reports/
 deploy/*
 !deploy/
 !deploy/README.md

@@ -20,7 +20,7 @@ Use this as a map. Do not duplicate full deployment instructions here; detailed 
 - `scripts/docker/load-release-images.ps1`: loads `deploy/nebula-images.tar`.
 - `scripts/db/init-multiple-dbs.sh`: creates per-service Postgres databases on first volume init.
 - Root `package.json` field `nebula.backendServices`: tooling-owned backend package, database, image, and port inventory.
-- `scripts/backend.mjs`: inventory-backed provisioning, Prisma, development, database verification/recovery, and release-image command source.
+- `scripts/backend.mjs`: inventory-backed provisioning, Prisma, development, database verification/recovery, release-image, and security-scan command source.
 
 ## Local Compose
 
@@ -157,6 +157,13 @@ Current backend images:
 - `nebulanv-main-product-service:latest`
 - `nebulanv-main-blog-service:latest`
 - `nebulanv-main-order-service:latest`
+
+The CI live job scans these exact local tags with pinned Trivy after the live
+e2e suites and before Compose cleanup. `pnpm scan:images:backend` derives the
+tags from the root inventory, scans all eight even when an earlier image is
+affected, and fails for any `HIGH` or `CRITICAL` OS or application-package
+finding. It does not rebuild, export, or upload an image and does not ignore
+unfixed findings.
 
 Release archive also includes infrastructure images:
 
