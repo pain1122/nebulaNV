@@ -23,9 +23,12 @@ import {
   buildPrismaArgs,
   buildTrivyImageArgs,
   buildTrivySourceArgs,
+  captureComposeConfigurations,
+  captureComposeFailureEvidence,
   checkBackendHealth,
   classifyDependencyAdvisories,
   collectRuntimeDependencyVersions,
+  createTrivyEvidenceReport,
   disposableMigrationServices,
   downBackend,
   generateBackendDependencyReport,
@@ -389,6 +392,8 @@ test("root command names point at the consolidated backend tool", () => {
       dependencyScan: manifest.scripts["scan:dependencies:backend"],
       sourceScan: manifest.scripts["scan:source:backend"],
       imageScan: manifest.scripts["scan:images:backend"],
+      composeEvidence: manifest.scripts["evidence:compose:backend"],
+      failureEvidence: manifest.scripts["evidence:failure:backend"],
       e2e: manifest.scripts["test:e2e"],
     },
     {
@@ -415,6 +420,8 @@ test("root command names point at the consolidated backend tool", () => {
       dependencyScan: "node ./scripts/backend.mjs security dependencies",
       sourceScan: "node ./scripts/backend.mjs security source",
       imageScan: "node ./scripts/backend.mjs security images",
+      composeEvidence: "node ./scripts/backend.mjs evidence compose",
+      failureEvidence: "node ./scripts/backend.mjs evidence failure",
       e2e: "pnpm build:backend && pnpm -r --workspace-concurrency=1 --filter=./apps/* --if-present run test:e2e",
     },
   );
@@ -422,6 +429,34 @@ test("root command names point at the consolidated backend tool", () => {
     manifest.scripts["dev:backend"],
     "node ./scripts/backend.mjs dev",
   );
+});
+
+test("CI retains only allowlisted backend evidence for fourteen days", () => {
+  const workflow = source(".github/workflows/ci.yml");
+  const uploadAction =
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
+  assert.equal(workflow.split(uploadAction).length - 1, 2);
+  assert.equal(workflow.split("retention-days: 14").length - 1, 2);
+  assert.match(workflow, /name: backend-quality-evidence/);
+  assert.match(workflow, /name: backend-live-evidence/);
+  assert.match(workflow, /run: pnpm evidence:compose:backend/);
+  assert.match(workflow, /run: pnpm evidence:failure:backend/);
+  assert.doesNotMatch(workflow, /run:\s*docker compose logs/);
+
+  const retainedPaths = [
+    ...workflow.matchAll(/          path: \|\r?\n((?:            .+\r?\n)+)/g),
+  ]
+    .flatMap((match) => match[1].trim().split(/\r?\n/))
+    .map((entry) => entry.trim());
+  assert.deepEqual(retainedPaths, [
+    ".security-reports/backend-dependencies.json",
+    ".security-reports/backend-source.json",
+    ".ci-evidence/compose-local.yaml",
+    ".ci-evidence/compose-release.yaml",
+    ".security-reports/nebulanv-main-*.json",
+    ".ci-evidence/compose-state.jsonl",
+    ".ci-evidence/compose-logs.txt",
+  ]);
 });
 
 test("backend quality tasks derive filters from the inventory and exclude web", () => {
@@ -669,19 +704,78 @@ test("Trivy source scope excludes web, env, generated, and vendor inputs", () =>
   assert.equal(args.includes("**/.env.example"), false);
   assert.equal(args.at(-1), ".");
 
+  const temporary = mkdtempSync(path.join(tmpdir(), "nebula-source-scan-"));
   const calls = [];
-  runBackendSourceScan({
-    execute(command, commandArgs) {
-      calls.push({ command, commandArgs });
-      return { status: 0 };
-    },
-    logger: { log() {} },
-    outputDirectory: ".security-reports-test",
+  try {
+    runBackendSourceScan({
+      execute(command, commandArgs) {
+        calls.push({ command, commandArgs });
+        const output = commandArgs[commandArgs.indexOf("--output") + 1];
+        writeFileSync(
+          output,
+          JSON.stringify({
+            SchemaVersion: 2,
+            ArtifactName: ".",
+            ArtifactType: "filesystem",
+            Results: [],
+          }),
+        );
+        return { status: 0 };
+      },
+      logger: { log() {} },
+      outputDirectory: temporary,
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, "trivy");
+    assert.equal(existsSync(path.join(temporary, "backend-source.json")), true);
+    assert.equal(
+      existsSync(path.join(temporary, "backend-source.trivy-raw")),
+      false,
+    );
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("retained Trivy evidence strips raw secret and image metadata", () => {
+  const evidence = createTrivyEvidenceReport({
+    SchemaVersion: 2,
+    ArtifactName: ".",
+    ArtifactType: "filesystem",
+    Metadata: { ImageConfig: { config: { Env: ["TOKEN=raw-secret"] } } },
+    Results: [
+      {
+        Target: "config.yml",
+        Class: "secret",
+        Type: "secret",
+        Secrets: [
+          {
+            RuleID: "example-token",
+            Category: "general",
+            Severity: "HIGH",
+            Title: "Example token",
+            StartLine: 4,
+            EndLine: 4,
+            Match: "raw-secret",
+            Code: { Lines: [{ Content: "token=raw-secret" }] },
+          },
+        ],
+        Misconfigurations: [
+          {
+            ID: "DS-0002",
+            Severity: "HIGH",
+            Title: "Non-root user required",
+            Message: "raw-secret",
+          },
+        ],
+      },
+    ],
   });
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].command, "trivy");
-  assert.equal(calls[1].commandArgs[0], "convert");
-  rmSync(".security-reports-test", { recursive: true, force: true });
+  const serialized = JSON.stringify(evidence);
+
+  assert.doesNotMatch(serialized, /raw-secret|ImageConfig|Match|Code|Message/);
+  assert.equal(evidence.results[0].secrets[0].RuleID, "example-token");
+  assert.equal(evidence.results[0].misconfigurations[0].ID, "DS-0002");
 });
 
 test("Trivy image scans reuse every inventory image and collect failures", () => {
@@ -699,6 +793,18 @@ test("Trivy image scans reuse every inventory image and collect failures", () =>
         execute(command, commandArgs) {
           calls.push({ command, commandArgs });
           const isScan = commandArgs[0] === "image";
+          if (isScan) {
+            const output = commandArgs[commandArgs.indexOf("--output") + 1];
+            writeFileSync(
+              output,
+              JSON.stringify({
+                SchemaVersion: 2,
+                ArtifactName: commandArgs.at(-1),
+                ArtifactType: "container_image",
+                Results: [],
+              }),
+            );
+          }
           return {
             status:
               isScan && commandArgs.at(-1) === services[1].defaultImage ? 1 : 0,
@@ -716,6 +822,99 @@ test("Trivy image scans reuse every inventory image and collect failures", () =>
     services.map((service) => service.defaultImage),
   );
   rmSync(".security-reports-test", { recursive: true, force: true });
+});
+
+test("Compose evidence is non-interpolated and sanitized", () => {
+  const temporary = mkdtempSync(
+    path.join(tmpdir(), "nebula-compose-evidence-"),
+  );
+  const env = {
+    ...process.env,
+    JWT_SECRET: "compose-secret-value",
+  };
+  const calls = [];
+
+  try {
+    captureComposeConfigurations({
+      env,
+      execute(command, args) {
+        calls.push({ command, args });
+        return {
+          status: 0,
+          stdout:
+            "DATABASE_URL=postgresql://admin:password@db:5432/app\nJWT_SECRET=compose-secret-value\n",
+          stderr: "",
+        };
+      },
+      outputDirectory: temporary,
+      platform: "linux",
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(
+      calls.every((call) => call.command === "docker"),
+      true,
+    );
+    assert.equal(
+      calls.every((call) => call.args.includes("--no-interpolate")),
+      true,
+    );
+    assert.equal(calls[1].args.includes("docker-compose.release.yml"), true);
+    for (const output of ["compose-local.yaml", "compose-release.yaml"]) {
+      const contents = readFileSync(path.join(temporary, output), "utf8");
+      assert.doesNotMatch(contents, /password|compose-secret-value/);
+      assert.match(contents, /\[REDACTED\]/);
+    }
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("failure evidence keeps bounded Compose diagnostics and redacts secrets", () => {
+  const temporary = mkdtempSync(
+    path.join(tmpdir(), "nebula-failure-evidence-"),
+  );
+  const env = {
+    ...process.env,
+    SERVICE_TOKEN: "failure-secret-value",
+  };
+  const calls = [];
+
+  try {
+    captureComposeFailureEvidence({
+      env,
+      execute(command, args) {
+        calls.push({ command, args });
+        return {
+          status: args.includes("logs") ? 7 : 0,
+          stdout: `service output failure-secret-value\n`,
+          stderr: "postgresql://admin:password@db:5432/app\n",
+        };
+      },
+      logger: { log() {} },
+      outputDirectory: temporary,
+      platform: "linux",
+    });
+
+    const logCall = calls.find((call) => call.args.includes("logs"));
+    assert.deepEqual(logCall.args.slice(-4), [
+      "--no-color",
+      "--timestamps",
+      "--tail",
+      "200",
+    ]);
+    for (const output of ["compose-state.jsonl", "compose-logs.txt"]) {
+      const contents = readFileSync(path.join(temporary, output), "utf8");
+      assert.doesNotMatch(contents, /password|failure-secret-value/);
+      assert.match(contents, /\[REDACTED\]/);
+    }
+    assert.match(
+      readFileSync(path.join(temporary, "compose-logs.txt"), "utf8"),
+      /capture_exit=7/,
+    );
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });
 
 test("backend image targets build sequentially and stop on the first failure", () => {

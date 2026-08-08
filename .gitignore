@@ -12,6 +12,7 @@ out/
 *.tsbuildinfo
 coverage/
 .security-reports/
+.ci-evidence/
 deploy/*
 !deploy/
 !deploy/README.md

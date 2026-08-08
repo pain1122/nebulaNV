@@ -222,8 +222,8 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [x] Add a blocking backend-runtime dependency scan.
 - [x] Add scanning for the eight images already built by the live job without rebuilding or uploading them.
 - [x] Add backend-only secret/config scanning with explicit safe exclusions.
-- [ ] Retain dependency, image, and secret scan reports.
-- [ ] Retain sanitized Compose configurations and bounded failure logs.
+- [x] Add bounded retention for dependency, image, and safe secret/config scan reports.
+- [x] Add non-interpolated sanitized Compose configurations and bounded failure logs.
 - [x] Exclude secrets, local env files, backups, Docker images, and oversized caches from artifacts.
 - [x] Always remove the isolated CI Compose project and volumes.
 

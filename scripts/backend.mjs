@@ -132,6 +132,8 @@ export const SECURITY_REPORT_DIRECTORY = path.join(
   ".security-reports",
 );
 
+export const CI_EVIDENCE_DIRECTORY = path.join(repositoryRoot, ".ci-evidence");
+
 export const TRIVY_SOURCE_SKIP_DIRECTORIES = Object.freeze([
   ".git",
   "**/.git",
@@ -181,6 +183,9 @@ function pnpmInvocation(env = process.env) {
   return { command: process.execPath, prefixArgs: [pnpmCli] };
 }
 
+const SENSITIVE_ENV_NAME_PATTERN =
+  /(?:PASS(?:WORD)?|SECRET|TOKEN|DATABASE_URL|SHADOW_DATABASE_URL)$/i;
+
 export function sanitizeOutput(value, env = process.env) {
   let output = String(value ?? "");
   output = output.replace(
@@ -190,9 +195,7 @@ export function sanitizeOutput(value, env = process.env) {
 
   for (const [name, secret] of Object.entries(env)) {
     if (
-      !/(?:PASS(?:WORD)?|SECRET|TOKEN|DATABASE_URL|SHADOW_DATABASE_URL)$/i.test(
-        name,
-      ) ||
+      !SENSITIVE_ENV_NAME_PATTERN.test(name) ||
       typeof secret !== "string" ||
       secret.length < 4
     ) {
@@ -202,6 +205,38 @@ export function sanitizeOutput(value, env = process.env) {
   }
 
   return output;
+}
+
+function evidenceRedactionEnvironment(env = process.env) {
+  const redactionEnv = { ...env };
+  const files = [
+    ".env",
+    "deploy/.env.production",
+    ...backendServices.map((service) => `${service.directory}/.env`),
+  ];
+  let index = 0;
+
+  for (const file of files) {
+    const filePath = path.join(repositoryRoot, file);
+    if (!existsSync(filePath)) continue;
+    for (const line of readFileSync(filePath, "utf8").split(/\r?\n/)) {
+      const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+      if (!match || !SENSITIVE_ENV_NAME_PATTERN.test(match[1])) continue;
+      let secret = match[2].trim();
+      if (
+        secret.length >= 2 &&
+        ((secret.startsWith('"') && secret.endsWith('"')) ||
+          (secret.startsWith("'") && secret.endsWith("'")))
+      ) {
+        secret = secret.slice(1, -1);
+      }
+      if (secret.length < 4 || secret.startsWith("${")) continue;
+      redactionEnv[`EVIDENCE_${index}_SECRET`] = secret;
+      index += 1;
+    }
+  }
+
+  return redactionEnv;
 }
 
 function demoServiceUrl(serviceName, variableName, env) {
@@ -1511,6 +1546,109 @@ export function runBackendQualityTask(
   logger.log(`[backend] ${task} complete for ${services.length} services`);
 }
 
+function ensureCiEvidenceDirectory(directory = CI_EVIDENCE_DIRECTORY) {
+  mkdirSync(directory, { recursive: true });
+  return directory;
+}
+
+function writeSanitizedEvidence(outputPath, value, env) {
+  writeFileSync(
+    outputPath,
+    sanitizeOutput(value, evidenceRedactionEnvironment(env)),
+    "utf8",
+  );
+}
+
+export function captureComposeConfigurations({
+  env = process.env,
+  execute = run,
+  outputDirectory = CI_EVIDENCE_DIRECTORY,
+  platform = process.platform,
+} = {}) {
+  const directory = ensureCiEvidenceDirectory(outputDirectory);
+  const configurations = [
+    {
+      label: "local",
+      args: ["compose", "config", "--no-interpolate"],
+      output: "compose-local.yaml",
+    },
+    {
+      label: "release",
+      args: [
+        "compose",
+        "--env-file",
+        "deploy/.env.production.example",
+        "-f",
+        "docker-compose.release.yml",
+        "config",
+        "--no-interpolate",
+      ],
+      output: "compose-release.yaml",
+    },
+  ];
+
+  for (const configuration of configurations) {
+    const result = execute(dockerExecutable(platform), configuration.args, {
+      capture: true,
+      emitCaptured: false,
+      env,
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `compose_evidence_${configuration.label}_failed_exit_${result.status ?? "unknown"}`,
+      );
+    }
+    writeSanitizedEvidence(
+      path.join(directory, configuration.output),
+      result.stdout,
+      env,
+    );
+  }
+
+  return directory;
+}
+
+export function captureComposeFailureEvidence({
+  env = process.env,
+  execute = run,
+  logger = console,
+  outputDirectory = CI_EVIDENCE_DIRECTORY,
+  platform = process.platform,
+} = {}) {
+  const directory = ensureCiEvidenceDirectory(outputDirectory);
+  const captures = [
+    {
+      args: ["compose", "ps", "-a", "--format", "json"],
+      output: "compose-state.jsonl",
+    },
+    {
+      args: ["compose", "logs", "--no-color", "--timestamps", "--tail", "200"],
+      output: "compose-logs.txt",
+    },
+  ];
+
+  for (const capture of captures) {
+    let value;
+    try {
+      const result = execute(dockerExecutable(platform), capture.args, {
+        capture: true,
+        emitCaptured: false,
+        env,
+      });
+      value = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+      if (result.status !== 0) {
+        value += `\ncapture_exit=${result.status ?? "unknown"}\n`;
+      }
+    } catch (error) {
+      value = `capture_unavailable=${error instanceof Error ? error.name : "unknown"}\n`;
+    }
+    writeSanitizedEvidence(path.join(directory, capture.output), value, env);
+  }
+
+  logger.log("[backend] bounded Compose failure evidence captured");
+  return directory;
+}
+
 function packageManifest(directory) {
   try {
     return JSON.parse(
@@ -1819,6 +1957,87 @@ export function buildTrivyImageArgs(image, outputPath) {
   ];
 }
 
+function selectedFields(value, fields) {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(
+    fields
+      .filter((field) => value[field] !== undefined)
+      .map((field) => [field, value[field]]),
+  );
+}
+
+export function createTrivyEvidenceReport(report) {
+  const results = Array.isArray(report?.Results) ? report.Results : [];
+  return {
+    generatedAt: new Date().toISOString(),
+    schemaVersion: report?.SchemaVersion,
+    artifactName: report?.ArtifactName,
+    artifactType: report?.ArtifactType,
+    results: results.map((result) => ({
+      ...selectedFields(result, ["Target", "Class", "Type"]),
+      vulnerabilities: (Array.isArray(result?.Vulnerabilities)
+        ? result.Vulnerabilities
+        : []
+      ).map((finding) =>
+        selectedFields(finding, [
+          "VulnerabilityID",
+          "PkgName",
+          "PkgPath",
+          "InstalledVersion",
+          "FixedVersion",
+          "Status",
+          "Severity",
+          "Title",
+          "PrimaryURL",
+          "References",
+        ]),
+      ),
+      misconfigurations: (Array.isArray(result?.Misconfigurations)
+        ? result.Misconfigurations
+        : []
+      ).map((finding) =>
+        selectedFields(finding, [
+          "Type",
+          "ID",
+          "AVDID",
+          "Title",
+          "Resolution",
+          "Severity",
+          "Status",
+          "PrimaryURL",
+          "References",
+        ]),
+      ),
+      secrets: (Array.isArray(result?.Secrets) ? result.Secrets : []).map(
+        (finding) =>
+          selectedFields(finding, [
+            "RuleID",
+            "Category",
+            "Severity",
+            "Title",
+            "StartLine",
+            "EndLine",
+          ]),
+      ),
+    })),
+  };
+}
+
+function writeTrivyEvidenceReport(rawPath, outputPath) {
+  const report = JSON.parse(readFileSync(rawPath, "utf8"));
+  const evidence = createTrivyEvidenceReport(report);
+  writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+  rmSync(rawPath, { force: true });
+  return evidence;
+}
+
+function countTrivyFindings(report, field) {
+  return report.results.reduce(
+    (total, result) => total + (result[field]?.length ?? 0),
+    0,
+  );
+}
+
 function printTrivyReport(outputPath, { env, execute }) {
   const result = execute(
     "trivy",
@@ -1838,8 +2057,12 @@ export function runBackendSourceScan({
 } = {}) {
   const directory = ensureSecurityReportDirectory(outputDirectory);
   const outputPath = path.join(directory, "backend-source.json");
-  const result = execute("trivy", buildTrivySourceArgs(outputPath), { env });
-  printTrivyReport(outputPath, { env, execute });
+  const rawPath = path.join(directory, "backend-source.trivy-raw");
+  const result = execute("trivy", buildTrivySourceArgs(rawPath), { env });
+  const report = writeTrivyEvidenceReport(rawPath, outputPath);
+  logger.log(
+    `[backend] source report: secrets=${countTrivyFindings(report, "secrets")}, misconfigurations=${countTrivyFindings(report, "misconfigurations")}`,
+  );
   if (result.status !== 0) {
     throw new Error(
       `backend_source_scan_failed_exit_${result.status ?? "unknown"}`,
@@ -1864,11 +2087,13 @@ export function runBackendImageScans({
   for (const service of services) {
     const image = service.defaultImage;
     const outputPath = path.join(directory, `${safeReportName(image)}.json`);
+    const rawPath = path.join(directory, `${safeReportName(image)}.trivy-raw`);
     logger.log(`[backend] image scan: ${image}`);
-    const result = execute("trivy", buildTrivyImageArgs(image, outputPath), {
+    const result = execute("trivy", buildTrivyImageArgs(image, rawPath), {
       env,
     });
-    printTrivyReport(outputPath, { env, execute });
+    printTrivyReport(rawPath, { env, execute });
+    writeTrivyEvidenceReport(rawPath, outputPath);
     if (result.status !== 0) failed.push(service.dockerService);
   }
   if (failed.length > 0) {
@@ -1947,6 +2172,7 @@ function usage() {
     "  node scripts/backend.mjs down",
     "  node scripts/backend.mjs quality <lint|check-types|build>",
     "  node scripts/backend.mjs security <dependencies|source|images>",
+    "  node scripts/backend.mjs evidence <compose|failure>",
     "  node scripts/backend.mjs build-images [--pull|--clean]",
     "  node scripts/backend.mjs prisma <generate|migrate-dev|migrate-deploy|migrate-status|push|seed>",
     "  node scripts/backend.mjs seed",
@@ -1993,6 +2219,14 @@ export async function main(args = process.argv.slice(2)) {
   }
   if (command === "security" && operation === "images" && !extra) {
     runBackendImageScans();
+    return;
+  }
+  if (command === "evidence" && operation === "compose" && !extra) {
+    captureComposeConfigurations();
+    return;
+  }
+  if (command === "evidence" && operation === "failure" && !extra) {
+    captureComposeFailureEvidence();
     return;
   }
   if (command === "build-images" && !confirmationArg && !unexpected) {

@@ -35,14 +35,25 @@ jobs:
         run: pnpm build:backend
       - name: Materialize tracked example environment files
         run: pnpm backend:env
-      - name: Validate local and release Compose configurations
-        run: |
-          docker compose config --quiet
-          docker compose --env-file deploy/.env.production.example -f docker-compose.release.yml config --quiet
+      - name: Validate and capture local and release Compose configurations
+        run: pnpm evidence:compose:backend
       - name: Scan backend source for secrets and configuration defects
         run: pnpm scan:source:backend
       - name: Verify checks leave tracked files unchanged
         run: git diff --exit-code
+      - name: Retain bounded quality evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-quality-evidence
+          path: |
+            .security-reports/backend-dependencies.json
+            .security-reports/backend-source.json
+            .ci-evidence/compose-local.yaml
+            .ci-evidence/compose-release.yaml
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
 
   live-e2e:
     needs: quality
@@ -65,11 +76,21 @@ jobs:
         run: pnpm test:e2e
       - name: Scan the tested backend images
         run: pnpm scan:images:backend
-      - name: Show container state after a failure
+      - name: Capture bounded Compose evidence after a failure
         if: failure()
-        run: |
-          docker compose ps -a
-          docker compose logs --tail=200
+        run: pnpm evidence:failure:backend
+      - name: Retain bounded live evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-live-evidence
+          path: |
+            .security-reports/nebulanv-main-*.json
+            .ci-evidence/compose-state.jsonl
+            .ci-evidence/compose-logs.txt
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
       - name: Remove live integration resources
         if: always()
         run: docker compose down -v

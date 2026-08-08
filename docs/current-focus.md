@@ -23,17 +23,17 @@ same backend commands.
 
 ## Evidence Snapshot
 
-| Area                              | Classification              | Current evidence                                                                                                                                                                                                                                                         |
-| --------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Standard Service Bootstrap        | complete                    | Shared validation, HTTP policy, error translation, health, shutdown, environment, logging, and guard-order checks are implemented and live-verified.                                                                                                                     |
-| Root Prisma commands              | complete                    | One package-owned backend inventory drives sequential generate, development migration, deploy migration, status, seed, and push commands. Focused tooling tests pass, and the real generate, deploy, status, and seed commands passed against the development databases. |
-| Ports and env examples            | complete                    | A tooling contract now locks the eight source defaults, Dockerfile health URLs, Compose/release ports, root/deployment examples, and service examples to the existing backend inventory.                                                                                 |
-| Backend healthchecks              | complete                    | All eight services and their required infrastructure reached readiness during the clean hosted live run.                                                                                                                                                                 |
-| Provisioning                      | complete                    | Clean hosted infrastructure/database waits, migrations, seeds, sequential Bake builds, startup, readiness, and API demo seed passed.                                                                                                                                     |
-| Demo seeds                        | complete                    | User/settings retain base ownership; product/blog base seeds perform no writes. The API demo seed uses the ordinary seeded admin, preserves initializer/service validation, refuses production, and was live-verified for create and safe-repeat behavior.               |
-| Database recovery                 | complete                    | All seven schemas were deployed and checked on disposable databases. Binary dump/restore, intentional migration failure/stop/recovery, and a maintenance backup/restore of the seven development databases were live-verified.                                           |
-| Legacy user refresh-token storage | complete                    | Active refresh sessions still use auth-service Redis session families. The unused single-value column, RPC, and response fields were removed; the migration, rebuilt services, migration status, and focused live tests were user-verified.                              |
-| CI                                | scan proof/evidence pending | Hosted quality and live e2e pass, and the action-runtime warning is gone. Batch 5B's dependency gate passes locally; hosted Trivy source/image proof, retained scan/Compose/log evidence, and the final full-workflow tracked-diff proof remain.                         |
+| Area                              | Classification             | Current evidence                                                                                                                                                                                                                                                         |
+| --------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Standard Service Bootstrap        | complete                   | Shared validation, HTTP policy, error translation, health, shutdown, environment, logging, and guard-order checks are implemented and live-verified.                                                                                                                     |
+| Root Prisma commands              | complete                   | One package-owned backend inventory drives sequential generate, development migration, deploy migration, status, seed, and push commands. Focused tooling tests pass, and the real generate, deploy, status, and seed commands passed against the development databases. |
+| Ports and env examples            | complete                   | A tooling contract now locks the eight source defaults, Dockerfile health URLs, Compose/release ports, root/deployment examples, and service examples to the existing backend inventory.                                                                                 |
+| Backend healthchecks              | complete                   | All eight services and their required infrastructure reached readiness during the clean hosted live run.                                                                                                                                                                 |
+| Provisioning                      | complete                   | Clean hosted infrastructure/database waits, migrations, seeds, sequential Bake builds, startup, readiness, and API demo seed passed.                                                                                                                                     |
+| Demo seeds                        | complete                   | User/settings retain base ownership; product/blog base seeds perform no writes. The API demo seed uses the ordinary seeded admin, preserves initializer/service validation, refuses production, and was live-verified for create and safe-repeat behavior.               |
+| Database recovery                 | complete                   | All seven schemas were deployed and checked on disposable databases. Binary dump/restore, intentional migration failure/stop/recovery, and a maintenance backup/restore of the seven development databases were live-verified.                                           |
+| Legacy user refresh-token storage | complete                   | Active refresh sessions still use auth-service Redis session families. The unused single-value column, RPC, and response fields were removed; the migration, rebuilt services, migration status, and focused live tests were user-verified.                              |
+| CI                                | live scan/evidence pending | Hosted quality, dependency, and source gates pass, and the action-runtime warning is gone. The latest live job failed during provisioning before e2e/image scanning; retained evidence and final full-workflow tracked-diff proof remain.                                |
 
 ## Active Work Order
 
@@ -149,9 +149,9 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 
 #### 5C. Useful Evidence
 
-- [ ] Retain dependency, image, and secret/config scan reports with stable artifact names and bounded retention.
-- [ ] Retain non-interpolated or sanitized local/release Compose configurations.
-- [ ] Capture Compose state and bounded service logs on failure before teardown.
+- [x] Add stable quality/live artifacts for dependency, image, and safe secret/config scan reports with 14-day retention.
+- [x] Add non-interpolated sanitized local/release Compose configurations through the existing backend tool.
+- [x] Capture sanitized Compose state and at most 200 timestamped log lines per container on failure before teardown.
 - [x] Freeze artifact exclusions: never upload secrets, local env files, database backups, Docker images, or oversized build caches.
 - [x] Always remove the isolated CI Compose project and volumes; the hosted success path verified the existing `if: always()` cleanup.
 
@@ -193,7 +193,8 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 - Batch 3B backend-tooling tests passed 19/19. Clean migration deploy/status passed for all seven disposable databases; binary recovery and intentional migration-failure recovery passed; the seven-database maintenance backup/restore, post-restore migration status, service restart, and final seed all completed without errors.
 - Batch 4 backend-tooling tests pass 23/23. Local and release Compose configurations parse. On 2026-08-03 the supported `pnpm backend:boot` workflow completed in roughly 30 minutes: all eight images built sequentially, all backend services plus MinIO became healthy, and the idempotent API demo seed reported its product and blog records as existing.
 - Batch 5B's pre-remediation audit traced 21 backend-runtime high/critical advisories across the Nest/Express, gRPC/protobuf, AWS XML, JWT, config/lodash, and validation families. Two `defu`/`effect` findings reached Prisma only through its optional CLI peer and were classified as tooling; Next/CKEditor findings remain deferred to F7. After the reviewed compatible family updates and two parent-scoped transitive fixes, the post-remediation dependency report passes with 0 backend-runtime blockers, 16 tooling findings, and 33 deferred-web findings.
-- Batch 5B backend-tooling tests pass 29/29. Frozen lockfile verification, backend lint/types/proto, 141 focused security/unit tests, the backend source build, and the dependency gate all pass locally. The dependency report contains 0 backend-runtime blockers, 16 tooling findings, and 33 deferred-web findings. Source/image gate execution and the full hosted workflow remain pending because Trivy is installed by CI and the image gate must inspect freshly built images.
+- Batch 5B backend-tooling tests passed 29/29. Frozen lockfile verification, backend lint/types/proto, 141 focused security/unit tests, the backend source build, and the dependency gate pass locally. Hosted run `31257447099` confirmed the dependency and Trivy source gates, Compose validation, and tracked-file cleanliness. Its live job failed during provisioning before e2e/image scanning, so the non-root runtime and image gate remain unverified pending post-5C diagnosis.
+- Batch 5C backend-tooling tests pass 33/33. The real Compose evidence command produced non-interpolated local/release configurations without credentialed database URLs. Artifact upload and failure-path capture remain pending hosted observation.
 - Batch 5A tooling coverage passes 24/24. The root command contract locks the `test:e2e` host source-build prerequisite, and the inventory-backed Turbo selection excludes `apps/web`.
 - The user ran `lint:backend`, `check-types:backend`, `proto:check`, `test:security`, and `build:backend`; all completed without errors. The 943 warning-only lint findings remain confined to `test/**` and are deferred by scope; production `src/**` reports no warnings.
 - Hosted run `31245928134` passed on 2026-08-08. Quality completed in 2m39s with frozen install, proto, backend lint/types, 141 focused security tests, source build, environment initialization, both Compose validations, and tracked-diff enforcement.
@@ -204,7 +205,7 @@ This is stale cleanup, not a redesign or removal of refresh tokens.
 
 ## Next Action
 
-Review and push the Batch 5B security-gate patch, then observe the quality
-dependency/source gates and the live job's scan of all eight freshly built
-images. If those gates pass and leave tracked files unchanged, proceed only to
-Batch 5C artifact retention and the final F2 exit evidence.
+Review and push the narrow Batch 5C evidence-retention patch, then inspect both
+stable 14-day artifacts and the failure-before-cleanup ordering in the hosted
+workflow. Do not close the F2 exit gate until the remaining image scan and
+complete tracked-file proof are observed.

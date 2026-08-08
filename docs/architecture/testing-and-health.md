@@ -129,15 +129,40 @@ pnpm scan:images:backend
   tags to scan all eight previously built images. It does not rebuild, upload,
   ignore unfixed findings, or stop after the first affected image.
 
-JSON output is written under ignored `.security-reports/`. Each command also
-prints a bounded table/summary and exits nonzero when its gate fails. F2 has no
-advisory allowlist: a backend-runtime `HIGH` or `CRITICAL` remains blocking
-until a reviewed compatible patch is applied. CI pins Trivy `v0.73.0` through
-the immutable `setup-trivy` action commit recorded in the workflow.
+JSON output is written under ignored `.security-reports/`. Retained Trivy
+reports contain finding metadata only: raw secret matches, source snippets, and
+container image metadata are removed before upload. Each command also prints a
+bounded table/summary and exits nonzero when its gate fails. F2 has no advisory
+allowlist: a backend-runtime `HIGH` or `CRITICAL` remains blocking until a
+reviewed compatible patch is applied. CI pins Trivy `v0.73.0` through the
+immutable `setup-trivy` action commit recorded in the workflow.
 
 The dependency and source gates run in the quality job. Image scanning runs in
 the live job after e2e tests and before the existing unconditional Compose
 cleanup, so it examines the exact images that passed the live tests.
+
+## CI Evidence Retention
+
+The existing backend tool owns evidence capture so Compose output uses the same
+credential redaction as other backend commands:
+
+```powershell
+pnpm evidence:compose:backend
+pnpm evidence:failure:backend
+```
+
+- `backend-quality-evidence` contains the classified dependency report, safe
+  source-scan report, and non-interpolated sanitized local/release Compose
+  configurations.
+- `backend-live-evidence` contains safe reports for the eight tested image tags.
+  On failure it also contains `docker compose ps -a` state and no more than the
+  last 200 timestamped, color-free log lines per container.
+
+Both artifacts use the immutable `upload-artifact` action commit recorded in
+the workflow and expire after 14 days. Upload paths are an explicit allowlist;
+env files, secret values and raw secret matches, backups, Docker images, and
+build/dependency caches are never included. Failure evidence is captured before
+the existing unconditional Compose project/volume cleanup.
 
 `pnpm backend:health` performs one read-only check of every `/health/ready`
 contract. `pnpm backend:down` runs Compose down without `-v`, so local database

@@ -105,6 +105,8 @@
     "scan:dependencies:backend": "node ./scripts/backend.mjs security dependencies",
     "scan:source:backend": "node ./scripts/backend.mjs security source",
     "scan:images:backend": "node ./scripts/backend.mjs security images",
+    "evidence:compose:backend": "node ./scripts/backend.mjs evidence compose",
+    "evidence:failure:backend": "node ./scripts/backend.mjs evidence failure",
     "backend:env": "node ./scripts/backend.mjs environment",
     "backend:boot": "node ./scripts/backend.mjs boot",
     "backend:health": "node ./scripts/backend.mjs health",
