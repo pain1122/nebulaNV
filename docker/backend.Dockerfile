@@ -193,11 +193,16 @@ COPY --link --from=shared-runtime-artifacts /packages ./packages
 # This keeps frozen-lockfile behavior and standalone images while preventing
 # source edits from recreating the 320 MB dependency layer.
 RUN --mount=from=shared-runtime-artifacts,source=/packages,target=/built-packages,ro \
+    --mount=from=prod-deps,source=/app/packages,target=/production-packages,ro \
     set -eu; \
     for source in /built-packages/*; do \
+      directory="${source##*/}"; \
       package_name="$(node -p "require('$source/package.json').name")"; \
       scope="${package_name%/*}"; \
       name="${package_name#*/}"; \
+      if [ -d "/production-packages/$directory/node_modules" ]; then \
+        cp -a "/production-packages/$directory/node_modules" "/workspace/packages/$directory/node_modules"; \
+      fi; \
       for target in /workspace/node_modules/.pnpm/*/node_modules/"$scope"/"$name"; do \
         [ -d "$target" ] || continue; \
         cp -a "$source"/. "$target"/; \
@@ -214,7 +219,7 @@ COPY --link --from=prod-deps /app/apps/user-service/package.json ./package.json
 COPY --link --from=prod-deps /app/apps/user-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/user-service/dist ./dist
 COPY --link --from=build /app/apps/user-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3100 50051
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3100/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -225,7 +230,7 @@ WORKDIR /workspace/apps/auth-service
 COPY --link --from=prod-deps /app/apps/auth-service/package.json ./package.json
 COPY --link --from=prod-deps /app/apps/auth-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/auth-service/dist ./dist
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3001 50052
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -237,7 +242,7 @@ COPY --link --from=prod-deps /app/apps/settings-service/package.json ./package.j
 COPY --link --from=prod-deps /app/apps/settings-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/settings-service/dist ./dist
 COPY --link --from=build /app/apps/settings-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3010 50054
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3010/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -249,7 +254,7 @@ COPY --link --from=prod-deps /app/apps/media-service/package.json ./package.json
 COPY --link --from=prod-deps /app/apps/media-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/media-service/dist ./dist
 COPY --link --from=build /app/apps/media-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3007 50058
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3007/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -261,7 +266,7 @@ COPY --link --from=prod-deps /app/apps/taxonomy-service/package.json ./package.j
 COPY --link --from=prod-deps /app/apps/taxonomy-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/taxonomy-service/dist ./dist
 COPY --link --from=build /app/apps/taxonomy-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3006 50057
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3006/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -273,7 +278,7 @@ COPY --link --from=prod-deps /app/apps/product-service/package.json ./package.js
 COPY --link --from=prod-deps /app/apps/product-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/product-service/dist ./dist
 COPY --link --from=build /app/apps/product-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3003 50053
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3003/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -285,7 +290,7 @@ COPY --link --from=prod-deps /app/apps/blog-service/package.json ./package.json
 COPY --link --from=prod-deps /app/apps/blog-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/blog-service/dist ./dist
 COPY --link --from=build /app/apps/blog-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3004 50055
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3004/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -297,7 +302,7 @@ COPY --link --from=prod-deps /app/apps/order-service/package.json ./package.json
 COPY --link --from=prod-deps /app/apps/order-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/order-service/dist ./dist
 COPY --link --from=build /app/apps/order-service/prisma ./prisma
-RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require.resolve(p)"
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
 EXPOSE 3005 50056
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3005/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

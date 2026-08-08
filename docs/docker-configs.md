@@ -126,9 +126,11 @@ dependency layer. `runtime-base` instead copies the stable dependency graph,
 adds the allowed compiled package artifacts, and synchronizes those artifacts
 into any prepared injected-workspace slots. A filtered production graph can
 legitimately omit a slot for a package that a particular service does not use,
-so slot absence is not itself an error. Each runtime target still fails unless
-all internal dependencies declared by that service resolve from the completed
-image filesystem.
+so slot absence is not itself an error. The same inventory-neutral loop copies
+each shared package's installed production dependency links beside its compiled
+output. Each runtime target then loads every internal dependency declared by
+that service, catching missing entry points and transitive runtime packages
+before the image is exported.
 
 Runtime targets:
 

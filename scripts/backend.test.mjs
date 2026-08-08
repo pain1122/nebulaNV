@@ -205,12 +205,21 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     dockerfile,
     /for target in \/workspace\/node_modules\/\.pnpm\/\*\/node_modules\//,
   );
+  assert.match(
+    dockerfile,
+    /--mount=from=prod-deps,source=\/app\/packages,target=\/production-packages,ro/,
+  );
+  assert.match(
+    dockerfile,
+    /cp -a "\/production-packages\/\$directory\/node_modules" "\/workspace\/packages\/\$directory\/node_modules"/,
+  );
   assert.doesNotMatch(dockerfile, /Missing injected pnpm slot/);
   assert.equal(
-    dockerfile.split("require.resolve(p)").length - 1,
+    dockerfile.split("require(p)").length - 1,
     backendServices.length,
-    "every runtime target must verify its declared internal dependencies",
+    "every runtime target must load its declared internal dependencies",
   );
+  assert.doesNotMatch(dockerfile, /require\.resolve\(p\)/);
   assert.match(dockerfile, /\nUSER node\n/);
   assert.equal(
     existsSync(path.join(repositoryRoot, "Dockerfile.debug")),
