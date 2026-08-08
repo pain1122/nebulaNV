@@ -124,8 +124,11 @@ first-party files must not be copied into `prod-deps` before `pnpm install`.
 Doing so makes every shared-code edit recreate and reload the large production
 dependency layer. `runtime-base` instead copies the stable dependency graph,
 adds the allowed compiled package artifacts, and synchronizes those artifacts
-into pnpm's prepared injected-workspace slots. The build fails if an expected
-slot is absent.
+into any prepared injected-workspace slots. A filtered production graph can
+legitimately omit a slot for a package that a particular service does not use,
+so slot absence is not itself an error. Each runtime target still fails unless
+all internal dependencies declared by that service resolve from the completed
+image filesystem.
 
 Runtime targets:
 

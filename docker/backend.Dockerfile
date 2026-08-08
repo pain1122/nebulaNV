@@ -186,26 +186,22 @@ COPY --link --from=prod-deps /app/node_modules ./node_modules
 COPY --link --from=shared-runtime-artifacts /packages ./packages
 
 # pnpm's injectWorkspacePackages mode places deployable copies of first-party
-# packages inside the virtual store. Overlay only the compiled artifacts onto
-# those prepared slots. This keeps frozen-lockfile behavior and standalone
-# images while preventing source edits from recreating the 320 MB dependency
-# layer. The guard fails the build if pnpm's layout changes unexpectedly.
+# packages inside the virtual store. Overlay the compiled artifacts onto every
+# prepared slot that exists. A package can legitimately have no slot in a
+# filtered production graph; the service-specific checks below remain the
+# authority for whether each target's declared internal dependencies resolve.
+# This keeps frozen-lockfile behavior and standalone images while preventing
+# source edits from recreating the 320 MB dependency layer.
 RUN --mount=from=shared-runtime-artifacts,source=/packages,target=/built-packages,ro \
     set -eu; \
     for source in /built-packages/*; do \
       package_name="$(node -p "require('$source/package.json').name")"; \
       scope="${package_name%/*}"; \
       name="${package_name#*/}"; \
-      matched=0; \
       for target in /workspace/node_modules/.pnpm/*/node_modules/"$scope"/"$name"; do \
         [ -d "$target" ] || continue; \
         cp -a "$source"/. "$target"/; \
-        matched=1; \
       done; \
-      if [ "$matched" != "1" ]; then \
-        echo "Missing injected pnpm slot for $package_name" >&2; \
-        exit 1; \
-      fi; \
     done
 
 # Root is required only while preparing the shared runtime filesystem. Every

@@ -201,6 +201,16 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     dockerfile,
     /COPY scripts\/docker\/verify-runtime-imports\.mjs \.\/scripts\/docker\/verify-runtime-imports\.mjs/,
   );
+  assert.match(
+    dockerfile,
+    /for target in \/workspace\/node_modules\/\.pnpm\/\*\/node_modules\//,
+  );
+  assert.doesNotMatch(dockerfile, /Missing injected pnpm slot/);
+  assert.equal(
+    dockerfile.split("require.resolve(p)").length - 1,
+    backendServices.length,
+    "every runtime target must verify its declared internal dependencies",
+  );
   assert.match(dockerfile, /\nUSER node\n/);
   assert.equal(
     existsSync(path.join(repositoryRoot, "Dockerfile.debug")),
