@@ -56,7 +56,7 @@ Milestone order:
 - [x] Full workspace build passes as of 2026-07-11.
 - [x] Docker Compose configuration parses as of 2026-07-11.
 - [x] Full workspace lint passes.
-- [ ] Full infrastructure-backed integration suite passes.
+- [x] Full infrastructure-backed integration suite passes as of 2026-08-08.
 - [ ] Dedicated external API gateway exists.
 - [ ] Tenant/site/channel ownership exists.
 - [ ] Media promotion and variant workers exist.
@@ -200,32 +200,42 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [x] Replace eight isolated `pnpm deploy` trees with one reusable production dependency layer.
 - [x] Keep all eight service images independently runnable while sharing universal foundation layers.
 - [x] Verify every image resolves its declared internal packages without another container or network access.
-- [ ] Add gateway/web/admin runtimes to the complete stack when available.
+- [ ] Add the gateway runtime in F3 and storefront/admin runtimes in F7; these do not gate F2.
 - [x] Add reliable healthchecks for infrastructure and services.
 - [x] Make services wait for readiness rather than process start.
 - [x] Run migrations before accepting traffic.
 - [x] Confirm ports and `.env.example` files agree.
 - [x] Remove stale Docker-profile documentation.
 - [x] Provide one-command boot, seed, health, and shutdown workflows.
-- [ ] Verify the complete stack from a clean checkout.
+- [x] Verify the currently supported eight-service backend stack from a clean checkout.
 
 ### CI
 
-- [ ] Verify formatting, lint, types, protos, tests, and builds.
+- [x] From a frozen clean install, verify backend lint/format enforcement, types, proto checks, and focused security tests.
+- [x] Verify the backend source build and quality-lane tracked-diff check.
 - [x] Start required databases and storage.
 - [x] Run migrations and seeds.
-- [ ] Run integration/e2e tests; the current clean-run blocker is missing host-side internal-package `dist` outputs before Jest compilation.
+- [x] Run the full backend integration/e2e command from a clean hosted checkout.
 - [x] Build container images.
 - [x] Verify Compose configuration.
-- [ ] Add dependency, image, and secret scanning.
-- [ ] Preserve useful build/test artifacts.
+- [ ] Classify dependency findings as backend runtime, backend tooling, or deferred web-only findings.
+- [ ] Add a blocking backend-runtime dependency scan.
+- [ ] Scan the eight images already built by the live job without rebuilding or uploading them.
+- [ ] Add backend-only secret/config scanning with explicit safe exclusions.
+- [ ] Retain dependency, image, and secret scan reports.
+- [ ] Retain sanitized Compose configurations and bounded failure logs.
+- [ ] Exclude secrets, local env files, backups, Docker images, and oversized caches from artifacts.
+- [x] Always remove the isolated CI Compose project and volumes.
 
 ### F2 Exit Gate
 
-- [ ] Clean install, lint, type check, build, migrate, seed, and test pass.
-- [ ] No manual database repair is required.
-- [ ] Local and CI verification use the same commands.
-- [ ] Verification leaves tracked source files clean.
+- [x] Clean install, lint, type check, proto check, focused security tests, and backend source build pass.
+- [x] Fresh migration deploy/status, base seed, startup/readiness, API demo seed, and live e2e pass without manual database repair.
+- [x] Local documentation and CI use the same inventory-backed quality, boot, and e2e commands.
+- [x] The clean quality workflow leaves tracked source files unchanged.
+- [ ] Dependency, image, and secret/config gates pass at the approved backend severity policy.
+- [ ] The complete live-and-scan workflow leaves tracked source files unchanged.
+- [ ] Durable documentation reflects the final verified commands and outcomes.
 
 ---
 
@@ -251,7 +261,7 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [ ] Define pagination, filtering, and sorting.
 - [ ] Define idempotency for create, checkout, upload, and contract operations.
 - [ ] Define retry-safe operations.
-- [ ] Define API versioning and deprecation.
+- [x] Define API and proto versioning/deprecation rules; external gateway route versions remain unimplemented.
 - [ ] Generate API documentation.
 - [ ] Provide typed web/mobile clients.
 
@@ -344,11 +354,11 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 ### Upload Safety
 
 - [ ] Bind upload authorization to tenant, site, actor, access class, MIME, and maximum size.
-- [ ] Verify object size and metadata during finalize.
+- [x] Verify object size and storage metadata during finalize.
 - [ ] Add MIME sniffing.
 - [ ] Define checksum behavior.
 - [ ] Preserve immutable upload facts.
-- [ ] Reject unsafe or mismatched storage paths.
+- [x] Reject unsafe or mismatched storage paths.
 - [ ] Define abandoned-presign cleanup.
 
 ### Lifecycle Worker
@@ -389,8 +399,9 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [ ] Keep media-service as CDN origin authority.
 - [ ] Define cache-control and ETag behavior.
 - [ ] Define replacement, invalidation, deletion, and revocation.
-- [ ] Define public-media CORS.
-- [ ] Define signed protected/strict delivery.
+- [x] Define public-media CORS policy.
+- [ ] Implement final storage/CDN media CORS and its F5 preflight/denial tests.
+- [x] Define signed protected/strict delivery and keep the current temporary signed-read behavior explicit.
 - [ ] Prevent CDN bypass of site, status, scan, or access policy.
 
 ### Consistency And Strict Media
@@ -408,19 +419,20 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 ### Provider Boundary
 
 - [ ] Define storage adapter interface.
-- [ ] Keep MinIO implementation.
+- [x] Keep the existing MinIO implementation.
 - [ ] Verify Supabase Storage S3 compatibility.
 - [ ] Reserve AWS S3/CDN implementation.
 - [ ] Add provider contract tests.
 
 ### F5 Exit Gate
 
+- [x] Current public/protected/strict media-foundation denial tests pass.
 - [ ] Upload becomes renderable without manual DB edits.
 - [ ] Web, thumbnail, and mobile variants are generated.
 - [ ] Content uses media IDs.
 - [ ] CDN routes are stable, versioned, and site-aware.
 - [ ] Orphans and drift are detectable and recoverable.
-- [ ] Public/protected/strict denial tests pass.
+- [ ] Final public/protected/strict denial tests pass after the F5 worker, variant, and CDN changes.
 
 ---
 
@@ -682,7 +694,7 @@ create and seed tenant/site/channels
 - [ ] Snapshot product identity, price, and currency into order items.
 - [ ] Basic checkout without production payment.
 - [ ] User and admin order list/detail.
-- [ ] Admin-authorized status changes.
+- [x] Admin-authorized order-status changes.
 - [ ] Idempotent checkout.
 - [ ] Integration tests.
 
