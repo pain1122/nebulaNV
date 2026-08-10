@@ -43,6 +43,7 @@ import {
   runPrismaOperation,
   sanitizeOutput,
   seedBackendDemo,
+  summarizeTrivyImageVulnerabilities,
   restoreLocalDatabases,
   validateBackupManifest,
   verifyCleanMigrations,
@@ -220,6 +221,24 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     "every runtime target must load its declared internal dependencies",
   );
   assert.doesNotMatch(dockerfile, /require\.resolve\(p\)/);
+  for (const runtimeToolPath of [
+    "/usr/local/lib/node_modules/npm",
+    "/usr/local/lib/node_modules/corepack",
+    "/opt/yarn-*",
+    "/usr/local/bin/npm",
+    "/usr/local/bin/npx",
+    "/usr/local/bin/corepack",
+    "/usr/local/bin/yarn",
+    "/usr/local/bin/yarnpkg",
+    "/usr/local/bin/pnpm",
+    "/usr/local/bin/pnpx",
+  ]) {
+    assert.equal(
+      dockerfile.includes(runtimeToolPath),
+      true,
+      `final runtime cleanup must remove ${runtimeToolPath}`,
+    );
+  }
   assert.match(dockerfile, /\nUSER node\n/);
   assert.equal(
     existsSync(path.join(repositoryRoot, "Dockerfile.debug")),
@@ -448,6 +467,10 @@ test("root command names point at the consolidated backend tool", () => {
     manifest.scripts["dev:backend"],
     "node ./scripts/backend.mjs dev",
   );
+  assert.equal(manifest.dependencies.concurrently, undefined);
+  assert.equal(manifest.dependencies["wait-on"], undefined);
+  assert.equal(manifest.devDependencies.concurrently, "^9.2.1");
+  assert.equal(manifest.devDependencies["wait-on"], "^9.0.3");
 });
 
 test("CI retains only allowlisted backend evidence for fourteen days", () => {
@@ -460,6 +483,11 @@ test("CI retains only allowlisted backend evidence for fourteen days", () => {
   assert.match(workflow, /name: backend-live-evidence/);
   assert.match(workflow, /run: pnpm evidence:compose:backend/);
   assert.match(workflow, /run: pnpm evidence:failure:backend/);
+  assert.equal(workflow.split("run: git diff --exit-code").length - 1, 2);
+  assert.match(
+    workflow,
+    /name: Verify live checks leave tracked files unchanged\r?\n\s+if: always\(\)\r?\n\s+run: git diff --exit-code/,
+  );
   assert.doesNotMatch(workflow, /run:\s*docker compose logs/);
 
   const retainedPaths = [
@@ -802,6 +830,7 @@ test("Trivy image scans reuse every inventory image and collect failures", () =>
   const args = buildTrivyImageArgs(services[0].defaultImage, "image.json");
   assert.equal(args[0], "image");
   assert.equal(args.includes("--ignore-unfixed"), false);
+  assert.equal(args[args.indexOf("--exit-code") + 1], "0");
   assert.equal(args.at(-1), services[0].defaultImage);
 
   const calls = [];
@@ -814,20 +843,33 @@ test("Trivy image scans reuse every inventory image and collect failures", () =>
           const isScan = commandArgs[0] === "image";
           if (isScan) {
             const output = commandArgs[commandArgs.indexOf("--output") + 1];
+            const isBlocked = commandArgs.at(-1) === services[1].defaultImage;
             writeFileSync(
               output,
               JSON.stringify({
                 SchemaVersion: 2,
                 ArtifactName: commandArgs.at(-1),
                 ArtifactType: "container_image",
-                Results: [],
+                Results: isBlocked
+                  ? [
+                      {
+                        Target: "node_modules",
+                        Class: "lang-pkgs",
+                        Type: "node-pkg",
+                        Vulnerabilities: [
+                          {
+                            VulnerabilityID: "CVE-TEST",
+                            PkgName: "example",
+                            Severity: "HIGH",
+                          },
+                        ],
+                      },
+                    ]
+                  : [],
               }),
             );
           }
-          return {
-            status:
-              isScan && commandArgs.at(-1) === services[1].defaultImage ? 1 : 0,
-          };
+          return { status: 0 };
         },
         logger: { log() {} },
         outputDirectory: ".security-reports-test",
@@ -841,6 +883,78 @@ test("Trivy image scans reuse every inventory image and collect failures", () =>
     services.map((service) => service.defaultImage),
   );
   rmSync(".security-reports-test", { recursive: true, force: true });
+});
+
+test("Trivy scanner failures block while the remaining images are still scanned", () => {
+  const services = backendServices.slice(0, 2);
+  const temporary = mkdtempSync(path.join(tmpdir(), "nebula-image-scan-"));
+  const scannedImages = [];
+
+  try {
+    assert.throws(
+      () =>
+        runBackendImageScans({
+          services,
+          execute(_command, commandArgs) {
+            if (commandArgs[0] === "image") {
+              const image = commandArgs.at(-1);
+              scannedImages.push(image);
+              if (image === services[0].defaultImage) return { status: 2 };
+
+              const output = commandArgs[commandArgs.indexOf("--output") + 1];
+              writeFileSync(
+                output,
+                JSON.stringify({
+                  SchemaVersion: 2,
+                  ArtifactName: image,
+                  ArtifactType: "container_image",
+                  Results: [],
+                }),
+              );
+            }
+            return { status: 0 };
+          },
+          logger: { log() {} },
+          outputDirectory: temporary,
+        }),
+      /backend_image_gate_failed_user-service/,
+    );
+    assert.deepEqual(
+      scannedImages,
+      services.map((service) => service.defaultImage),
+    );
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("Trivy image policy defers only Debian findings without a fix", () => {
+  const summary = summarizeTrivyImageVulnerabilities({
+    results: [
+      {
+        Class: "os-pkgs",
+        Type: "debian",
+        vulnerabilities: [
+          { Severity: "CRITICAL" },
+          { Severity: "HIGH", FixedVersion: "1.2.3" },
+        ],
+      },
+      {
+        Class: "lang-pkgs",
+        Type: "node-pkg",
+        vulnerabilities: [
+          { Severity: "HIGH" },
+          { Severity: "CRITICAL", FixedVersion: "4.5.6" },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(summary, {
+    total: 4,
+    blocking: 3,
+    deferredUnfixedDebian: 1,
+  });
 });
 
 test("Compose evidence is non-interpolated and sanitized", () => {

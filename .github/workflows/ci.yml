@@ -76,6 +76,9 @@ jobs:
         run: pnpm test:e2e
       - name: Scan the tested backend images
         run: pnpm scan:images:backend
+      - name: Verify live checks leave tracked files unchanged
+        if: always()
+        run: git diff --exit-code
       - name: Capture bounded Compose evidence after a failure
         if: failure()
         run: pnpm evidence:failure:backend

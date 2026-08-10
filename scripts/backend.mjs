@@ -1948,13 +1948,39 @@ export function buildTrivyImageArgs(image, outputPath) {
     "--severity",
     "HIGH,CRITICAL",
     "--exit-code",
-    "1",
+    "0",
     "--format",
     "json",
     "--output",
     outputPath,
     image,
   ];
+}
+
+export function summarizeTrivyImageVulnerabilities(report) {
+  const summary = {
+    total: 0,
+    blocking: 0,
+    deferredUnfixedDebian: 0,
+  };
+
+  for (const result of report.results) {
+    for (const finding of result.vulnerabilities ?? []) {
+      summary.total += 1;
+      const hasFix =
+        typeof finding.FixedVersion === "string" &&
+        finding.FixedVersion.trim().length > 0;
+      const isUnfixedDebian =
+        result.Class === "os-pkgs" && result.Type === "debian" && !hasFix;
+      if (isUnfixedDebian) {
+        summary.deferredUnfixedDebian += 1;
+      } else {
+        summary.blocking += 1;
+      }
+    }
+  }
+
+  return summary;
 }
 
 function selectedFields(value, fields) {
@@ -2084,6 +2110,7 @@ export function runBackendImageScans({
 } = {}) {
   const directory = ensureSecurityReportDirectory(outputDirectory);
   const failed = [];
+  let deferredUnfixedDebian = 0;
   for (const service of services) {
     const image = service.defaultImage;
     const outputPath = path.join(directory, `${safeReportName(image)}.json`);
@@ -2092,12 +2119,27 @@ export function runBackendImageScans({
     const result = execute("trivy", buildTrivyImageArgs(image, rawPath), {
       env,
     });
+    if (result.status !== 0 || !existsSync(rawPath)) {
+      failed.push(service.dockerService);
+      rmSync(rawPath, { force: true });
+      continue;
+    }
     printTrivyReport(rawPath, { env, execute });
-    writeTrivyEvidenceReport(rawPath, outputPath);
-    if (result.status !== 0) failed.push(service.dockerService);
+    const report = writeTrivyEvidenceReport(rawPath, outputPath);
+    const summary = summarizeTrivyImageVulnerabilities(report);
+    deferredUnfixedDebian += summary.deferredUnfixedDebian;
+    logger.log(
+      `[backend] image report: findings=${summary.total}, blocking=${summary.blocking}, deferred-unfixed-debian=${summary.deferredUnfixedDebian}`,
+    );
+    if (summary.blocking > 0) failed.push(service.dockerService);
   }
   if (failed.length > 0) {
     throw new Error(`backend_image_gate_failed_${failed.join("_")}`);
+  }
+  if (deferredUnfixedDebian > 0) {
+    logger.log(
+      `[backend] image gate retained ${deferredUnfixedDebian} unfixed Debian finding(s) for production hardening`,
+    );
   }
   logger.log(`[backend] image gate passed for ${services.length} images`);
 }

@@ -149,6 +149,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.5.2",
     "@types/supertest": "^6.0.3",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "eslint": "^9.36.0",
     "globals": "^16.4.0",
@@ -160,7 +161,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "turbo": "^2.5.8",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "wait-on": "^9.0.3"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.9.0",
@@ -179,13 +181,11 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
-    "concurrently": "^9.2.1",
     "express": "^5.2.1",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "wait-on": "^9.0.3"
+    "rxjs": "^7.8.2"
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {
@@ -195,6 +195,8 @@
     "overrides": {
       "@nestjs/testing": "11.1.28",
       "@aws-sdk/xml-builder>fast-xml-parser": "5.5.6",
+      "@prisma/config>effect": "3.20.0",
+      "defu": "6.1.7",
       "router>path-to-regexp": "8.4.2",
       "fstream": ">=1.0.13",
       "npmlog": "^7.0.1",

@@ -107,10 +107,39 @@ Purpose:
 - Verifies every declared internal package entry point while building each runtime target.
 - Performs root-owned runtime setup once, then runs every service target as the
   built-in unprivileged `node` user.
+- Keeps package managers in development/build stages but removes npm, npx,
+  Corepack, pnpm, and Yarn from final runtime images; services start directly
+  with Node and do not install packages after image creation.
 
 The shared multi-target Dockerfile is the only backend image definition. The
 obsolete root diagnostic Dockerfile and per-service Dockerfile copies were
 removed; do not recreate them or maintain a parallel build path.
+
+### Development And Runtime Optimization Boundary
+
+The current Docker structure is deliberate. Preserve these decisions during
+foundation development:
+
+- Keep the full Debian/Node, pnpm, Prisma, compiler, test, shell, and debugging
+  toolchain available on the host and in build stages.
+- Keep final service images limited to compiled application artifacts and real
+  production dependencies. Classifying a package as development-only must not
+  remove it from normal local or build-stage installs.
+- Retain the shared multi-target Dockerfile, inventory-backed sequential Bake
+  runner, injected workspace packages, narrow Docker context, shared dependency
+  layers, and non-root runtime. They intentionally minimize duplicate work,
+  cache invalidation, image size, and Docker Desktop contention.
+- Do not restore per-service Dockerfiles or grouped parallel local builds as a
+  development shortcut. Individual services remain buildable through their
+  existing shared Bake targets.
+- Preserve Debian compatibility while the project foundations are still under
+  development. A distroless/custom runtime, base-family replacement, or other
+  restriction on runtime diagnosis is later release-hardening work and requires
+  a separately reviewed compatibility need and explicit approval.
+
+Development freedom and runtime minimization are separate concerns: removing an
+unused tool from a final image is acceptable only when local development, build,
+generation, testing, and diagnosis retain an owned path for that tool.
 
 The common layers provide storage reuse, not a runtime dependency between
 containers. Every image manifest contains its own copy of the required layer
@@ -172,9 +201,12 @@ Current backend images:
 The CI live job scans these exact local tags with pinned Trivy after the live
 e2e suites and before Compose cleanup. `pnpm scan:images:backend` derives the
 tags from the root inventory, scans all eight even when an earlier image is
-affected, and fails for any `HIGH` or `CRITICAL` OS or application-package
-finding. It does not rebuild, export, or upload an image and does not ignore
-unfixed findings.
+affected, and retains every `HIGH` or `CRITICAL` finding in the sanitized
+evidence. During foundation development, application-package findings and
+Debian OS findings with an available fixed version block the gate. Debian OS
+findings without an available stable fix remain visible and are deferred to the
+production-hardening backlog; scanner or report failures still block. The
+command does not use `--ignore-unfixed`, rebuild, export, or upload an image.
 
 Release archive also includes infrastructure images:
 
@@ -341,6 +373,10 @@ docker compose --env-file deploy\.env.production -f docker-compose.release.yml u
 - Do not replace `MEDIA_S3_PUBLIC_ENDPOINT` with `minio:9000`; signed URLs need a client-reachable host.
 - Do not rely on Postgres init scripts after the volume already exists.
 - Keep app containers stateless; persistent data belongs in external services or Docker volumes.
+- Treat the shared/sequential/injected Docker build design as an intentional
+  build-time and image-size optimization, not stale development scaffolding.
+- Keep development and build tools available outside final runtime images; do
+  not trade away the active development workflow merely to make a scanner green.
 - Keep shared runtime content limited to universal foundation contracts, clients, configuration, and transport/security helpers.
 - Keep proprietary licensed modules out of core service images unless that image is explicitly the purchased module artifact.
 - Keep Compose release compatible with future Kubernetes expectations: env-driven config, externalized state, no app-local persistent files.
