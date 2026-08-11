@@ -1,6 +1,6 @@
 ﻿# Testing And Health
 
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-10
 
 Purpose: define how NebulaNV proves each service is alive, connected, authorized correctly, and still honoring its HTTP/gRPC contract.
 
@@ -103,7 +103,9 @@ separate Jest aliases or maintain another shared-package list for this step.
 
 CI uses the same backend-only lint, type, source-build, proto, focused security,
 Compose-validation, `backend:boot`, and `test:e2e` entry points. The quality job
-also fails if generation or verification changes tracked files.
+fails if generation or verification changes tracked files. The live job runs
+its tracked-diff check with `if: always()` after boot, e2e, and image scanning,
+so a failed earlier step cannot silently skip the cleanliness proof.
 
 ## Backend Security Gates
 
@@ -132,10 +134,15 @@ pnpm scan:images:backend
 JSON output is written under ignored `.security-reports/`. Retained Trivy
 reports contain finding metadata only: raw secret matches, source snippets, and
 container image metadata are removed before upload. Each command also prints a
-bounded table/summary and exits nonzero when its gate fails. F2 has no advisory
-allowlist: a backend-runtime `HIGH` or `CRITICAL` remains blocking until a
-reviewed compatible patch is applied. CI pins Trivy `v0.73.0` through the
-immutable `setup-trivy` action commit recorded in the workflow.
+bounded table/summary and exits nonzero when its gate fails. The dependency
+gate has no approved backend-runtime advisory allowlist: a backend-runtime
+`HIGH` or `CRITICAL` remains blocking until a reviewed compatible patch is
+applied. For the foundation image gate, application-package findings and Debian
+OS findings with an available fixed version block; Debian findings without an
+available stable fix remain visible and are assigned to F9 production
+hardening. Scanner failures, missing/malformed reports, and incomplete image
+coverage still block. CI pins Trivy `v0.73.0` through the immutable
+`setup-trivy` action commit recorded in the workflow.
 
 The dependency and source gates run in the quality job. Image scanning runs in
 the live job after e2e tests and before the existing unconditional Compose
@@ -163,6 +170,30 @@ the workflow and expire after 14 days. Upload paths are an explicit allowlist;
 env files, secret values and raw secret matches, backups, Docker images, and
 build/dependency caches are never included. Failure evidence is captured before
 the existing unconditional Compose project/volume cleanup.
+
+### F2 Final Verification Record
+
+On 2026-08-10, [hosted run 31391317016](https://github.com/pain1122/nebulaNV/actions/runs/31391317016)
+passed on commit `1d090f8` using the checked-in workflow commands:
+
+- The quality job completed frozen install, `scan:dependencies:backend`, pinned
+  Trivy installation, proto check, backend lint/types, focused security tests,
+  backend source build, local/release Compose evidence, `scan:source:backend`,
+  and the quality tracked-diff check.
+- The live job completed `backend:boot`, `test:e2e`,
+  `scan:images:backend`, the always-run live tracked-diff check, evidence
+  retention, and isolated Compose resource removal.
+- The dependency artifact recorded zero backend-runtime findings, zero backend
+  tooling findings, and 33 deferred web findings. The eight retained image
+  reports recorded zero application findings and zero fixable Debian findings;
+  all 176 remaining findings were Debian OS findings without an available fix.
+- The repository owner also completed the same `pnpm backend:boot` and
+  `pnpm test:e2e` commands locally before the hosted proof.
+
+These counts are a historical F2 verification snapshot, not a permanent
+waiver. Later release work must rebuild and rescan current images, and F9 owns
+resolution or evidence-backed applicability decisions for the retained Debian
+findings.
 
 `pnpm backend:health` performs one read-only check of every `/health/ready`
 contract. `pnpm backend:down` runs Compose down without `-v`, so local database

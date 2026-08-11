@@ -131,6 +131,7 @@
     "test:database-recovery": "node ./scripts/backend.mjs database test-recovery",
     "test:backend-tooling": "node --test ./scripts/backend.test.mjs",
     "dev:auth": "pnpm --filter ./apps/auth-service start",
+    "dev:gateway": "pnpm --filter @nebula/gateway start",
     "dev:user": "wait-on tcp:127.0.0.1:50052 && pnpm --filter ./apps/user-service start",
     "dev:settings": "wait-on tcp:127.0.0.1:50052 && pnpm --filter ./apps/settings-service start",
     "dev:taxonomy": "wait-on tcp:127.0.0.1:50052 tcp:127.0.0.1:50054 && pnpm --filter ./apps/taxonomy-service start",

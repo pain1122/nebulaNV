@@ -1,6 +1,6 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-06-22
+Last updated: 2026-08-10
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
 ## 1. Collaboration Contract
@@ -12,10 +12,20 @@ Purpose: fast, safe handoff for AI/developer sessions without re-discovering the
 - When not allowed to edit, give exact edit instructions, file paths, and reasoning.
 - Before suggesting code changes, explain what problem the change solves and what contract it affects.
 
-## 2. Absolute Safety Rules
+## 2. Safety Rules
 
-- Never expose, print, or commit real `.env` secrets.
-- Use `.env.example`, deployment examples, and docs for variable names only.
+- During the basic development and test phases, the assistant may create and
+  edit ignored local `.env` files, including development-only credentials and
+  signing values needed to run the selected work. Keep those values
+  non-production, scoped to the local project, and out of tracked files and
+  user-facing output.
+- The direct-secret boundary begins with the production phase and applies to
+  production and every later deployment phase. Do not create, replace, print,
+  or commit production secret values; use the deployment secret owner or
+  secret manager and document only variable names and required formats.
+- Tracked `.env.example`, production examples, and documentation contain safe
+  development placeholders or variable names, never deployable production
+  credentials.
 - Never delete user work unless Salar explicitly asks for that exact deletion.
 - Never run destructive git commands such as `git reset --hard` or `git checkout --` unless explicitly requested.
 - Always check `git status --short` before editing, committing, or discussing final workspace state.

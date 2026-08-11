@@ -2,7 +2,9 @@ import * as Joi from "joi";
 import {
   bcryptEnvSchema,
   grpcTargetEnvSchema,
+  httpOnlyBindEnvSchema,
   jwtAccessVerificationEnvSchema,
+  resolveHttpOnlyBind,
   resolveServiceBind,
   runtimeEnvSchema,
   serviceBindEnvSchema,
@@ -100,5 +102,48 @@ describe("shared environment validation primitives", () => {
       grpcPort: 50000,
       grpcUrl: "0.0.0.0:50000",
     });
+  });
+
+  it("validates and resolves an HTTP-only bind without inventing gRPC fields", () => {
+    const httpSchema = Joi.object({
+      ...httpOnlyBindEnvSchema("gateway"),
+    });
+
+    expect(
+      httpSchema.validate({ GATEWAY_HTTP_PORT: "3002" }).value,
+    ).toMatchObject({ GATEWAY_HTTP_PORT: 3002 });
+    expect(httpSchema.validate({ GATEWAY_HTTP_PORT: "0" }).error).toBeDefined();
+    expect(Object.keys(httpOnlyBindEnvSchema("gateway"))).toEqual([
+      "PORT",
+      "GATEWAY_HTTP_PORT",
+    ]);
+
+    expect(
+      resolveHttpOnlyBind(
+        { GATEWAY_HTTP_PORT: "4102", PORT: "3002", GRPC_PORT: "50059" },
+        { servicePrefix: "gateway", defaultHttpPort: 3002 },
+      ),
+    ).toEqual({ httpPort: 4102 });
+    expect(
+      resolveHttpOnlyBind(
+        { PORT: "3002" },
+        { servicePrefix: "gateway", defaultHttpPort: 4000 },
+      ),
+    ).toEqual({ httpPort: 3002 });
+    expect(
+      resolveHttpOnlyBind(
+        {},
+        { servicePrefix: "gateway", defaultHttpPort: 3002 },
+      ),
+    ).toEqual({ httpPort: 3002 });
+  });
+
+  it("rejects unsafe service prefixes for both bind contracts", () => {
+    expect(() => httpOnlyBindEnvSchema("bad-prefix")).toThrow(
+      "Invalid service environment prefix",
+    );
+    expect(() =>
+      resolveHttpOnlyBind({}, { servicePrefix: "1bad", defaultHttpPort: 3002 }),
+    ).toThrow("Invalid service environment prefix");
   });
 });

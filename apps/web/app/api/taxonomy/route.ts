@@ -1,8 +1,14 @@
 // apps/web/app/api/taxonomy/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getBearerFromReq } from "@/lib/auth/bearer";
+import { errorMessage } from "@/lib/unknown";
 
-type UiKind = "product_cat" | "product_tag" | "product_attribute" | "product_variable" | "product_brand";
+type UiKind =
+  | "product_cat"
+  | "product_tag"
+  | "product_attribute"
+  | "product_variable"
+  | "product_brand";
 
 const KIND_MAP: Record<UiKind, string> = {
   product_cat: "category.default",
@@ -25,7 +31,11 @@ export async function GET(req: NextRequest) {
 
     const uiKind = (url.searchParams.get("kind") || "") as UiKind;
     const kind = KIND_MAP[uiKind];
-    if (!kind) return NextResponse.json({ ok: false, error: "invalid_kind" }, { status: 400 });
+    if (!kind)
+      return NextResponse.json(
+        { ok: false, error: "invalid_kind" },
+        { status: 400 },
+      );
 
     const upstream = new URL(`${getBase()}/taxonomies`);
     upstream.searchParams.set("scope", "product");
@@ -37,23 +47,34 @@ export async function GET(req: NextRequest) {
       upstream.searchParams.append(k, v);
     }
 
-    // ✅ server-side Bearer
+    // Forward the verified browser session as a Bearer token.
     const headers = new Headers();
     const bearer = getBearerFromReq(req);
     if (bearer) headers.set("authorization", bearer);
 
-    const res = await fetch(upstream.toString(), { headers, cache: "no-store" });
+    const res = await fetch(upstream.toString(), {
+      headers,
+      cache: "no-store",
+    });
     const contentType = res.headers.get("content-type") ?? "";
     const isJson = contentType.includes("application/json");
     const body = isJson ? await res.json() : await res.text();
 
-    if (!res.ok) return isJson
-      ? NextResponse.json(body, { status: res.status })
-      : new NextResponse(String(body), { status: res.status });
+    if (!res.ok)
+      return isJson
+        ? NextResponse.json(body, { status: res.status })
+        : new NextResponse(String(body), { status: res.status });
 
     return NextResponse.json(body, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[/api/taxonomy] error:", e);
-    return NextResponse.json({ ok: false, error: "fetch_failed", message: e?.message || "Unknown error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "fetch_failed",
+        message: errorMessage(e, "Unknown error"),
+      },
+      { status: 500 },
+    );
   }
 }

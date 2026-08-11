@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBearerFromReq } from "@/lib/auth/bearer"
+import { getBearerFromReq } from "@/lib/auth/bearer";
+import { asRecord, errorMessage } from "@/lib/unknown";
 
 function getProductServiceBaseUrl() {
   const httpUrl = process.env.PRODUCT_HTTP_URL;
@@ -8,7 +9,14 @@ function getProductServiceBaseUrl() {
   return `http://127.0.0.1:${port}`;
 }
 
-const ALLOWED = new Set(["includeDeleted", "page", "limit", "q", "categoryId", "status"]);
+const ALLOWED = new Set([
+  "includeDeleted",
+  "page",
+  "limit",
+  "q",
+  "categoryId",
+  "status",
+]);
 
 export async function GET(req: NextRequest) {
   const base = getProductServiceBaseUrl();
@@ -48,21 +56,29 @@ export async function GET(req: NextRequest) {
 
     // normalize response for panel
     const page = Math.max(1, Number(incoming.get("page") || 1));
-    const limit = Math.min(100, Math.max(1, Number(incoming.get("limit") || 20)));
+    const limit = Math.min(
+      100,
+      Math.max(1, Number(incoming.get("limit") || 20)),
+    );
 
-    const items = Array.isArray((upstreamBody as any)?.data) ? (upstreamBody as any).data : [];
-    const total = Number((upstreamBody as any)?.total ?? items.length);
+    const upstreamRecord = asRecord(upstreamBody);
+    const items = Array.isArray(upstreamRecord.data) ? upstreamRecord.data : [];
+    const total = Number(upstreamRecord.total ?? items.length);
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return NextResponse.json(
       { ok: true, page, limit, total, totalPages, items },
-      { status: 200, headers: { "cache-control": "no-store" } }
+      { status: 200, headers: { "cache-control": "no-store" } },
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[web/api/products] proxy error:", e);
     return NextResponse.json(
-      { ok: false, error: "UPSTREAM_UNREACHABLE", message: e?.message ?? "Unknown error" },
-      { status: 502 }
+      {
+        ok: false,
+        error: "UPSTREAM_UNREACHABLE",
+        message: errorMessage(e, "Unknown error"),
+      },
+      { status: 502 },
     );
   }
 }

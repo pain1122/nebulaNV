@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import React, {useEffect, useMemo, useRef} from "react"
-import {CKEditor} from "@ckeditor/ckeditor5-react"
+import React, { useEffect, useMemo, useRef } from "react";
+import { CKEditor } from "@ckeditor/ckeditor5-react";
 import {
   ClassicEditor,
   Fullscreen,
@@ -39,21 +39,27 @@ import {
   SpecialCharactersEssentials,
   PasteFromOffice,
   Autoformat,
-} from "ckeditor5"
+  type Editor,
+  type EditorConfig,
+} from "ckeditor5";
 
-import "ckeditor5/ckeditor5.css"
+import "ckeditor5/ckeditor5.css";
 
 type Props = {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-}
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+};
 
-export default function RichTextEditorClient({value, onChange, placeholder}: Props) {
-  const editorRef = useRef<any>(null)
-  const didInitRef = useRef(false)
+export default function RichTextEditorClient({
+  value,
+  onChange,
+  placeholder,
+}: Props) {
+  const editorRef = useRef<Editor | null>(null);
+  const didInitRef = useRef(false);
 
-  const config = useMemo(
+  const config = useMemo<EditorConfig>(
     () => ({
       licenseKey: "GPL",
       plugins: [
@@ -139,10 +145,16 @@ export default function RichTextEditorClient({value, onChange, placeholder}: Pro
         shouldNotGroupWhenFull: true,
       },
       table: {
-        contentToolbar: ["tableColumn", "tableRow", "mergeTableCells", "tableProperties", "tableCellProperties"],
+        contentToolbar: [
+          "tableColumn",
+          "tableRow",
+          "mergeTableCells",
+          "tableProperties",
+          "tableCellProperties",
+        ],
       },
       list: {
-        properties: {styles: true, startIndex: true, reversed: true},
+        properties: { styles: true, startIndex: true, reversed: true },
       },
       link: {
         addTargetToExternalLinks: true,
@@ -150,32 +162,32 @@ export default function RichTextEditorClient({value, onChange, placeholder}: Pro
           toggleDownloadable: {
             mode: "manual",
             label: "Downloadable",
-            attributes: {download: "file"},
+            attributes: { download: "file" },
           },
         },
       },
       placeholder: placeholder ?? "",
     }),
     [placeholder],
-  )
+  );
 
   useEffect(() => {
-    const editor = editorRef.current
-    if (!editor || !didInitRef.current) return
-    const current = editor.getData()
-    if (value !== current) editor.setData(value ?? "")
-  }, [value])
+    const editor = editorRef.current;
+    if (!editor || !didInitRef.current) return;
+    const current = editor.getData();
+    if (value !== current) editor.setData(value ?? "");
+  }, [value]);
 
   return (
     <CKEditor
-      editor={ClassicEditor as any}
-      config={config as any}
-      onReady={(editor: any) => {
-        editorRef.current = editor
-        editor.setData(value ?? "")
-        didInitRef.current = true
+      editor={ClassicEditor}
+      config={config}
+      onReady={(editor) => {
+        editorRef.current = editor;
+        editor.setData(value ?? "");
+        didInitRef.current = true;
       }}
-      onChange={(_, editor: any) => onChange(editor.getData())}
+      onChange={(_, editor) => onChange(editor.getData())}
     />
-  )
+  );
 }

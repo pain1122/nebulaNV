@@ -1,8 +1,9 @@
-import {NextRequest, NextResponse} from "next/server"
+import { NextRequest, NextResponse } from "next/server";
+import { errorMessage, parseJsonRecord, stringField } from "@/lib/unknown";
 
 function baseAuth() {
-  const base = process.env.AUTH_HTTP_URL || "http://127.0.0.1:3001"
-  return base.replace(/\/+$/, "")
+  const base = process.env.AUTH_HTTP_URL || "http://127.0.0.1:3001";
+  return base.replace(/\/+$/, "");
 }
 
 export async function POST(req: NextRequest) {
@@ -24,29 +25,29 @@ export async function POST(req: NextRequest) {
     });
 
     const text = await upstream.text();
-    let json: any = {};
-    try {
-      json = text ? JSON.parse(text) : {};
-    } catch {}
+    const json = parseJsonRecord(text);
 
     if (!upstream.ok) {
       return NextResponse.json(
-        { ok: false, message: json?.message || text || "login_failed" },
-        { status: upstream.status }
+        {
+          ok: false,
+          message: stringField(json, "message") || text || "login_failed",
+        },
+        { status: upstream.status },
       );
     }
 
-    const accessToken = json?.accessToken;
-    const refreshToken = json?.refreshToken;
+    const accessToken = stringField(json, "accessToken");
+    const refreshToken = stringField(json, "refreshToken");
 
     if (!accessToken || !refreshToken) {
       return NextResponse.json(
         { ok: false, message: "missing_tokens_from_auth_service" },
-        { status: 502 }
+        { status: 502 },
       );
     }
 
-    // (cookies are OPTIONAL — fine to keep)
+    // Cookie lifetime follows the user's "remember me" choice.
     const maxAge = body.remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
 
     const res = NextResponse.json({
@@ -71,11 +72,11 @@ export async function POST(req: NextRequest) {
     });
 
     return res;
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[/api/auth/login]", e);
     return NextResponse.json(
-      { ok: false, message: e?.message || "login_route_failed" },
-      { status: 500 }
+      { ok: false, message: errorMessage(e, "login_route_failed") },
+      { status: 500 },
     );
   }
 }

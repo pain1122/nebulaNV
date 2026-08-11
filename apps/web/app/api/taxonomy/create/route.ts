@@ -1,7 +1,13 @@
 // apps/web/app/api/taxonomy/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { errorMessage } from "@/lib/unknown";
 
-type UiKind = "product_cat" | "product_tag" | "product_attribute" | "product_variable" | "product_brand";
+type UiKind =
+  | "product_cat"
+  | "product_tag"
+  | "product_attribute"
+  | "product_variable"
+  | "product_brand";
 
 const KIND_MAP: Record<UiKind, string> = {
   product_cat: "category.default",
@@ -28,7 +34,11 @@ export async function POST(req: NextRequest) {
     };
 
     const kind = KIND_MAP[body.kind];
-    if (!kind) return NextResponse.json({ ok: false, error: "invalid_kind" }, { status: 400 });
+    if (!kind)
+      return NextResponse.json(
+        { ok: false, error: "invalid_kind" },
+        { status: 400 },
+      );
 
     const upstreamUrl = `${getBase()}/taxonomies`;
 
@@ -63,15 +73,20 @@ export async function POST(req: NextRequest) {
     return new NextResponse(text, {
       status: upstream.status,
       headers: {
-        "content-type": upstream.headers.get("content-type") ?? "application/json",
+        "content-type":
+          upstream.headers.get("content-type") ?? "application/json",
         "cache-control": "no-store",
       },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[/api/taxonomy/create]", e);
     return NextResponse.json(
-      { ok: false, error: "fetch_failed", message: e?.message || "Unknown error" },
-      { status: 500 }
+      {
+        ok: false,
+        error: "fetch_failed",
+        message: errorMessage(e, "Unknown error"),
+      },
+      { status: 500 },
     );
   }
 }

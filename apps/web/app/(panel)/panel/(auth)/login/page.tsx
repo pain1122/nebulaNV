@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { setTokens } from "@/lib/auth/tokens"
+import { setTokens } from "@/lib/auth/tokens";
+import { asRecord, errorMessage, stringField } from "@/lib/unknown";
 
 export default function Login() {
   const router = useRouter();
@@ -26,17 +27,21 @@ export default function Login() {
         body: JSON.stringify({ identifier, password, remember }),
       });
 
-      const json = await res.json().catch(() => ({}));
+      const json = asRecord(await res.json().catch(() => ({})));
 
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.message || `Login failed (${res.status})`);
+      if (!res.ok || json.ok !== true) {
+        throw new Error(
+          stringField(json, "message") || `Login failed (${res.status})`,
+        );
       }
 
-      setTokens(json.accessToken)
+      const accessToken = stringField(json, "accessToken");
+      if (!accessToken) throw new Error("missing_access_token");
+      setTokens(accessToken);
 
       router.replace("/panel/products/list-products");
-    } catch (err: any) {
-      setError(err?.message || "خطای ورود");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "خطای ورود"));
     } finally {
       setLoading(false);
     }
@@ -100,7 +105,11 @@ export default function Login() {
             </div>
 
             <div className="mt-4">
-              <button className="btn btn-info w-100" type="submit" disabled={loading}>
+              <button
+                className="btn btn-info w-100"
+                type="submit"
+                disabled={loading}
+              >
                 {loading ? "در حال ورود..." : "وارد شوید"}
               </button>
             </div>

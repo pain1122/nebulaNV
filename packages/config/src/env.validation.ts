@@ -26,10 +26,7 @@ export const jwtAccessVerificationEnvSchema = {
 export function serviceBindEnvSchema(
   servicePrefix: string,
 ): Record<string, Joi.Schema> {
-  const prefix = servicePrefix.trim().toUpperCase();
-  if (!/^[A-Z][A-Z0-9_]*$/.test(prefix)) {
-    throw new Error(`Invalid service environment prefix: ${servicePrefix}`);
-  }
+  const prefix = normalizedServicePrefix(servicePrefix);
 
   return {
     PORT: port.optional(),
@@ -38,6 +35,24 @@ export function serviceBindEnvSchema(
     [`${prefix}_HTTP_PORT`]: port.optional(),
     [`${prefix}_GRPC_HOST`]: host.optional(),
     [`${prefix}_GRPC_PORT`]: port.optional(),
+  };
+}
+
+/**
+ * Bind variables for an HTTP-only runtime such as the public gateway.
+ *
+ * This is deliberately separate from `serviceBindEnvSchema`: adding dummy
+ * gRPC variables would make the runtime inventory and startup contract claim
+ * that the gateway owns a listener which does not exist.
+ */
+export function httpOnlyBindEnvSchema(
+  servicePrefix: string,
+): Record<string, Joi.Schema> {
+  const prefix = normalizedServicePrefix(servicePrefix);
+
+  return {
+    PORT: port.optional(),
+    [`${prefix}_HTTP_PORT`]: port.optional(),
   };
 }
 
@@ -83,6 +98,15 @@ export interface ServiceBind {
   grpcUrl: string;
 }
 
+export interface HttpOnlyBindOptions {
+  servicePrefix: string;
+  defaultHttpPort: number;
+}
+
+export interface HttpOnlyBind {
+  httpPort: number;
+}
+
 type Environment = Readonly<Record<string, string | number | null | undefined>>;
 
 function selectedNumber(
@@ -99,11 +123,33 @@ function selectedNumber(
   return fallback;
 }
 
+function normalizedServicePrefix(servicePrefix: string): string {
+  const prefix = servicePrefix.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]*$/.test(prefix)) {
+    throw new Error(`Invalid service environment prefix: ${servicePrefix}`);
+  }
+  return prefix;
+}
+
+export function resolveHttpOnlyBind(
+  env: Environment,
+  options: HttpOnlyBindOptions,
+): HttpOnlyBind {
+  const prefix = normalizedServicePrefix(options.servicePrefix);
+  return {
+    httpPort: selectedNumber(
+      env,
+      [`${prefix}_HTTP_PORT`, "PORT"],
+      options.defaultHttpPort,
+    ),
+  };
+}
+
 export function resolveServiceBind(
   env: Environment,
   options: ServiceBindOptions,
 ): ServiceBind {
-  const prefix = options.servicePrefix.trim().toUpperCase();
+  const prefix = normalizedServicePrefix(options.servicePrefix);
   const httpPort = selectedNumber(
     env,
     [`${prefix}_HTTP_PORT`, "PORT"],

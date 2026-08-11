@@ -1,6 +1,6 @@
 # TODO: NebulaNV Platform Roadmap
 
-Last reviewed: 2026-07-11
+Last reviewed: 2026-08-10
 
 ## Mission
 
@@ -70,7 +70,8 @@ Milestone order:
 
 ## F0 — Close Current Media Policy
 
-Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
+Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
+(completed before the active F2/F3 handoff).
 
 - [x] Freeze CORS/origin matrix for storefront, admin, direct uploads, CDN, and signed reads.
 - [x] Document canvas, WebGL, overlays, and UI restrictions as casual-copy resistance, not DRM.
@@ -200,7 +201,8 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [x] Replace eight isolated `pnpm deploy` trees with one reusable production dependency layer.
 - [x] Keep all eight service images independently runnable while sharing universal foundation layers.
 - [x] Verify every image resolves its declared internal packages without another container or network access.
-- [ ] Add the gateway runtime in F3 and storefront/admin runtimes in F7; these do not gate F2.
+- F2 scope boundary: gateway runtime work is owned by F3, while storefront and
+  admin runtimes are owned by F7. Their absence is not unfinished F2 work.
 - [x] Add reliable healthchecks for infrastructure and services.
 - [x] Make services wait for readiness rather than process start.
 - [x] Run migrations before accepting traffic.
@@ -233,9 +235,12 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [x] Fresh migration deploy/status, base seed, startup/readiness, API demo seed, and live e2e pass without manual database repair.
 - [x] Local documentation and CI use the same inventory-backed quality, boot, and e2e commands.
 - [x] The clean quality workflow leaves tracked source files unchanged.
-- [ ] Dependency, image, and secret/config gates pass at the approved backend severity policy.
-- [ ] The complete live-and-scan workflow leaves tracked source files unchanged.
-- [ ] Durable documentation reflects the final verified commands and outcomes.
+- [x] Dependency, image, and secret/config gates pass in hosted CI at the
+      approved foundation policy: application findings and fixable Debian
+      findings block; unfixed Debian findings remain visible but their
+      production remediation is owned by F9 rather than F2.
+- [x] The complete live-and-scan workflow leaves tracked source files unchanged.
+- [x] Durable documentation reflects the final verified commands and outcomes.
 
 ---
 
@@ -245,13 +250,18 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 
 - [ ] Create a dedicated gateway application.
 - [ ] Expose versioned external routes under `/api/v1`.
-- [ ] Keep internal service ports private.
-- [ ] Route admin, storefront, mobile, and partner traffic through the gateway.
-- [ ] Authenticate calling application and user.
+- [ ] Keep backend HTTP/gRPC ports private in release while retaining local
+      diagnostic access.
+- [ ] Route admin, storefront, and mobile traffic through the gateway; reserve
+      the same boundary for future partner traffic.
+- [ ] Resolve and validate registered public-client context, authenticate the
+      user when required, and reserve cryptographic client authentication for
+      future confidential partner/server clients.
 - [ ] Resolve trusted tenant, site, channel, and actor context.
 - [ ] Sign forwarded internal context.
 - [ ] Apply rate limits and request-size limits.
-- [ ] Add request/trace IDs.
+- [ ] Add end-to-end request/correlation IDs; reserve distributed tracing and
+      spans for F9.
 - [ ] Add gateway health and dependency readiness.
 
 ### API Standards
@@ -278,16 +288,22 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 ### Current Integration Corrections
 
 - [ ] Fix web refresh helper to use POST.
-- [ ] Fix refresh-cookie rotation.
+- [ ] Characterize and preserve the existing refresh-cookie rotation while
+      moving its upstream flow to the gateway.
 - [ ] Add product POST gateway/proxy route.
-- [ ] Align product create payload with backend DTOs.
+- [ ] Map the UI `content` field to backend `description` for product create and
+      update while preserving the existing `{ data }`/`{ patch }` envelopes.
 - [ ] Remove frontend assumptions about individual service URLs.
 
 ### F3 Exit Gate
 
-- [ ] External clients need only the gateway URL.
-- [ ] Internal services are not publicly reachable.
-- [ ] Gateway context cannot be forged by an ordinary client.
+- [ ] External clients configure only the gateway API base URL; they may follow
+      gateway-issued presigned storage/CDN URLs.
+- [ ] Release clients cannot reach backend HTTP/gRPC ports; explicitly required
+      storage data-plane endpoints remain separate from the API boundary.
+- [ ] Ordinary clients cannot directly set or override signed gateway context;
+      accepted public identifiers resolve only their fixed registered context
+      and do not claim cryptographic application authenticity.
 - [ ] Typed clients and documentation match runtime behavior.
 
 ---
@@ -615,6 +631,11 @@ Active checkpoint: P0-0D Download Resistance and SEO Media Strategy.
 - [ ] Define image signing and verification.
 - [ ] Restrict pull credentials.
 - [ ] Generate SBOMs and scan images.
+- [ ] At production freeze, rebuild from the current stable Debian/Node base and
+      rescan so foundation-era results are not treated as current evidence.
+- [ ] Resolve every remaining unfixed Debian finding retained by the F2 policy
+      through an available vendor update, evidence-backed applicability
+      decision, or a separately reviewed runtime change before release.
 - [ ] Keep secrets outside images.
 - [ ] Define Kubernetes Secret encryption/KMS and rotation.
 - [ ] Prevent modules from receiving unrelated secrets.
@@ -880,5 +901,7 @@ Begin only after the platform and major feature modules are proven.
 # Current Next Action
 
 1. F1 Security And Trust Integrity is complete; preserve its contracts.
-2. Continue F2 with deterministic verification, lint/types, contracts, bootstrap, migrations, and runtime consistency.
-3. Do not begin gateway or new feature work before the F2 exit gate.
+2. F2 Code Quality And Reproducibility is complete; preserve its commands,
+   evidence policy, tracked-file cleanliness, and production-hardening handoff.
+3. Use `docs/current-focus.md` to freeze the required F3 decisions and route
+   manifest in order, then begin Batch 1 implementation.
