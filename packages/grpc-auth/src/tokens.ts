@@ -13,6 +13,10 @@ export const ORDER_SERVICE = "ORDER_SERVICE" as const;
 export const ORDER_SERVICE_NAME = "OrderService" as const;
 export const MEDIA_SERVICE = "MEDIA_SERVICE" as const;
 export const MEDIA_SERVICE_NAME = "MediaService" as const;
+export const BLOG_SERVICE = "BLOG_SERVICE" as const;
+export const BLOG_SERVICE_NAME = "BlogService" as const;
+export const TAXONOMY_SERVICE = "TAXONOMY_SERVICE" as const;
+export const TAXONOMY_SERVICE_NAME = "TaxonomyService" as const;
 
 // Stable deployment identities used as S2S audiences.
 export const AUTH_SERVICE_TARGET = "auth-service" as const;
@@ -23,6 +27,18 @@ export const ORDER_SERVICE_TARGET = "order-service" as const;
 export const MEDIA_SERVICE_TARGET = "media-service" as const;
 export const BLOG_SERVICE_TARGET = "blog-service" as const;
 export const TAXONOMY_SERVICE_TARGET = "taxonomy-service" as const;
+
+export const GATEWAY_CALLER_ID = "gateway" as const;
+export const GATEWAY_OUTBOUND_TARGETS = Object.freeze([
+  AUTH_SERVICE_TARGET,
+  USER_SERVICE_TARGET,
+  PRODUCT_SERVICE_TARGET,
+  SETTINGS_SERVICE_TARGET,
+  BLOG_SERVICE_TARGET,
+  ORDER_SERVICE_TARGET,
+  TAXONOMY_SERVICE_TARGET,
+  MEDIA_SERVICE_TARGET,
+]);
 
 export const AUTHORIZATION_HEADER = "authorization" as const;
 export const S2S_SIGNATURE_HEADER_DEFAULT = "x-s2s-signature" as const;
@@ -38,6 +54,8 @@ export const X_S2S_NONCE_HEADER = "x-s2s-nonce" as const;
 export const X_REQUEST_ID_HEADER = "x-request-id" as const;
 export const X_S2S_KEY_ID_HEADER = "x-s2s-key-id" as const;
 export const X_S2S_BODY_SHA256_HEADER = "x-s2s-body-sha256" as const;
+export const X_S2S_CONTEXT_HEADER = "x-s2s-context" as const;
+export const X_S2S_CONTEXT_SHA256_HEADER = "x-s2s-context-sha256" as const;
 
 export const ENV_SERVICE_NAME = "SERVICE_NAME" as const;
 export const ENV_SERVICE_NAME_ALT = "SVC_NAME" as const;
@@ -149,6 +167,54 @@ export function parseOutboundKeyMap(
     out[safeTarget] = parseKey(value, `${envName}_${safeTarget}`);
   }
   return out;
+}
+
+/**
+ * Validate an outbound-only trust map against the caller's declared reach.
+ * Extra targets are rejected as undeclared authority, while a missing target
+ * would make the gateway fail later and less clearly on its first call.
+ */
+export function parseExactOutboundKeyMap(
+  raw: string | undefined,
+  envName: string,
+  requiredTargets: readonly string[],
+): Record<string, S2SKey> {
+  if (requiredTargets.length === 0) {
+    throw new Error(`${envName}_required_targets_empty`);
+  }
+
+  const targets = requiredTargets.map((target) =>
+    requiredSafeId(target, `${envName}_required_target`),
+  );
+  if (new Set(targets).size !== targets.length) {
+    throw new Error(`${envName}_required_targets_duplicate`);
+  }
+
+  const parsed = parseOutboundKeyMap(raw, envName);
+  const configuredTargets = Object.keys(parsed);
+  const requiredSet = new Set(targets);
+  const configuredSet = new Set(configuredTargets);
+  const missing = targets.filter((target) => !configuredSet.has(target));
+  const unexpected = configuredTargets.filter(
+    (target) => !requiredSet.has(target),
+  );
+
+  if (missing.length > 0) {
+    throw new Error(`${envName}_missing_targets_${missing.join(",")}`);
+  }
+  if (unexpected.length > 0) {
+    throw new Error(`${envName}_unexpected_targets_${unexpected.join(",")}`);
+  }
+
+  const secrets = new Set<string>();
+  for (const key of Object.values(parsed)) {
+    if (secrets.has(key.secret)) {
+      throw new Error(`${envName}_pairwise_secrets_must_be_distinct`);
+    }
+    secrets.add(key.secret);
+  }
+
+  return parsed;
 }
 
 export function parseInboundKeyMap(
@@ -307,6 +373,18 @@ export function assertS2SRuntimeConfiguration(): void {
   if (process.env.NODE_ENV === "production" && replayMode === "memory") {
     throw new Error("memory_s2s_replay_store_forbidden_in_production");
   }
+}
+
+/** Validate only the trust material an outbound-only gateway actually owns. */
+export function assertGatewayOutboundRuntimeConfiguration(
+  requiredTargets: readonly string[] = GATEWAY_OUTBOUND_TARGETS,
+): void {
+  resolveS2SSignHeader();
+  parseExactOutboundKeyMap(
+    process.env[ENV_GATEWAY_OUTBOUND_KEYS],
+    ENV_GATEWAY_OUTBOUND_KEYS,
+    requiredTargets,
+  );
 }
 
 export function isGatewayOnly(): boolean {

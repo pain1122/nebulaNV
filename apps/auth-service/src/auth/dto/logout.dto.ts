@@ -14,11 +14,4 @@ export class LogoutDto {
   @IsOptional()
   @IsBoolean()
   allDevices?: boolean;
-
-  /**
-   * Optional device identifier (useful if you support per-device sessions).
-   */
-  @IsOptional()
-  @IsString()
-  deviceId?: string;
 }

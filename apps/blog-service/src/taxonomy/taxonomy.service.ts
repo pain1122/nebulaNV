@@ -9,7 +9,10 @@ import {
   type TaxonomyProxy,
   type UpdateTaxonomyReq,
 } from "@nebula/clients";
-import { wrapGrpc } from "@nebula/grpc-auth";
+import {
+  wrapGrpc,
+  type VerifiedServiceDownstreamContext,
+} from "@nebula/grpc-auth";
 import { CreateTaxonomyDto, UpdateTaxonomyDto } from "./dto/taxonomy.dto";
 
 export type ListTaxonomyQuery = {
@@ -18,6 +21,16 @@ export type ListTaxonomyQuery = {
   q?: string;
   parentId?: string | null;
 };
+
+type TaxonomyDownstream = Metadata | VerifiedServiceDownstreamContext;
+
+function downstreamMetadata(
+  downstream?: TaxonomyDownstream,
+): Metadata | undefined {
+  return downstream && "signingPolicy" in downstream
+    ? downstream.metadata
+    : downstream;
+}
 
 @Injectable()
 export class TaxonomyService {
@@ -28,14 +41,23 @@ export class TaxonomyService {
     @Inject(TAXONOMY_SERVICE) private readonly taxonomyClient: ClientGrpc,
   ) {}
 
-  private taxonomy(): TaxonomyProxy {
-    return getTaxonomy(this.taxonomyClient);
+  private taxonomy(downstream?: TaxonomyDownstream): TaxonomyProxy {
+    return getTaxonomy(
+      this.taxonomyClient,
+      downstream && "signingPolicy" in downstream
+        ? downstream.signingPolicy
+        : undefined,
+    );
   }
 
   // ---------------------------
   // List (needs kind)
   // ---------------------------
-  async list(kind: string, q?: ListTaxonomyQuery) {
+  async list(
+    kind: string,
+    q?: ListTaxonomyQuery,
+    downstream?: TaxonomyDownstream,
+  ) {
     const page = q?.page ?? 1;
     const limit = q?.limit ?? 50;
     const search = q?.q ?? "";
@@ -43,14 +65,17 @@ export class TaxonomyService {
 
     const res = await wrapGrpc(
       firstValueFrom(
-        this.taxonomy().ListTaxonomies({
-          scope: this.scope,
-          kind,
-          page,
-          limit,
-          q: search,
-          parentId,
-        }),
+        this.taxonomy(downstream).ListTaxonomies(
+          {
+            scope: this.scope,
+            kind,
+            page,
+            limit,
+            q: search,
+            parentId,
+          },
+          downstreamMetadata(downstream),
+        ),
       ),
     );
 
@@ -65,9 +90,14 @@ export class TaxonomyService {
   // ---------------------------
   // Get (by ID only)
   // ---------------------------
-  async get(id: string) {
+  async get(id: string, downstream?: TaxonomyDownstream) {
     const res = await wrapGrpc(
-      firstValueFrom(this.taxonomy().GetTaxonomy({ id })),
+      firstValueFrom(
+        this.taxonomy(downstream).GetTaxonomy(
+          { id },
+          downstreamMetadata(downstream),
+        ),
+      ),
     );
 
     if (!res.data || res.data.scope !== this.scope) {
@@ -80,10 +110,14 @@ export class TaxonomyService {
   // ---------------------------
   // Create (needs kind)
   // ---------------------------
-  async create(kind: string, dto: CreateTaxonomyDto, metadata?: Metadata) {
+  async create(
+    kind: string,
+    dto: CreateTaxonomyDto,
+    downstream?: TaxonomyDownstream,
+  ) {
     const res = await wrapGrpc(
       firstValueFrom(
-        this.taxonomy().CreateTaxonomy(
+        this.taxonomy(downstream).CreateTaxonomy(
           {
             scope: this.scope,
             kind,
@@ -98,7 +132,7 @@ export class TaxonomyService {
             sortOrder: dto.sortOrder ?? 0,
             meta: {},
           },
-          metadata,
+          downstreamMetadata(downstream),
         ),
       ),
     );
@@ -114,10 +148,19 @@ export class TaxonomyService {
   // ---------------------------
   // Update (by ID only)
   // ---------------------------
-  async update(id: string, dto: UpdateTaxonomyDto, metadata?: Metadata) {
+  async update(
+    id: string,
+    dto: UpdateTaxonomyDto,
+    downstream?: TaxonomyDownstream,
+  ) {
     // First make sure this taxonomy belongs to blog scope
     const existing = await wrapGrpc(
-      firstValueFrom(this.taxonomy().GetTaxonomy({ id }, metadata)),
+      firstValueFrom(
+        this.taxonomy(downstream).GetTaxonomy(
+          { id },
+          downstreamMetadata(downstream),
+        ),
+      ),
     );
     if (!existing.data || existing.data.scope !== this.scope) {
       throw new BadRequestException("taxonomy_not_in_blog_scope");
@@ -138,7 +181,12 @@ export class TaxonomyService {
     }
 
     const res = await wrapGrpc(
-      firstValueFrom(this.taxonomy().UpdateTaxonomy(patch, metadata)),
+      firstValueFrom(
+        this.taxonomy(downstream).UpdateTaxonomy(
+          patch,
+          downstreamMetadata(downstream),
+        ),
+      ),
     );
 
     return { data: res.data };
@@ -147,16 +195,26 @@ export class TaxonomyService {
   // ---------------------------
   // Delete (by ID only)
   // ---------------------------
-  async remove(id: string, metadata?: Metadata) {
+  async remove(id: string, downstream?: TaxonomyDownstream) {
     const existing = await wrapGrpc(
-      firstValueFrom(this.taxonomy().GetTaxonomy({ id }, metadata)),
+      firstValueFrom(
+        this.taxonomy(downstream).GetTaxonomy(
+          { id },
+          downstreamMetadata(downstream),
+        ),
+      ),
     );
     if (!existing.data || existing.data.scope !== this.scope) {
       throw new BadRequestException("taxonomy_not_in_blog_scope");
     }
 
     await wrapGrpc(
-      firstValueFrom(this.taxonomy().DeleteTaxonomy({ id }, metadata)),
+      firstValueFrom(
+        this.taxonomy(downstream).DeleteTaxonomy(
+          { id },
+          downstreamMetadata(downstream),
+        ),
+      ),
     );
     return { data: true };
   }

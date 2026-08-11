@@ -1,8 +1,14 @@
 // apps/product-service/src/taxonomy/grpc/taxonomy-grpc.controller.ts
 import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import type { Metadata } from "@grpc/grpc-js";
-import { bearerFromMeta, Roles, Public } from "@nebula/grpc-auth";
+import type { ServerUnaryCall } from "@grpc/grpc-js";
+import {
+  createVerifiedServiceDownstreamContext,
+  Roles,
+  Public,
+  type MetadataWithContext,
+  type RpcContextWithContext,
+} from "@nebula/grpc-auth";
 import { productv1 as product } from "@nebula/protos";
 import { type TaxonomyDto } from "@nebula/clients";
 import { TaxonomyService } from "../taxonomy.service";
@@ -18,6 +24,9 @@ const toDateString = (value: string | Date | undefined): string => {
   if (!value) return "";
   return value instanceof Date ? value.toISOString() : value;
 };
+
+type GrpcCall<TRequest> = ServerUnaryCall<TRequest, unknown> &
+  RpcContextWithContext;
 
 @Controller()
 export class TaxonomyGrpcController {
@@ -54,16 +63,22 @@ export class TaxonomyGrpcController {
   @GrpcMethod("ProductTaxonomyService", "List")
   async list(
     req: product.ListProductTaxonomiesRequest,
+    metadata: MetadataWithContext,
+    call: GrpcCall<product.ListProductTaxonomiesRequest>,
   ): Promise<product.ListProductTaxonomiesResponse> {
     const page = req.page || 1;
     const limit = req.limit || 50;
 
-    const res = await this.svc.list(req.kind, {
-      page,
-      limit,
-      q: req.q ?? "",
-      parentId: req.parentId || undefined,
-    });
+    const res = await this.svc.list(
+      req.kind,
+      {
+        page,
+        limit,
+        q: req.q ?? "",
+        parentId: req.parentId || undefined,
+      },
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
 
     return product.ListProductTaxonomiesResponse.create({
       data: res.data.map((t) => this.toProto(t)),
@@ -80,8 +95,13 @@ export class TaxonomyGrpcController {
   @GrpcMethod("ProductTaxonomyService", "Get")
   async get(
     req: product.GetProductTaxonomyRequest,
+    metadata: MetadataWithContext,
+    call: GrpcCall<product.GetProductTaxonomyRequest>,
   ): Promise<product.ProductTaxonomyResponse> {
-    const res = await this.svc.get(req.id);
+    const res = await this.svc.get(
+      req.id,
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
     return product.ProductTaxonomyResponse.create({
       data: this.toProto(res.data),
     });
@@ -94,7 +114,8 @@ export class TaxonomyGrpcController {
   @GrpcMethod("ProductTaxonomyService", "Create")
   async create(
     req: product.CreateProductTaxonomyRequest,
-    metadata: Metadata,
+    metadata: MetadataWithContext,
+    call: GrpcCall<product.CreateProductTaxonomyRequest>,
   ): Promise<product.ProductTaxonomyResponse> {
     const dto: CreateTaxonomyDto = {
       slug: req.slug,
@@ -108,7 +129,7 @@ export class TaxonomyGrpcController {
     const { data } = await this.svc.create(
       req.kind,
       dto,
-      bearerFromMeta(metadata),
+      createVerifiedServiceDownstreamContext(metadata, call),
     );
 
     return product.ProductTaxonomyResponse.create({
@@ -123,7 +144,8 @@ export class TaxonomyGrpcController {
   @GrpcMethod("ProductTaxonomyService", "Update")
   async update(
     req: product.UpdateProductTaxonomyRequest,
-    metadata: Metadata,
+    metadata: MetadataWithContext,
+    call: GrpcCall<product.UpdateProductTaxonomyRequest>,
   ): Promise<product.ProductTaxonomyResponse> {
     const patch: UpdateTaxonomyDto = {
       slug: req.slug || undefined,
@@ -137,7 +159,7 @@ export class TaxonomyGrpcController {
     const { data } = await this.svc.update(
       req.id,
       patch,
-      bearerFromMeta(metadata),
+      createVerifiedServiceDownstreamContext(metadata, call),
     );
 
     return product.ProductTaxonomyResponse.create({
@@ -152,9 +174,13 @@ export class TaxonomyGrpcController {
   @GrpcMethod("ProductTaxonomyService", "Delete")
   async delete(
     req: product.DeleteProductTaxonomyRequest,
-    metadata: Metadata,
+    metadata: MetadataWithContext,
+    call: GrpcCall<product.DeleteProductTaxonomyRequest>,
   ): Promise<product.DeleteProductTaxonomyResponse> {
-    const ok = await this.svc.remove(req.id, bearerFromMeta(metadata));
+    const ok = await this.svc.remove(
+      req.id,
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
     return product.DeleteProductTaxonomyResponse.create({ success: !!ok });
   }
 }

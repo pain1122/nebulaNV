@@ -82,6 +82,7 @@ Current methods:
 
 - `FindUser`
 - `GetUser`
+- `ListUsers`
 - `UpdateProfile`
 - `CreateUser`
 - `FindUserWithHash`
@@ -91,6 +92,9 @@ Access policy:
 
 - `GetUser` requires `user`, `admin`, or `root-admin`; self or admin only.
 - `FindUser` requires `admin` or `root-admin`.
+- `ListUsers` requires `admin` or `root-admin`. It is intentionally
+  unpaginated and returns only `id`, `email`, `phone`, `role`, and ISO-8601
+  `createdAt`; it never returns password/hash data.
 - `UpdateProfile` requires `user`, `admin`, or `root-admin`; self or admin only.
 - `CreateUser` is internal-only and accepts only verified `auth-service` S2S calls. Its signed request body is the registration target; it always creates the normal `user` role.
 - `FindUserWithHash` is internal-only for verified `auth-service` auth flows.
@@ -173,6 +177,8 @@ Covered behavior:
 - Internal `FindUserWithHash` miss returns structured empty response.
 - Admin can `FindUser` by email.
 - Normal user cannot `FindUser`.
+- Admin can `ListUsers` through the non-secret list projection.
+- Normal user cannot `ListUsers`.
 - Internal `CreateUser` creates normal user even if role `admin` is requested.
 - Internal hash lookups return only the user identity and password hash fields
   required by auth-service.

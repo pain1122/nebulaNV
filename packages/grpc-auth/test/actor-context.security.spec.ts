@@ -17,6 +17,29 @@ import type {
   HttpRequestWithContext,
   MetadataWithContext,
 } from "../src/context";
+import type { S2SActorAssertion } from "../src/s2s-context";
+import { gatewayTestSignedContext } from "./gateway-context.fixture";
+
+const REQUEST_CONTEXT = Object.freeze({
+  applicationId: "storefront-web-local",
+  tenantId: "single-site-tenant",
+  siteId: "single-site",
+  channelId: "web",
+});
+
+function attachSignedContext(
+  metadata: MetadataWithContext,
+  actor?: S2SActorAssertion,
+): void {
+  metadata.requestContext = REQUEST_CONTEXT;
+  metadata.signedActor = actor;
+}
+
+const ACTOR_MISMATCH_CASES: Array<[string, Partial<S2SActorAssertion>]> = [
+  ["user ID", { userId: "different-user" }],
+  ["role", { role: "root-admin" }],
+  ["session", { sessionRef: "different-session" }],
+];
 
 type RoutePolicy = {
   public?: boolean;
@@ -104,6 +127,29 @@ function httpContext(
 }
 
 describe("verified actor context", () => {
+  it("builds the test gateway assertion from the same session reference contract", () => {
+    const previous = process.env.JWT_ACCESS_SECRET;
+    process.env.JWT_ACCESS_SECRET = "test-only-access-secret-000000000000001";
+    const payload = Buffer.from(
+      JSON.stringify({ sub: "user-1", role: "user", sid: "session-1" }),
+      "utf8",
+    ).toString("base64url");
+    try {
+      expect(gatewayTestSignedContext(`header.${payload}.signature`)).toEqual(
+        expect.objectContaining({
+          actor: {
+            userId: "user-1",
+            role: "user",
+            sessionRef: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
+          },
+        }),
+      );
+    } finally {
+      if (previous === undefined) delete process.env.JWT_ACCESS_SECRET;
+      else process.env.JWT_ACCESS_SECRET = previous;
+    }
+  });
+
   it("does not resolve raw identity metadata as a user", () => {
     const metadata = new Metadata() as MetadataWithContext;
     metadata.set("x-user-id", "forged-user");
@@ -175,6 +221,11 @@ describe("verified actor context", () => {
     const metadata = new Metadata() as MetadataWithContext;
     metadata.svc = "web-gateway";
     metadata.svcKind = "gateway";
+    attachSignedContext(metadata, {
+      userId: "verified-user",
+      role: "admin",
+      sessionRef: "safe-session-reference",
+    });
     metadata.set("authorization", "Bearer signed-access-token");
     metadata.set("x-user-id", "forged-user");
     metadata.set("x-user-role", "root-admin");
@@ -203,12 +254,18 @@ describe("verified actor context", () => {
         isValid: true,
         userId: "verified-user",
         role: "user",
+        sessionRef: "safe-session-reference",
       }),
     );
     const guard = createGuard(validateToken);
     const metadata = new Metadata() as MetadataWithContext;
     metadata.svc = "web-gateway";
     metadata.svcKind = "gateway";
+    attachSignedContext(metadata, {
+      userId: "verified-user",
+      role: "user",
+      sessionRef: "safe-session-reference",
+    });
     metadata.set("authorization", "Bearer signed-access-token");
 
     await expect(
@@ -223,5 +280,142 @@ describe("verified actor context", () => {
         message: "role_not_allowed",
       }),
     });
+  });
+
+  it.each(ACTOR_MISMATCH_CASES)(
+    "rejects a signed actor whose %s disagrees with auth truth",
+    async (_label, mismatch) => {
+      const validateToken = jest.fn().mockReturnValue(
+        of({
+          isValid: true,
+          userId: "verified-user",
+          role: "admin",
+          sessionRef: "verified-session",
+        }),
+      );
+      const guard = createGuard(validateToken);
+      const metadata = new Metadata() as MetadataWithContext;
+      metadata.svc = "web-gateway";
+      metadata.svcKind = "gateway";
+      attachSignedContext(metadata, {
+        userId: "verified-user",
+        role: "admin",
+        sessionRef: "verified-session",
+        ...mismatch,
+      });
+      metadata.set("authorization", "Bearer signed-access-token");
+
+      await expect(
+        guard.canActivate(
+          rpcContext(metadata, {} as GrpcServerCallWithContext, {
+            requireUser: true,
+          }),
+        ),
+      ).rejects.toMatchObject({
+        error: expect.objectContaining({
+          code: status.UNAUTHENTICATED,
+          message: "s2s_actor_bearer_mismatch",
+        }),
+      });
+      expect(metadata.user).toBeUndefined();
+    },
+  );
+
+  it("rejects either half of a v3 actor/bearer pair", async () => {
+    const guard = createGuard();
+    const actorWithoutBearer = new Metadata() as MetadataWithContext;
+    actorWithoutBearer.svc = "web-gateway";
+    actorWithoutBearer.svcKind = "gateway";
+    attachSignedContext(actorWithoutBearer, {
+      userId: "verified-user",
+      role: "user",
+      sessionRef: "verified-session",
+    });
+    await expect(
+      guard.canActivate(
+        rpcContext(actorWithoutBearer, {} as GrpcServerCallWithContext, {
+          public: true,
+          gatewayOnly: true,
+        }),
+      ),
+    ).rejects.toMatchObject({
+      error: expect.objectContaining({
+        message: "s2s_actor_bearer_missing",
+      }),
+    });
+
+    const bearerWithoutActor = new Metadata() as MetadataWithContext;
+    bearerWithoutActor.svc = "web-gateway";
+    bearerWithoutActor.svcKind = "gateway";
+    attachSignedContext(bearerWithoutActor);
+    bearerWithoutActor.set("authorization", "Bearer signed-access-token");
+    await expect(
+      guard.canActivate(
+        rpcContext(bearerWithoutActor, {} as GrpcServerCallWithContext),
+      ),
+    ).rejects.toMatchObject({
+      error: expect.objectContaining({
+        message: "s2s_actor_assertion_missing",
+      }),
+    });
+  });
+
+  it("allows anonymous v3 and legacy service-v2 bearer behavior during migration", async () => {
+    const anonymousGuard = createGuard();
+    const anonymous = new Metadata() as MetadataWithContext;
+    anonymous.svc = "web-gateway";
+    anonymous.svcKind = "gateway";
+    attachSignedContext(anonymous);
+    await expect(
+      anonymousGuard.canActivate(
+        rpcContext(anonymous, {} as GrpcServerCallWithContext, {
+          public: true,
+          gatewayOnly: true,
+        }),
+      ),
+    ).resolves.toBe(true);
+    expect(anonymous.user).toEqual({ userId: null, role: "guest" });
+
+    const validateToken = jest.fn().mockReturnValue(
+      of({
+        isValid: true,
+        userId: "legacy-user",
+        role: "user",
+        sessionRef: "legacy-session",
+      }),
+    );
+    const serviceGuard = createGuard(validateToken);
+    const legacyService = new Metadata() as MetadataWithContext;
+    legacyService.svc = "legacy-service";
+    legacyService.svcKind = "service";
+    legacyService.set("authorization", "Bearer signed-access-token");
+    await expect(
+      serviceGuard.canActivate(
+        rpcContext(legacyService, {} as GrpcServerCallWithContext),
+      ),
+    ).resolves.toBe(true);
+    expect(legacyService.user).toMatchObject({ userId: "legacy-user" });
+  });
+
+  it("does not make a private GatewayOnly RPC anonymous", async () => {
+    const guard = createGuard();
+    const metadata = new Metadata() as MetadataWithContext;
+    metadata.svc = "web-gateway";
+    metadata.svcKind = "gateway";
+    attachSignedContext(metadata);
+
+    await expect(
+      guard.canActivate(
+        rpcContext(metadata, {} as GrpcServerCallWithContext, {
+          gatewayOnly: true,
+        }),
+      ),
+    ).rejects.toMatchObject({
+      error: expect.objectContaining({
+        code: status.UNAUTHENTICATED,
+        message: "missing_token_or_signature",
+      }),
+    });
+    expect(metadata.user).toBeUndefined();
   });
 });

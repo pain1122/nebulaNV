@@ -4,7 +4,6 @@ import type { ClientGrpc } from "@nestjs/microservices";
 import type { Observable } from "rxjs";
 import {
   TAXONOMY_SERVICE_TARGET,
-  buildGrpcS2SMetadata,
   invokeGrpcUnary,
   mergeSignedMetadata,
 } from "@nebula/grpc-auth";
@@ -22,6 +21,10 @@ import type {
   TaxonomyRes,
   TaxonomyListRes,
 } from "./taxonomy.types";
+import {
+  buildClientGrpcS2SMetadata,
+  type GrpcClientSigningPolicy,
+} from "./s2s-metadata";
 
 type UpdateTaxonomyPatch = Omit<UpdateTaxonomyReq, "id">;
 
@@ -69,7 +72,10 @@ type Raw = {
   ): Observable<TaxonomyListRes>;
 };
 
-export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
+export function getTaxonomy(
+  client: ClientGrpc,
+  signingPolicy?: GrpcClientSigningPolicy,
+): TaxonomyProxy {
   const raw = client.getService<Raw>("TaxonomyService");
 
   return {
@@ -79,7 +85,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.getTaxonomy,
             request: req,
@@ -94,7 +101,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.getBySlug,
             request: req,
@@ -109,7 +117,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.ensureSystemTaxonomy,
             request: req,
@@ -125,7 +134,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         request,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.createTaxonomy,
             request,
@@ -143,7 +153,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         request,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.updateTaxonomy,
             request,
@@ -159,7 +170,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.deleteTaxonomy,
             request: req,
@@ -174,7 +186,8 @@ export function getTaxonomy(client: ClientGrpc): TaxonomyProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: TAXONOMY_SERVICE_TARGET,
             definition: taxonomy.TaxonomyServiceService.listTaxonomies,
             request: req,

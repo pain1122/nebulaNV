@@ -8,10 +8,12 @@ import {
 } from "./context";
 import {
   buildGrpcS2SMetadata,
+  buildGatewayGrpcS2SMetadata,
   mergeMetadata,
   mergeSignedMetadata,
   withBearer,
   type BuildGrpcS2SMetadataOptions,
+  type BuildGatewayGrpcS2SMetadataOptions,
 } from "./s2s";
 
 export type CtxUser = {
@@ -57,6 +59,17 @@ export function authAndS2S<TRequest>(
   const application = mergeMetadata(opts.metadata, bearer(token));
   const signed = buildGrpcS2SMetadata(opts);
   return mergeSignedMetadata(application, signed);
+}
+
+/**
+ * Gateway application metadata is an allowlist of one value: the verified
+ * actor bearer. Raw inbound HTTP headers are never accepted by this builder.
+ */
+export function gatewayAuthAndS2S<TRequest>(
+  token: string | null | undefined,
+  opts: BuildGatewayGrpcS2SMetadataOptions<TRequest>,
+): Metadata {
+  return mergeSignedMetadata(bearer(token), buildGatewayGrpcS2SMetadata(opts));
 }
 
 export function withAuth<TRequest>(opts: {

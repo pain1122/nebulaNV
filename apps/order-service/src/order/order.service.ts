@@ -6,20 +6,21 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { ClientGrpc } from "@nestjs/microservices";
-import type { Metadata } from "@grpc/grpc-js";
-import { firstValueFrom, type Observable } from "rxjs";
-import { productv1 } from "@nebula/protos";
-
+import { firstValueFrom } from "rxjs";
 import { PrismaService } from "../prisma.service";
 import { OrderStatus } from "../../prisma/generated/client";
 import { AddToCartDto, UpdateCartItemDto } from "./dto/order.dto";
 import { PRODUCT_SERVICE } from "../product-client.module";
 import { SETTINGS_SERVICE } from "../settings-client.module";
-import { getSettings, type SettingsProxy } from "@nebula/clients";
 import {
-  PRODUCT_SERVICE_TARGET,
-  buildGrpcS2SMetadata,
+  getProduct,
+  getSettings,
+  type ProductProxy,
+  type SettingsProxy,
+} from "@nebula/clients";
+import {
   wrapGrpc,
+  type VerifiedServiceDownstreamContext,
 } from "@nebula/grpc-auth";
 
 type PriceLike = number | string | { toString(): string } | null | undefined;
@@ -56,16 +57,9 @@ function hasPrismaCode(error: unknown, code: string): boolean {
   );
 }
 
-interface ProductGrpcService {
-  GetProduct(
-    request: { id: string },
-    metadata?: Metadata,
-  ): Observable<ProductGrpcResponse>;
-}
-
 @Injectable()
 export class OrderService implements OnModuleInit {
-  private productSvc!: ProductGrpcService;
+  private productSvc!: ProductProxy;
   private settingsSvc!: SettingsProxy;
   private cartTtlMsCache: number | null = null;
 
@@ -76,31 +70,41 @@ export class OrderService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // names must match your protos
-    this.productSvc =
-      this.productClient.getService<ProductGrpcService>("ProductService");
+    this.productSvc = getProduct(this.productClient);
     this.settingsSvc = getSettings(this.settingsClient);
   }
 
   // --------- Helpers ---------
 
-  private async fetchProductOrThrow(productId: string): Promise<ProductRecord> {
+  private product(downstream?: VerifiedServiceDownstreamContext): ProductProxy {
+    return downstream
+      ? getProduct(this.productClient, downstream.signingPolicy)
+      : this.productSvc;
+  }
+
+  private settings(
+    downstream?: VerifiedServiceDownstreamContext,
+  ): SettingsProxy {
+    return downstream
+      ? getSettings(this.settingsClient, downstream.signingPolicy)
+      : this.settingsSvc;
+  }
+
+  private async fetchProductOrThrow(
+    productId: string,
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<ProductRecord> {
     const request = { id: productId };
     const res = await wrapGrpc(
       firstValueFrom(
-        this.productSvc.GetProduct(
-          request,
-          buildGrpcS2SMetadata({
-            target: PRODUCT_SERVICE_TARGET,
-            definition: productv1.ProductServiceService.getProduct,
-            request,
-          }),
-        ),
+        this.product(downstream).GetProduct(request, downstream?.metadata),
       ),
     );
 
     // product-service typically returns: { data: { id, slug, title, sku, price, currency, ... } }
-    const raw = res?.data ?? res?.product ?? res;
+    const productResponse = res as unknown as ProductGrpcResponse;
+    const raw =
+      productResponse.data ?? productResponse.product ?? productResponse;
 
     if (!raw || !raw.id) {
       throw new NotFoundException("product_not_found");
@@ -138,16 +142,21 @@ export class OrderService implements OnModuleInit {
   }
 
   // TTL is stored in settings: namespace=order, key=cart_ttl, JSON { minutes: 30 }
-  private async getCartTtlMs(): Promise<number> {
+  private async getCartTtlMs(
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<number> {
     if (this.cartTtlMsCache != null) return this.cartTtlMsCache;
 
     try {
       const res = await firstValueFrom(
-        this.settingsSvc.GetString({
-          namespace: "order",
-          key: "cart_ttl_minutes",
-          environment: "default",
-        }),
+        this.settings(downstream).GetString(
+          {
+            namespace: "order",
+            key: "cart_ttl_minutes",
+            environment: "default",
+          },
+          downstream?.metadata,
+        ),
       );
 
       const minutes = res.value || 30;
@@ -163,7 +172,10 @@ export class OrderService implements OnModuleInit {
 
   // --------- Cart helpers ---------
 
-  private async getActiveCart(userId: string) {
+  private async getActiveCart(
+    userId: string,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
     const now = new Date();
 
     let cart = await this.prisma.cart.findUnique({
@@ -177,7 +189,7 @@ export class OrderService implements OnModuleInit {
     }
 
     if (!cart) {
-      const ttlMs = await this.getCartTtlMs();
+      const ttlMs = await this.getCartTtlMs(downstream);
 
       cart = await this.prisma.cart.create({
         data: {
@@ -193,8 +205,11 @@ export class OrderService implements OnModuleInit {
     return cart;
   }
 
-  private async bumpCartExpiry(cartId: string) {
-    const ttlMs = await this.getCartTtlMs();
+  private async bumpCartExpiry(
+    cartId: string,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
+    const ttlMs = await this.getCartTtlMs(downstream);
     await this.prisma.cart.update({
       where: { id: cartId },
       data: { expiresAt: new Date(Date.now() + ttlMs) },
@@ -203,16 +218,23 @@ export class OrderService implements OnModuleInit {
 
   // --------- Cart API ---------
 
-  async getCartForUser(userId: string) {
-    const cart = await this.getActiveCart(userId);
+  async getCartForUser(
+    userId: string,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
+    const cart = await this.getActiveCart(userId, downstream);
     return { data: cart };
   }
 
-  async addToCart(userId: string, dto: AddToCartDto) {
-    const cart = await this.getActiveCart(userId);
+  async addToCart(
+    userId: string,
+    dto: AddToCartDto,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
+    const cart = await this.getActiveCart(userId, downstream);
 
     // 🔗 fetch price + currency from product-service
-    const prod = await this.fetchProductOrThrow(dto.productId);
+    const prod = await this.fetchProductOrThrow(dto.productId, downstream);
     const unitPrice = this.normalizePrice(prod.price);
     const currency = prod.currency || "EUR";
 
@@ -255,7 +277,7 @@ export class OrderService implements OnModuleInit {
       });
     }
 
-    await this.bumpCartExpiry(cart.id);
+    await this.bumpCartExpiry(cart.id, downstream);
 
     const updated = await this.prisma.cart.findUnique({
       where: { id: cart.id },
@@ -265,8 +287,13 @@ export class OrderService implements OnModuleInit {
     return { data: updated };
   }
 
-  async updateCartItem(userId: string, itemId: string, dto: UpdateCartItemDto) {
-    const cart = await this.getActiveCart(userId);
+  async updateCartItem(
+    userId: string,
+    itemId: string,
+    dto: UpdateCartItemDto,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
+    const cart = await this.getActiveCart(userId, downstream);
 
     const item = cart.items.find((i) => i.id === itemId);
     if (!item) throw new NotFoundException("cart_item_not_found");
@@ -280,7 +307,7 @@ export class OrderService implements OnModuleInit {
       });
     }
 
-    await this.bumpCartExpiry(cart.id);
+    await this.bumpCartExpiry(cart.id, downstream);
 
     const updated = await this.prisma.cart.findUnique({
       where: { id: cart.id },
@@ -290,15 +317,19 @@ export class OrderService implements OnModuleInit {
     return { data: updated };
   }
 
-  async removeCartItem(userId: string, itemId: string) {
-    const cart = await this.getActiveCart(userId);
+  async removeCartItem(
+    userId: string,
+    itemId: string,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
+    const cart = await this.getActiveCart(userId, downstream);
 
     const item = cart.items.find((i) => i.id === itemId);
     if (!item) throw new NotFoundException("cart_item_not_found");
 
     await this.prisma.cartItem.delete({ where: { id: itemId } });
 
-    await this.bumpCartExpiry(cart.id);
+    await this.bumpCartExpiry(cart.id, downstream);
 
     const updated = await this.prisma.cart.findUnique({
       where: { id: cart.id },

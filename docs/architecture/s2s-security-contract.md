@@ -1,10 +1,11 @@
 # S2S Security Contract
 
-Status: implemented for all eight backend gRPC services on 2026-07-11.
+Status: v2 is implemented for all eight backend gRPC services; strict
+receiver-first v3 context acceptance was added on 2026-08-11.
 
 ## Boundary
 
-S2S v2 authenticates unary internal gRPC calls. Browser HTTP requests use the JWT/gateway boundary and never receive S2S keys or headers. Client-streaming and bidirectional-streaming RPCs are deliberately rejected until a stream-specific signing contract exists.
+S2S v2 and v3 authenticate unary internal gRPC calls. Browser HTTP requests use the JWT/gateway boundary and never receive S2S keys or headers. Client-streaming and bidirectional-streaming RPCs are deliberately rejected until a stream-specific signing contract exists.
 
 Every gRPC method requires S2S identity. `@Public()` only makes the end-user JWT optional; it never makes an RPC unsigned.
 
@@ -12,7 +13,7 @@ Every gRPC method requires S2S identity. `@Public()` only makes the end-user JWT
 
 Each call carries one value for every field:
 
-- protocol version (`2`)
+- protocol version (`2` or `3`)
 - caller name and caller kind (`service` or `gateway`)
 - target service
 - transport method (`grpc`)
@@ -23,6 +24,19 @@ Each call carries one value for every field:
 - key ID
 - SHA-256 digest of the serialized protobuf request
 - HMAC-SHA256 signature
+
+V2 remains the byte-compatible context-free ordinary-service format. V3 adds
+one `x-s2s-context` value containing unpadded base64url canonical JSON and one
+lowercase `x-s2s-context-sha256` value. The v3 signature payload appends that
+context digest after the existing body digest. Gateway-kind calls require v3;
+ordinary service calls without verified ingress context remain v2.
+
+The v3 JSON has only `version`, `applicationId`, `tenantId`, `siteId`,
+`channelId`, and optional `actor`. Identifiers are safe ASCII values of 1-128
+bytes, actor role is `user`, `admin`, or `root-admin`, and canonical JSON is at
+most 1024 bytes. Unknown/null/array/extension fields, non-canonical encoding,
+partial or duplicate carriers, context on v2, and altered context/digest are
+rejected.
 
 The signature is a versioned JSON-array payload. Verification uses constant-time comparison. The server interceptor independently captures the real RPC path and reserializes the received request with the registered generated definition before the guard compares path and body digest.
 
@@ -36,6 +50,7 @@ Service and gateway trust bundles are separate:
 S2S_OUTBOUND_KEYS={"target-service":{"id":"caller-target-2026-07","secret":"32-byte-or-longer-random-secret"}}
 S2S_INBOUND_KEYS={"caller-service":{"current":{"id":"caller-target-2026-07","secret":"same-pairwise-secret"}}}
 GATEWAY_INBOUND_KEYS={"gateway":{"current":{"id":"gateway-target-2026-07","secret":"different-random-secret"}}}
+GATEWAY_OUTBOUND_KEYS={"target-service":{"id":"gateway-target-2026-07","secret":"same-gateway-pairwise-secret"}}
 ```
 
 There is no shared S2S master secret and no gateway/inter-service secret reuse. Startup rejects malformed maps, a missing inbound trust bundle, invalid service identity, unsafe clock configuration, gateway/service key overlap, and an in-memory production replay store.
@@ -84,11 +99,20 @@ Outbound signing never chooses the previous key.
 The receiving chain is:
 
 1. generated-definition server interceptor captures trusted RPC identity/body digest;
-2. `S2SGuard` verifies caller, target, binding, time, signature, route policy, and replay;
+2. `S2SGuard` validates v2/v3 cardinality and canonical context, then verifies caller, target, binding, time, signature, route policy, and replay;
 3. `GrpcTokenAuthGuard` verifies optional/required user JWT and attaches user context;
 4. controller/resource authorization runs.
 
-Verified caller identity is attached only after all S2S checks pass.
+Verified caller identity is attached only after all S2S checks pass. V3
+application/site context is attached as `requestContext`; its optional actor is
+attached separately as `signedActor`, never as authoritative `user`.
+
+For a gateway or any v3 hop, actor assertion and Bearer token must either both
+be absent (anonymous) or both be present. Auth-service validates the Bearer and
+the receiver requires exact `userId`, `role`, and non-secret `sessionRef`
+agreement before attaching `user`. Legacy service-v2 Bearer calls remain
+accepted during receiver-first migration and continue to rely on auth-service
+truth without claiming v3 application context.
 
 `@InternalOnly()` requires caller kind `service`. `@Public({ gatewayOnly: true })` requires caller kind `gateway`. `@AllowedS2SCallers(...)` restricts a route to named verified callers.
 
@@ -134,6 +158,11 @@ return client.getString(request, metadata);
 
 Application metadata is preserved, but reserved S2S fields supplied by a caller are discarded. Passing custom metadata can never suppress or replace the fresh signature.
 
+Gateway clients instead use `gatewayAuthAndS2S(...)` with the registry-derived
+context and optional auth-verified bearer. That builder has no raw inbound HTTP
+metadata parameter. It emits only the bearer allowlist plus fresh v3 signed
+metadata.
+
 ## Runtime Configuration
 
 Common settings:
@@ -149,10 +178,21 @@ Common settings:
 - `S2S_INBOUND_KEYS`
 - `GATEWAY_INBOUND_KEYS`
 
+The outbound-only gateway has a smaller startup contract:
+
+- `S2S_SIGNATURE_HEADER`
+- `GATEWAY_OUTBOUND_KEYS`
+
+Its declared map must cover exactly the eight F3 downstream targets, with a
+different secret for every gateway-to-target edge. It does not configure
+receiver-only inbound maps, replay storage, replay Redis, `PUBLIC_MODE`, or a
+gRPC listener. Each target service still owns the matching
+`GATEWAY_INBOUND_KEYS` receiver entry and performs signature/replay checks.
+
 Release Redis is password-protected, has no host port, and is a healthy dependency of every backend service.
 
 ## Proven Denials
 
-Focused tests cover missing signatures, wrong target/RPC/body, stale and future timestamps, replay and concurrent replay, unsupported versions, invalid signatures, expired previous keys, gateway/service key separation, caller allowlists, gateway-only/internal-only policy, private-route protection in `OPEN`, startup validation, and all eight service bootstrap templates.
+Focused tests cover missing signatures, wrong target/RPC/body, stale and future timestamps, replay and concurrent replay, unsupported versions, invalid signatures, expired previous keys, gateway/service key separation, caller allowlists, gateway-only/internal-only policy, private-route protection in `OPEN`, startup validation, all eight service bootstrap templates, v2 compatibility, required gateway v3, canonical context bounds, and partial/duplicate/unsigned/altered context denial.
 
 This closes the S2S Enforcement slice only. Raw propagated user/role removal, order-status authorization, refresh-token policy, and broader HTTP/gRPC authorization parity remain separate F1 work.

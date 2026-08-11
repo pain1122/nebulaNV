@@ -6,10 +6,11 @@ import {
   markS2SMetadata,
   registerS2SClientDefinition,
 } from "@nebula/grpc-auth";
+import { gatewayTestSignedContext } from "../../../../packages/grpc-auth/test/gateway-context.fixture";
 
 export const CODES = grpc.status;
 
-export function mdS2S() {
+export function mdS2S(accessToken?: string) {
   const md = markS2SMetadata(new grpc.Metadata(), {
     kind: "gateway",
     serviceName: "gateway",
@@ -19,6 +20,7 @@ export function mdS2S() {
         process.env.S2S_TEST_GATEWAY_KEY ??
         "dev-only-gateway-to-settings-s2s-key-001",
     },
+    context: gatewayTestSignedContext(accessToken),
   });
   return md;
 }
@@ -37,7 +39,7 @@ export function mdProductService() {
 }
 
 export function mdAuth(opts: { access: string }) {
-  const md = mdS2S();
+  const md = mdS2S(opts.access);
   md.set("authorization", `Bearer ${opts.access}`);
   return md;
 }

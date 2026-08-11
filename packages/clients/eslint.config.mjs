@@ -1,12 +1,16 @@
 // @ts-check
-import {createRequire} from "node:module"
+import { createRequire } from "node:module";
 
-import eslint from "@eslint/js"
-import globals from "globals"
+import eslint from "@eslint/js";
+import globals from "globals";
 
-const rootRequire = createRequire(new URL("../../package.json", import.meta.url))
-const eslintPluginPrettierRecommended = rootRequire("eslint-plugin-prettier/recommended")
-const tseslint = rootRequire("typescript-eslint")
+const rootRequire = createRequire(
+  new URL("../../package.json", import.meta.url),
+);
+const eslintPluginPrettierRecommended = rootRequire(
+  "eslint-plugin-prettier/recommended",
+);
+const tseslint = rootRequire("typescript-eslint");
 
 export default tseslint.config(
   {
@@ -34,4 +38,4 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-argument": "warn",
     },
   },
-)
+);

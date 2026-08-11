@@ -1,4 +1,11 @@
-import { IsIn, IsOptional, IsString, Matches } from "class-validator";
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from "class-validator";
 import { Transform, type TransformFnParams } from "class-transformer";
 
 const trim = ({ value }: TransformFnParams): unknown =>
@@ -30,4 +37,28 @@ export class ProtectedFeatureReadUrlDto {
   @Transform(lowerTrim)
   @IsIn(["true", "false", "1", "0"])
   download?: string;
+}
+
+export class MyProtectedReadUrlGrpcDto {
+  @IsUUID()
+  id!: string;
+
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "scope is not safe" })
+  scope!: string;
+
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "entityType is not safe" })
+  entityType!: string;
+
+  @IsString()
+  @Transform(trim)
+  @Matches(SAFE_CONTEXT_VALUE, { message: "entityId is not safe" })
+  entityId!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  download?: boolean;
 }

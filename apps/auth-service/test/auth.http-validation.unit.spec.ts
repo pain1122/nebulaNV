@@ -74,4 +74,14 @@ describe('auth HTTP validation migration', () => {
       },
     );
   });
+
+  it('rejects unsupported device-scoped logout input', async () => {
+    await rejectsBadRequest(
+      { deviceId: 'device-without-an-owned-session-contract' },
+      {
+        type: 'body',
+        metatype: LogoutDto,
+      },
+    );
+  });
 });

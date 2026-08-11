@@ -26,6 +26,8 @@ export type AuthUserDto = {
 export type TokenPair = {
   accessToken: string;
   refreshToken: string;
+  accessExpiresInSeconds: number;
+  refreshExpiresInSeconds: number;
 };
 
 type AuthTokenPayloadBase = {

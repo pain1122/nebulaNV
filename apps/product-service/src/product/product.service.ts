@@ -17,7 +17,10 @@ import { SETTINGS_SERVICE } from "../settings-client.module";
 import { getSettings, type SettingsProxy } from "@nebula/clients";
 import { TAXONOMY_SERVICE } from "../taxonomy-client.module";
 import { getTaxonomy, type TaxonomyProxy } from "@nebula/clients";
-import { wrapGrpc } from "@nebula/grpc-auth";
+import {
+  wrapGrpc,
+  type VerifiedServiceDownstreamContext,
+} from "@nebula/grpc-auth";
 import { isRecord } from "../error.utils";
 import { DiscountTypeDto, type ProductInputDto } from "./dto/product-input.dto";
 import { type ApplyDiscountBulkDto } from "./dto/apply-discount-bulk.dto";
@@ -47,6 +50,11 @@ type ListProductsInput = {
   limit?: number | string | null;
   includeDeleted?: boolean | null;
 };
+
+type PublicListProductsInput = Omit<
+  ListProductsInput,
+  "status" | "includeDeleted"
+>;
 
 type PrismaMappingOptions = {
   missingTarget?: string;
@@ -124,26 +132,35 @@ export class ProductServiceImpl {
     @Inject(SETTINGS_SERVICE) private readonly settingsClient: ClientGrpc,
   ) {}
 
-  private settings(): SettingsProxy {
-    return getSettings(this.settingsClient);
+  private settings(
+    downstream?: VerifiedServiceDownstreamContext,
+  ): SettingsProxy {
+    return getSettings(this.settingsClient, downstream?.signingPolicy);
   }
 
-  private taxonomy(): TaxonomyProxy {
-    return getTaxonomy(this.taxonomyClient);
+  private taxonomy(
+    downstream?: VerifiedServiceDownstreamContext,
+  ): TaxonomyProxy {
+    return getTaxonomy(this.taxonomyClient, downstream?.signingPolicy);
   }
 
   private defaultCurrencyCache: string | null = null;
 
-  private async getDefaultCurrency(): Promise<string> {
+  private async getDefaultCurrency(
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<string> {
     if (this.defaultCurrencyCache) return this.defaultCurrencyCache;
 
     try {
       const res = await firstValueFrom(
-        this.settings().GetString({
-          namespace: "pricing",
-          environment: "default",
-          key: "default_currency",
-        }),
+        this.settings(downstream).GetString(
+          {
+            namespace: "pricing",
+            environment: "default",
+            key: "default_currency",
+          },
+          downstream?.metadata,
+        ),
       );
 
       const cur = res?.value || "USD";
@@ -199,13 +216,18 @@ export class ProductServiceImpl {
     };
   };
 
-  private async getDefaultCategoryId(): Promise<string> {
+  private async getDefaultCategoryId(
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<string> {
     const res = await firstValueFrom(
-      this.settings().GetString({
-        namespace: "product",
-        environment: "default",
-        key: "default_product_category",
-      }),
+      this.settings(downstream).GetString(
+        {
+          namespace: "product",
+          environment: "default",
+          key: "default_product_category",
+        },
+        downstream?.metadata,
+      ),
     );
 
     if (!res?.value) {
@@ -215,7 +237,7 @@ export class ProductServiceImpl {
     }
 
     // Validate that this ID actually points at a product category taxonomy
-    await this.assertCategoryExists(res.value);
+    await this.assertCategoryExists(res.value, downstream);
 
     return res.value;
   }
@@ -260,10 +282,18 @@ export class ProductServiceImpl {
     }
   }
 
-  private async assertCategoryExists(categoryId: string) {
+  private async assertCategoryExists(
+    categoryId: string,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
     try {
       const res = await wrapGrpc(
-        firstValueFrom(this.taxonomy().GetTaxonomy({ id: categoryId })),
+        firstValueFrom(
+          this.taxonomy(downstream).GetTaxonomy(
+            { id: categoryId },
+            downstream?.metadata,
+          ),
+        ),
       );
 
       const t = res?.data;
@@ -298,7 +328,10 @@ export class ProductServiceImpl {
   }
 
   // ---- Create ----
-  async create(n: ProductInputDto) {
+  async create(
+    n: ProductInputDto,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
     const input = n;
     this.assertCreate(input);
     this.assertPrice(input.price);
@@ -308,11 +341,12 @@ export class ProductServiceImpl {
       ? basicSlugify(input.slug)
       : await this.ensureUniqueSlug(title);
     const sku = await this.ensureUniqueSku(input.sku ?? null);
-    const categoryId = input.categoryId ?? (await this.getDefaultCategoryId());
-    await this.assertCategoryExists(categoryId);
+    const categoryId =
+      input.categoryId ?? (await this.getDefaultCategoryId(downstream));
+    await this.assertCategoryExists(categoryId, downstream);
 
     // normalize window to Date|null for DB
-    const defaultCurrency = await this.getDefaultCurrency();
+    const defaultCurrency = await this.getDefaultCurrency(downstream);
     const discountStart: Date | null = input.discountStart
       ? new Date(input.discountStart)
       : null;
@@ -381,7 +415,11 @@ export class ProductServiceImpl {
   }
 
   // ---- Update (patch) ----
-  async update(id: string, n?: ProductPatchInput) {
+  async update(
+    id: string,
+    n?: ProductPatchInput,
+    downstream?: VerifiedServiceDownstreamContext,
+  ) {
     const patch = n ?? {};
     if (patch.price != null) this.assertPrice(patch.price);
 
@@ -391,9 +429,9 @@ export class ProductServiceImpl {
     if (patch.categoryId !== undefined) {
       if (patch.categoryId === "" || patch.categoryId == null) {
         // Explicitly reset to default category
-        nextCategoryId = await this.getDefaultCategoryId();
+        nextCategoryId = await this.getDefaultCategoryId(downstream);
       } else {
-        await this.assertCategoryExists(patch.categoryId);
+        await this.assertCategoryExists(patch.categoryId, downstream);
         nextCategoryId = patch.categoryId;
       }
     }
@@ -473,21 +511,42 @@ export class ProductServiceImpl {
     }
   }
 
-  // ---- Get ----
-  async get(id: string) {
+  // ---- Public/admin reads ----
+  async getPublic(id: string) {
+    const p = await this.prisma.product.findFirst({
+      where: { id, status: ProductStatus.ACTIVE, deletedAt: null },
+    });
+    if (!p) throw new NotFoundException("product_not_found");
+    return { data: this.toDto(p) };
+  }
+
+  async getAdmin(id: string) {
     const p = await this.prisma.product.findUnique({ where: { id } });
     if (!p) throw new NotFoundException("product_not_found");
     return { data: this.toDto(p) };
   }
 
-  // ---- List (exclude soft-deleted by default) ----
-  async list(req: ListProductsInput) {
-    const includeDeleted = !!req.includeDeleted;
+  async listPublic(req: PublicListProductsInput) {
+    return this.listMatching(req, {
+      status: ProductStatus.ACTIVE,
+      deletedAt: null,
+    });
+  }
+
+  async listAdmin(req: ListProductsInput) {
+    const where: Prisma.ProductWhereInput = {};
+    if (!req.includeDeleted) where.deletedAt = null;
+    if (req.status) where.status = asStatus(req.status);
+    return this.listMatching(req, where);
+  }
+
+  private async listMatching(
+    req: PublicListProductsInput,
+    where: Prisma.ProductWhereInput,
+  ) {
     const page = Math.max(1, Number(req.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.limit) || 10));
-    const where: Prisma.ProductWhereInput = {};
 
-    if (!includeDeleted) where.deletedAt = null;
     if (req.q) {
       where.OR = [
         { title: { contains: req.q, mode: "insensitive" } },
@@ -495,7 +554,6 @@ export class ProductServiceImpl {
       ];
     }
     if (req.categoryId) where.categoryId = req.categoryId;
-    if (req.status) where.status = asStatus(req.status);
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
@@ -635,13 +693,26 @@ export class ProductServiceImpl {
       if (data.length) {
         await this.prisma.productGalleryImage.createMany({ data });
       }
-      return this.listGallery(productId, false);
+      return this.listAdminGallery(productId, false);
     } catch (e) {
       throw mapPrisma(e);
     }
   }
 
-  async listGallery(productId: string, includeDeleted = false) {
+  async listPublicGallery(productId: string) {
+    const visible = await this.prisma.product.findFirst({
+      where: {
+        id: productId,
+        status: ProductStatus.ACTIVE,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!visible) throw new NotFoundException("product_not_found");
+    return this.listAdminGallery(productId, false);
+  }
+
+  async listAdminGallery(productId: string, includeDeleted = false) {
     return this.prisma.productGalleryImage.findMany({
       where: { productId, ...(includeDeleted ? {} : { deletedAt: null }) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -687,7 +758,7 @@ export class ProductServiceImpl {
       }
 
       // Normalize 0..n among non-deleted
-      const rows = await this.listGallery(productId, false);
+      const rows = await this.listAdminGallery(productId, false);
       let i = 0;
       await this.prisma.$transaction(
         rows
@@ -700,7 +771,7 @@ export class ProductServiceImpl {
           ),
       );
 
-      return this.listGallery(productId, false);
+      return this.listAdminGallery(productId, false);
     } catch (e) {
       throw mapPrisma(e);
     }
@@ -728,7 +799,7 @@ export class ProductServiceImpl {
       }
 
       // return including deleted so callers can see state
-      return this.listGallery(productId, true);
+      return this.listAdminGallery(productId, true);
     } catch (e) {
       throw mapPrisma(e);
     }

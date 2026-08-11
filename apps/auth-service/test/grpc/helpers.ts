@@ -20,6 +20,13 @@ const gatewayAuth: S2SSigningIdentity = {
       process.env.S2S_TEST_GATEWAY_KEY ??
       'dev-only-gateway-to-auth-s2s-key-00001',
   },
+  context: {
+    version: '1',
+    applicationId: 'admin-web-test',
+    tenantId: 'single-site-tenant',
+    siteId: 'single-site',
+    channelId: 'web',
+  },
 };
 
 const authAuth: S2SSigningIdentity = {

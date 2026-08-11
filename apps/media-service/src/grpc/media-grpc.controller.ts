@@ -1,4 +1,4 @@
-import { Controller, Logger } from "@nestjs/common";
+import { Controller, Logger, UsePipes } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { Metadata, status } from "@grpc/grpc-js";
 import {
@@ -8,9 +8,20 @@ import {
   type PresignUploadInput,
 } from "../media.service";
 import type { Media as MediaRecord } from "../../prisma/generated";
-import { Public, Roles, resolveCtxUser, toRpc } from "@nebula/grpc-auth";
+import {
+  createGrpcValidationPipe,
+  Public,
+  Roles,
+  resolveCtxUser,
+  toRpc,
+} from "@nebula/grpc-auth";
 import { media } from "@nebula/protos";
-import type { ListMediaDto } from "../dto";
+import {
+  ListMediaDto,
+  MyProtectedReadUrlGrpcDto,
+  PublicLibraryDeleteConfirmDto,
+  PublicLibraryDeletePreviewDto,
+} from "../dto";
 
 type GrpcPresignOutput = {
   storage?: string | null;
@@ -30,6 +41,8 @@ type GrpcPresignOutput = {
   entityId?: string | null;
   ownerId?: string | null;
 };
+
+const Pipe = createGrpcValidationPipe();
 
 @Controller()
 export class MediaGrpcController {
@@ -52,7 +65,7 @@ export class MediaGrpcController {
   }
 
   private listInput(
-    req: media.ListReq,
+    req: Partial<Omit<media.ListReq, "$type">>,
     ctx: { userId?: string | null; role?: string },
     overrides: Partial<ListMediaDto> = {},
   ): ListMediaDto {
@@ -88,6 +101,21 @@ export class MediaGrpcController {
       scanStatus:
         overrides.scanStatus ??
         (req.scanStatus?.trim() ? req.scanStatus.trim() : undefined),
+      search:
+        overrides.search ??
+        (req.search?.trim() ? req.search.trim() : undefined),
+      path: overrides.path ?? (req.path?.trim() ? req.path.trim() : undefined),
+      mimeType:
+        overrides.mimeType ??
+        (req.mimeType?.trim() ? req.mimeType.trim() : undefined),
+      mediaType:
+        overrides.mediaType ??
+        (req.mediaType?.trim() ? req.mediaType.trim() : undefined),
+      sortBy:
+        overrides.sortBy ??
+        (req.sortBy?.trim() ? req.sortBy.trim() : undefined),
+      order:
+        overrides.order ?? (req.order?.trim() ? req.order.trim() : undefined),
     };
   }
 
@@ -378,6 +406,27 @@ export class MediaGrpcController {
     return media.ListRes.create({ items: out.files.map(toProtoMedia) });
   }
 
+  @UsePipes(Pipe)
+  @Roles("user", "admin", "root-admin")
+  @GrpcMethod("MediaService", "ListMyProtectedLibrary")
+  async listMyProtectedLibrary(
+    req: ListMediaDto,
+    meta: Metadata,
+  ): Promise<media.ListRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx?.userId)
+      throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.browseProtectedFilemanager(
+      this.listInput(req, ctx, {
+        ownerId: ctx.userId,
+        accessClass: "PROTECTED",
+        visibility: "private",
+      }),
+    );
+    return media.ListRes.create({ items: out.files.map(toProtoMedia) });
+  }
+
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "PresignPublicLibraryUpload")
   async presignPublicLibraryUpload(
@@ -537,6 +586,29 @@ export class MediaGrpcController {
     return this.readUrlResponse(out);
   }
 
+  @UsePipes(Pipe)
+  @Roles("user", "admin", "root-admin")
+  @GrpcMethod("MediaService", "CreateMyProtectedReadUrl")
+  async createMyProtectedReadUrl(
+    req: MyProtectedReadUrlGrpcDto,
+    meta: Metadata,
+  ): Promise<media.ReadUrlRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx?.userId)
+      throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.createProtectedFeatureReadUrl(req.id, {
+      ownerId: ctx.userId,
+      actorUserId: ctx.userId,
+      actorRole: ctx.role ?? null,
+      scope: req.scope,
+      entityType: req.entityType,
+      entityId: req.entityId,
+      download: req.download,
+    });
+    return this.readUrlResponse(out);
+  }
+
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "DeletePublicLibraryById")
   async deletePublicLibraryById(
@@ -574,6 +646,84 @@ export class MediaGrpcController {
 
     const deleted = await this.svc.deleteStrictLibraryById(req.id);
     return media.DeleteRes.create({ deleted });
+  }
+
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "PreviewPublicLibraryDelete")
+  async previewPublicLibraryDelete(
+    req: PublicLibraryDeletePreviewDto,
+    meta: Metadata,
+  ): Promise<media.PreviewPublicLibraryDeleteRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx?.userId)
+      throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.previewPublicLibraryDelete({
+      ...req,
+      actorUserId: ctx.userId,
+      actorRole: ctx.role ?? null,
+    });
+    return media.PreviewPublicLibraryDeleteRes.create({
+      scope: out.scope,
+      recursive: out.recursive,
+      canDelete: out.canDelete,
+      warnings: out.warnings.map((warning) => ({
+        code: warning.code,
+        folderPath: warning.folderPath ?? "",
+        fileCount: warning.fileCount ?? 0,
+        limit: warning.limit ?? 0,
+      })),
+      fileCount: out.fileCount,
+      folderCount: out.folderCount,
+      totalSizeBytes: out.totalSizeBytes.toString(),
+      folders: out.folders.map((folder) => ({
+        type: folder.type,
+        folderPath: folder.folderPath,
+        fileCount: folder.fileCount,
+      })),
+      files: out.files.map((file) => ({
+        type: file.type,
+        id: file.id,
+        folderPath: file.folderPath,
+        displayName: file.displayName,
+        path: file.path,
+        sizeBytes: file.sizeBytes.toString(),
+        mimeType: file.mimeType,
+      })),
+      confirmToken:
+        "confirmToken" in out && typeof out.confirmToken === "string"
+          ? out.confirmToken
+          : "",
+      expiresIn:
+        "expiresIn" in out && typeof out.expiresIn === "number"
+          ? out.expiresIn
+          : 0,
+    });
+  }
+
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("MediaService", "ConfirmPublicLibraryDelete")
+  async confirmPublicLibraryDelete(
+    req: PublicLibraryDeleteConfirmDto,
+    meta: Metadata,
+  ): Promise<media.ConfirmPublicLibraryDeleteRes> {
+    const ctx = resolveCtxUser(meta);
+    if (!ctx?.userId)
+      throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+
+    const out = await this.svc.confirmPublicLibraryDelete({
+      ...req,
+      actorUserId: ctx.userId,
+      actorRole: ctx.role ?? null,
+    });
+    return media.ConfirmPublicLibraryDeleteRes.create({
+      deleted: out.deleted,
+      fileCount: out.fileCount,
+      folderCount: out.folderCount,
+      totalSizeBytes: out.totalSizeBytes.toString(),
+    });
   }
 }
 

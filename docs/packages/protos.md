@@ -28,7 +28,8 @@ Important files:
 
 Current source proto files:
 
-- `auth.proto`: AuthService token validation, token issuing, refresh, and profile lookup.
+- `auth.proto`: AuthService registration, token issuing/validation, refresh,
+  logout, and profile lookup.
 - `user.proto`: UserService user lookup, profile update, and auth-facing user/hash methods.
 - `settings.proto`: SettingsService string key-value reads, writes, and deletes.
 - `taxonomy.proto`: TaxonomyService canonical taxonomy CRUD/list/get-by-slug.

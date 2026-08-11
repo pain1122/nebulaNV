@@ -18,22 +18,32 @@ import {
 } from "./context";
 import {
   ALLOWED_S2S_CALLERS_KEY,
+  ALLOWED_S2S_IDENTITIES_KEY,
+  type AllowedS2SIdentity,
   INTERNAL_ONLY_KEY,
   IS_PUBLIC_KEY,
   PUBLIC_FLAGS_KEY,
   type PublicFlags,
 } from "./public.decorator";
 import {
-  S2S_PROTOCOL_VERSION,
+  S2S_PROTOCOL_VERSION_V2,
+  S2S_PROTOCOL_VERSION_V3,
   verifyS2SSignature,
   type S2SCallerKind,
   type S2SSignedEnvelope,
 } from "./s2s.crypto";
+import {
+  decodeS2SSignedContext,
+  requestContextFromSigned,
+  type S2SSignedContext,
+} from "./s2s-context";
 import { S2SReplayStore } from "./s2s-replay.store";
 import { getS2SServerContext } from "./s2s.transport";
 import {
   X_REQUEST_ID_HEADER,
   X_S2S_BODY_SHA256_HEADER,
+  X_S2S_CONTEXT_HEADER,
+  X_S2S_CONTEXT_SHA256_HEADER,
   X_S2S_ISSUED_AT_HEADER,
   X_S2S_KEY_ID_HEADER,
   X_S2S_KIND_HEADER,
@@ -60,6 +70,7 @@ type HttpRequest = HttpRequestWithContext & {
 const SAFE_FIELD = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$/;
 const SAFE_PATH = /^\/[A-Za-z0-9][A-Za-z0-9._:@/-]{0,254}$/;
 const HEX_64 = /^[a-f0-9]{64}$/i;
+const LOWER_HEX_64 = /^[a-f0-9]{64}$/;
 
 @Injectable()
 export class S2SGuard implements CanActivate {
@@ -120,8 +131,46 @@ export class S2SGuard implements CanActivate {
     }
 
     const version = values.get(X_S2S_VERSION_HEADER)!;
-    if (version !== S2S_PROTOCOL_VERSION) {
+    if (
+      version !== S2S_PROTOCOL_VERSION_V2 &&
+      version !== S2S_PROTOCOL_VERSION_V3
+    ) {
       return this.unauthenticated(ctx, "s2s_version_unsupported");
+    }
+
+    const contextValues = metadata.get(X_S2S_CONTEXT_HEADER);
+    const contextDigestValues = metadata.get(X_S2S_CONTEXT_SHA256_HEADER);
+    let signedContext: S2SSignedContext | undefined;
+    let contextSha256: string | undefined;
+    if (version === S2S_PROTOCOL_VERSION_V2) {
+      if (contextValues.length > 0 || contextDigestValues.length > 0) {
+        return this.unauthenticated(ctx, "s2s_context_not_allowed_for_v2");
+      }
+    } else {
+      const encodedContext = this.singleHeader(metadata, X_S2S_CONTEXT_HEADER);
+      contextSha256 = this.singleHeader(metadata, X_S2S_CONTEXT_SHA256_HEADER);
+      if (!encodedContext) {
+        return this.unauthenticated(ctx, "s2s_context_missing_or_duplicate");
+      }
+      if (!contextSha256) {
+        return this.unauthenticated(
+          ctx,
+          "s2s_context_digest_missing_or_duplicate",
+        );
+      }
+      if (!LOWER_HEX_64.test(contextSha256)) {
+        return this.unauthenticated(ctx, "s2s_context_digest_invalid");
+      }
+      let decoded;
+      try {
+        decoded = decodeS2SSignedContext(encodedContext);
+      } catch {
+        return this.unauthenticated(ctx, "s2s_context_invalid");
+      }
+      if (decoded.sha256 !== contextSha256.toLowerCase()) {
+        return this.unauthenticated(ctx, "s2s_context_digest_mismatch");
+      }
+      signedContext = decoded.context;
     }
 
     const kindValue = values.get(X_S2S_KIND_HEADER)!;
@@ -129,6 +178,9 @@ export class S2SGuard implements CanActivate {
       return this.unauthenticated(ctx, "s2s_kind_invalid");
     }
     const kind: S2SCallerKind = kindValue;
+    if (kind === "gateway" && version !== S2S_PROTOCOL_VERSION_V3) {
+      return this.unauthenticated(ctx, "s2s_context_required_for_gateway");
+    }
     const caller = values.get(X_SVC_HEADER)!;
     const target = values.get(X_S2S_TARGET_HEADER)!;
     const method = values.get(X_S2S_METHOD_HEADER)!;
@@ -214,19 +266,35 @@ export class S2SGuard implements CanActivate {
     const key = this.selectKey(keySet.current, keySet.previous, keyId, now);
     if (!key) return this.unauthenticated(ctx, "s2s_key_unknown_or_expired");
 
-    const envelope: S2SSignedEnvelope = {
-      version: S2S_PROTOCOL_VERSION,
-      kind,
-      caller,
-      target,
-      method,
-      path,
-      issuedAtMs,
-      nonce,
-      requestId,
-      keyId,
-      bodySha256,
-    };
+    const envelope: S2SSignedEnvelope =
+      version === S2S_PROTOCOL_VERSION_V3
+        ? {
+            version,
+            kind,
+            caller,
+            target,
+            method,
+            path,
+            issuedAtMs,
+            nonce,
+            requestId,
+            keyId,
+            bodySha256,
+            contextSha256: contextSha256!,
+          }
+        : {
+            version,
+            kind,
+            caller,
+            target,
+            method,
+            path,
+            issuedAtMs,
+            nonce,
+            requestId,
+            keyId,
+            bodySha256,
+          };
     if (!verifyS2SSignature(key.secret, envelope, signature)) {
       return this.unauthenticated(ctx, "s2s_signature_invalid");
     }
@@ -247,6 +315,20 @@ export class S2SGuard implements CanActivate {
       return this.forbidden(ctx, "s2s_caller_not_allowed_for_route");
     }
 
+    const allowedIdentities =
+      this.reflector.getAllAndOverride<readonly AllowedS2SIdentity[]>(
+        ALLOWED_S2S_IDENTITIES_KEY,
+        [ctx.getHandler?.(), ctx.getClass?.()],
+      ) ?? [];
+    if (
+      allowedIdentities.length > 0 &&
+      !allowedIdentities.some(
+        (identity) => identity.kind === kind && identity.caller === caller,
+      )
+    ) {
+      return this.forbidden(ctx, "s2s_identity_not_allowed_for_route");
+    }
+
     const replayTtlMs = Math.max(1_000, issuedAtMs + maxSkewMs - now + 1_000);
     let claimed: boolean;
     try {
@@ -259,7 +341,7 @@ export class S2SGuard implements CanActivate {
     }
     if (!claimed) return this.unauthenticated(ctx, "s2s_request_replayed");
 
-    this.attachVerifiedCaller(ctx, caller, kind, requestId);
+    this.attachVerifiedCaller(ctx, caller, kind, requestId, signedContext);
     return true;
   }
 
@@ -314,12 +396,21 @@ export class S2SGuard implements CanActivate {
     svc: string,
     svcKind: S2SCallerKind,
     requestId: string,
+    signedContext?: S2SSignedContext,
   ): void {
     const attach = (carrier: ContextCarrier | undefined) => {
       if (!carrier) return;
       carrier.svc = svc;
       carrier.svcKind = svcKind;
       carrier.requestId = requestId;
+      if (signedContext) {
+        carrier.requestContext = requestContextFromSigned(signedContext);
+        if (signedContext.actor) carrier.signedActor = signedContext.actor;
+        else delete carrier.signedActor;
+      } else {
+        delete carrier.requestContext;
+        delete carrier.signedActor;
+      }
     };
 
     if (ctx.getType<"http" | "rpc">() === "http") {

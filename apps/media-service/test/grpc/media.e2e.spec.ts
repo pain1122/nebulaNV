@@ -1,4 +1,5 @@
 // apps/media-service/test/grpc/media.e2e.spec.ts
+import { status } from "@grpc/grpc-js";
 import { httpJson } from "../utils/http";
 import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
 
@@ -8,7 +9,21 @@ const AUTH_HTTP_URL = process.env.AUTH_HTTP_URL || "http://127.0.0.1:3001";
 
 type LoginResponse = { accessToken: string };
 
+function subFromJwt(token: string): string {
+  const [, payload] = token.split(".");
+  if (!payload) throw new Error("jwt_payload_missing");
+  const decoded = JSON.parse(
+    Buffer.from(payload, "base64url").toString("utf8"),
+  ) as { sub?: string };
+  if (!decoded.sub) throw new Error("jwt_sub_missing");
+  return decoded.sub;
+}
+
 describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
+  let adminAccess = "";
+  let userAccess = "";
+  let userId = "";
+
   beforeAll(async () => {
     process.env.SVC_NAME = "bucket";
     const login = await httpJson<LoginResponse>(
@@ -19,7 +34,19 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
         password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
       },
     );
+    adminAccess = login.accessToken;
     setS2STestActorToken(login.accessToken);
+
+    const userLogin = await httpJson<LoginResponse>(
+      "POST",
+      `${AUTH_HTTP_URL}/auth/login`,
+      {
+        identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
+        password: process.env.SEED_USER_PASS ?? "User123!",
+      },
+    );
+    userAccess = userLogin.accessToken;
+    userId = subFromJwt(userAccess);
   });
 
   const client = loadClient<any>({
@@ -542,6 +569,159 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
         mdS2S({ role: "admin" }),
       ),
     ).rejects.toBeTruthy();
+  });
+
+  it("derives the protected-library owner from the verified actor", async () => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const entityId = `product_${suffix}`;
+    let id: string | undefined;
+
+    try {
+      const created = await call<any>(
+        client,
+        "Create",
+        {
+          storage: "local",
+          path: `protected/test/grpc_owned_${suffix}.webp`,
+          filename: `grpc_owned_${suffix}.webp`,
+          mimeType: "image/webp",
+          sizeBytes: "5",
+          ownerId: userId,
+          visibility: "private",
+          accessClass: "PROTECTED",
+          scope: "product-media",
+          entityType: "product",
+          entityId,
+        },
+        mdS2S({ role: "admin" }),
+      );
+      id = created.media.id;
+
+      const userList = await call<any>(
+        client,
+        "ListMyProtectedLibrary",
+        {
+          take: 20,
+          scope: "product-media",
+          entityType: "product",
+          entityId,
+        },
+        mdS2S({ accessToken: userAccess, role: "user" }),
+      );
+      expect(userList.items.some((item: any) => item.id === id)).toBe(true);
+
+      const adminList = await call<any>(
+        client,
+        "ListMyProtectedLibrary",
+        {
+          take: 20,
+          scope: "product-media",
+          entityType: "product",
+          entityId,
+        },
+        mdS2S({ accessToken: adminAccess, role: "admin" }),
+      );
+      expect(adminList.items.some((item: any) => item.id === id)).toBe(false);
+
+      await expect(
+        call<any>(
+          client,
+          "CreateMyProtectedReadUrl",
+          {
+            id,
+            scope: "product-media",
+            entityType: "product",
+            entityId,
+          },
+          mdS2S({ accessToken: userAccess, role: "user" }),
+        ),
+      ).rejects.toMatchObject({ code: status.INVALID_ARGUMENT });
+    } finally {
+      if (id) {
+        await call<any>(
+          client,
+          "DeleteById",
+          { id },
+          mdS2S({ role: "admin" }),
+        ).catch(() => undefined);
+      }
+    }
+  });
+
+  it("requires admin preview and a bound token before public-library deletion", async () => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const folderPath = `/test/grpc_delete_${suffix}`;
+    let id: string | undefined;
+
+    try {
+      const created = await call<any>(
+        client,
+        "Create",
+        {
+          storage: "local",
+          path: `uploads${folderPath}/hero.webp`,
+          folderPath,
+          displayName: "hero.webp",
+          filename: "hero.webp",
+          mimeType: "image/webp",
+          sizeBytes: "5",
+          visibility: "public",
+          accessClass: "PUBLIC",
+          scope: "panel",
+        },
+        mdS2S({ role: "admin" }),
+      );
+      id = created.media.id;
+      const items = [{ type: "file", id }];
+
+      await expect(
+        call<any>(
+          client,
+          "PreviewPublicLibraryDelete",
+          { items, recursive: false, scope: "panel" },
+          mdS2S({ accessToken: userAccess, role: "user" }),
+        ),
+      ).rejects.toMatchObject({ code: status.PERMISSION_DENIED });
+
+      const preview = await call<any>(
+        client,
+        "PreviewPublicLibraryDelete",
+        { items, recursive: false, scope: "panel" },
+        mdS2S({ role: "admin" }),
+      );
+      expect(preview.canDelete).toBe(true);
+      expect(preview.fileCount).toBe(1);
+      expect(preview.totalSizeBytes).toBe("5");
+      expect(preview.confirmToken).toBeTruthy();
+
+      const confirmed = await call<any>(
+        client,
+        "ConfirmPublicLibraryDelete",
+        {
+          items,
+          recursive: false,
+          scope: "panel",
+          confirmToken: preview.confirmToken,
+        },
+        mdS2S({ role: "admin" }),
+      );
+      expect(confirmed).toEqual({
+        deleted: true,
+        fileCount: 1,
+        folderCount: 0,
+        totalSizeBytes: "5",
+      });
+      id = undefined;
+    } finally {
+      if (id) {
+        await call<any>(
+          client,
+          "DeleteById",
+          { id },
+          mdS2S({ role: "admin" }),
+        ).catch(() => undefined);
+      }
+    }
   });
 
   it("FinalizeUpload rejects descriptive protected/strict private paths", async () => {

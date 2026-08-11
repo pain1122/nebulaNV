@@ -1,8 +1,11 @@
 import * as Joi from "joi";
 import {
   ENV_GATEWAY_INBOUND_KEYS,
+  ENV_GATEWAY_OUTBOUND_KEYS,
   ENV_S2S_INBOUND_KEYS,
   ENV_S2S_OUTBOUND_KEYS,
+  GATEWAY_OUTBOUND_TARGETS,
+  parseExactOutboundKeyMap,
   parseInboundKeyMap,
   parseOutboundKeyMap,
   PublicModes,
@@ -62,5 +65,25 @@ export function s2sEnvSchema(serviceName: string) {
     REDIS_HOST: Joi.string().hostname().default("127.0.0.1"),
     REDIS_PORT: Joi.number().integer().min(1).max(65_535).default(6_379),
     REDIS_PASSWORD: Joi.string().allow("").optional(),
+  };
+}
+
+/**
+ * Startup schema for an HTTP gateway that only signs outbound gRPC calls.
+ * It deliberately excludes inbound trust, replay storage, public HTTP policy,
+ * and listener configuration owned by hybrid receiving services.
+ */
+export function gatewayOutboundEnvSchema(
+  requiredTargets: readonly string[] = GATEWAY_OUTBOUND_TARGETS,
+) {
+  return {
+    S2S_SIGNATURE_HEADER: Joi.string()
+      .lowercase()
+      .pattern(/^[a-z0-9][a-z0-9-]{0,62}$/)
+      .default(S2S_SIGNATURE_HEADER_DEFAULT),
+    GATEWAY_OUTBOUND_KEYS: keyMap(
+      (raw, envName) => parseExactOutboundKeyMap(raw, envName, requiredTargets),
+      ENV_GATEWAY_OUTBOUND_KEYS,
+    ),
   };
 }

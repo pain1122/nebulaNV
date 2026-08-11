@@ -58,6 +58,33 @@ export class UserGrpcController {
   }
 
   @Roles('admin', 'root-admin')
+  @GrpcMethod('UserService', 'ListUsers')
+  async listUsers(
+    _data: userv1.ListUsersRequest,
+    meta: Metadata,
+    call: RpcContextWithContext,
+  ): Promise<userv1.ListUsersResponse> {
+    const ctxUser = this.verifiedCtxUser(meta, call);
+    if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, 'Missing user context');
+    if (ctxUser.role !== 'admin' && ctxUser.role !== 'root-admin') {
+      throw toRpc(status.PERMISSION_DENIED, 'admin_only');
+    }
+
+    const users = await this.users.getAllUsers({ role: ctxUser.role });
+    return userv1.ListUsersResponse.create({
+      users: users.map((user) =>
+        userv1.UserListItem.create({
+          id: user.id,
+          email: user.email ?? '',
+          phone: user.phone ?? '',
+          role: user.role,
+          createdAt: user.createdAt.toISOString(),
+        }),
+      ),
+    });
+  }
+
+  @Roles('admin', 'root-admin')
   @GrpcMethod('UserService', 'FindUser')
   async findUser(
     data: userv1.FindUserRequest,

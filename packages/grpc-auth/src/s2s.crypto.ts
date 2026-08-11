@@ -1,12 +1,14 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
-export const S2S_PROTOCOL_VERSION = "2" as const;
+export const S2S_PROTOCOL_VERSION_V2 = "2" as const;
+export const S2S_PROTOCOL_VERSION_V3 = "3" as const;
+/** The context-free default remains v2 for ordinary service callers. */
+export const S2S_PROTOCOL_VERSION = S2S_PROTOCOL_VERSION_V2;
 export const S2S_BODY_DIGEST_ALGORITHM = "sha256" as const;
 
 export type S2SCallerKind = "service" | "gateway";
 
-export type S2SSignedEnvelope = {
-  version: typeof S2S_PROTOCOL_VERSION;
+type S2SSignedEnvelopeBase = {
   kind: S2SCallerKind;
   caller: string;
   target: string;
@@ -18,6 +20,17 @@ export type S2SSignedEnvelope = {
   keyId: string;
   bodySha256: string;
 };
+
+export type S2SSignedEnvelopeV2 = S2SSignedEnvelopeBase & {
+  version: typeof S2S_PROTOCOL_VERSION_V2;
+};
+
+export type S2SSignedEnvelopeV3 = S2SSignedEnvelopeBase & {
+  version: typeof S2S_PROTOCOL_VERSION_V3;
+  contextSha256: string;
+};
+
+export type S2SSignedEnvelope = S2SSignedEnvelopeV2 | S2SSignedEnvelopeV3;
 
 type CanonicalValue =
   | null
@@ -102,7 +115,7 @@ export function digestS2SBytes(body: Uint8Array): string {
 
 /** A JSON array avoids the delimiter ambiguity of the former colon payload. */
 export function canonicalS2SPayload(envelope: S2SSignedEnvelope): string {
-  return JSON.stringify([
+  const payload: Array<string | number> = [
     "nebula-s2s",
     envelope.version,
     envelope.kind,
@@ -115,7 +128,11 @@ export function canonicalS2SPayload(envelope: S2SSignedEnvelope): string {
     envelope.requestId,
     envelope.keyId,
     envelope.bodySha256,
-  ]);
+  ];
+  if (envelope.version === S2S_PROTOCOL_VERSION_V3) {
+    payload.push(envelope.contextSha256);
+  }
+  return JSON.stringify(payload);
 }
 
 export function signS2S(secret: string, envelope: S2SSignedEnvelope): string {

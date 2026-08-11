@@ -1,6 +1,6 @@
 # Media Service
 
-Last reviewed: 2026-06-29
+Last reviewed: 2026-08-11
 
 ## Purpose
 
@@ -31,7 +31,9 @@ This is the current implemented lane.
 
 Rules:
 
-- HTTP and gRPC media actions are restricted to `admin/root-admin`.
+- Administrative HTTP and gRPC media actions are restricted to
+  `admin/root-admin`; the explicit `my/protected-library` list/read paths allow
+  authenticated users and derive ownership from verified actor context.
 - The public filemanager lane uses `MEDIA_PUBLIC_FOLDER`, currently `uploads`.
 - Admin-facing `folderPath` is relative to `MEDIA_PUBLIC_FOLDER`.
 - Example: `folderPath = "/images/products"` and `displayName = "hero.webp"` becomes storage key `uploads/images/products/hero.webp`.
@@ -350,6 +352,7 @@ Methods:
 - `ListPublicLibrary`
 - `ListProtectedLibrary`
 - `ListStrictLibrary`
+- `ListMyProtectedLibrary`
 - `PresignPublicLibraryUpload`
 - `PresignProtectedLibraryUpload`
 - `PresignStrictLibraryUpload`
@@ -359,9 +362,12 @@ Methods:
 - `CreatePublicLibraryReadUrl`
 - `CreateProtectedLibraryReadUrl`
 - `CreateStrictLibraryReadUrl`
+- `CreateMyProtectedReadUrl`
 - `DeletePublicLibraryById`
 - `DeleteProtectedLibraryById`
 - `DeleteStrictLibraryById`
+- `PreviewPublicLibraryDelete`
+- `ConfirmPublicLibraryDelete`
 
 Notes:
 
@@ -370,9 +376,11 @@ Notes:
 - `Media`, `CreateReq`, `ListReq`, `PresignUploadReq/Res`, and `FinalizeUploadReq` carry `entityType` and `entityId` for protected/strict business context.
 - Generic `PresignUpload`/`FinalizeUpload` remain compatibility paths. Explicit public/protected/strict RPC methods are preferred for backend jobs and filemanager lane calls.
 - Protected/strict lane RPCs force private/opaque-key behavior through media-service methods and require owner/scope/entity context.
+- `ListMyProtectedLibrary` and `CreateMyProtectedReadUrl` omit owner/access/visibility authority from their wire requests. The controller derives the owner from verified actor context, fixes the lane to `PROTECTED`/`private`, and reuses the service's exact scope/entity checks.
+- `PreviewPublicLibraryDelete` and `ConfirmPublicLibraryDelete` reuse the HTTP path's bounded plan, actor/role-bound short-lived token, plan re-check, and synchronous deletion cap. The legacy direct public delete RPC remains for internal compatibility; the F3 gateway manifest exposes only preview/confirm.
 - `ListReq.status` and `ListReq.scanStatus` are mapped by `media-grpc.controller.ts`.
 - `Ping` is currently used for stronger gRPC readiness in media-service tests.
-- Media gRPC methods are protected by S2S/auth guard behavior, with admin/root-admin roles on media actions.
+- Media gRPC methods are protected by S2S/auth guard behavior. Administrative actions require admin/root-admin; the two explicit owned protected methods also allow a user and derive ownership from verified actor context.
 
 ## Important Env
 
@@ -496,6 +504,8 @@ gRPC:
 - Public filemanager storage key and metadata echoes are asserted.
 - Protected/strict filemanager uploads and descriptive protected/strict paths are rejected.
 - Lane-specific public/protected/strict presign RPCs are covered for public key shape, required protected context, protected opaque keys, and strict filename privacy.
+- Focused controller tests prove owned list/read actor derivation, fixed protected/private lane values, admin-only delete preview/confirm, actor forwarding, response mapping, missing-context denial, and strict DTO rejection.
+- The live gRPC suite includes actor-derived owned list/read and two-step public delete scenarios. Their updated execution remains assigned to the later service-stack checkpoint.
 
 ## Related Files
 
@@ -533,6 +543,7 @@ Tests:
 
 - `apps/media-service/test/http/media.http.e2e.spec.ts`
 - `apps/media-service/test/media.service.access.spec.ts`
+- `apps/media-service/test/media-grpc-gateway-contracts.unit.spec.ts`
 - `apps/media-service/test/grpc/media.e2e.spec.ts`
 - `apps/media-service/test/grpc/helpers.ts`
 - `apps/media-service/test/setup/wait-for-services.ts`
@@ -554,9 +565,10 @@ Tests:
 
 ## Latest Verification
 
-- `pnpm --filter @nebula/media-service build` passes as of 2026-07-01.
+- `pnpm --filter @nebula/media-service build` passes as of 2026-08-11.
+- The focused gateway-contract and existing access-policy unit suites pass 21 tests as of 2026-08-11; media-service type-check and focused lint also pass.
 - `pnpm --filter @nebula/media-service test:unit` passes with 13 tests as of 2026-07-15, including explicit public-render denial for `PROTECTED` and `STRICT` media.
 - `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/http/media.http.e2e.spec.ts --runInBand` passes with 20 tests as of 2026-07-01 when `DATABASE_URL` points at Docker Postgres on `127.0.0.1:15432`.
 - The HTTP e2e suite now includes a strict-media public-render denial assertion; its updated live run is queued for the later Docker-backed verification step.
-- `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand` passes with 9 tests as of 2026-07-01.
+- `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand` last passed its prior 9-test form on 2026-07-01. The suite now contains 11 scenarios; the two additive F3 scenarios are compiled but await the later service-stack run.
 - `pnpm --filter @nebula/media-service lint` is intentionally left for the later `lint:fix` cleanup pass and currently fails on Prettier formatting in modified media files.

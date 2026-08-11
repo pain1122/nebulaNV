@@ -1,17 +1,18 @@
 import { Controller, UseGuards, Logger } from '@nestjs/common';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { Metadata, status } from '@grpc/grpc-js';
+import { isEmail } from 'class-validator';
 import { GrpcAuthService } from './grpc-auth.service';
 import { AuthService } from '../auth.service';
 import { authv1, userv1 } from '@nebula/protos';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import {
   Public,
+  GatewayOnly,
   Roles,
   toRpc,
   resolveCtxUser,
-  InternalOnly,
-  AllowedS2SCallers,
+  AllowedS2SIdentities,
   type RpcContextWithContext,
 } from '@nebula/grpc-auth';
 import { AuthUserDto, toAuthRole } from '../auth.types';
@@ -20,9 +21,13 @@ import { AccessTokenValidationService } from '../token/access-token-validation.s
 
 type ValidateUserRequest = authv1.ValidateUserRequest;
 type ValidateUserResponse = authv1.ValidateUserResponse;
+type RegisterRequest = authv1.RegisterRequest;
+type RegisterResponse = authv1.RegisterResponse;
 type GetTokensRequest = authv1.GetTokensRequest;
 type GetTokensResponse = authv1.GetTokensResponse;
 type RefreshTokensRequest = authv1.RefreshTokensRequest;
+type LogoutRequest = authv1.LogoutRequest;
+type LogoutResponse = authv1.LogoutResponse;
 type ValidateTokenRequest = authv1.ValidateTokenRequest;
 type ValidateTokenResponse = authv1.ValidateTokenResponse;
 
@@ -77,6 +82,21 @@ export class AuthGrpcController {
 
   // ---------------------- PUBLIC ----------------------
   @Public({ gatewayOnly: true })
+  @GrpcMethod('AuthService', 'Register')
+  async register(data: RegisterRequest): Promise<RegisterResponse> {
+    const email = data.email?.trim();
+    if (!email || !isEmail(email)) {
+      throw toRpc(status.INVALID_ARGUMENT, 'validation_failed:email');
+    }
+    if (typeof data.password !== 'string' || data.password.length < 6) {
+      throw toRpc(status.INVALID_ARGUMENT, 'validation_failed:password');
+    }
+
+    const user = await this.authService.register(email, data.password);
+    return authv1.RegisterResponse.create(user);
+  }
+
+  @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'ValidateUser')
   async validateUser(data: ValidateUserRequest): Promise<ValidateUserResponse> {
     try {
@@ -125,18 +145,16 @@ export class AuthGrpcController {
       role: toAuthRole(uw.role),
     };
 
-    const { accessToken, refreshToken } = await this.authService.login(user);
-
-    return authv1.GetTokensResponse.create({ accessToken, refreshToken });
+    return authv1.GetTokensResponse.create(await this.authService.login(user));
   }
 
   @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'RefreshTokens')
   async refreshTokens(data: RefreshTokensRequest): Promise<GetTokensResponse> {
     try {
-      const { accessToken, refreshToken } =
-        await this.authService.refreshTokens(data.refreshToken);
-      return authv1.GetTokensResponse.create({ accessToken, refreshToken });
+      return authv1.GetTokensResponse.create(
+        await this.authService.refreshTokens(data.refreshToken),
+      );
     } catch (err: unknown) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,
@@ -145,18 +163,51 @@ export class AuthGrpcController {
     }
   }
 
+  @GatewayOnly()
+  @Roles('user', 'admin', 'root-admin')
+  @UseGuards(JwtAuthGuard)
+  @GrpcMethod('AuthService', 'Logout')
+  async logout(
+    data: LogoutRequest,
+    meta: Metadata,
+    call: RpcContextWithContext,
+  ): Promise<LogoutResponse> {
+    const token = this.requireBearer(meta);
+    const ctx = resolveCtxUser(meta, call);
+    if (!ctx?.userId || !ctx.sessionRef) {
+      throw toRpc(status.UNAUTHENTICATED, 'missing_user_context');
+    }
+
+    const validation = await this.accessTokens.validate(token);
+    if (
+      !validation.valid ||
+      validation.payload.sub !== ctx.userId ||
+      validation.sessionRef !== ctx.sessionRef
+    ) {
+      throw toRpc(status.UNAUTHENTICATED, 'actor_session_mismatch');
+    }
+
+    await this.authService.logout({
+      userId: validation.payload.sub,
+      sessionId: validation.payload.sid,
+      refreshToken: data.refreshToken || undefined,
+      allDevices: data.allDevices,
+    });
+    return authv1.LogoutResponse.create({ success: true });
+  }
+
   // PUBLIC: used by guards/services to validate AT
   @Public()
-  @InternalOnly()
-  @AllowedS2SCallers(
-    'auth-service',
-    'user-service',
-    'settings-service',
-    'blog-service',
-    'product-service',
-    'media-service',
-    'taxonomy-service',
-    'order-service',
+  @AllowedS2SIdentities(
+    { kind: 'gateway', caller: 'gateway' },
+    { kind: 'service', caller: 'auth-service' },
+    { kind: 'service', caller: 'user-service' },
+    { kind: 'service', caller: 'settings-service' },
+    { kind: 'service', caller: 'blog-service' },
+    { kind: 'service', caller: 'product-service' },
+    { kind: 'service', caller: 'media-service' },
+    { kind: 'service', caller: 'taxonomy-service' },
+    { kind: 'service', caller: 'order-service' },
   )
   @GrpcMethod('AuthService', 'ValidateToken')
   async validateToken(

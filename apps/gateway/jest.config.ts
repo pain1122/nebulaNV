@@ -7,6 +7,7 @@ const config: Config = {
   testMatch: ["**/*.spec.ts"],
   moduleFileExtensions: ["ts", "js", "json"],
   moduleNameMapper: {
+    "^@nebula/grpc-auth$": "<rootDir>/../../packages/grpc-auth/index.ts",
     "^@packages/config$": "<rootDir>/../../packages/config/src/index.ts",
   },
   transform: {

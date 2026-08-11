@@ -1,6 +1,6 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-08-10
+Last updated: 2026-08-11
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
 ## 1. Collaboration Contract
@@ -33,10 +33,38 @@ Purpose: fast, safe handoff for AI/developer sessions without re-discovering the
 - Do not change service contracts without checking the related DTO, controller, gRPC controller, proto, tests, and Prisma shape.
 - Do not treat generated/build/vendor/log artifacts as source of truth.
 
+### Failure-Oriented Design Review
+
+Do not plan architecture or security from certainty that every layer will hold.
+For each material boundary or design decision, explicitly review:
+
+1. **Prevention:** what stops the failure under normal operation;
+2. **Detection:** how the system or operator learns that it happened;
+3. **Containment:** the maximum blast radius when the layer fails;
+4. **Fail state:** whether failure is closed, safely degraded, or accidentally
+   permissive;
+5. **Recovery:** how configuration, keys, sessions, service, or data return to a
+   trusted state;
+6. **Common-mode failure:** whether apparently independent protections rely on
+   the same component, credential, configuration, or authority;
+7. **Evidence:** the focused denial, fault, recovery, or integration test that
+   proves the claimed behavior;
+8. **Residual risk:** what remains possible and which milestone owns it.
+
+Apply this review to the structure as a whole, not only to individual input
+checks. Never claim that a public client identifier, gateway decision, signed
+workload assertion, network boundary, or role allowlist alone proves human
+authorization. Preserve independent Auth and domain-service enforcement so a
+gateway failure does not automatically defeat every layer. State plainly when
+the current phase is safe only because a later capability, such as multi-site
+operation, remains disabled until its isolation work is complete.
+
 ## 3. Project Snapshot
 
 - Stack: NestJS microservices plus Next.js web app in a pnpm monorepo.
-- Backend apps: `auth-service`, `user-service`, `product-service`, `settings-service`, `taxonomy-service`, `order-service`, `blog-service`, `media-service`.
+- Backend apps: HTTP-only `gateway` plus the hybrid `auth-service`,
+  `user-service`, `product-service`, `settings-service`, `taxonomy-service`,
+  `order-service`, `blog-service`, and `media-service`.
 - Frontend app: `web`.
 - Shared packages: `grpc-auth`, `clients`, `config`, `protos`.
 - Runtime target: Node `>=22`, pnpm `10.17.1`.
@@ -150,6 +178,7 @@ console.log("safe multiline script")
 
 | Service          | HTTP |  gRPC |
 | ---------------- | ---: | ----: |
+| gateway          | 3002 |     - |
 | user-service     | 3100 | 50051 |
 | auth-service     | 3001 | 50052 |
 | product-service  | 3003 | 50053 |

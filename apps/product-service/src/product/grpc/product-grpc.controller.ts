@@ -1,8 +1,16 @@
 import { Controller, Logger, UsePipes } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
+import type { ServerUnaryCall } from "@grpc/grpc-js";
 
 import { ProductServiceImpl } from "../product.service";
-import { createGrpcValidationPipe, Public, Roles } from "@nebula/grpc-auth";
+import {
+  createGrpcValidationPipe,
+  createVerifiedServiceDownstreamContext,
+  Public,
+  Roles,
+  type MetadataWithContext,
+  type RpcContextWithContext,
+} from "@nebula/grpc-auth";
 import { productv1 } from "@nebula/protos";
 
 import { CreateProductDto } from "../dto/create-product.dto";
@@ -17,6 +25,30 @@ import { RemoveImageDto } from "../dto/remove-image.dto";
 
 const Pipe = createGrpcValidationPipe();
 
+type GrpcCall<TRequest> = ServerUnaryCall<TRequest, unknown> &
+  RpcContextWithContext;
+
+type GalleryRow = {
+  id: string;
+  url: string;
+  alt: string | null;
+  sortOrder: number;
+  deletedAt: Date | null;
+};
+
+function galleryResponse(productId: string, images: GalleryRow[]) {
+  return productv1.GalleryResponse.create({
+    productId,
+    images: images.map((image) => ({
+      id: image.id,
+      url: image.url,
+      alt: image.alt ?? "",
+      sort: image.sortOrder,
+      deletedAt: image.deletedAt?.toISOString() ?? "",
+    })),
+  });
+}
+
 @Controller()
 export class ProductGrpcController {
   private readonly log = new Logger(ProductGrpcController.name);
@@ -28,8 +60,15 @@ export class ProductGrpcController {
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "CreateProduct")
-  create(dto: CreateProductDto) {
-    return this.svc.create(dto.data);
+  create(
+    dto: CreateProductDto,
+    metadata: MetadataWithContext,
+    call: GrpcCall<CreateProductDto>,
+  ) {
+    return this.svc.create(
+      dto.data,
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
   }
 
   // ------------------------------------------------------
@@ -39,8 +78,16 @@ export class ProductGrpcController {
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "UpdateProduct")
-  async update(dto: UpdateProductDto) {
-    return this.svc.update(dto.id, dto.patch);
+  async update(
+    dto: UpdateProductDto,
+    metadata: MetadataWithContext,
+    call: GrpcCall<UpdateProductDto>,
+  ) {
+    return this.svc.update(
+      dto.id,
+      dto.patch,
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
   }
 
   // ------------------------------------------------------
@@ -50,7 +97,7 @@ export class ProductGrpcController {
   @Public()
   @GrpcMethod("ProductService", "GetProduct")
   get(req: IdDto) {
-    return this.svc.get(req.id);
+    return this.svc.getPublic(req.id);
   }
 
   // ------------------------------------------------------
@@ -60,7 +107,26 @@ export class ProductGrpcController {
   @Public()
   @GrpcMethod("ProductService", "ListProducts")
   list(req: ListProductsDto) {
-    return this.svc.list({
+    return this.svc.listPublic({
+      q: req.q,
+      categoryId: req.categoryId,
+      page: req.page,
+      limit: req.limit,
+    });
+  }
+
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "AdminGetProduct")
+  adminGet(req: IdDto) {
+    return this.svc.getAdmin(req.id);
+  }
+
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "AdminListProducts")
+  adminList(req: ListProductsDto) {
+    return this.svc.listAdmin({
       q: req.q,
       categoryId: req.categoryId,
       status: req.status,
@@ -118,15 +184,7 @@ export class ProductGrpcController {
   @GrpcMethod("ProductService", "AddImages")
   async addImagesGrpc(req: AddImagesDto) {
     const imgs = await this.svc.addImages(req.productId, req.images ?? []);
-    return productv1.GalleryResponse.create({
-      productId: req.productId,
-      images: imgs.map((i) => ({
-        id: i.id,
-        url: i.url,
-        alt: i.alt ?? "",
-        sort: i.sortOrder,
-      })),
-    });
+    return galleryResponse(req.productId, imgs);
   }
 
   // ------------------------------------------------------
@@ -136,19 +194,19 @@ export class ProductGrpcController {
   @Public()
   @GrpcMethod("ProductService", "ListGallery")
   async listGalleryGrpc(req: ListGalleryDto) {
-    const imgs = await this.svc.listGallery(
+    const imgs = await this.svc.listPublicGallery(req.productId);
+    return galleryResponse(req.productId, imgs);
+  }
+
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "AdminListGallery")
+  async adminListGalleryGrpc(req: ListGalleryDto) {
+    const imgs = await this.svc.listAdminGallery(
       req.productId,
       !!req.includeDeleted,
     );
-    return productv1.GalleryResponse.create({
-      productId: req.productId,
-      images: imgs.map((i) => ({
-        id: i.id,
-        url: i.url,
-        alt: i.alt ?? "",
-        sort: i.sortOrder,
-      })),
-    });
+    return galleryResponse(req.productId, imgs);
   }
 
   // ------------------------------------------------------
@@ -159,15 +217,7 @@ export class ProductGrpcController {
   @GrpcMethod("ProductService", "ReorderImages")
   async reorderImagesGrpc(req: ReorderImagesDto) {
     const imgs = await this.svc.reorderImages(req.productId, req.orders ?? []);
-    return productv1.GalleryResponse.create({
-      productId: req.productId,
-      images: imgs.map((i) => ({
-        id: i.id,
-        url: i.url,
-        alt: i.alt ?? "",
-        sort: i.sortOrder,
-      })),
-    });
+    return galleryResponse(req.productId, imgs);
   }
 
   // ------------------------------------------------------
@@ -182,14 +232,6 @@ export class ProductGrpcController {
       req.imageId,
       !!req.hardDelete,
     );
-    return productv1.GalleryResponse.create({
-      productId: req.productId,
-      images: imgs.map((i) => ({
-        id: i.id,
-        url: i.url,
-        alt: i.alt ?? "",
-        sort: i.sortOrder,
-      })),
-    });
+    return galleryResponse(req.productId, imgs);
   }
 }

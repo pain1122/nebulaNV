@@ -1,12 +1,14 @@
 import { Controller } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { Metadata, status, type ServerUnaryCall } from "@grpc/grpc-js";
+import { status, type ServerUnaryCall } from "@grpc/grpc-js";
 import {
+  createVerifiedServiceDownstreamContext,
   Public,
   RequireUserId,
   Roles,
   resolveCtxUser,
   toRpc,
+  type MetadataWithContext,
   type RpcContextWithContext,
 } from "@nebula/grpc-auth";
 import type { orderv1 } from "@nebula/protos";
@@ -52,12 +54,15 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "GetCart")
   async getCart(
     req: ProtoLoaderRequest<orderv1.GetCartRequest>,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<ProtoLoaderRequest<orderv1.GetCartRequest>>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
-    return this.svc.getCartForUser(ctxUser.userId);
+    return this.svc.getCartForUser(
+      ctxUser.userId,
+      createVerifiedServiceDownstreamContext(meta, call),
+    );
   }
 
   @Roles("user")
@@ -65,15 +70,19 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "AddToCart")
   async addToCart(
     req: ProtoLoaderRequest<orderv1.AddToCartRequest>,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<ProtoLoaderRequest<orderv1.AddToCartRequest>>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
-    return this.svc.addToCart(ctxUser.userId, {
-      productId: req.productId,
-      quantity: req.quantity,
-    });
+    return this.svc.addToCart(
+      ctxUser.userId,
+      {
+        productId: req.productId,
+        quantity: req.quantity,
+      },
+      createVerifiedServiceDownstreamContext(meta, call),
+    );
   }
 
   @Roles("user")
@@ -81,14 +90,17 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "UpdateCartItem")
   async updateCartItem(
     req: ProtoLoaderRequest<orderv1.UpdateCartItemRequest>,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<ProtoLoaderRequest<orderv1.UpdateCartItemRequest>>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
-    return this.svc.updateCartItem(ctxUser.userId, req.itemId, {
-      quantity: req.quantity,
-    });
+    return this.svc.updateCartItem(
+      ctxUser.userId,
+      req.itemId,
+      { quantity: req.quantity },
+      createVerifiedServiceDownstreamContext(meta, call),
+    );
   }
 
   @Roles("user")
@@ -96,12 +108,16 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "RemoveCartItem")
   async removeCartItem(
     req: ProtoLoaderRequest<orderv1.RemoveCartItemRequest>,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<ProtoLoaderRequest<orderv1.RemoveCartItemRequest>>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
-    return this.svc.removeCartItem(ctxUser.userId, req.itemId);
+    return this.svc.removeCartItem(
+      ctxUser.userId,
+      req.itemId,
+      createVerifiedServiceDownstreamContext(meta, call),
+    );
   }
 
   @Roles("user")
@@ -109,7 +125,7 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "Checkout")
   async checkout(
     req: CheckoutRequest,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<CheckoutRequest>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);
@@ -122,7 +138,7 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "GetOrder")
   async getOrder(
     req: ProtoLoaderRequest<orderv1.GetOrderRequest>,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<ProtoLoaderRequest<orderv1.GetOrderRequest>>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);
@@ -135,7 +151,7 @@ export class OrderGrpcController {
   @GrpcMethod("OrderService", "ListOrders")
   async listOrders(
     req: ListOrdersRequest,
-    meta: Metadata,
+    meta: MetadataWithContext,
     call: GrpcCall<ListOrdersRequest>,
   ) {
     const ctxUser = resolveCtxUser(meta, call);

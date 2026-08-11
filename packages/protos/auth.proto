@@ -5,12 +5,25 @@ package auth;
 import "user.proto";
 
 service AuthService {
+  rpc Register       (RegisterRequest)       returns (RegisterResponse);
   rpc ValidateUser   (ValidateUserRequest)   returns (ValidateUserResponse);
   rpc GetTokens      (GetTokensRequest)      returns (GetTokensResponse);
   rpc RefreshTokens  (RefreshTokensRequest)  returns (GetTokensResponse);
+  rpc Logout         (LogoutRequest)         returns (LogoutResponse);
   rpc ValidateToken  (ValidateTokenRequest)  returns (ValidateTokenResponse);
 
   rpc GetProfile (GetProfileRequest) returns (user.UserResponse);
+}
+
+message RegisterRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  string id    = 1;
+  string email = 2;
+  string role  = 3;
 }
 
 message ValidateUserRequest {
@@ -32,8 +45,19 @@ message RefreshTokensRequest {
 }
 
 message GetTokensResponse {
-  string accessToken  = 1;
+  string accessToken            = 1;
+  string refreshToken           = 2;
+  int32 accessExpiresInSeconds  = 3;
+  int32 refreshExpiresInSeconds = 4;
+}
+
+message LogoutRequest {
+  bool   allDevices  = 1;
   string refreshToken = 2;
+}
+
+message LogoutResponse {
+  bool success = 1;
 }
 
 message ValidateTokenRequest {

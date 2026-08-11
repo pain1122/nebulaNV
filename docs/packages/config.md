@@ -18,7 +18,10 @@ every applicable service:
   listener host and port fields;
 - `resolveServiceBind()` applies service-specific, then generic, then default
   listener precedence;
-- `grpcTargetEnvSchema()` validates downstream `host:port` client targets;
+- `grpcTargetEnvSchema()` validates optional downstream `host:port` client
+  targets for services with safe local defaults;
+- `requiredGrpcTargetEnvSchema()` validates required downstream `host:port`
+  targets for runtimes such as the gateway that must not invent an upstream;
 - `bcryptEnvSchema` bounds bcrypt work factors used by auth and user;
 - `jwtAccessVerificationEnvSchema` validates an optional local access-token
   verification secret.

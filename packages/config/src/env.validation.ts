@@ -84,6 +84,14 @@ export function grpcTargetEnvSchema(
   );
 }
 
+export function requiredGrpcTargetEnvSchema(
+  ...envNames: string[]
+): Record<string, Joi.Schema> {
+  return Object.fromEntries(
+    envNames.map((envName) => [envName, grpcTarget().required()]),
+  );
+}
+
 export interface ServiceBindOptions {
   servicePrefix: string;
   defaultHttpPort: number;

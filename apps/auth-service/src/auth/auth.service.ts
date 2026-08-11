@@ -27,6 +27,7 @@ type GetUserWithHashResponse = userv1.GetUserWithHashResponse;
 
 type LogoutRequest = {
   userId: string;
+  sessionId?: string;
   refreshToken?: string;
   allDevices?: boolean;
 };
@@ -34,7 +35,6 @@ type LogoutRequest = {
 type IssuedTokenPair = TokenPair & {
   refreshTokenId: string;
   refreshTokenHash: string;
-  refreshTtlSeconds: number;
 };
 
 function normalizeEmail(s: string): string {
@@ -143,12 +143,14 @@ export class AuthService {
       sessionId,
       tokenId: issued.refreshTokenId,
       tokenHash: issued.refreshTokenHash,
-      ttlSeconds: issued.refreshTtlSeconds,
+      ttlSeconds: issued.refreshExpiresInSeconds,
     });
 
     return {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
+      accessExpiresInSeconds: issued.accessExpiresInSeconds,
+      refreshExpiresInSeconds: issued.refreshExpiresInSeconds,
     };
   }
 
@@ -205,7 +207,7 @@ export class AuthService {
       expectedTokenHash: this.hashToken(oldRt),
       nextTokenId: issued.refreshTokenId,
       nextTokenHash: issued.refreshTokenHash,
-      ttlSeconds: issued.refreshTtlSeconds,
+      ttlSeconds: issued.refreshExpiresInSeconds,
     });
 
     if (rotation !== 'rotated') {
@@ -221,6 +223,8 @@ export class AuthService {
     return {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
+      accessExpiresInSeconds: issued.accessExpiresInSeconds,
+      refreshExpiresInSeconds: issued.refreshExpiresInSeconds,
     };
   }
 
@@ -256,6 +260,27 @@ export class AuthService {
       await this.authRedis.bumpTokenVersion(req.userId);
       this.logger.debug(
         `logout(allDevices) → revoked sessions for user=${req.userId}`,
+      );
+      return;
+    }
+
+    if (req.sessionId) {
+      if (req.refreshToken) {
+        const payload = this.verifyRefreshToken(req.refreshToken);
+        if (
+          !payload ||
+          payload.sub !== req.userId ||
+          payload.sid !== req.sessionId
+        ) {
+          this.logger.debug(
+            'logout(current) → refresh token does not match bearer session (noop)',
+          );
+          return;
+        }
+      }
+      await this.authRedis.revokeRefreshSession(req.userId, req.sessionId);
+      this.logger.debug(
+        `logout(current) → revoked bearer session for user=${req.userId}`,
       );
       return;
     }
@@ -312,7 +337,14 @@ export class AuthService {
       refreshToken,
       refreshTokenId: refreshPayload.jti,
       refreshTokenHash: this.hashToken(refreshToken),
-      refreshTtlSeconds: this.refreshTtlSeconds(refreshToken),
+      accessExpiresInSeconds: this.tokenTtlSeconds(
+        accessToken,
+        'access_token_expiration_missing',
+      ),
+      refreshExpiresInSeconds: this.tokenTtlSeconds(
+        refreshToken,
+        'refresh_token_expiration_missing',
+      ),
     };
   }
 
@@ -331,14 +363,14 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private refreshTtlSeconds(token: string): number {
+  private tokenTtlSeconds(token: string, missingError: string): number {
     const decoded: unknown = this.jwt.decode(token);
     if (
       typeof decoded !== 'object' ||
       decoded === null ||
       typeof (decoded as Record<string, unknown>).exp !== 'number'
     ) {
-      throw new Error('refresh_token_expiration_missing');
+      throw new Error(missingError);
     }
 
     const expiresAt = (decoded as { exp: number }).exp;

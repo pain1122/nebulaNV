@@ -1,6 +1,6 @@
 # Product Service
 
-Last reviewed: 2026-06-17
+Last reviewed: 2026-08-11
 
 ## Purpose
 
@@ -32,7 +32,10 @@ Product routes:
 
 Access:
 
-- Product reads are public.
+- Anonymous product reads force `ACTIVE`, non-deleted product visibility.
+- During the gateway migration, the same HTTP list/get routes preserve broader
+  behavior only when the shared guard attaches a verified `admin` or
+  `root-admin` actor; raw headers cannot select that branch.
 - Product writes require `admin` or `root-admin`.
 
 Taxonomy routes exposed by product-service:
@@ -67,12 +70,15 @@ Product methods:
 - `UpdateProduct`
 - `GetProduct`
 - `ListProducts`
+- `AdminGetProduct`
+- `AdminListProducts`
 - `DeleteProduct`
 - `RestoreProduct`
 - `HardDeleteProduct`
 - `ApplyDiscountBulk`
 - `AddImages`
 - `ListGallery`
+- `AdminListGallery`
 - `ReorderImages`
 - `RemoveImage`
 
@@ -83,6 +89,21 @@ Product taxonomy methods:
 - `Create`
 - `Update`
 - `Delete`
+
+Product read policy:
+
+- `GetProduct`, `ListProducts`, and `ListGallery` are authoritative public
+  reads. They return only `ACTIVE`, non-deleted products and non-deleted
+  gallery rows. Gallery reads first verify that the parent product is publicly
+  visible.
+- The legacy public request fields `status` and `includeDeleted` remain on the
+  wire as deprecated compatibility fields but are ignored; they cannot widen
+  public visibility.
+- `AdminGetProduct`, `AdminListProducts`, and `AdminListGallery` are private and
+  require a verified `admin` or `root-admin` actor. Only these contracts accept
+  lifecycle/deletion controls.
+- `GalleryImage.deletedAt` is an additive admin-management field. It is always
+  empty on public reads because deleted gallery rows are never returned there.
 
 ## Current DB Shape
 
@@ -122,7 +143,9 @@ The DB already has fields for attributes, comments, product sets, VR hotspots, 3
 - SKU is generated if absent and made unique.
 - `categoryId` is required directly or resolved from settings-service default.
 - Category ID must point to taxonomy-service record with `scope = "product"` and `kind = "category.default"`.
-- List excludes soft-deleted products unless `includeDeleted` is true.
+- Public list always forces `status = ACTIVE` and `deletedAt = null`.
+- Admin list excludes soft-deleted products unless `includeDeleted` is true and
+  may filter by lifecycle status.
 - List orders featured products first, then feature sort, then newest.
 - Soft delete exists in service logic and gRPC, but not in HTTP routes.
 - Soft delete sets `deletedAt`.
@@ -239,7 +262,10 @@ HTTP:
 gRPC:
 
 - Admin S2S can create product.
-- Public get/list product works.
+- Public get/list/gallery enforce ACTIVE, non-deleted visibility even when a
+  caller sends deprecated admin-capable fields.
+- Distinct admin get/list/gallery contracts retain lifecycle/deletion access.
+- Normal users are denied from the admin read contracts.
 - Admin S2S can update product.
 - Missing product update returns `NOT_FOUND` with `product_not_found`.
 - Product taxonomy gRPC create/get/list/update/delete works through product-service facade.
@@ -302,13 +328,12 @@ Tests:
 - `apps/product-service/test/utils/settings.ts`
 - `apps/product-service/test/default-product-taxonomy.initializer.unit.spec.ts`
 - `apps/product-service/test/product.error-translation.unit.spec.ts`
+- `apps/product-service/test/product-read-visibility.unit.spec.ts`
 - `apps/product-service/test/setup/wait-for-services.ts`
 - `apps/product-service/test/jest.env.ts`
 
 ## Known Gaps
 
-- Public product read behavior needs launch review: `GET /products/:id` currently fetches by ID without deleted/status filtering.
-- Public list excludes deleted products but does not force `ACTIVE` only unless status filtering is provided.
 - Product variants are not modeled yet.
 - Need WooCommerce-style variant support with per-variant SKU, price, stock, media, attributes/options, and active/deleted state.
 - Order/cart items should eventually snapshot selected `variantId` and selected options, not only `productId`.

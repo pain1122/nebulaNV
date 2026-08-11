@@ -169,8 +169,17 @@ message ListProductsRequest {
   int32 limit = 2;
   string q = 3;
   string categoryId = 4;
+  string status = 5 [deprecated = true]; // retained for wire compatibility; public reads ignore it
+  bool   includeDeleted = 6 [deprecated = true]; // retained for wire compatibility; public reads ignore it
+}
+
+message AdminListProductsRequest {
+  int32 page = 1;
+  int32 limit = 2;
+  string q = 3;
+  string categoryId = 4;
   string status = 5;
-  bool   includeDeleted = 6; // default false
+  bool   includeDeleted = 6;
 }
 
 message DeleteProductRequest { string id = 1; }
@@ -200,6 +209,7 @@ message GalleryImage {
   string url  = 2;
   string alt  = 3;
   int32  sort = 4; // maps to sortOrder
+  string deletedAt = 5; // ISO-8601 string; always empty on public reads
 }
 
 message NewImage {
@@ -215,7 +225,12 @@ message AddImagesRequest {
 
 message ListGalleryRequest {
   string productId = 1;
-  bool   includeDeleted = 2; // default false
+  bool   includeDeleted = 2 [deprecated = true]; // retained for wire compatibility; public reads ignore it
+}
+
+message AdminListGalleryRequest {
+  string productId = 1;
+  bool   includeDeleted = 2;
 }
 
 message ImageOrder {
@@ -247,6 +262,8 @@ service ProductService {
   rpc UpdateProduct (UpdateProductRequest) returns (ProductResponse);
   rpc GetProduct    (GetProductRequest)    returns (ProductResponse);
   rpc ListProducts  (ListProductsRequest)  returns (ListProductsResponse);
+  rpc AdminGetProduct   (GetProductRequest)          returns (ProductResponse);
+  rpc AdminListProducts (AdminListProductsRequest)   returns (ListProductsResponse);
 
   rpc DeleteProduct      (DeleteProductRequest)      returns (ProductResponse); // soft
   rpc RestoreProduct     (RestoreProductRequest)     returns (ProductResponse);
@@ -256,6 +273,7 @@ service ProductService {
 
   rpc AddImages     (AddImagesRequest)     returns (GalleryResponse);
   rpc ListGallery   (ListGalleryRequest)   returns (GalleryResponse);
+  rpc AdminListGallery (AdminListGalleryRequest) returns (GalleryResponse);
   rpc ReorderImages (ReorderImagesRequest) returns (GalleryResponse);
   rpc RemoveImage   (RemoveImageRequest)   returns (GalleryResponse);
 }

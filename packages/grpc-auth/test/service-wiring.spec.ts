@@ -127,7 +127,7 @@ describe("canonical gRPC security wiring", () => {
   it("signs the two shared client wrappers after merging caller metadata", () => {
     for (const file of ["settings.client.ts", "taxonomy.client.ts"]) {
       const client = source(`packages/clients/src/${file}`);
-      expect(client).toContain("buildGrpcS2SMetadata");
+      expect(client).toContain("buildClientGrpcS2SMetadata");
       expect(client).toContain("mergeSignedMetadata");
       expect(client).not.toContain("m ??");
     }

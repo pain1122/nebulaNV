@@ -89,6 +89,7 @@ import {
   type HttpRequestWithContext,
   type MetadataWithContext,
 } from "./context";
+import type { S2SActorAssertion } from "./s2s-context";
 import { buildGrpcS2SMetadata } from "./s2s";
 
 import { authv1 } from "@nebula/protos";
@@ -265,6 +266,43 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     );
   }
 
+  private getSignedActor(ctx: ExecutionContext): S2SActorAssertion | null {
+    if (this.isRpc(ctx)) {
+      const meta = this.extractMeta(ctx);
+      const call = ctx.getArgByIndex<GrpcServerCallWithContext | undefined>(2);
+      const contextCarrier = ctx as ExecutionContext & ContextCarrier;
+      return (
+        meta?.signedActor ??
+        call?.signedActor ??
+        contextCarrier.signedActor ??
+        null
+      );
+    }
+
+    return (
+      ctx.switchToHttp().getRequest<HttpRequestWithContext | undefined>()
+        ?.signedActor ?? null
+    );
+  }
+
+  private hasSignedRequestContext(ctx: ExecutionContext): boolean {
+    if (this.isRpc(ctx)) {
+      const meta = this.extractMeta(ctx);
+      const call = ctx.getArgByIndex<GrpcServerCallWithContext | undefined>(2);
+      const contextCarrier = ctx as ExecutionContext & ContextCarrier;
+      return Boolean(
+        meta?.requestContext ??
+          call?.requestContext ??
+          contextCarrier.requestContext,
+      );
+    }
+
+    return Boolean(
+      ctx.switchToHttp().getRequest<HttpRequestWithContext | undefined>()
+        ?.requestContext,
+    );
+  }
+
   // Validate token and attach authenticated user.
   //
   // Step 1: Optional local signature check
@@ -275,10 +313,10 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
   //   - Handles role changes
   //   - Auth-service is the source of truth.
 
-  private async attachUserFromToken(
+  private async validateUserFromToken(
     ctx: ExecutionContext,
     token: string,
-  ): Promise<void> {
+  ): Promise<ContextUser> {
     // 1️⃣ Try local verify first
     try {
       const secret = process.env.JWT_ACCESS_SECRET;
@@ -304,11 +342,25 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
       this.unauthenticated(ctx, "token_invalid_or_expired");
     }
 
-    this.setCtxUser(ctx, {
+    return {
       userId: res.userId,
       role: res.role || undefined,
       sessionRef: res.sessionRef || undefined,
-    });
+    };
+  }
+
+  private enforceSignedActorConsistency(
+    ctx: ExecutionContext,
+    actor: S2SActorAssertion,
+    user: ContextUser,
+  ): void {
+    if (
+      user.userId !== actor.userId ||
+      user.role !== actor.role ||
+      user.sessionRef !== actor.sessionRef
+    ) {
+      this.unauthenticated(ctx, "s2s_actor_bearer_mismatch");
+    }
   }
 
   private resolveRequiredUserId(ctx: ExecutionContext): string | null {
@@ -366,15 +418,32 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     const token = this.extractToken(ctx);
     const svc = this.getSvc(ctx);
     const svcKind = this.getSvcKind(ctx);
+    const signedActor = this.getSignedActor(ctx);
+    const hasSignedRequestContext = this.hasSignedRequestContext(ctx);
+    const requiresActorConsistency =
+      svcKind === "gateway" || hasSignedRequestContext || Boolean(signedActor);
 
     if (internalOnly && (!svc || svcKind !== "service")) {
       this.unauthenticated(ctx, "internal_only");
     }
 
+    if (requiresActorConsistency) {
+      if (signedActor && !token) {
+        this.unauthenticated(ctx, "s2s_actor_bearer_missing");
+      }
+      if (token && !signedActor) {
+        this.unauthenticated(ctx, "s2s_actor_assertion_missing");
+      }
+    }
+
     // JWT present → authenticate user and enforce role decorators.
     // Service identity is assumed to be already validated by S2SGuard.
     if (token) {
-      await this.attachUserFromToken(ctx, token);
+      const verifiedUser = await this.validateUserFromToken(ctx, token);
+      if (signedActor) {
+        this.enforceSignedActorConsistency(ctx, signedActor, verifiedUser);
+      }
+      this.setCtxUser(ctx, verifiedUser);
 
       // S2SGuard already verified service identity
 

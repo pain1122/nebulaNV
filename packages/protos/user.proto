@@ -5,6 +5,7 @@ package user;
 service UserService {
   rpc FindUser            (FindUserRequest) returns (UserResponse);
   rpc GetUser             (GetUserRequest)  returns (UserResponse);
+  rpc ListUsers           (ListUsersRequest) returns (ListUsersResponse);
   rpc UpdateProfile       (UpdateProfileRequest)       returns (UserResponse);
   rpc CreateUser          (CreateUserRequest)          returns (UserResponse);
   rpc FindUserWithHash    (FindUserWithHashRequest)    returns (FindUserWithHashResponse);
@@ -28,6 +29,22 @@ message UserResponse {
 string id    = 1;     // Unique identifier of the user
 string email = 2;     // Email address
 string role  = 3;     // Role (e.g., "user", "admin")
+}
+
+// Current admin list contract. It is intentionally unpaginated and never
+// exposes password hashes or other authentication material.
+message ListUsersRequest {}
+
+message ListUsersResponse {
+  repeated UserListItem users = 1;
+}
+
+message UserListItem {
+  string id        = 1;
+  string email     = 2;
+  string phone     = 3;
+  string role      = 4;
+  string createdAt = 5; // ISO-8601 string
 }
 
 // Request message for updating a profile

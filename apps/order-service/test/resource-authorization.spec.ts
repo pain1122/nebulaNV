@@ -1,6 +1,9 @@
 import { Metadata } from "@grpc/grpc-js";
 import type { ClientGrpc } from "@nestjs/microservices";
-import type { RpcContextWithContext } from "@nebula/grpc-auth";
+import type {
+  MetadataWithContext,
+  RpcContextWithContext,
+} from "@nebula/grpc-auth";
 import { OrderGrpcController } from "../src/order/grpc/order-grpc.controller";
 import { OrderService } from "../src/order/order.service";
 import type { PrismaService } from "../src/prisma.service";
@@ -15,9 +18,30 @@ describe("order resource authorization", () => {
     const controller = new OrderGrpcController(
       service as unknown as OrderService,
     );
-    const metadata = new Metadata();
+    const metadata = new Metadata() as MetadataWithContext;
+    metadata.svc = "gateway";
+    metadata.svcKind = "gateway";
+    metadata.requestId = "req-resource-owner";
+    metadata.requestContext = {
+      applicationId: "admin-web",
+      tenantId: "tenant-main",
+      siteId: "site-main",
+      channelId: "browser",
+    };
+    metadata.signedActor = {
+      userId: "verified-user",
+      role: "user",
+      sessionRef: "session-1",
+    };
+    metadata.user = metadata.signedActor;
+    metadata.set("authorization", "Bearer verified-token");
     const call = {
-      user: { userId: "verified-user", role: "user" },
+      svc: metadata.svc,
+      svcKind: metadata.svcKind,
+      requestId: metadata.requestId,
+      requestContext: metadata.requestContext,
+      signedActor: metadata.signedActor,
+      user: metadata.user,
     } as RpcContextWithContext;
 
     await controller.getCart(
@@ -36,7 +60,14 @@ describe("order resource authorization", () => {
       call as never,
     );
 
-    expect(service.getCartForUser).toHaveBeenCalledWith("verified-user");
+    expect(service.getCartForUser).toHaveBeenCalledWith(
+      "verified-user",
+      expect.objectContaining({
+        signingPolicy: expect.objectContaining({
+          requestId: "req-resource-owner",
+        }),
+      }),
+    );
     expect(service.getOrderForUser).toHaveBeenCalledWith(
       "verified-user",
       "order-1",

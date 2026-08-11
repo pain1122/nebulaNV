@@ -122,6 +122,32 @@ describe('UserService gRPC (seeded users)', () => {
     ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
   });
 
+  it('listUsers returns the non-secret admin list projection', async () => {
+    if (!haveAdmin) return;
+
+    const res = await call<{
+      users: Array<{
+        id: string;
+        email: string;
+        phone: string;
+        role: string;
+        createdAt: string;
+      }>;
+    }>(client, 'listUsers', {}, mdAuth({ access: adminAccess }));
+
+    const listedUser = res.users.find((user) => user.id === userId);
+    expect(listedUser).toMatchObject({ email: userEmail, role: 'user' });
+    expect(Number.isNaN(Date.parse(listedUser?.createdAt ?? ''))).toBe(false);
+    expect(listedUser).not.toHaveProperty('password');
+    expect(listedUser).not.toHaveProperty('passwordHash');
+  });
+
+  it('listUsers rejects normal users', async () => {
+    await expect(
+      call(client, 'listUsers', {}, mdAuth({ access: userAccess })),
+    ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
+  });
+
   it('createUser creates a user through auth-service style S2S metadata', async () => {
     const passwordHash = await bcrypt.hash(createdPassword, 10);
 

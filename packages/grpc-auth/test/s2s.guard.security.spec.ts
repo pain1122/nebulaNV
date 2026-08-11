@@ -6,19 +6,37 @@ import { RpcException } from "@nestjs/microservices";
 import { Metadata, status } from "@grpc/grpc-js";
 import {
   ALLOWED_S2S_CALLERS_KEY,
+  ALLOWED_S2S_IDENTITIES_KEY,
+  AllowedS2SIdentities,
+  type AllowedS2SIdentity,
   INTERNAL_ONLY_KEY,
   IS_PUBLIC_KEY,
   PUBLIC_FLAGS_KEY,
 } from "../src/public.decorator";
 import { S2SGuard } from "../src/s2s.guard";
+import type { MetadataWithContext } from "../src/context";
 import { S2SReplayStore } from "../src/s2s-replay.store";
 import {
   S2S_SERVER_CONTEXT,
   type MetadataWithS2SServerContext,
 } from "../src/s2s.transport";
 import { buildGrpcS2SMetadata } from "../src/s2s";
+import type { S2SSignedContext } from "../src/s2s-context";
+import { S2S_PROTOCOL_VERSION_V2, signS2S } from "../src/s2s.crypto";
 import {
+  X_REQUEST_ID_HEADER,
+  X_S2S_BODY_SHA256_HEADER,
+  X_S2S_CONTEXT_HEADER,
+  X_S2S_CONTEXT_SHA256_HEADER,
+  X_S2S_ISSUED_AT_HEADER,
+  X_S2S_KEY_ID_HEADER,
+  X_S2S_KIND_HEADER,
+  X_S2S_METHOD_HEADER,
+  X_S2S_NONCE_HEADER,
+  X_S2S_PATH_HEADER,
+  X_S2S_TARGET_HEADER,
   X_S2S_VERSION_HEADER,
+  X_SVC_HEADER,
   resolveS2SSignHeader,
   type S2SKey,
 } from "../src/tokens";
@@ -34,6 +52,19 @@ const previous: S2SKey = {
 const gateway: S2SKey = {
   id: "gateway-receiver-v1",
   secret: "test-only-current-gateway-key-000000000001",
+};
+
+const signedContext: S2SSignedContext = {
+  version: "1",
+  applicationId: "storefront-web-local",
+  tenantId: "single-site-tenant",
+  siteId: "single-site",
+  channelId: "web",
+  actor: {
+    userId: "verified-user",
+    role: "user",
+    sessionRef: "verified-session",
+  },
 };
 
 type Request = { value?: string };
@@ -65,6 +96,7 @@ function handlerWith(metadata?: {
   gatewayOnly?: boolean;
   internalOnly?: boolean;
   callers?: string[];
+  identities?: AllowedS2SIdentity[];
 }): () => void {
   const handler = () => undefined;
   if (metadata?.public) Reflect.defineMetadata(IS_PUBLIC_KEY, true, handler);
@@ -76,6 +108,13 @@ function handlerWith(metadata?: {
   }
   if (metadata?.callers) {
     Reflect.defineMetadata(ALLOWED_S2S_CALLERS_KEY, metadata.callers, handler);
+  }
+  if (metadata?.identities) {
+    Reflect.defineMetadata(
+      ALLOWED_S2S_IDENTITIES_KEY,
+      metadata.identities,
+      handler,
+    );
   }
   return handler;
 }
@@ -125,17 +164,50 @@ function signed(opts?: {
   caller?: string;
   issuedAtMs?: number;
   nonce?: string;
-}): Metadata {
+  context?: S2SSignedContext;
+}): MetadataWithContext {
+  const kind = opts?.kind ?? "service";
   return buildGrpcS2SMetadata({
     target: opts?.target ?? "receiver-service",
     definition: opts?.definitionOverride ?? definition,
     request: opts?.request ?? { value: "one" },
     key: opts?.key ?? current,
-    kind: opts?.kind ?? "service",
+    kind,
     serviceName: opts?.caller ?? "caller-service",
     issuedAtMs: opts?.issuedAtMs,
     nonce: opts?.nonce,
+    context: opts?.context ?? (kind === "gateway" ? signedContext : undefined),
+  }) as MetadataWithContext;
+}
+
+function legacyGatewayV2(request: Request): Metadata {
+  const metadata = buildGrpcS2SMetadata({
+    target: "receiver-service",
+    definition,
+    request,
+    key: gateway,
+    kind: "service",
+    serviceName: "gateway",
   });
+  const one = (header: string) => metadata.get(header)[0] as string;
+  metadata.set(X_S2S_KIND_HEADER, "gateway");
+  metadata.set(
+    resolveS2SSignHeader(),
+    signS2S(gateway.secret, {
+      version: S2S_PROTOCOL_VERSION_V2,
+      kind: "gateway",
+      caller: one(X_SVC_HEADER),
+      target: one(X_S2S_TARGET_HEADER),
+      method: one(X_S2S_METHOD_HEADER),
+      path: one(X_S2S_PATH_HEADER),
+      issuedAtMs: Number(one(X_S2S_ISSUED_AT_HEADER)),
+      nonce: one(X_S2S_NONCE_HEADER),
+      requestId: one(X_REQUEST_ID_HEADER),
+      keyId: one(X_S2S_KEY_ID_HEADER),
+      bodySha256: one(X_S2S_BODY_SHA256_HEADER),
+    }),
+  );
+  return metadata;
 }
 
 async function rpcError(
@@ -159,12 +231,144 @@ describe("S2SGuard v2 security contract", () => {
     guard = new S2SGuard(new Reflector(), new S2SReplayStore());
   });
 
+  it("rejects empty, invalid, and duplicate exact-identity policies", () => {
+    expect(() => AllowedS2SIdentities()).toThrow(
+      "allowed_s2s_identities_empty",
+    );
+    expect(() =>
+      AllowedS2SIdentities({ kind: "service", caller: "bad caller" }),
+    ).toThrow("allowed_s2s_identity_invalid");
+    expect(() =>
+      AllowedS2SIdentities(
+        { kind: "gateway", caller: "gateway" },
+        { kind: "gateway", caller: "gateway" },
+      ),
+    ).toThrow("allowed_s2s_identity_duplicate");
+  });
+
   it("accepts one valid current-key request", async () => {
     const request = { value: "one" };
     await expect(
       guard.canActivate(rpcContext(signed({ request }), request)),
     ).resolves.toBe(true);
     expect(request).toEqual({ value: "one" });
+  });
+
+  it("accepts v3 from gateway and service callers, then attaches verified context", async () => {
+    const gatewayRequest = { value: "gateway" };
+    const gatewayMetadata = signed({
+      request: gatewayRequest,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+    });
+    await expect(
+      guard.canActivate(rpcContext(gatewayMetadata, gatewayRequest)),
+    ).resolves.toBe(true);
+    expect(gatewayMetadata.requestContext).toEqual({
+      applicationId: "storefront-web-local",
+      tenantId: "single-site-tenant",
+      siteId: "single-site",
+      channelId: "web",
+    });
+    expect(gatewayMetadata.signedActor).toEqual(signedContext.actor);
+    expect(gatewayMetadata.user).toBeUndefined();
+
+    const serviceRequest = { value: "service" };
+    const serviceMetadata = signed({
+      request: serviceRequest,
+      context: signedContext,
+    });
+    await expect(
+      guard.canActivate(rpcContext(serviceMetadata, serviceRequest)),
+    ).resolves.toBe(true);
+    expect(serviceMetadata.requestContext).toEqual(
+      gatewayMetadata.requestContext,
+    );
+  });
+
+  it("requires v3 for gateway callers while keeping ordinary service v2 valid", async () => {
+    const request = { value: "one" };
+    const error = await rpcError(
+      guard.canActivate(rpcContext(legacyGatewayV2(request), request)),
+    );
+    expect(error.message).toBe("s2s_context_required_for_gateway");
+
+    const serviceMetadata = signed({ request });
+    serviceMetadata.requestContext = {
+      applicationId: "forged-app",
+      tenantId: "forged-tenant",
+      siteId: "forged-site",
+      channelId: "forged-channel",
+    };
+    await expect(
+      guard.canActivate(rpcContext(serviceMetadata, request)),
+    ).resolves.toBe(true);
+    expect(serviceMetadata.requestContext).toBeUndefined();
+  });
+
+  it("rejects partial, duplicate, unsigned, and altered context carriers", async () => {
+    const request = { value: "one" };
+
+    const partial = signed({ request });
+    partial.set(X_S2S_VERSION_HEADER, "3");
+    partial.set(X_S2S_CONTEXT_HEADER, "e30");
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(partial, request)))).message,
+    ).toBe("s2s_context_digest_missing_or_duplicate");
+
+    const duplicate = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+    });
+    duplicate.add(X_S2S_CONTEXT_HEADER, "e30");
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(duplicate, request))))
+        .message,
+    ).toBe("s2s_context_missing_or_duplicate");
+
+    const unsigned = signed({ request });
+    unsigned.set(X_S2S_CONTEXT_HEADER, "e30");
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(unsigned, request))))
+        .message,
+    ).toBe("s2s_context_not_allowed_for_v2");
+
+    const altered = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+    });
+    const alteredContext = Buffer.from(
+      JSON.stringify({
+        version: "1",
+        applicationId: "admin-web-local",
+        tenantId: "single-site-tenant",
+        siteId: "single-site",
+        channelId: "web",
+        actor: signedContext.actor,
+      }),
+      "utf8",
+    ).toString("base64url");
+    altered.set(X_S2S_CONTEXT_HEADER, alteredContext);
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(altered, request)))).message,
+    ).toBe("s2s_context_digest_mismatch");
+
+    const alteredDigest = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+    });
+    alteredDigest.set(X_S2S_CONTEXT_SHA256_HEADER, "0".repeat(64));
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(alteredDigest, request))))
+        .message,
+    ).toBe("s2s_context_digest_mismatch");
   });
 
   it("requires S2S even when the RPC is public", async () => {
@@ -218,6 +422,17 @@ describe("S2SGuard v2 security contract", () => {
       ),
     );
     expect(error.message).toBe("s2s_body_binding_mismatch");
+  });
+
+  it("rejects an altered signed request ID", async () => {
+    const request = { value: "one" };
+    const metadata = signed({ request });
+    metadata.set(X_REQUEST_ID_HEADER, "attacker-replaced-request-id");
+
+    const error = await rpcError(
+      guard.canActivate(rpcContext(metadata, request)),
+    );
+    expect(error.message).toBe("s2s_signature_invalid");
   });
 
   it("rejects unknown versions and invalid signatures", async () => {
@@ -351,6 +566,33 @@ describe("S2SGuard v2 security contract", () => {
     expect(gatewayError.message).toBe("s2s_service_caller_required");
   });
 
+  it("enforces gateway kind on a non-public authenticated RPC", async () => {
+    const request = { value: "one" };
+    const handler = handlerWith({ gatewayOnly: true });
+    const serviceError = await rpcError(
+      guard.canActivate(rpcContext(signed({ request }), request, handler)),
+    );
+    expect(serviceError).toMatchObject({
+      code: status.PERMISSION_DENIED,
+      message: "s2s_gateway_caller_required",
+    });
+
+    await expect(
+      guard.canActivate(
+        rpcContext(
+          signed({
+            request,
+            kind: "gateway",
+            caller: "gateway",
+            key: gateway,
+          }),
+          request,
+          handler,
+        ),
+      ),
+    ).resolves.toBe(true);
+  });
+
   it("enforces route-level caller allowlists", async () => {
     const request = { value: "one" };
     const handler = handlerWith({
@@ -364,5 +606,71 @@ describe("S2SGuard v2 security contract", () => {
       code: status.PERMISSION_DENIED,
       message: "s2s_caller_not_allowed_for_route",
     });
+  });
+
+  it("enforces exact mixed caller-kind and caller-name identities", async () => {
+    const request = { value: "one" };
+    const mixedHandler = handlerWith({
+      public: true,
+      identities: [
+        { kind: "gateway", caller: "gateway" },
+        { kind: "service", caller: "caller-service" },
+      ],
+    });
+
+    await expect(
+      guard.canActivate(rpcContext(signed({ request }), request, mixedHandler)),
+    ).resolves.toBe(true);
+    await expect(
+      guard.canActivate(
+        rpcContext(
+          signed({
+            request,
+            kind: "gateway",
+            caller: "gateway",
+            key: gateway,
+          }),
+          request,
+          mixedHandler,
+        ),
+      ),
+    ).resolves.toBe(true);
+
+    const gatewayOnlyIdentity = handlerWith({
+      public: true,
+      identities: [{ kind: "gateway", caller: "gateway" }],
+    });
+    expect(
+      (
+        await rpcError(
+          guard.canActivate(
+            rpcContext(signed({ request }), request, gatewayOnlyIdentity),
+          ),
+        )
+      ).message,
+    ).toBe("s2s_identity_not_allowed_for_route");
+
+    const serviceOnlyIdentity = handlerWith({
+      public: true,
+      identities: [{ kind: "service", caller: "caller-service" }],
+    });
+    expect(
+      (
+        await rpcError(
+          guard.canActivate(
+            rpcContext(
+              signed({
+                request,
+                kind: "gateway",
+                caller: "gateway",
+                key: gateway,
+              }),
+              request,
+              serviceOnlyIdentity,
+            ),
+          ),
+        )
+      ).message,
+    ).toBe("s2s_identity_not_allowed_for_route");
   });
 });

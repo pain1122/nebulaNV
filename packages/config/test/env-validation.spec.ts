@@ -4,6 +4,7 @@ import {
   grpcTargetEnvSchema,
   httpOnlyBindEnvSchema,
   jwtAccessVerificationEnvSchema,
+  requiredGrpcTargetEnvSchema,
   resolveHttpOnlyBind,
   resolveServiceBind,
   runtimeEnvSchema,
@@ -44,6 +45,28 @@ describe("shared environment validation primitives", () => {
     expect(schema.validate({ BCRYPT_ROUNDS: "7" }).error).toBeDefined();
     expect(
       schema.validate({ JWT_ACCESS_SECRET: "too-short" }).error,
+    ).toBeDefined();
+  });
+
+  it("can require exact host:port targets for runtimes without safe defaults", () => {
+    const requiredSchema = Joi.object({
+      ...requiredGrpcTargetEnvSchema("AUTH_GRPC_URL", "USER_GRPC_URL"),
+    });
+
+    expect(
+      requiredSchema.validate({
+        AUTH_GRPC_URL: "auth-service:50052",
+        USER_GRPC_URL: "user-service:50051",
+      }).error,
+    ).toBeUndefined();
+    expect(
+      requiredSchema.validate({ AUTH_GRPC_URL: "auth-service:50052" }).error,
+    ).toBeDefined();
+    expect(
+      requiredSchema.validate({
+        AUTH_GRPC_URL: "https://auth-service:50052",
+        USER_GRPC_URL: "user-service:50051",
+      }).error,
     ).toBeDefined();
   });
 

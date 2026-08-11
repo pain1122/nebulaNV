@@ -102,6 +102,24 @@ describe('AuthService security behaviors', () => {
       expect(redis.isUserDisabled).toHaveBeenCalledWith(user.id);
       expect(jwt.sign).not.toHaveBeenCalled();
     });
+
+    it('returns authoritative access and refresh lifetimes with a new session', async () => {
+      const tokens = await authService.login(user);
+
+      expect(tokens).toMatchObject({
+        accessToken: 'access-token',
+        refreshToken: 'new-refresh-token',
+        accessExpiresInSeconds: expect.any(Number),
+        refreshExpiresInSeconds: expect.any(Number),
+      });
+      expect(tokens.accessExpiresInSeconds).toBeGreaterThan(0);
+      expect(tokens.refreshExpiresInSeconds).toBeGreaterThan(0);
+      expect(redis.createRefreshSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ttlSeconds: tokens.refreshExpiresInSeconds,
+        }),
+      );
+    });
   });
 
   describe('Profile translation', () => {
@@ -240,6 +258,37 @@ describe('AuthService security behaviors', () => {
         user.id,
         refreshPayload.sid,
       );
+      expect(redis.revokeAllRefreshSessions).not.toHaveBeenCalled();
+      expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
+    });
+
+    it('revokes the session derived from a verified access bearer', async () => {
+      await authService.logout({
+        userId: user.id,
+        sessionId: refreshPayload.sid,
+      });
+
+      expect(redis.revokeRefreshSession).toHaveBeenCalledWith(
+        user.id,
+        refreshPayload.sid,
+      );
+      expect(redis.revokeAllRefreshSessions).not.toHaveBeenCalled();
+      expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
+    });
+
+    it('does not let another refresh session override the bearer session', async () => {
+      jwt.verify.mockReturnValue({
+        ...refreshPayload,
+        sid: 'different-session',
+      });
+
+      await authService.logout({
+        userId: user.id,
+        sessionId: refreshPayload.sid,
+        refreshToken: 'different-refresh-token',
+      });
+
+      expect(redis.revokeRefreshSession).not.toHaveBeenCalled();
       expect(redis.revokeAllRefreshSessions).not.toHaveBeenCalled();
       expect(redis.bumpTokenVersion).not.toHaveBeenCalled();
     });

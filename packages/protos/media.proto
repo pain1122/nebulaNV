@@ -110,6 +110,12 @@ message ListReq {
   string folderPath = 10;
   string entityType = 11;
   string entityId = 12;
+  string search = 13;
+  string path = 14;
+  string mimeType = 15;
+  string mediaType = 16;
+  string sortBy = 17;
+  string order = 18;
 }
 
 message ListRes {
@@ -135,6 +141,97 @@ message ReadUrlRes {
   string accessClass = 3;
   string filename = 4;
   string mimeType = 5;
+}
+
+// User-owned protected lane. Owner, access class, and visibility are derived
+// from verified actor context and therefore do not exist in these requests.
+message ListMyProtectedLibraryReq {
+  string q = 1;
+  int32 take = 2;
+  int32 skip = 3;
+  string scope = 4;
+  string status = 5;
+  string scanStatus = 6;
+  string folderPath = 7;
+  string entityType = 8;
+  string entityId = 9;
+  string search = 10;
+  string path = 11;
+  string mimeType = 12;
+  string mediaType = 13;
+  string sortBy = 14;
+  string order = 15;
+}
+
+message CreateMyProtectedReadUrlReq {
+  string id = 1;
+  string scope = 2;
+  string entityType = 3;
+  string entityId = 4;
+  bool download = 5;
+}
+
+message PublicLibraryDeleteItem {
+  string type = 1; // file|folder
+  string id = 2; // required for file
+  string folderPath = 3; // required for folder
+}
+
+message PreviewPublicLibraryDeleteReq {
+  repeated PublicLibraryDeleteItem items = 1;
+  bool recursive = 2;
+  string scope = 3;
+}
+
+message ConfirmPublicLibraryDeleteReq {
+  repeated PublicLibraryDeleteItem items = 1;
+  bool recursive = 2;
+  string scope = 3;
+  string confirmToken = 4;
+}
+
+message PublicLibraryDeleteWarning {
+  string code = 1;
+  string folderPath = 2;
+  int32 fileCount = 3;
+  int32 limit = 4;
+}
+
+message PublicLibraryDeleteFolder {
+  string type = 1;
+  string folderPath = 2;
+  int32 fileCount = 3;
+}
+
+message PublicLibraryDeleteFile {
+  string type = 1;
+  string id = 2;
+  string folderPath = 3;
+  string displayName = 4;
+  string path = 5;
+  string sizeBytes = 6;
+  string mimeType = 7;
+}
+
+message PreviewPublicLibraryDeleteRes {
+  string scope = 1;
+  bool recursive = 2;
+  bool canDelete = 3;
+  repeated PublicLibraryDeleteWarning warnings = 4;
+  int32 fileCount = 5;
+  int32 folderCount = 6;
+  string totalSizeBytes = 7;
+  repeated PublicLibraryDeleteFolder folders = 8;
+  repeated PublicLibraryDeleteFile files = 9;
+  string confirmToken = 10;
+  int32 expiresIn = 11;
+}
+
+message ConfirmPublicLibraryDeleteRes {
+  bool deleted = 1;
+  int32 fileCount = 2;
+  int32 folderCount = 3;
+  string totalSizeBytes = 4;
 }
 
 // ---- Presign / Finalize ----
@@ -212,6 +309,7 @@ service MediaService {
   rpc ListPublicLibrary(ListReq) returns (ListRes);
   rpc ListProtectedLibrary(ListReq) returns (ListRes);
   rpc ListStrictLibrary(ListReq) returns (ListRes);
+  rpc ListMyProtectedLibrary(ListMyProtectedLibraryReq) returns (ListRes);
 
   rpc PresignPublicLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
   rpc PresignProtectedLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
@@ -224,8 +322,12 @@ service MediaService {
   rpc CreatePublicLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
   rpc CreateProtectedLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
   rpc CreateStrictLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+  rpc CreateMyProtectedReadUrl(CreateMyProtectedReadUrlReq) returns (ReadUrlRes);
 
   rpc DeletePublicLibraryById(DeleteByIdReq) returns (DeleteRes);
   rpc DeleteProtectedLibraryById(DeleteByIdReq) returns (DeleteRes);
   rpc DeleteStrictLibraryById(DeleteByIdReq) returns (DeleteRes);
+
+  rpc PreviewPublicLibraryDelete(PreviewPublicLibraryDeleteReq) returns (PreviewPublicLibraryDeleteRes);
+  rpc ConfirmPublicLibraryDelete(ConfirmPublicLibraryDeleteReq) returns (ConfirmPublicLibraryDeleteRes);
 }

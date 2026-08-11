@@ -2,7 +2,6 @@ import type { CallOptions, Metadata } from "@grpc/grpc-js";
 import type { ClientGrpc } from "@nestjs/microservices";
 import {
   SETTINGS_SERVICE_TARGET,
-  buildGrpcS2SMetadata,
   invokeGrpcUnary,
   mergeSignedMetadata,
 } from "@nebula/grpc-auth";
@@ -19,6 +18,10 @@ import type {
   SetStringReq,
   SetStringRes,
 } from "./settings.types";
+import {
+  buildClientGrpcS2SMetadata,
+  type GrpcClientSigningPolicy,
+} from "./s2s-metadata";
 
 type Raw = {
   GetString(
@@ -43,7 +46,10 @@ type Raw = {
   ): Observable<EnsureBootstrapStringRes>;
 };
 
-export function getSettings(client: ClientGrpc): SettingsProxy {
+export function getSettings(
+  client: ClientGrpc,
+  signingPolicy?: GrpcClientSigningPolicy,
+): SettingsProxy {
   const raw = client.getService<Raw>("SettingsService");
   return {
     GetString: (req, m, opts) =>
@@ -52,7 +58,8 @@ export function getSettings(client: ClientGrpc): SettingsProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: SETTINGS_SERVICE_TARGET,
             definition: settings.SettingsServiceService.getString,
             request: req,
@@ -66,7 +73,8 @@ export function getSettings(client: ClientGrpc): SettingsProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: SETTINGS_SERVICE_TARGET,
             definition: settings.SettingsServiceService.setString,
             request: req,
@@ -80,7 +88,8 @@ export function getSettings(client: ClientGrpc): SettingsProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: SETTINGS_SERVICE_TARGET,
             definition: settings.SettingsServiceService.deleteString,
             request: req,
@@ -94,7 +103,8 @@ export function getSettings(client: ClientGrpc): SettingsProxy {
         req,
         mergeSignedMetadata(
           m,
-          buildGrpcS2SMetadata({
+          buildClientGrpcS2SMetadata({
+            policy: signingPolicy,
             target: SETTINGS_SERVICE_TARGET,
             definition: settings.SettingsServiceService.ensureBootstrapString,
             request: req,

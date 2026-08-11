@@ -7,10 +7,16 @@ import {
   createHttpValidationPipe,
   type StructuredLogger,
 } from "@packages/config";
+import type { ApplicationRegistry } from "../application/application.contracts";
+import {
+  createGatewayApplicationContextMiddleware,
+  createGatewayCorsOptionsDelegate,
+} from "./application-context";
 
 export const GATEWAY_API_PREFIX = "api/v1";
 
 export interface ConfigureGatewayHttpOptions {
+  applicationRegistry: ApplicationRegistry;
   jsonLimitBytes: number;
   logger: StructuredLogger;
   nodeEnv?: string;
@@ -33,6 +39,10 @@ export function configureGatewayHttp(
     }),
   );
   app.use(createHttpSecurityHeadersMiddleware(options.nodeEnv));
+  app.enableCors(createGatewayCorsOptionsDelegate(options.applicationRegistry));
+  app.use(
+    createGatewayApplicationContextMiddleware(options.applicationRegistry),
+  );
   app.use(
     json({
       limit: options.jsonLimitBytes,

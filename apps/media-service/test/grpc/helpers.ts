@@ -7,6 +7,7 @@ import {
   registerS2SClientDefinition,
   withBearer,
 } from "@nebula/grpc-auth";
+import { gatewayTestSignedContext } from "../../../../packages/grpc-auth/test/gateway-context.fixture";
 
 type LoadClientArgs = {
   url: string;
@@ -75,6 +76,7 @@ export function mdS2S(opts?: {
   accessToken?: string;
   role?: "user" | "admin" | "root-admin";
 }) {
+  const accessToken = opts?.accessToken ?? defaultActorAccessToken;
   const md = markS2SMetadata(new grpc.Metadata(), {
     kind: "gateway",
     serviceName: "gateway",
@@ -84,8 +86,8 @@ export function mdS2S(opts?: {
         process.env.S2S_TEST_GATEWAY_KEY ??
         "dev-only-gateway-to-media-s2s-key-0001",
     },
+    context: gatewayTestSignedContext(accessToken),
   });
-  const accessToken = opts?.accessToken ?? defaultActorAccessToken;
   if (opts?.role && (!accessToken || roleFromJwt(accessToken) !== opts.role)) {
     throw new Error(`media_test_${opts.role}_jwt_missing_or_invalid`);
   }

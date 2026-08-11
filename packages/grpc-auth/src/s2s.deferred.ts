@@ -5,6 +5,7 @@ import {
   type GrpcRequestDefinition,
 } from "./s2s";
 import type { S2SCallerKind } from "./s2s.crypto";
+import type { S2SSignedContext } from "./s2s-context";
 import type { S2SKey } from "./tokens";
 
 const S2S_SIGNING_INTENT = Symbol.for("@nebula/grpc-auth/s2s-signing-intent");
@@ -25,6 +26,7 @@ export type S2SSigningIdentity = {
   serviceName: string;
   key: S2SKey;
   requestId?: string;
+  context?: S2SSignedContext;
 };
 
 export type S2SSigningIntent = S2SSigningIdentity & {
@@ -74,6 +76,7 @@ export function finalizeS2SMetadata<TRequest>(opts: {
       serviceName: identity.serviceName,
       key: identity.key,
       requestId: identity.requestId,
+      context: identity.context,
     }),
   );
 }

@@ -3,15 +3,19 @@ import { Metadata, type MetadataValue } from "@grpc/grpc-js";
 import { messageTypeRegistry } from "@nebula/protos";
 import {
   S2S_PROTOCOL_VERSION,
+  S2S_PROTOCOL_VERSION_V3,
   digestS2SBytes,
   signS2S,
   type S2SCallerKind,
   type S2SSignedEnvelope,
 } from "./s2s.crypto";
+import { encodeS2SSignedContext, type S2SSignedContext } from "./s2s-context";
 import {
   AUTHORIZATION_HEADER,
   X_REQUEST_ID_HEADER,
   X_S2S_BODY_SHA256_HEADER,
+  X_S2S_CONTEXT_HEADER,
+  X_S2S_CONTEXT_SHA256_HEADER,
   X_S2S_ISSUED_AT_HEADER,
   X_S2S_KEY_ID_HEADER,
   X_S2S_KIND_HEADER,
@@ -49,6 +53,7 @@ export type BuildS2SMetadataOptions = {
   nonce?: string;
   requestId?: string;
   headerName?: string;
+  context?: S2SSignedContext;
 };
 
 export type BuildGrpcS2SMetadataOptions<TRequest> = {
@@ -62,6 +67,14 @@ export type BuildGrpcS2SMetadataOptions<TRequest> = {
   nonce?: string;
   requestId?: string;
   headerName?: string;
+  context?: S2SSignedContext;
+};
+
+export type BuildGatewayGrpcS2SMetadataOptions<TRequest> = Omit<
+  BuildGrpcS2SMetadataOptions<TRequest>,
+  "kind" | "context"
+> & {
+  context: S2SSignedContext;
 };
 
 export type GrpcUnaryMethod<TRequest, TOptions, TResult> = (
@@ -98,6 +111,8 @@ export const S2S_RESERVED_HEADERS = Object.freeze([
   X_REQUEST_ID_HEADER,
   X_S2S_KEY_ID_HEADER,
   X_S2S_BODY_SHA256_HEADER,
+  X_S2S_CONTEXT_HEADER,
+  X_S2S_CONTEXT_SHA256_HEADER,
 ]);
 
 function assertSafeField(value: string, label: string): void {
@@ -138,19 +153,41 @@ export function buildS2SMetadata(opts: BuildS2SMetadataOptions): Metadata {
   assertSafeField(key.id, "s2s_key_id");
   assertDigest(opts.bodySha256);
 
-  const envelope: S2SSignedEnvelope = {
-    version: S2S_PROTOCOL_VERSION,
-    kind,
-    caller,
-    target: opts.target,
-    method: opts.method,
-    path: opts.path,
-    issuedAtMs,
-    nonce,
-    requestId,
-    keyId: key.id,
-    bodySha256: opts.bodySha256,
-  };
+  if (kind === "gateway" && !opts.context) {
+    throw new Error("s2s_context_required_for_gateway");
+  }
+  const encodedContext = opts.context
+    ? encodeS2SSignedContext(opts.context)
+    : undefined;
+
+  const envelope: S2SSignedEnvelope = encodedContext
+    ? {
+        version: S2S_PROTOCOL_VERSION_V3,
+        kind,
+        caller,
+        target: opts.target,
+        method: opts.method,
+        path: opts.path,
+        issuedAtMs,
+        nonce,
+        requestId,
+        keyId: key.id,
+        bodySha256: opts.bodySha256,
+        contextSha256: encodedContext.sha256,
+      }
+    : {
+        version: S2S_PROTOCOL_VERSION,
+        kind,
+        caller,
+        target: opts.target,
+        method: opts.method,
+        path: opts.path,
+        issuedAtMs,
+        nonce,
+        requestId,
+        keyId: key.id,
+        bodySha256: opts.bodySha256,
+      };
 
   const md = new Metadata();
   md.set(X_SVC_HEADER, caller);
@@ -164,6 +201,10 @@ export function buildS2SMetadata(opts: BuildS2SMetadataOptions): Metadata {
   md.set(X_REQUEST_ID_HEADER, envelope.requestId);
   md.set(X_S2S_KEY_ID_HEADER, envelope.keyId);
   md.set(X_S2S_BODY_SHA256_HEADER, envelope.bodySha256);
+  if (encodedContext) {
+    md.set(X_S2S_CONTEXT_HEADER, encodedContext.encoded);
+    md.set(X_S2S_CONTEXT_SHA256_HEADER, encodedContext.sha256);
+  }
   md.set(
     opts.headerName ?? resolveS2SSignHeader(),
     signS2S(key.secret, envelope),
@@ -190,7 +231,18 @@ export function buildGrpcS2SMetadata<TRequest>(
     nonce: opts.nonce,
     requestId: opts.requestId,
     headerName: opts.headerName,
+    context: opts.context,
   });
+}
+
+/**
+ * Build gateway metadata from trusted arguments only. Inbound HTTP metadata is
+ * intentionally not accepted; the optional actor bearer is added separately.
+ */
+export function buildGatewayGrpcS2SMetadata<TRequest>(
+  opts: BuildGatewayGrpcS2SMetadataOptions<TRequest>,
+): Metadata {
+  return buildGrpcS2SMetadata({ ...opts, kind: "gateway" });
 }
 
 /**

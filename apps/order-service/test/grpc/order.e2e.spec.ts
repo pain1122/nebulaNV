@@ -85,7 +85,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "GetCart",
       { userId },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
     expect(res.data).toBeTruthy();
     expect(res.data.userId).toBe(userId);
@@ -102,7 +102,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
           productId: MISSING_ID,
           quantity: 1,
         },
-        mergeMd(mdS2S(), mdBearer(userToken)),
+        mergeMd(mdS2S(userToken), mdBearer(userToken)),
       ),
     ).rejects.toMatchObject({
       code: grpc.status.NOT_FOUND,
@@ -115,7 +115,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "AddToCart",
       { userId, productId, quantity: 2 },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
 
     expect(res.data).toBeTruthy();
@@ -131,7 +131,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "UpdateCartItem",
       { userId, itemId: cartItemId, quantity: 3 },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
 
     const item = res.data.items.find((i: any) => i.id === cartItemId);
@@ -144,7 +144,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "Checkout",
       { userId, note: "gRPC checkout" },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
 
     expect(res.data).toBeTruthy();
@@ -159,7 +159,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "GetCart",
       { userId },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
     expect(cart.data.items.length).toBe(0);
   });
@@ -169,7 +169,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "ListOrders",
       { userId },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
 
     expect(res.data.length).toBeGreaterThan(0);
@@ -182,7 +182,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "GetOrder",
       { userId, id: orderId },
-      mergeMd(mdS2S(), mdBearer(userToken)),
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
 
     expect(res.data.id).toBe(orderId);
@@ -195,7 +195,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
       client,
       "UpdateOrderStatus",
       { id: orderId, status: "PAID" },
-      mergeMd(mdS2S(), mdBearer(adminToken)),
+      mergeMd(mdS2S(adminToken), mdBearer(adminToken)),
     );
 
     expect(res.data.id).toBe(orderId);
@@ -208,7 +208,7 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
         client,
         "UpdateOrderStatus",
         { id: MISSING_ID, status: "PAID" },
-        mergeMd(mdS2S(), mdBearer(adminToken)),
+        mergeMd(mdS2S(adminToken), mdBearer(adminToken)),
       ),
     ).rejects.toMatchObject({
       code: grpc.status.NOT_FOUND,

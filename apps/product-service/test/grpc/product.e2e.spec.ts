@@ -19,7 +19,9 @@ describe("ProductService gRPC (admin required on writes)", () => {
   });
 
   let id = "";
+  let draftId = "";
   let categoryId = "";
+  let userAccess = "";
 
   beforeAll(async () => {
     // (Optional) login admin – not strictly needed for S2S, but handy to ensure auth-service is alive
@@ -33,12 +35,27 @@ describe("ProductService gRPC (admin required on writes)", () => {
     }).then((r) => r.json() as Promise<LoginResp>);
     setS2STestActorToken(login.accessToken);
 
+    const userLogin = await fetch(`${AUTH_HTTP}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        identifier: process.env.SEED_USER_EMAIL ?? "user@example.com",
+        password: process.env.SEED_USER_PASS ?? "User123!",
+      }),
+    }).then((r) => r.json() as Promise<LoginResp>);
+    userAccess = userLogin.accessToken;
+
     // Read the default product category from settings via gRPC
     categoryId = await getDefaultProductCategoryGrpc();
   });
 
   it("CreateProduct succeeds with S2S admin metadata", async () => {
-    const input = { title: "E2E Widget gRPC", price: 149.5, categoryId };
+    const input = {
+      title: "E2E Widget gRPC",
+      price: 149.5,
+      categoryId,
+      status: "ACTIVE",
+    };
 
     const res = await call<any>(
       client,
@@ -69,6 +86,90 @@ describe("ProductService gRPC (admin required on writes)", () => {
     expect(!!hit).toBe(true);
   });
 
+  it("keeps DRAFT products on the distinct admin read contracts", async () => {
+    const title = `E2E Hidden Draft ${Date.now()}`;
+    const created = await call<any>(
+      client,
+      "CreateProduct",
+      { data: { title, price: 20, categoryId, status: "DRAFT" } },
+      mdS2S({ role: "admin" }),
+    );
+    draftId = created.data.id;
+
+    await expect(
+      call(client, "GetProduct", { id: draftId }, mdS2S()),
+    ).rejects.toMatchObject({ code: status.NOT_FOUND });
+
+    const publicList = await call<any>(
+      client,
+      "ListProducts",
+      { q: title, status: "DRAFT", includeDeleted: true },
+      mdS2S(),
+    );
+    expect(publicList.data).toEqual([]);
+
+    const adminGet = await call<any>(
+      client,
+      "AdminGetProduct",
+      { id: draftId },
+      mdS2S({ role: "admin" }),
+    );
+    expect(adminGet.data).toMatchObject({ id: draftId, status: "DRAFT" });
+
+    const adminList = await call<any>(
+      client,
+      "AdminListProducts",
+      { q: title, status: "DRAFT", includeDeleted: true },
+      mdS2S({ role: "admin" }),
+    );
+    expect(adminList.data.some((product: any) => product.id === draftId)).toBe(
+      true,
+    );
+  });
+
+  it("rejects a normal user from Product admin reads", async () => {
+    await expect(
+      call(
+        client,
+        "AdminGetProduct",
+        { id },
+        mdS2S({ accessToken: userAccess, role: "user" }),
+      ),
+    ).rejects.toMatchObject({ code: status.PERMISSION_DENIED });
+  });
+
+  it("separates public and admin gallery visibility", async () => {
+    const added = await call<any>(
+      client,
+      "AddImages",
+      {
+        productId: draftId,
+        images: [{ url: "https://example.test/draft.jpg", alt: "draft" }],
+      },
+      mdS2S({ role: "admin" }),
+    );
+    expect(added.images).toHaveLength(1);
+
+    await expect(
+      call(client, "ListGallery", { productId: draftId }, mdS2S()),
+    ).rejects.toMatchObject({ code: status.NOT_FOUND });
+
+    const adminGallery = await call<any>(
+      client,
+      "AdminListGallery",
+      { productId: draftId, includeDeleted: true },
+      mdS2S({ role: "admin" }),
+    );
+    expect(adminGallery.images).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: added.images[0].id,
+          deletedAt: "",
+        }),
+      ]),
+    );
+  });
+
   it("UpdateProduct (admin) changes title", async () => {
     const res = await call<any>(
       client,
@@ -91,5 +192,22 @@ describe("ProductService gRPC (admin required on writes)", () => {
       code: status.NOT_FOUND,
       details: "product_not_found",
     });
+  });
+
+  it("hides a soft-deleted product from public reads but not admin reads", async () => {
+    await call(client, "DeleteProduct", { id }, mdS2S({ role: "admin" }));
+
+    await expect(
+      call(client, "GetProduct", { id }, mdS2S()),
+    ).rejects.toMatchObject({ code: status.NOT_FOUND });
+
+    const adminGet = await call<any>(
+      client,
+      "AdminGetProduct",
+      { id },
+      mdS2S({ role: "admin" }),
+    );
+    expect(adminGet.data.id).toBe(id);
+    expect(adminGet.data.deletedAt).not.toBe("");
   });
 });

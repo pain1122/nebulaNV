@@ -24,6 +24,7 @@ Other services validate access tokens through auth-service gRPC `ValidateToken`.
 
 Current/expected consumers include:
 
+- gateway, only through its gateway-kind pairwise identity
 - user-service
 - media-service
 - settings-service
@@ -58,9 +59,11 @@ Service: `AuthService`
 
 Methods:
 
+- `Register`
 - `ValidateUser`
 - `GetTokens`
 - `RefreshTokens`
+- `Logout`
 - `ValidateToken`
 - `GetProfile`
 
@@ -69,7 +72,19 @@ Important behavior:
 - `ValidateToken` returns `{ isValid: false }` for invalid tokens instead of
   throwing. Valid responses include an HMAC-derived `sessionRef` for log
   correlation; the raw JWT session ID is never returned.
+- `ValidateToken` is the sole mixed-kind Auth RPC. Its exact identity policy
+  allows `gateway/gateway` plus the existing approved service-kind consumers;
+  caller name without the matching kind is insufficient. Other Auth internal
+  and gateway-only methods keep their prior policies.
 - `GetTokens` is a pre-JWT, gateway-only login step. Its `userId` comes from the method-specific request body after S2S verification binds that body to the exact RPC; it is not propagated actor context.
+- `Register` is gateway-only and delegates to auth-service's existing password
+  hashing and auth-only User `CreateUser` path. The gateway never receives
+  permission to call User `CreateUser` directly.
+- `Logout` is a private, gateway-only RPC. It validates the access Bearer and
+  derives both user ID and current session ID from that result; no body user ID
+  exists. `allDevices` revokes all sessions and bumps token version. Otherwise
+  it revokes the bearer session, and an optional refresh token may only confirm
+  that same user/session.
 - `GetProfile` allows self access or admin/root-admin access.
 - gRPC public methods marked `gatewayOnly` still rely on S2S/gateway guard policy.
 
@@ -84,6 +99,11 @@ Access and refresh tokens include:
 - `sid`
 - `jti`
 - `typ`
+
+Login and successful refresh responses include authoritative
+`accessExpiresInSeconds` and `refreshExpiresInSeconds` values calculated by
+auth-service from the issued tokens. Gateway/BFF callers do not parse JWTs or
+duplicate expiry-string configuration.
 
 `tv` is the global token version. `sid` identifies one device/session, `jti` identifies one token generation, and `typ` separates access and refresh tokens.
 
@@ -148,7 +168,8 @@ The undocumented `JWT_SECRET` fallback is no longer accepted.
 Covered:
 
 - HTTP register/login/refresh/logout/me flow.
-- gRPC validateUser, validateToken, getTokens, getProfile.
+- gRPC register, validateUser, getTokens, refreshTokens, logout, validateToken,
+  and getProfile boundary behavior.
 - Profile lookup distinguishes missing bearer credentials from downstream user-service failures.
 - Token tampering rejection.
 - Spoofed gRPC role metadata rejection.
@@ -200,6 +221,8 @@ Runtime:
 
 Tests:
 
+- `apps/auth-service/test/grpc/auth-grpc.controller.spec.ts`
+- `apps/auth-service/test/grpc/auth.e2e.spec.ts`
 - `apps/auth-service/test/e2e/auth.http-grpc.flow.e2e.spec.ts`
 - `apps/auth-service/test/redis/auth.service.security.spec.ts`
 - `apps/auth-service/test/redis/jwt-auth.guard.security.spec.ts`

@@ -1,13 +1,22 @@
 // apps/blog-service/src/taxonomy/grpc/taxonomy-grpc.controller.ts
 import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import type { Metadata } from "@grpc/grpc-js";
-import { bearerFromMeta, Roles, Public } from "@nebula/grpc-auth";
+import type { ServerUnaryCall } from "@grpc/grpc-js";
+import {
+  createVerifiedServiceDownstreamContext,
+  Roles,
+  Public,
+  type MetadataWithContext,
+  type RpcContextWithContext,
+} from "@nebula/grpc-auth";
 import { blogv1 as blog } from "@nebula/protos";
 
 import { TaxonomyService } from "../taxonomy.service";
 import { CreateTaxonomyDto, UpdateTaxonomyDto } from "../dto/taxonomy.dto";
 import { type BlogTaxonomyRecord, dateishToString } from "../taxonomy.types";
+
+type GrpcCall<TRequest> = ServerUnaryCall<TRequest, unknown> &
+  RpcContextWithContext;
 
 @Controller()
 export class TaxonomyGrpcController {
@@ -44,16 +53,22 @@ export class TaxonomyGrpcController {
   @GrpcMethod("BlogTaxonomyService", "List")
   async list(
     req: blog.ListBlogTaxonomiesRequest,
+    metadata: MetadataWithContext,
+    call: GrpcCall<blog.ListBlogTaxonomiesRequest>,
   ): Promise<blog.ListBlogTaxonomiesResponse> {
     const page = req.page || 1;
     const limit = req.limit || 50;
 
-    const res = await this.svc.list(req.kind, {
-      page,
-      limit,
-      q: req.q ?? "",
-      parentId: req.parentId || undefined,
-    });
+    const res = await this.svc.list(
+      req.kind,
+      {
+        page,
+        limit,
+        q: req.q ?? "",
+        parentId: req.parentId || undefined,
+      },
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
 
     return blog.ListBlogTaxonomiesResponse.create({
       data: res.data.map((t) => this.toProto(t)),
@@ -70,8 +85,13 @@ export class TaxonomyGrpcController {
   @GrpcMethod("BlogTaxonomyService", "Get")
   async get(
     req: blog.GetBlogTaxonomyRequest,
+    metadata: MetadataWithContext,
+    call: GrpcCall<blog.GetBlogTaxonomyRequest>,
   ): Promise<blog.BlogTaxonomyResponse> {
-    const res = await this.svc.get(req.id);
+    const res = await this.svc.get(
+      req.id,
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
     return blog.BlogTaxonomyResponse.create({
       data: this.toProto(res.data),
     });
@@ -84,7 +104,8 @@ export class TaxonomyGrpcController {
   @GrpcMethod("BlogTaxonomyService", "Create")
   async create(
     req: blog.CreateBlogTaxonomyRequest,
-    metadata: Metadata,
+    metadata: MetadataWithContext,
+    call: GrpcCall<blog.CreateBlogTaxonomyRequest>,
   ): Promise<blog.BlogTaxonomyResponse> {
     const dto: CreateTaxonomyDto = {
       slug: req.slug,
@@ -98,7 +119,7 @@ export class TaxonomyGrpcController {
     const { data } = await this.svc.create(
       req.kind,
       dto,
-      bearerFromMeta(metadata),
+      createVerifiedServiceDownstreamContext(metadata, call),
     );
 
     return blog.BlogTaxonomyResponse.create({
@@ -113,7 +134,8 @@ export class TaxonomyGrpcController {
   @GrpcMethod("BlogTaxonomyService", "Update")
   async update(
     req: blog.UpdateBlogTaxonomyRequest,
-    metadata: Metadata,
+    metadata: MetadataWithContext,
+    call: GrpcCall<blog.UpdateBlogTaxonomyRequest>,
   ): Promise<blog.BlogTaxonomyResponse> {
     const patch: UpdateTaxonomyDto = {
       slug: req.slug || undefined,
@@ -127,7 +149,7 @@ export class TaxonomyGrpcController {
     const { data } = await this.svc.update(
       req.id,
       patch,
-      bearerFromMeta(metadata),
+      createVerifiedServiceDownstreamContext(metadata, call),
     );
 
     return blog.BlogTaxonomyResponse.create({
@@ -142,9 +164,13 @@ export class TaxonomyGrpcController {
   @GrpcMethod("BlogTaxonomyService", "Delete")
   async delete(
     req: blog.DeleteBlogTaxonomyRequest,
-    metadata: Metadata,
+    metadata: MetadataWithContext,
+    call: GrpcCall<blog.DeleteBlogTaxonomyRequest>,
   ): Promise<blog.DeleteBlogTaxonomyResponse> {
-    const ok = await this.svc.remove(req.id, bearerFromMeta(metadata));
+    const ok = await this.svc.remove(
+      req.id,
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
     return blog.DeleteBlogTaxonomyResponse.create({ success: !!ok });
   }
 }

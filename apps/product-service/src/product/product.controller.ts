@@ -7,9 +7,10 @@ import {
   Post,
   Query,
   ParseUUIDPipe,
+  Req,
 } from "@nestjs/common";
 import { ProductServiceImpl } from "./product.service";
-import { Public, Roles } from "@nebula/grpc-auth";
+import { Public, Roles, type HttpRequestWithContext } from "@nebula/grpc-auth";
 import { Throttle } from "@nestjs/throttler";
 import {
   CreateProductRequestDto,
@@ -24,23 +25,35 @@ export class ProductController {
   @Public()
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get()
-  list(@Query() q: ListProductsRequestDto) {
+  list(@Query() q: ListProductsRequestDto, @Req() req: HttpRequestWithContext) {
     // q is sanitized/coerced by ValidationPipe + DTO transforms
-    return this.svc.list({
+    const input = {
       q: q.q ?? "",
       categoryId: q.categoryId ?? "",
-      status: q.status ?? "",
       page: q.page ?? 1,
       limit: q.limit ?? 20,
-      includeDeleted: !!q.includeDeleted,
-    });
+    };
+    const isAdmin =
+      req.user?.role === "admin" || req.user?.role === "root-admin";
+    return isAdmin
+      ? this.svc.listAdmin({
+          ...input,
+          status: q.status ?? "",
+          includeDeleted: !!q.includeDeleted,
+        })
+      : this.svc.listPublic(input);
   }
 
   @Public()
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get(":id")
-  get(@Param("id", new ParseUUIDPipe({ version: "4" })) id: string) {
-    return this.svc.get(id);
+  get(
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Req() req: HttpRequestWithContext,
+  ) {
+    const isAdmin =
+      req.user?.role === "admin" || req.user?.role === "root-admin";
+    return isAdmin ? this.svc.getAdmin(id) : this.svc.getPublic(id);
   }
 
   @Roles("admin", "root-admin")

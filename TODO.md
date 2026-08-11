@@ -248,7 +248,7 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
 
 ### Gateway Boundary
 
-- [ ] Create a dedicated gateway application.
+- [x] Create a dedicated gateway application.
 - [ ] Expose versioned external routes under `/api/v1`.
 - [ ] Keep backend HTTP/gRPC ports private in release while retaining local
       diagnostic access.
@@ -259,7 +259,7 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
       future confidential partner/server clients.
 - [ ] Resolve trusted tenant, site, channel, and actor context.
 - [ ] Sign forwarded internal context.
-- [ ] Apply rate limits and request-size limits.
+- [x] Apply rate limits and request-size limits.
 - [ ] Add end-to-end request/correlation IDs; reserve distributed tracing and
       spans for F9.
 - [ ] Add gateway health and dependency readiness.
@@ -277,13 +277,13 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
 
 ### Client Types
 
-- [ ] Define anonymous storefront clients.
-- [ ] Define authenticated user clients.
-- [ ] Define admin clients.
-- [ ] Define registered mobile applications.
-- [ ] Reserve partner credentials for future integrations.
-- [ ] Ensure partner credentials never reuse S2S secrets.
-- [ ] Define OAuth/API-key direction without implementing a partner marketplace.
+- [x] Define anonymous storefront clients.
+- [x] Define authenticated user clients.
+- [x] Define admin clients.
+- [x] Define registered mobile applications.
+- [x] Reserve partner credentials for future integrations.
+- [x] Ensure partner credentials never reuse S2S secrets.
+- [x] Define OAuth/API-key direction without implementing a partner marketplace.
 
 ### Current Integration Corrections
 
