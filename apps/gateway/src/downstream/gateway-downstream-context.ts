@@ -7,7 +7,7 @@ import {
   withBearer,
   type S2SSignedContext,
 } from "@nebula/grpc-auth";
-import type { GatewayHttpRequest } from "../http/application-context";
+import type { GatewayHttpRequest } from "../http/public-client-boundary";
 
 export type GatewayOutboundTarget = (typeof GATEWAY_OUTBOUND_TARGETS)[number];
 

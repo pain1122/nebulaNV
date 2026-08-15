@@ -16,9 +16,11 @@ import {
   hasRoleAtLeast,
   type Role,
 } from "@nebula/grpc-auth";
-import { ANONYMOUS_ACTOR } from "../application/application-context";
+import { ANONYMOUS_ACTOR } from "../application/trusted-request";
 import type { AuthenticatedActorState } from "../application/application.contracts";
-import type { GatewayHttpRequest } from "../http/application-context";
+import type { GatewayHttpRequest } from "../http/public-client-boundary";
+import { GATEWAY_ROUTE_POLICY_METADATA } from "../http/gateway-route-policy";
+import { gatewayRoutePolicy } from "../contracts/route-policy";
 import { GatewayAuthResolver } from "./gateway-auth-resolver";
 
 const MAX_BEARER_BYTES = 8192;
@@ -94,6 +96,19 @@ export class GatewayBearerAuthGuard implements CanActivate {
     if (!request.requestContext) {
       if (isPublic) return true;
       throw new UnauthorizedException("gateway_request_context_missing");
+    }
+
+    const routeId = this.reflector.getAllAndOverride<string>(
+      GATEWAY_ROUTE_POLICY_METADATA,
+      [handler, controller],
+    );
+    if (
+      routeId &&
+      !gatewayRoutePolicy(routeId).applications.includes(
+        request.requestContext.applicationProfile,
+      )
+    ) {
+      throw new ForbiddenException("application_profile_not_allowed");
     }
 
     const requiredRoles =

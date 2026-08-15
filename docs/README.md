@@ -23,6 +23,7 @@ For most backend tasks, read in this order:
 - [System Relationships](architecture/system-relationships.md): ownership, valid service connections, forbidden paths.
 - [Contracts And Boundaries](architecture/contracts-and-boundaries.md): DTO/proto/service/Prisma/mapper rules, naming, identity, cross-service clients.
 - [API And Proto Versioning](architecture/api-and-proto-versioning.md): additive-change rules, breaking-change triggers, deprecation, and compatibility verification.
+- [Gateway External API Standards](architecture/gateway-api-standards.md): executable route policies, envelopes/errors, query profiles, pagination, retry/idempotency, and contract-only OpenAPI ownership.
 - [S2S Security Contract](architecture/s2s-security-contract.md): implemented v2 envelope, pairwise keys, replay defense, rotation, and canonical service bootstrap.
 - [Actor Context Contract](architecture/actor-context-contract.md): implemented service/user identity provenance, forbidden raw-header fallbacks, and actor/target separation.
 - [Tenant, Package, Channel, And Kubernetes Platform](architecture/tenant-package-channel-platform.md): target tenant hierarchy, parent contracts, site/app ownership, modular Kubernetes features, licensing, isolation, and pre-admin prerequisites.

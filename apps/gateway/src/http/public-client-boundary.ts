@@ -11,9 +11,12 @@ import {
 import {
   ANONYMOUS_ACTOR,
   createGatewayRequestContext,
-} from "../application/application-context";
+} from "../application/trusted-request";
 import { normalizeLookupOrigin } from "../application/application-origin";
+import { gatewayErrorEnvelope } from "../contracts/api-envelope";
 
+// This boundary resolves public client identity and strips caller-controlled
+// authority headers before trusted request state is attached.
 export const GATEWAY_CORS_ALLOWED_HEADERS = [
   "Authorization",
   "Content-Type",
@@ -84,20 +87,26 @@ function stripUntrustedContextHeaders(request: Request): void {
 }
 
 function identityFailure(
+  request: GatewayHttpRequest,
   response: Response,
   status: number,
-  message: string,
+  code: "CLIENT_ID_REQUIRED" | "APPLICATION_NOT_ALLOWED" | "INTERNAL_ERROR",
 ): void {
-  response.status(status).json({
-    statusCode: status,
-    error:
-      status === 400
-        ? "Bad Request"
-        : status === 403
-          ? "Forbidden"
-          : "Internal Server Error",
-    message,
-  });
+  const message =
+    code === "CLIENT_ID_REQUIRED"
+      ? "A valid client identifier is required"
+      : code === "APPLICATION_NOT_ALLOWED"
+        ? "Application identity was not accepted"
+        : "An internal error occurred";
+  response
+    .status(status)
+    .json(
+      gatewayErrorEnvelope(
+        code,
+        message,
+        request.requestId?.trim() || "unavailable",
+      ),
+    );
 }
 
 export function createGatewayApplicationContextMiddleware(
@@ -121,15 +130,11 @@ export function createGatewayApplicationContextMiddleware(
       clientIds.length !== 1 ||
       !PUBLIC_CLIENT_ID_PATTERN.test(clientIds[0] ?? "")
     ) {
-      identityFailure(
-        response,
-        400,
-        "A single valid x-nebula-client-id header is required",
-      );
+      identityFailure(request, response, 400, "CLIENT_ID_REQUIRED");
       return;
     }
     if (origins.length > 1) {
-      identityFailure(response, 400, "At most one Origin header is allowed");
+      identityFailure(request, response, 400, "CLIENT_ID_REQUIRED");
       return;
     }
 
@@ -137,19 +142,11 @@ export function createGatewayApplicationContextMiddleware(
       .resolve({ clientId: clientIds[0], origin: origins[0] })
       .then((record) => {
         if (!record) {
-          identityFailure(
-            response,
-            403,
-            "Application identity was not accepted",
-          );
+          identityFailure(request, response, 403, "APPLICATION_NOT_ALLOWED");
           return;
         }
         if (!request.requestId) {
-          identityFailure(
-            response,
-            500,
-            "Trusted request identity is unavailable",
-          );
+          identityFailure(request, response, 500, "INTERNAL_ERROR");
           return;
         }
 

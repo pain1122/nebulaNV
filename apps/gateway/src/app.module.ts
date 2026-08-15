@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { createServiceLifecycleProvider } from "@packages/config";
 import * as path from "node:path";
@@ -13,10 +13,11 @@ import { gatewayRateLimitTracker } from "./http/rate-limit";
 import { GatewayAuthResolver } from "./auth/gateway-auth-resolver";
 import { GatewayBearerAuthGuard } from "./auth/gateway-bearer-auth.guard";
 import { GatewayRedisService } from "./state/gateway-redis.service";
+import { GatewayIdempotencyService } from "./state/gateway-idempotency.service";
+import { GatewayRoutePolicyInterceptor } from "./http/gateway-route-policy";
+import { GATEWAY_HTTP_CONTROLLERS } from "./contracts/gateway-http-controllers";
 
-// Batch 4's contract-only OpenAPI module will consume this same list. Health is
-// operational and intentionally remains outside the external API document.
-export const GATEWAY_HTTP_CONTROLLERS = [] as const;
+export { GATEWAY_HTTP_CONTROLLERS } from "./contracts/gateway-http-controllers";
 
 @Module({
   imports: [
@@ -50,10 +51,12 @@ export const GATEWAY_HTTP_CONTROLLERS = [] as const;
     createServiceLifecycleProvider("gateway"),
     applicationRegistryProvider,
     GatewayRedisService,
+    GatewayIdempotencyService,
     GatewayReadinessService,
     GatewayAuthResolver,
     { provide: APP_GUARD, useClass: GatewayBearerAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: GatewayRoutePolicyInterceptor },
   ],
 })
 export class AppModule {}

@@ -12,8 +12,9 @@ import {
 import type { GatewayRequestContext } from "../src/application/application.contracts";
 import { GatewayBearerAuthGuard } from "../src/auth/gateway-bearer-auth.guard";
 import type { GatewayAuthResolver } from "../src/auth/gateway-auth-resolver";
-import type { GatewayHttpRequest } from "../src/http/application-context";
+import type { GatewayHttpRequest } from "../src/http/public-client-boundary";
 import { gatewayRateLimitTracker } from "../src/http/rate-limit";
+import { GATEWAY_ROUTE_POLICY_METADATA } from "../src/http/gateway-route-policy";
 
 const requestContext: GatewayRequestContext = Object.freeze({
   requestId: "request-auth-123",
@@ -31,6 +32,7 @@ function handlerWith(options: {
   internalOnly?: boolean;
   roles?: Role[];
   minimumRole?: Role;
+  routeId?: string;
 }): () => void {
   const handler = () => undefined;
   if (options.public) Reflect.defineMetadata(IS_PUBLIC_KEY, true, handler);
@@ -40,6 +42,13 @@ function handlerWith(options: {
   if (options.roles) Reflect.defineMetadata(ROLES_KEY, options.roles, handler);
   if (options.minimumRole) {
     Reflect.defineMetadata(ROLE_MIN_KEY, options.minimumRole, handler);
+  }
+  if (options.routeId) {
+    Reflect.defineMetadata(
+      GATEWAY_ROUTE_POLICY_METADATA,
+      options.routeId,
+      handler,
+    );
   }
   return handler;
 }
@@ -191,6 +200,18 @@ describe("GatewayBearerAuthGuard", () => {
         ),
       ),
     ).rejects.toMatchObject({ message: "role_too_low" });
+  });
+
+  it("enforces the manifest application profile before route execution", async () => {
+    await expect(
+      guard.canActivate(
+        httpContext(
+          gatewayRequest(),
+          handlerWith({ public: true, routeId: "admin.products.create" }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: "application_profile_not_allowed" });
+    expect(resolve).not.toHaveBeenCalled();
   });
 
   it("fails closed on invalid Auth truth, missing API context, and internal-only routes", async () => {

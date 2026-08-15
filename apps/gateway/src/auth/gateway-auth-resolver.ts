@@ -15,7 +15,7 @@ import {
   wrapGrpc,
   type S2SSignedContext,
 } from "@nebula/grpc-auth";
-import { actorFromVerifiedAuth } from "../application/application-context";
+import { actorFromVerifiedAuth } from "../application/trusted-request";
 import type {
   AuthenticatedActorState,
   GatewayRequestContext,

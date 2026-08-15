@@ -155,7 +155,8 @@ gRPC:
 - Blog taxonomy create/get/list/update/delete covered.
 - Missing blog taxonomy records return `NOT_FOUND` with `taxonomy_not_found`.
 - The unwired initializer is covered in isolation for blog scope/key ownership, log-and-continue failure behavior, and safe repeated invocation.
-- Some gRPC admin enforcement needs review because one test currently allows `CreatePost` without metadata.
+- gRPC write coverage proves `CreatePost` rejects a signed S2S call without an
+  actor JWT and succeeds only with verified admin metadata.
 
 ## Related Files
 

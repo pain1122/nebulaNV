@@ -17,7 +17,7 @@ import {
   createGatewayDownstreamContext,
   type GatewayOutboundTarget,
 } from "../src/downstream/gateway-downstream-context";
-import type { GatewayHttpRequest } from "../src/http/application-context";
+import type { GatewayHttpRequest } from "../src/http/public-client-boundary";
 
 const USER_KEY = {
   id: "gateway-user-v1",

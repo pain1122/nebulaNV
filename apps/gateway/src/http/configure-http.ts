@@ -11,7 +11,11 @@ import type { ApplicationRegistry } from "../application/application.contracts";
 import {
   createGatewayApplicationContextMiddleware,
   createGatewayCorsOptionsDelegate,
-} from "./application-context";
+} from "./public-client-boundary";
+import {
+  GatewayHttpErrorFilter,
+  gatewayValidationExceptionFactory,
+} from "./gateway-http-error";
 
 export const GATEWAY_API_PREFIX = "api/v1";
 
@@ -50,5 +54,10 @@ export function configureGatewayHttp(
       type: ["application/json", "application/*+json"],
     }),
   );
-  app.useGlobalPipes(createHttpValidationPipe());
+  app.useGlobalPipes(
+    createHttpValidationPipe({
+      exceptionFactory: gatewayValidationExceptionFactory,
+    }),
+  );
+  app.useGlobalFilters(new GatewayHttpErrorFilter(options.logger));
 }

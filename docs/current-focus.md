@@ -1,17 +1,18 @@
 # Current Focus
 
-Last updated: 2026-08-11
+Last updated: 2026-08-15
 
 ## Active Slice
 
-F3 - External API Gateway, Batch 4 external API standards.
+F3 - External API Gateway, Batch 5 versioned route adapters.
 
 The F2 exit and F3 entry gates are complete, every required gateway decision is
-frozen, and Batches 1 through 3 have passed their focused checks. Batch 3 now
-has the outbound-only trust validator, receiver-first v3 context/actor
-foundation, selected additive internal contracts, manifest-selected clients,
-gateway Auth resolver, transitive causal propagation, and the frozen readiness
-matrix. `TODO.md` remains the milestone board. This file is the single,
+frozen, and Batches 1 through 4 have passed their focused checks. Batch 4 now
+has the executable route-policy and input-profile contracts, stable external
+envelopes/errors/pagination, bounded Redis idempotency, and contract-owned
+OpenAPI infrastructure. Batch 3 retains the outbound trust, verified context,
+internal contracts/clients, Auth resolver, causal propagation, and readiness
+foundation. `TODO.md` remains the milestone board. This file is the single,
 complete F3 checklist and work order; it is not evidence that an unchecked item
 is implemented.
 
@@ -61,7 +62,7 @@ release backend boundary. Existing unrelated dirty work, especially in
 | Current Integration Corrections | Batch 7                           |
 | F3 Exit Gate                    | Batch 8                           |
 
-The completed decisions, Batch 1 foundation, and the earlier API/proto
+The completed decisions, Batches 1 through 4, and the earlier API/proto
 versioning rule are retained as checked items. Every other F3 work-order item
 remains unchecked until verified.
 
@@ -78,37 +79,37 @@ remains unchecked until verified.
 
 ## Classified Findings From The Source Audit
 
-| Area                                           | Classification                        | Evidence-backed consequence for F3                                                                                                                                                                                              |
-| ---------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gateway application                            | confirmed defect                      | Batch 1 resolves the missing HTTP-only workspace/foundation; public routes, image, Compose service, OpenAPI artifact, and external client remain later-batch gaps.                                                              |
-| Gateway service-local env example              | confirmed defect                      | Batch 2 initially added only the root example even though every existing backend service has an app-local `.env.example`; the gateway example and ignored local override now match its startup schema.                          |
-| HTTP-only configuration                        | confirmed defect                      | Resolved in Batch 1 by an additive shared HTTP-only schema/resolver; the existing hybrid resolver remains unchanged.                                                                                                            |
-| Gateway outbound trust                         | confirmed defect                      | Resolved by the first Batch 3 item with an exact-target outbound-only env/runtime validator; the hybrid receiver schema remains unchanged and no fake inbound/replay configuration was added.                                   |
-| Shared Joi schema composition                  | confirmed defect                      | Adding the gateway trust schema exposed grpc-auth resolving Joi 18.0.2 while gateway/config used 18.0.1, which makes Joi reject the mixed schema at startup; grpc-auth is narrowly pinned to the existing 18.0.1 owner version. |
-| Signed context                                 | confirmed defect                      | Resolved at the shared receiver/signer boundary with strict v3 canonical context while retaining byte-compatible ordinary-service v2; raw context-looking metadata remains untrusted.                                           |
-| Transitive propagation                         | confirmed defect                      | Resolved in Batch 3: guarded service controllers project only verified ingress state, and Order/Product/ProductTaxonomy/BlogTaxonomy preserve context/request ID while each nested target gets a fresh service-kind signature.  |
-| Internal clients                               | confirmed defect                      | Resolved for the F3 manifest: all selected Auth, User, Settings, Product/facade, Blog/facade, Taxonomy, Order, and Media methods now have fixed-definition signed wrappers; gateway owns eight validated targets.               |
-| Auth gateway path                              | confirmed defect                      | Resolved: Register/Logout, the exact mixed-kind `ValidateToken` policy, and a gateway-owned Auth resolver use gateway v3/pairwise signing without local JWT decoding or changing the ordinary-service guard.                    |
-| Route parity                                   | confirmed defect                      | Resolved for the frozen F3 launch surface: User `ListUsers`, authoritative public/distinct admin Product reads, Media owned protected list/read, and two-step public delete now have additive gRPC contracts.                   |
-| External standards                             | confirmed defect                      | Envelopes, route-specific query/pagination/idempotency policy, OpenAPI generation, and an external typed client do not exist.                                                                                                   |
-| Registry authority                             | confirmed defect                      | Resolved for F3 by a replaceable, strictly validated deployment-configuration adapter; F4 still owns persistent tenant/site/channel/application authority and stable lifecycle management.                                      |
-| Browser session/CORS                           | confirmed defect                      | Direct-service CORS uses `credentials: false` and a narrow header list; it cannot simply be reused for cookie routes, idempotency, or registry-driven origins.                                                                  |
-| Browser token/cookie contract                  | confirmed defect                      | The app duplicates access-token transport and gives remember-me cookies 30 days while auth refresh truth is 7 days; choose one transport and align expiry/clear behavior.                                                       |
-| Logout device selector                         | confirmed defect                      | The frozen input named `deviceId`, but auth-service has no device registry or device-scoped session behavior and the existing DTO ignored it; F3 rejects it and derives current-session logout from the bearer.                 |
-| Current web integration                        | confirmed defect                      | Refresh omits POST, failed concurrent refresh can leave queued callers unresolved, no focused harness exists, and product forwarding/mapping is incomplete.                                                                     |
-| Product public reads                           | confirmed defect                      | Resolved in Batch 3: public get/list/gallery now force ACTIVE/non-deleted visibility, while three distinct role-protected admin reads own lifecycle/deletion controls.                                                          |
-| Release health                                 | confirmed defect                      | Release already uses `GATEWAY_ONLY`, while unsigned Docker `/health/ready` probes are only `@Public()` and can be rejected.                                                                                                     |
-| Media transport                                | confirmed defect                      | Public render is an HTTP byte stream, but no signed gateway HTTP carrier or validated media HTTP target exists under the current release policy.                                                                                |
-| Release exposure                               | confirmed defect                      | Release publishes backend HTTP/gRPC, database, and MinIO ports. API ports must become internal while presigned storage data-plane access remains explicit.                                                                      |
-| Release image archive                          | confirmed defect                      | The PowerShell image-save script uses an undefined `$repoRoot`; its passing regex test does not prove the script can archive a gateway image.                                                                                   |
-| Refresh-rotation task                          | stale implementation or documentation | The web refresh route already stores the rotated token. F3 must characterize/preserve it and fix the POST caller, not add another rotation policy.                                                                              |
-| Release policy wording                         | stale implementation or documentation | `GATEWAY_ONLY` is already the release default and is an HTTP policy; it must be preserved and tested, not described as a new public-gRPC switch.                                                                                |
-| Deployment and blog documentation              | stale implementation or documentation | Deploy docs contradict the sequential Bake/offline install path, and the blog doc says gRPC create accepts no metadata although current enforcement rejects it.                                                                 |
-| Batch ownership wording                        | stale implementation or documentation | Batch 2 previously implied live Auth and Next-BFF integration even though the frozen work order assigns those runtime changes to Batches 3 and 7; Batch 2 now owns their context/registry contracts only.                       |
-| F3 milestone checkbox state                    | stale implementation or documentation | Completed Batch 1 gateway/rate-limit items and Batch 2 client-profile decisions remained unchecked in `TODO.md`; their milestone state is now aligned without checking composite trust/routes still owned by later batches.     |
-| Distributed rate storage and full tracing      | future scaling consideration          | F3 needs a correlation ID and a single-gateway limit baseline. Multi-replica rate storage, trusted-proxy topology, and distributed spans belong to F9 unless scope changes.                                                     |
-| Mobile/application attestation                 | optional hardening                    | Public client IDs do not prove binary authenticity; reserve an attestation extension point without blocking F3.                                                                                                                 |
-| Partner marketplace and CDN/streaming redesign | future scaling consideration          | Reserve clean boundaries, but do not implement these later-phase capabilities in F3.                                                                                                                                            |
+| Area                                           | Classification                        | Evidence-backed consequence for F3                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gateway application                            | confirmed defect                      | Batch 1 resolves the missing HTTP-only workspace/foundation; public routes, image, Compose service, OpenAPI artifact, and external client remain later-batch gaps.                                                                                                                                    |
+| Gateway service-local env example              | confirmed defect                      | Batch 2 initially added only the root example even though every existing backend service has an app-local `.env.example`; the gateway example and ignored local override now match its startup schema.                                                                                                |
+| HTTP-only configuration                        | confirmed defect                      | Resolved in Batch 1 by an additive shared HTTP-only schema/resolver; the existing hybrid resolver remains unchanged.                                                                                                                                                                                  |
+| Gateway outbound trust                         | confirmed defect                      | Resolved by the first Batch 3 item with an exact-target outbound-only env/runtime validator; the hybrid receiver schema remains unchanged and no fake inbound/replay configuration was added.                                                                                                         |
+| Shared Joi schema composition                  | confirmed defect                      | Adding the gateway trust schema exposed grpc-auth resolving Joi 18.0.2 while gateway/config used 18.0.1, which makes Joi reject the mixed schema at startup; grpc-auth is narrowly pinned to the existing 18.0.1 owner version.                                                                       |
+| Signed context                                 | confirmed defect                      | Resolved at the shared receiver/signer boundary with strict v3 canonical context while retaining byte-compatible ordinary-service v2; raw context-looking metadata remains untrusted.                                                                                                                 |
+| Transitive propagation                         | confirmed defect                      | Resolved in Batch 3: guarded service controllers project only verified ingress state, and Order/Product/ProductTaxonomy/BlogTaxonomy preserve context/request ID while each nested target gets a fresh service-kind signature.                                                                        |
+| Internal clients                               | confirmed defect                      | Resolved for the F3 manifest: all selected Auth, User, Settings, Product/facade, Blog/facade, Taxonomy, Order, and Media methods now have fixed-definition signed wrappers; gateway owns eight validated targets.                                                                                     |
+| Auth gateway path                              | confirmed defect                      | Resolved: Register/Logout, the exact mixed-kind `ValidateToken` policy, and a gateway-owned Auth resolver use gateway v3/pairwise signing without local JWT decoding or changing the ordinary-service guard.                                                                                          |
+| Route parity                                   | confirmed defect                      | Resolved for the frozen F3 launch surface: User `ListUsers`, authoritative public/distinct admin Product reads, Media owned protected list/read, and two-step public delete now have additive gRPC contracts.                                                                                         |
+| External standards                             | confirmed defect                      | Resolved for the Batch 4 standards layer: route policy, envelopes/errors, input and pagination profiles, complete gateway key semantics, Redis replay coordination, and contract-only OpenAPI setup are executable. Actual routes, the checked document, and external client remain later-batch work. |
+| Registry authority                             | confirmed defect                      | Resolved for F3 by a replaceable, strictly validated deployment-configuration adapter; F4 still owns persistent tenant/site/channel/application authority and stable lifecycle management.                                                                                                            |
+| Browser session/CORS                           | confirmed defect                      | Direct-service CORS uses `credentials: false` and a narrow header list; it cannot simply be reused for cookie routes, idempotency, or registry-driven origins.                                                                                                                                        |
+| Browser token/cookie contract                  | confirmed defect                      | The app duplicates access-token transport and gives remember-me cookies 30 days while auth refresh truth is 7 days; choose one transport and align expiry/clear behavior.                                                                                                                             |
+| Logout device selector                         | confirmed defect                      | The frozen input named `deviceId`, but auth-service has no device registry or device-scoped session behavior and the existing DTO ignored it; F3 rejects it and derives current-session logout from the bearer.                                                                                       |
+| Current web integration                        | confirmed defect                      | Refresh omits POST, failed concurrent refresh can leave queued callers unresolved, no focused harness exists, and product forwarding/mapping is incomplete.                                                                                                                                           |
+| Product public reads                           | confirmed defect                      | Resolved in Batch 3: public get/list/gallery now force ACTIVE/non-deleted visibility, while three distinct role-protected admin reads own lifecycle/deletion controls.                                                                                                                                |
+| Release health                                 | confirmed defect                      | Release already uses `GATEWAY_ONLY`, while unsigned Docker `/health/ready` probes are only `@Public()` and can be rejected.                                                                                                                                                                           |
+| Media transport                                | confirmed defect                      | Public render is an HTTP byte stream, but no signed gateway HTTP carrier or validated media HTTP target exists under the current release policy.                                                                                                                                                      |
+| Release exposure                               | confirmed defect                      | Release publishes backend HTTP/gRPC, database, and MinIO ports. API ports must become internal while presigned storage data-plane access remains explicit.                                                                                                                                            |
+| Release image archive                          | confirmed defect                      | The PowerShell image-save script uses an undefined `$repoRoot`; its passing regex test does not prove the script can archive a gateway image.                                                                                                                                                         |
+| Refresh-rotation task                          | stale implementation or documentation | The web refresh route already stores the rotated token. F3 must characterize/preserve it and fix the POST caller, not add another rotation policy.                                                                                                                                                    |
+| Release policy wording                         | stale implementation or documentation | `GATEWAY_ONLY` is already the release default and is an HTTP policy; it must be preserved and tested, not described as a new public-gRPC switch.                                                                                                                                                      |
+| Deployment and blog documentation              | stale implementation or documentation | Resolved before the Batch 4 freeze: the deploy runbook now uses the supported sequential Bake wrapper and actual frozen offline production install, while the blog guide records rejection without an actor JWT and verified-admin success.                                                           |
+| Batch ownership wording                        | stale implementation or documentation | Batch 2 previously implied live Auth and Next-BFF integration even though the frozen work order assigns those runtime changes to Batches 3 and 7; Batch 2 now owns their context/registry contracts only.                                                                                             |
+| F3 milestone checkbox state                    | stale implementation or documentation | Completed Batch 1 gateway/rate-limit/readiness items and Batch 2 client-profile decisions remained unchecked in `TODO.md`; their milestone state is now aligned without checking composite trust/routes still owned by later batches.                                                                 |
+| Distributed rate storage and full tracing      | future scaling consideration          | F3 needs a correlation ID and a single-gateway limit baseline. Multi-replica rate storage, trusted-proxy topology, and distributed spans belong to F9 unless scope changes.                                                                                                                           |
+| Mobile/application attestation                 | optional hardening                    | Public client IDs do not prove binary authenticity; reserve an attestation extension point without blocking F3.                                                                                                                                                                                       |
+| Partner marketplace and CDN/streaming redesign | future scaling consideration          | Reserve clean boundaries, but do not implement these later-phase capabilities in F3.                                                                                                                                                                                                                  |
 
 ## Existing Owners To Preserve
 
@@ -316,19 +317,19 @@ explicit lane name fixes access class and visibility; clients cannot override
 those values in a body. `public-library` still means an admin-managed public
 asset library, not anonymous file-manager access.
 
-| External route                                                            | Applications and actor           | Downstream contract or transport          | Input profile          | Success          | Retry  | Boundary or prerequisite                                                                                   |
-| ------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------- | ---------------------- | ---------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
-| `GET /api/v1/admin/media/:id`                                             | `admin-web`; admin or root-admin | Media `GetById`                           | UUID path              | `200 item`       | safe   | Generic administrative record read only.                                                                   |
-| `GET /api/v1/admin/media/{public,protected,strict}-library`               | `admin-web`; admin or root-admin | Media lane `List*Library`                 | `media-admin-list`     | `200 collection` | safe   | Offset/take profile with no invented total; protected/strict may accept an owner filter.                   |
-| `GET /api/v1/media/my/protected-library`                                  | `storefront-web`, `mobile`; user | Media `ListMyProtectedLibrary`            | `media-owned-list`     | `200 collection` | safe   | Owner/access/visibility are derived and fixed.                                                             |
-| `POST /api/v1/admin/media/{public,protected,strict}-library/presign`      | `admin-web`; admin or root-admin | Media lane `Presign*Upload`               | `media-presign`        | `200 action`     | key    | Upstream target and object path policy are server-owned.                                                   |
-| `POST /api/v1/admin/media/{public,protected,strict}-library/finalize`     | `admin-web`; admin or root-admin | Media lane `Finalize*Upload`              | `media-finalize`       | `201 item`       | key    | Finalize validates the pending object; client metadata remains a hint.                                     |
-| `POST /api/v1/admin/media/{public,protected,strict}-library/:id/read-url` | `admin-web`; admin or root-admin | Media lane `Create*ReadUrl`               | `media-read-url`       | `200 action`     | key    | Only `download` is accepted from query; TTL and storage target remain server-owned.                        |
-| `POST /api/v1/media/my/protected-library/:id/read-url`                    | `storefront-web`, `mobile`; user | Media `CreateMyProtectedReadUrl`          | `media-owned-read-url` | `200 action`     | key    | Owner is the verified actor and scope/entity context must match the record.                                |
-| `DELETE /api/v1/admin/media/{protected,strict}-library/:id`               | `admin-web`; admin or root-admin | Media lane `Delete*LibraryById`           | UUID path              | `200 action`     | key    | Public-library deletion uses the two-step routes below instead.                                            |
-| `POST /api/v1/admin/media/public-library/delete-preview`                  | `admin-web`; admin or root-admin | Media `PreviewPublicLibraryDelete`        | `media-delete-preview` | `200 action`     | key    | Returns bounded preview plus a short-lived confirmation token.                                             |
-| `POST /api/v1/admin/media/public-library/delete-confirm`                  | `admin-web`; admin or root-admin | Media `ConfirmPublicLibraryDelete`        | `media-delete-confirm` | `200 action`     | key    | Confirmation token and request hash must match.                                                            |
-| `GET /api/v1/media/render/:id`                                            | all three; anonymous             | fixed internal media HTTP render endpoint | `media-render`         | `200 stream`     | stream | Sole byte-stream exception; preserve content headers, ETag/cache behavior, and denial status without JSON. |
+| External route                                                            | Applications and actor           | Downstream contract or transport          | Input profile          | Success          | Retry  | Boundary or prerequisite                                                                                             |
+| ------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------- | ---------------------- | ---------------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/admin/media/:id`                                             | `admin-web`; admin or root-admin | Media `GetById`                           | UUID path              | `200 item`       | safe   | Generic administrative record read only.                                                                             |
+| `GET /api/v1/admin/media/{public,protected,strict}-library`               | `admin-web`; admin or root-admin | Media lane `List*Library`                 | lane list profile      | `200 collection` | safe   | `media-public-list` forbids owner selection; protected/strict use `media-admin-list` and may accept an owner filter. |
+| `GET /api/v1/media/my/protected-library`                                  | `storefront-web`, `mobile`; user | Media `ListMyProtectedLibrary`            | `media-owned-list`     | `200 collection` | safe   | Owner/access/visibility are derived and fixed.                                                                       |
+| `POST /api/v1/admin/media/{public,protected,strict}-library/presign`      | `admin-web`; admin or root-admin | Media lane `Presign*Upload`               | `media-presign`        | `200 action`     | key    | Upstream target and object path policy are server-owned.                                                             |
+| `POST /api/v1/admin/media/{public,protected,strict}-library/finalize`     | `admin-web`; admin or root-admin | Media lane `Finalize*Upload`              | `media-finalize`       | `201 item`       | key    | Finalize validates the pending object; client metadata remains a hint.                                               |
+| `POST /api/v1/admin/media/{public,protected,strict}-library/:id/read-url` | `admin-web`; admin or root-admin | Media lane `Create*ReadUrl`               | `media-read-url`       | `200 action`     | key    | Only `download` is accepted from query; TTL and storage target remain server-owned.                                  |
+| `POST /api/v1/media/my/protected-library/:id/read-url`                    | `storefront-web`, `mobile`; user | Media `CreateMyProtectedReadUrl`          | `media-owned-read-url` | `200 action`     | key    | Owner is the verified actor and scope/entity context must match the record.                                          |
+| `DELETE /api/v1/admin/media/{protected,strict}-library/:id`               | `admin-web`; admin or root-admin | Media lane `Delete*LibraryById`           | UUID path              | `200 action`     | key    | Public-library deletion uses the two-step routes below instead.                                                      |
+| `POST /api/v1/admin/media/public-library/delete-preview`                  | `admin-web`; admin or root-admin | Media `PreviewPublicLibraryDelete`        | `media-delete-preview` | `200 action`     | key    | Returns bounded preview plus a short-lived confirmation token.                                                       |
+| `POST /api/v1/admin/media/public-library/delete-confirm`                  | `admin-web`; admin or root-admin | Media `ConfirmPublicLibraryDelete`        | `media-delete-confirm` | `200 action`     | key    | Confirmation token and request hash must match.                                                                      |
+| `GET /api/v1/media/render/:id`                                            | all three; anonymous             | fixed internal media HTTP render endpoint | `media-render`         | `200 stream`     | stream | Sole byte-stream exception; preserve content headers, ETag/cache behavior, and denial status without JSON.           |
 
 ### Exact Input And Query Profiles
 
@@ -345,7 +346,8 @@ asset library, not anonymous file-manager access.
 - `product-public-list`: `q`, `categoryId`, `page`, `limit`; status and deleted
   flags are forbidden. `product-admin-list` adds `status` and `includeDeleted`.
 - `product-write`: `title`, `slug`, `sku`, `price`, `currency`, `status`,
-  `description`, `excerpt`, `categoryId`, `thumbnailUrl`, `model3dUrl`,
+  external `content` (mapped by the gateway adapter to internal `description`),
+  `excerpt`, `categoryId`, `thumbnailUrl`, `model3dUrl`,
   `model3dFormat`, `model3dLiveView`, `model3dPosterUrl`, `vrEnabled`,
   `vrPlanImageUrl`, `metaTitle`, `metaDescription`, `metaKeywords`,
   `customSchema`, `noindex`, `isFeatured`, `featureSort`, `promoTitle`,
@@ -368,9 +370,11 @@ asset library, not anonymous file-manager access.
 - `cart-add`: `productId`, `quantity`; `cart-update`: `quantity`; `checkout`:
   optional `note`; `order-list`: optional `status`; `order-status`: `status` in
   `PENDING`, `PAID`, `FULFILLED`, `CANCELLED`.
-- `media-admin-list`: `q`, `search`, `path`, `take`, `skip`, `ownerId`, `scope`,
+- `media-public-list`: `q`, `search`, `path`, `take`, `skip`, `scope`,
   `entityType`, `entityId`, `folderPath`, `mimeType`, `mediaType`, `sortBy`,
-  `order`, `status`, `scanStatus`; lane fixes `accessClass` and `visibility`.
+  `order`, `status`, `scanStatus`. `media-admin-list` additionally permits
+  `ownerId` for protected/strict administrative lanes; every lane fixes
+  `accessClass` and `visibility`.
   `media-owned-list` is the same without `ownerId`, and fixes owner to actor,
   access to `PROTECTED`, and visibility to `private`.
 - `media-presign`: `filename`, `mimeType`, `folderPath`, `displayName`, optional
@@ -1182,45 +1186,89 @@ wrong receiver/RPC/body, replay and concurrent duplicates, altered signed
 request IDs, reserved/raw-header override attempts, partial/duplicate/unsigned
 context, actor/bearer mismatch, wrong caller kind, target-key coverage, and
 cross-target secret reuse. The newly explicit altered-request-ID case brings
-the S2S guard suite to 21 tests; the full grpc-auth total will be refreshed at
-the next grouped checkpoint.
+the S2S guard suite to 21 tests; the complete grpc-auth suite passes 117 tests.
 
 ### Batch 4 - External API Standards
 
 - [x] Reuse the frozen additive API/proto versioning and deprecation rules in
       `docs/architecture/api-and-proto-versioning.md`. The `/api/v1` routes
       themselves remain unimplemented.
-- [ ] Turn the frozen route/policy manifest into the single contract source for
+- [x] Turn the frozen route/policy manifest into the single contract source for
       DTOs, adapters, OpenAPI, tests, and generated clients. Do not infer route
       scope later from every method a proto happens to expose.
-- [ ] Define one JSON success envelope and one error envelope with stable error
+- [x] Define one JSON success envelope and one error envelope with stable error
       codes and request IDs. Normalize at the gateway; do not rewrite services.
       Do not wrap the media byte stream, empty/204 responses, or shared
       operational-health shapes in a JSON data envelope.
-- [ ] Define validation-error details from the shared strict HTTP pipe without
+- [x] Define validation-error details from the shared strict HTTP pipe without
       exposing stacks, raw upstream messages, or internal service metadata.
-- [ ] Define resource-specific pagination profiles under the common envelope.
+- [x] Define resource-specific pagination profiles under the common envelope.
       Preserve page/limit/total where the downstream contract supplies it,
       translate product's total deliberately, retain media offset/take without
       inventing a total, and label current user/order lists unpaginated unless
       an additive contract is approved.
-- [ ] Define per-resource filter/sort/field allowlists and reject unsupported
+- [x] Define per-resource filter/sort/field allowlists and reject unsupported
       combinations. Never forward a generic query object to Prisma/proto, and
       do not expose generic settings keys or internal trust/secrets by default.
-- [ ] Define `Idempotency-Key` syntax, scope, request hashing, expiry,
+- [x] Define `Idempotency-Key` syntax, scope, request hashing, expiry,
       in-flight behavior, replay response, and conflict behavior for create,
       checkout, upload, and future contract operations.
-- [ ] Centralize gateway replay suppression in Redis. Document where a domain
+- [x] Centralize gateway replay suppression in Redis. Document where a domain
       operation still requires owning-service durable idempotency; never claim
       gateway response caching provides exactly-once execution after a crash.
-- [ ] Complete a route-specific retry/idempotency matrix. GET/HEAD and
-      explicitly idempotent operations may be retry-safe; cart-add increments,
-      blog-create slug suffixing, and a checkout whose response is lost after
-      commit are not made durable exactly-once by gateway caching.
-- [ ] Define external DTO/envelope/error/pagination/idempotency components
+- [x] Turn the frozen route-specific retry/idempotency matrix into executable
+      route policy and tests. GET/HEAD and explicitly idempotent operations may
+      be retry-safe; cart-add increments, blog-create slug suffixing, and a
+      checkout whose response is lost after commit are not made durable
+      exactly-once by gateway caching.
+- [x] Define external DTO/envelope/error/pagination/idempotency components
       separately from proto interfaces and Prisma models. Configure OpenAPI
       generation now, but generate/snapshot each domain only after its actual
       Batch 5 routes exist.
+
+Batch 4 was completed on 2026-08-15. The executable manifest contains 70 unique
+F3 endpoints and is consumed through `GatewayApiRoute(routeId)`, which derives
+runtime method/path, application and actor metadata, idempotency policy, stable
+operation ID, and OpenAPI response/header declarations from the same record.
+Public/admin input profiles fail closed on unknown keys and unsupported
+combinations without importing proto or Prisma types.
+
+The post-Batch-4 maintainability cleanup keeps the original route/input
+aggregator imports but moves definitions into service-specific `routes/` and
+`inputs/` files with duplicate validation. Ambiguous application/HTTP context
+files are now `trusted-request.ts` and `public-client-boundary.ts`, and the
+OpenAPI-only shared DTO file is `openapi-envelope.dto.ts`. Manifest input
+validation runs for safe, session, stream, and key-profile routes before
+controller or downstream execution.
+
+The gateway now owns one request-correlated JSON success/error contract, safe
+validation field/code details, and four explicit pagination profiles. The
+global boundary filter also normalizes application-identity middleware,
+body-parser, Auth/role, downstream, throttle, and unknown failures without
+returning raw internal messages. Stream, operational-health, and successful
+empty-response exceptions remain explicit.
+
+`Idempotency-Key` is a bounded 16-128 byte public request key. The Redis state
+machine binds its digest to application, actor, route, and canonical request
+material; atomically distinguishes first execution, in-flight duplicate,
+conflicting reuse, and completed replay; and rebinds replayed envelopes to the
+new ingress request ID. Defaults are a 60-second in-flight lease, 24-hour
+completed TTL, and 512-KiB cached response cap. Redis failure fails key-profile
+routes closed, while crash/lease ambiguity remains documented as not durable
+exactly-once domain execution.
+
+The contract-only OpenAPI module uses `@nestjs/swagger` 11.4.6 and the shared
+controller list without importing runtime gRPC, Redis, lifecycle, or production
+configuration. It creates deterministic controller-derived documents but does
+not expose Swagger UI or generate an empty checked artifact before Batch 5
+routes exist. `docs/architecture/gateway-api-standards.md` records the complete
+contract.
+
+Verification passes 114 gateway tests across 24 suites and 66 shared-config
+tests. Gateway and config type-check/lint pass, both package builds pass,
+formatting/diff checks
+are clean, and the gateway environment examples cover every new bounded
+idempotency setting.
 
 ### Batch 5 - Versioned Route Adapters
 
@@ -1355,9 +1403,10 @@ the next grouped checkpoint.
       readiness policy, and F4 registry replacement.
 - [ ] Update the exact runtime owners: the new gateway document, docs index,
       `deploy/README.md`, `docs/docker-configs.md`, local Docker boot guide,
-      testing/health contract, and config/grpc-auth/client docs. Correct stale
-      `docker compose build`/`pnpm deploy --prod` instructions and distinguish
-      nine backend runtime images, eight hybrid services, and seven databases.
+      testing/health contract, and config/grpc-auth/client docs. Preserve the
+      corrected sequential Bake/frozen-offline-install instructions and, after
+      gateway runtime wiring lands, distinguish nine backend runtime images,
+      eight hybrid services, and seven databases.
 - [ ] After the behavior lands, update the actor/S2S contracts so a new ingress
       gets a new request ID while nested causal hops preserve it and re-sign
       with fresh nonces. Correct the stale blog-service claim that gRPC create
@@ -1431,9 +1480,9 @@ the next grouped checkpoint.
 
 ## Next Action
 
-Start Batch 4 by turning the frozen route/policy manifest into the single
-contract source for gateway DTOs, adapters, OpenAPI, tests, and the generated
-external client. Define the shared JSON success/error contracts first while
-preserving explicit stream, empty-response, and operational-health exceptions.
-Compose remains deferred until the capability-aware runtime inventory and
-gateway container wiring in Batch 6.
+Start Batch 5 with the `/api/v1/auth` adapters derived from the executable
+manifest. Preserve Auth-service token/session ownership, implement the selected
+browser/BFF and native transport split, and generate/snapshot only the Auth
+portion of the checked OpenAPI document with focused cookie/CSRF, status/error,
+application-policy, and idempotency tests. Compose remains deferred until the
+capability-aware runtime inventory and gateway container wiring in Batch 6.

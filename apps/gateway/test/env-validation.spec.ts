@@ -56,6 +56,9 @@ describe("gateway environment validation", () => {
       GATEWAY_RATE_LIMIT_TTL_MS: 60_000,
       GATEWAY_RATE_LIMIT_REQUESTS: 120,
       GATEWAY_READINESS_TIMEOUT_MS: 1_500,
+      GATEWAY_IDEMPOTENCY_TTL_SECONDS: 86_400,
+      GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: 60,
+      GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES: 524_288,
     });
   });
 
@@ -74,6 +77,13 @@ describe("gateway environment validation", () => {
     expect(rootExample.GATEWAY_OUTBOUND_KEYS).toBe(
       gatewayExample.GATEWAY_OUTBOUND_KEYS,
     );
+    for (const key of [
+      "GATEWAY_IDEMPOTENCY_TTL_SECONDS",
+      "GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS",
+      "GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES",
+    ]) {
+      expect(rootExample[key]).toBe(gatewayExample[key]);
+    }
     for (const [target, relativePath] of Object.entries(SERVICE_ENV_EXAMPLES)) {
       const receiver = readEnvironmentExample(
         path.resolve(__dirname, relativePath),
@@ -99,6 +109,9 @@ describe("gateway environment validation", () => {
       GATEWAY_RATE_LIMIT_TTL_MS: 60_000,
       GATEWAY_RATE_LIMIT_REQUESTS: 120,
       GATEWAY_READINESS_TIMEOUT_MS: 1_500,
+      GATEWAY_IDEMPOTENCY_TTL_SECONDS: 86_400,
+      GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: 60,
+      GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES: 524_288,
       GATEWAY_APPLICATION_REGISTRY_JSON: TEST_APPLICATION_REGISTRY_JSON,
     });
     expect(envSchema.describe().keys).not.toHaveProperty("GRPC_PORT");
@@ -113,6 +126,9 @@ describe("gateway environment validation", () => {
         GATEWAY_RATE_LIMIT_TTL_MS: "30000",
         GATEWAY_RATE_LIMIT_REQUESTS: "80",
         GATEWAY_READINESS_TIMEOUT_MS: "2000",
+        GATEWAY_IDEMPOTENCY_TTL_SECONDS: "3600",
+        GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: "30",
+        GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES: "262144",
       }),
     );
 
@@ -123,6 +139,9 @@ describe("gateway environment validation", () => {
       GATEWAY_RATE_LIMIT_TTL_MS: 30_000,
       GATEWAY_RATE_LIMIT_REQUESTS: 80,
       GATEWAY_READINESS_TIMEOUT_MS: 2_000,
+      GATEWAY_IDEMPOTENCY_TTL_SECONDS: 3_600,
+      GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: 30,
+      GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES: 262_144,
     });
 
     expect(
@@ -130,6 +149,16 @@ describe("gateway environment validation", () => {
         validEnvironment({
           GATEWAY_JSON_LIMIT_BYTES: 1024 * 1024 + 1,
         }),
+      ).error,
+    ).toBeDefined();
+    expect(
+      envSchema.validate(
+        validEnvironment({ GATEWAY_IDEMPOTENCY_TTL_SECONDS: 59 }),
+      ).error,
+    ).toBeDefined();
+    expect(
+      envSchema.validate(
+        validEnvironment({ GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: 4 }),
       ).error,
     ).toBeDefined();
     expect(

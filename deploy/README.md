@@ -9,15 +9,25 @@ The deployable package is:
 - `deploy/nebula-images.tar`
 - `scripts/db/init-multiple-dbs.sh`
 
+> Current F3 checkpoint: this runbook still describes the existing eight-image
+> backend release. Gateway inventory/image wiring and the confirmed
+> `save-release-images.ps1` repository-root repair belong to Batch 6. Do not
+> treat the archive step below as a verified gateway release path until those
+> items are completed and the release workflow is rerun.
+
 ## 1. Build Images On A Machine With Internet
 
 From the repository root:
 
 ```powershell
-docker compose build
+.\scripts\docker\build-backend.ps1
 ```
 
-The normal `docker-compose.yml` has `build:` blocks and stable `image:` names. That means this command builds and tags the backend images.
+This is the supported Docker Desktop build path. It validates Compose, derives
+the backend targets from the root inventory, and runs the official Bake targets
+sequentially so expensive shared dependency/runtime layers are reused. Use
+`-Pull` to refresh base images or `-Clean` to invalidate the first target's
+shared layers deliberately.
 
 ## 2. Save Images Into One Archive
 
@@ -89,7 +99,9 @@ docker compose --env-file deploy\.env.production -f docker-compose.release.yml p
 ## Notes
 
 - `docker-compose.release.yml` has no `build:` blocks. It runs only preloaded images.
-- Runtime dependencies are inside the backend images because `docker/backend.Dockerfile` uses `pnpm deploy --prod`.
+- Runtime dependencies are inside the backend images because the shared
+  `prod-deps` stage runs a frozen, filtered `pnpm install --prod --offline`
+  before the compiled first-party artifacts are assembled into each image.
 - Database data is stored in Docker volumes, not inside app images.
 - Migrations still need a proper deployment step. For now, run migrations deliberately before promoting a real production stack.
 - If `POSTGRES_PASSWORD` contains URL-special characters, URL-encode it before using it in database URLs.

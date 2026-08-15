@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -53,6 +54,11 @@ class ProbeController {
   @Post()
   body(@Body() body: ProbeDto): ProbeDto {
     return body;
+  }
+
+  @Get("upstream-error")
+  upstreamError(): never {
+    throw new BadRequestException("raw_upstream_internal_message");
   }
 }
 
@@ -155,11 +161,19 @@ describe("gateway HTTP bootstrap", () => {
   it("uses strict DTO validation and shared security headers", async () => {
     await createApp();
 
-    await request(app.getHttpServer())
+    const invalid = await request(app.getHttpServer())
       .post("/api/v1/probe")
       .set(TEST_ADMIN_IDENTITY_HEADERS)
       .send({ value: "ok", unexpected: true })
       .expect(400);
+    expect(invalid.body).toEqual({
+      error: {
+        code: "VALIDATION_FAILED",
+        message: "Request validation failed",
+        details: [{ field: "unexpected", code: "unknown_field" }],
+      },
+      requestId: invalid.headers["x-request-id"],
+    });
     const response = await request(app.getHttpServer())
       .post("/api/v1/probe")
       .set(TEST_ADMIN_IDENTITY_HEADERS)
@@ -172,11 +186,18 @@ describe("gateway HTTP bootstrap", () => {
   it("rejects JSON bodies over the explicit byte limit", async () => {
     await createApp(1024);
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post("/api/v1/probe")
       .set(TEST_ADMIN_IDENTITY_HEADERS)
       .send({ value: "x".repeat(1100) })
       .expect(413);
+    expect(response.body).toEqual({
+      error: {
+        code: "REQUEST_TOO_LARGE",
+        message: "Request body is too large",
+      },
+      requestId: response.headers["x-request-id"],
+    });
   });
 
   it("uses the shared sanitized readiness shape", async () => {
@@ -288,10 +309,34 @@ describe("gateway HTTP bootstrap", () => {
   it("rejects ambiguous public identity carriers", async () => {
     await createApp();
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .get("/api/v1/probe")
       .set("Origin", "http://localhost:3000")
       .set("X-Nebula-Client-ID", ["admin-web-local", "mobile-local"])
       .expect(400);
+    expect(response.body).toEqual({
+      error: {
+        code: "CLIENT_ID_REQUIRED",
+        message: "A valid client identifier is required",
+      },
+      requestId: response.headers["x-request-id"],
+    });
+  });
+
+  it("does not expose raw upstream exception messages", async () => {
+    await createApp();
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/probe/upstream-error")
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: { code: "BAD_REQUEST", message: "Request is invalid" },
+      requestId: response.headers["x-request-id"],
+    });
+    expect(JSON.stringify(response.body)).not.toContain(
+      "raw_upstream_internal_message",
+    );
   });
 });

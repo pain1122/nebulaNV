@@ -32,7 +32,8 @@ export function channelKindForProfile(
 }
 
 /**
- * Converts only an auth-service-verified identity into actor state. Registry
+ * Converts only an auth-service-verified identity into trusted request actor
+ * state. Registry
  * identity, client headers, request bodies, and local JWT decoding are not
  * accepted by this boundary.
  */

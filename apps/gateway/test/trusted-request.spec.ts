@@ -3,7 +3,7 @@ import {
   actorFromVerifiedAuth,
   createGatewayRequestContext,
   isGlobalAdminActor,
-} from "../src/application/application-context";
+} from "../src/application/trusted-request";
 import {
   PUBLIC_APPLICATION_PROFILES,
   RESERVED_CONFIDENTIAL_APPLICATION_PROFILE,
@@ -11,7 +11,7 @@ import {
 import { StaticApplicationRegistry } from "../src/application/application-registry";
 import { TEST_APPLICATION_REGISTRY_JSON } from "./application-fixture";
 
-describe("gateway application and actor context", () => {
+describe("gateway trusted application and actor request state", () => {
   const registry = StaticApplicationRegistry.fromJson(
     TEST_APPLICATION_REGISTRY_JSON,
     { nodeEnv: "test" },

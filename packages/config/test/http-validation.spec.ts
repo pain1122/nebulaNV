@@ -56,4 +56,17 @@ describe("createHttpValidationPipe", () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it("allows a boundary owner to normalize errors without changing strictness", async () => {
+    const exception = new BadRequestException("boundary_validation_failed");
+    const exceptionFactory = jest.fn(() => exception);
+
+    await expect(
+      createHttpValidationPipe({ exceptionFactory }).transform(
+        { name: "example", page: "2", extra: true },
+        { type: "query", metatype: ExplicitTransformRequest },
+      ),
+    ).rejects.toBe(exception);
+    expect(exceptionFactory).toHaveBeenCalledTimes(1);
+  });
 });

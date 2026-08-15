@@ -29,9 +29,9 @@ function directPeer(request: GatewayRateLimitRequest): string {
 /**
  * Builds a collision-safe tracker from trusted request state only.
  *
- * Batch 2 will attach `requestContext.applicationId` after registry
- * resolution, and Batch 3 will attach `user` after Auth verification. Raw
- * client headers and forwarded IP headers are deliberately not consulted.
+ * Registry resolution attaches `requestContext.applicationId`, and Auth
+ * verification attaches `user`. Raw client headers and forwarded IP headers
+ * are deliberately not consulted.
  */
 export function gatewayRateLimitTracker(
   request: GatewayRateLimitRequest,

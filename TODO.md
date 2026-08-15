@@ -262,15 +262,15 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
 - [x] Apply rate limits and request-size limits.
 - [ ] Add end-to-end request/correlation IDs; reserve distributed tracing and
       spans for F9.
-- [ ] Add gateway health and dependency readiness.
+- [x] Add gateway health and dependency readiness.
 
 ### API Standards
 
-- [ ] Define success and error envelopes.
-- [ ] Define validation-error shape.
-- [ ] Define pagination, filtering, and sorting.
-- [ ] Define idempotency for create, checkout, upload, and contract operations.
-- [ ] Define retry-safe operations.
+- [x] Define success and error envelopes.
+- [x] Define validation-error shape.
+- [x] Define pagination, filtering, and sorting.
+- [x] Define idempotency for create, checkout, upload, and contract operations.
+- [x] Define retry-safe operations.
 - [x] Define API and proto versioning/deprecation rules; external gateway route versions remain unimplemented.
 - [ ] Generate API documentation.
 - [ ] Provide typed web/mobile clients.
