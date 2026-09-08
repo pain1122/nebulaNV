@@ -15,6 +15,25 @@ export const GATEWAY_DEFAULT_IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
 export const GATEWAY_DEFAULT_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS = 60;
 export const GATEWAY_DEFAULT_IDEMPOTENCY_MAX_RESPONSE_BYTES = 512 * 1024;
 export const GATEWAY_APPLICATION_REGISTRY_MAX_BYTES = 64 * 1024;
+
+function mediaRenderHttpOrigin(value: string, helpers: Joi.CustomHelpers) {
+  try {
+    const parsed = new URL(value);
+    if (
+      parsed.protocol !== "http:" ||
+      !parsed.hostname ||
+      !parsed.port ||
+      parsed.username ||
+      parsed.password ||
+      value !== parsed.origin
+    ) {
+      return helpers.error("any.invalid");
+    }
+    return value;
+  } catch {
+    return helpers.error("any.invalid");
+  }
+}
 export const GATEWAY_GRPC_TARGET_ENV_NAMES = Object.freeze([
   "AUTH_GRPC_URL",
   "USER_GRPC_URL",
@@ -52,6 +71,9 @@ export const envSchema = Joi.object({
     .default(GATEWAY_DEFAULT_RATE_LIMIT_REQUESTS),
   GATEWAY_REDIS_URL: Joi.string()
     .uri({ scheme: ["redis", "rediss"] })
+    .required(),
+  MEDIA_RENDER_HTTP_URL: Joi.string()
+    .custom(mediaRenderHttpOrigin, "fixed media render HTTP origin")
     .required(),
   GATEWAY_READINESS_TIMEOUT_MS: Joi.number()
     .integer()

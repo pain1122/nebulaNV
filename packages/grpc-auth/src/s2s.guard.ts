@@ -23,6 +23,8 @@ import {
   INTERNAL_ONLY_KEY,
   IS_PUBLIC_KEY,
   PUBLIC_FLAGS_KEY,
+  S2S_CONTEXT_RECEIVER_KEY,
+  type S2SContextReceiver,
   type PublicFlags,
 } from "./public.decorator";
 import {
@@ -96,6 +98,11 @@ export class S2SGuard implements CanActivate {
         ctx.getHandler?.(),
         ctx.getClass?.(),
       ]) ?? false;
+    const contextReceiver =
+      this.reflector.getAllAndOverride<S2SContextReceiver>(
+        S2S_CONTEXT_RECEIVER_KEY,
+        [ctx.getHandler?.(), ctx.getClass?.()],
+      );
 
     // Every gRPC method is an internal transport boundary. @Public only makes
     // the end-user JWT optional; it never disables caller authentication.
@@ -329,6 +336,23 @@ export class S2SGuard implements CanActivate {
       return this.forbidden(ctx, "s2s_identity_not_allowed_for_route");
     }
 
+    if (contextReceiver) {
+      if (
+        version !== S2S_PROTOCOL_VERSION_V3 ||
+        signedContext?.version !== contextReceiver.version ||
+        signedContext.purpose !== contextReceiver.purpose ||
+        signedContext.resolutionStage !== contextReceiver.resolutionStage ||
+        (contextReceiver.requireActor && !signedContext.actor)
+      ) {
+        return this.unauthenticated(
+          ctx,
+          "s2s_resolution_context_required_for_route",
+        );
+      }
+    } else if (signedContext?.version === "2") {
+      return this.unauthenticated(ctx, "s2s_context_v2_not_allowed_for_route");
+    }
+
     const replayTtlMs = Math.max(1_000, issuedAtMs + maxSkewMs - now + 1_000);
     let claimed: boolean;
     try {
@@ -404,11 +428,18 @@ export class S2SGuard implements CanActivate {
       carrier.svcKind = svcKind;
       carrier.requestId = requestId;
       if (signedContext) {
-        carrier.requestContext = requestContextFromSigned(signedContext);
+        if (signedContext.version === "1") {
+          carrier.requestContext = requestContextFromSigned(signedContext);
+          delete carrier.resolutionContext;
+        } else {
+          carrier.resolutionContext = signedContext;
+          delete carrier.requestContext;
+        }
         if (signedContext.actor) carrier.signedActor = signedContext.actor;
         else delete carrier.signedActor;
       } else {
         delete carrier.requestContext;
+        delete carrier.resolutionContext;
         delete carrier.signedActor;
       }
     };

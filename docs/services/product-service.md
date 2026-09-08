@@ -135,6 +135,16 @@ Important note:
 
 The DB already has fields for attributes, comments, product sets, VR hotspots, 3D URLs, gallery, SEO, promos, and discounts. Not all of those have full HTTP/gRPC contracts yet.
 
+R2 adds nullable `identityRealmId` and `subjectId` beside `ProductComment.userId`.
+Identified comments use default realm `b1000000-0000-4000-8000-000000000001`
+and the same UUID subject; anonymous comments stay all-null. Non-null legacy
+text IDs must be canonical lowercase UUIDv4. Partial, mismatched, wrong-realm,
+or actorless pairs reject. Existing readers stay primary and no cross-service
+foreign key or tenant/site scope is added. `pnpm db:verify:f4-r2-default-actors`
+passed populated upgrade, unchanged product/comment snapshots, zero-row reruns,
+legacy-write compatibility, malformed-ID denial, and complete transactional
+DDL rollback on a malformed old-schema comment.
+
 ## Product Rules
 
 - Create requires `title`.

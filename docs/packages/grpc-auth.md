@@ -6,6 +6,28 @@ The canonical S2S protocol and operating rules are documented in [S2S Security C
 
 The trusted user/service context rules are documented in [Actor Context Contract](../architecture/actor-context-contract.md).
 
+The implemented F4 default-realm context-v2 and receiver-first compatibility
+decision is recorded in
+[ADR-0010](../architecture/decisions/0010-f4-signed-context-compatibility.md).
+Its authority freshness, cache-integrity, outage, and key-compromise behavior is
+frozen by
+[ADR-0012](../architecture/decisions/0012-f4-failure-freshness-audit-and-recovery.md).
+The minimum Batch 3 receiver prerequisite is now implemented only for strict
+context-v2 `RESOLUTION/AUTHORITY`. Under the original plan, complete v2 stages,
+`AUTHORIZED` writers/receivers, and operation-slice cutover remained Batch 4.
+ADR-0014 now freezes that receiver as compatibility evidence and authorizes no
+new v2 writer. ADR-0015 closes Batch 1R and orders realm-aware context-v3 work:
+dormant receivers at R5, the controlled default-realm writer/session cohort at
+R6, and persistent-registry expansion in Batch 4.
+
+[ADR-0014](../architecture/decisions/0014-f4-customer-identity-realms-and-federation.md)
+freezes additive context v3 for realm-qualified subjects and exact application
+audiences. Existing v2 parsing and its `sr1_`/`ar1_` meanings do not change;
+realm traffic requires new realm/application-keyed `sr2_` session and `ar2_`
+decision references, receiver-first rollout, exact-field rejection, and no
+v2 fallback after a v3 denial. This is target behavior, not current package
+behavior.
+
 ## Main Exports
 
 - `GRPC_SECURITY_PROVIDERS`
@@ -29,7 +51,8 @@ The trusted user/service context rules are documented in [Actor Context Contract
 - `gatewayAuthAndS2S(...)`
 - `createVerifiedServiceDownstreamContext(...)`
 - `Public`, `GatewayOnly`, `InternalOnly`, `AllowedS2SCallers`,
-  `AllowedS2SIdentities`, `RequireUserId`
+  `AllowedS2SIdentities`, `RequireUserId`,
+  `RequireS2SAuthorityResolution`
 - role decorators and context helpers
 
 ## Enforced Rules
@@ -51,17 +74,29 @@ The trusted user/service context rules are documented in [Actor Context Contract
   without making the JWT optional. `Public({ gatewayOnly: true })` remains the
   anonymous/optional-user gateway form.
 - `PUBLIC_MODE=OPEN` affects only explicitly public routes; it cannot open private/internal routes.
+- `@OperationalHealth()` is the only unsigned HTTP exception to
+  `GATEWAY_ONLY`. It marks sanitized health controllers and is never an RPC
+  bypass; ordinary public/private domain routes retain their normal policy.
 - `S2SGuard` attaches verified service identity (`svc`, `svcKind`, and
   `requestId`). After a valid v3 envelope it separately attaches
-  `requestContext` and `signedActor`; it never turns the signed actor assertion
-  into authoritative `user` identity.
+  either legacy `requestContext` or the exact resolver-only
+  `resolutionContext`, plus `signedActor`; it never turns the signed actor
+  assertion into authoritative `user` identity.
 - A JWT guard attaches `user` only after token verification. Auth-service also
-  supplies a non-secret HMAC `sessionRef`; guards propagate it through the same
+  supplies a non-secret, versioned `sr1_...` HMAC `sessionRef`; the prefix
+  guarantees the signed-context safe-identifier grammar even when the
+  base64url digest starts with `-` or `_`. Guards propagate it through the same
   verified context and never expose the raw JWT session ID.
 - For gateway/v3 traffic, the JWT guard requires the signed actor assertion and
   forwarded bearer to appear together, asks auth-service for current truth,
-  and requires exact `userId`, `role`, and `sessionRef` agreement before
-  attaching `user`. Anonymous v3 traffic has neither.
+  and requires exact `userId`/`sessionRef` agreement before attaching `user`.
+  Context v1 also requires its legacy role to match; context v2 deliberately
+  carries no global role and cannot use one as scoped authority. Anonymous
+  legacy v3 traffic has neither.
+- Context v2 is currently admitted only by
+  `RequireS2SAuthorityResolution()`, with purpose `RESOLUTION`, stage
+  `AUTHORITY`, and an actor. Legacy/undeclared routes reject v2 and that route
+  rejects v1. No writer is enabled by this receiver support.
 - Legacy service-v2 bearer calls remain compatible during receiver-first
   migration. They still receive authoritative auth-service validation but do
   not gain a signed application/site context.
@@ -83,7 +118,7 @@ The common service startup order is app creation, shutdown-hook registration,
 request logging, HTTP validation, security headers, optional service-owned
 middleware, CORS, bind resolution, secured gRPC connection/start, HTTP listen,
 then ready logging. Compression, bind hosts, and media public-render policy may
-remain service-owned; do not replace the eight bootstraps with one oversized
+remain service-owned; do not replace the nine bootstraps with one oversized
 helper.
 
 Each service-local Joi schema composes `s2sEnvSchema("service-name")`. Listener startup repeats deep validation before accepting traffic.
@@ -112,7 +147,7 @@ the handler already accepts a real DTO class with validation metadata.
 
 ## Error Translation
 
-`startSecuredGrpc(...)` installs the shared gRPC error filter for all eight services. Services must not add competing global mappers.
+`startSecuredGrpc(...)` installs the shared gRPC error filter for all nine hybrid services. Services must not add competing global mappers.
 
 The filter preserves explicit `RpcException` values from guards, validation, and controllers. Nest HTTP exceptions thrown by domain services use this transport mapping:
 
@@ -139,6 +174,8 @@ bearer plus explicit trusted signing inputs and therefore cannot copy arbitrary
 inbound HTTP headers into downstream metadata. `x-s2s-context` and
 `x-s2s-context-sha256` are reserved, single-value carriers. Their decoded JSON
 is canonical, exact-schema, unpadded base64url, and at most 1024 bytes.
+Context v2 uses a separate exact canonical shape and a 2048-byte limit; the
+decoder enforces the version-specific bound after reading the version.
 
 The HTTP-only gateway does not reuse `GrpcTokenAuthGuard`, because that guard's
 Auth lookup intentionally signs as its ordinary service caller. The gateway's
@@ -150,10 +187,17 @@ For a causal service-to-service hop, use
 `createVerifiedServiceDownstreamContext(metadata, call)` after the inbound
 guards. It projects only guard-attached request/application/actor/user state
 and the verified bearer into fresh outbound inputs. It rejects inconsistent or
-partial carriers and never copies arbitrary inbound metadata. The result omits
+partial carriers, explicitly refuses every `RESOLUTION` context, and never
+copies arbitrary inbound metadata. The result omits
 caller kind/name and a target key deliberately: the receiving service's typed
 client wrapper resolves that hop's own service identity and pairwise target
 key. Context-free bootstrap jobs keep using the ordinary v2 wrapper defaults.
+
+Request identity follows causal provenance: gateway ingress owns a new request
+ID; `createVerifiedServiceDownstreamContext(...)` accepts only the guard-attached
+ID/context and preserves that ID on a nested hop. The next typed wrapper still
+creates a fresh timestamp, nonce, caller signature, and pairwise target proof.
+Raw metadata cannot replace the preserved request ID or force gateway identity.
 
 ## Verification
 
@@ -164,7 +208,8 @@ pnpm --filter @nebula/grpc-auth build
 ```
 
 The service-wiring test reads the canonical `nebula.backendServices` inventory
-from the root `package.json` and verifies all eight service integrations without
-copying another service list into this package.
+from the root `package.json`, selects its nine `http-grpc` runtimes, and
+verifies those service integrations without copying another service list or
+treating the HTTP-only gateway as a gRPC server.
 
 Streaming signing is not implemented. Adding a streaming RPC requires a separate framed-message signing design; it must not bypass this guard.

@@ -1,66 +1,39 @@
-import {getAccessToken, setTokens, clearTokens} from "@/lib/auth/tokens"
-import {refreshAccessToken} from "@/lib/auth/refresh"
+import { clearTokens, getAccessToken } from "@/lib/auth/tokens";
+import { refreshAccessToken } from "@/lib/auth/refresh";
 
-let isRefreshing = false
-let pendingQueue: ((token: string) => void)[] = []
+let refreshInFlight: Promise<string> | undefined;
 
-const AUTH_EXCLUDE = ["/api/auth/login"]
+function withBearer(init: RequestInit, token: string | null): RequestInit {
+  const headers = new Headers(init.headers);
+  if (token) headers.set("authorization", `Bearer ${token}`);
+  return { ...init, headers };
+}
 
-export async function apiFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
-  // 🔐 Never intercept auth endpoints
-  if (typeof input === "string") {
-    if (input.startsWith("/api/auth/")) {
-      return fetch(input, init)
-    }
+function refreshedAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAccessToken().finally(() => {
+      refreshInFlight = undefined;
+    });
+  }
+  return refreshInFlight;
+}
+
+export async function apiFetch(
+  input: RequestInfo,
+  init: RequestInit = {},
+): Promise<Response> {
+  if (typeof input === "string" && input.startsWith("/api/auth/")) {
+    return fetch(input, init);
   }
 
-  const token = getAccessToken()
-
-  const res = await fetch(input, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      ...(token ? {Authorization: `Bearer ${token}`} : {}),
-    },
-  })
-
-  // ✅ happy path
-  if (res.status !== 401) return res
-
-  // 🔒 queue requests while refreshing
-  if (isRefreshing) {
-    return new Promise((resolve) => {
-      pendingQueue.push((newToken) => {
-        resolve(
-          fetch(input, {
-            ...init,
-            headers: {
-              ...(init.headers || {}),
-              Authorization: `Bearer ${newToken}`,
-            },
-          }),
-        )
-      })
-    })
-  }
-
-  isRefreshing = true
+  const response = await fetch(input, withBearer(init, getAccessToken()));
+  if (response.status !== 401) return response;
 
   try {
-    // 🔹 use local refresh helper
-    const newAccessToken = await refreshAccessToken()
-
-    pendingQueue.forEach((cb) => cb(newAccessToken))
-    pendingQueue = []
-
-    return fetch(input, {
-      ...init,
-      headers: {
-        ...(init.headers || {}),
-        Authorization: `Bearer ${newAccessToken}`,
-      },
-    })
-  } finally {
-    isRefreshing = false
+    const token = await refreshedAccessToken();
+    return fetch(input, withBearer(init, token));
+  } catch (error: unknown) {
+    clearTokens();
+    throw error;
   }
 }

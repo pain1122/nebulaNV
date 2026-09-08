@@ -4,6 +4,7 @@ import {
   decodeGatewayIdempotencyState,
   gatewayIdempotencyRequestHash,
   gatewayIdempotencyStorageKey,
+  validRefreshCookieDeletion,
   validateIdempotencyKey,
 } from "../src/contracts/idempotency";
 import { GatewayIdempotencyService } from "../src/state/gateway-idempotency.service";
@@ -171,5 +172,33 @@ describe("gateway idempotency contract", () => {
         headers: {},
       }),
     ).rejects.toThrow("gateway_idempotency_response_too_large");
+  });
+
+  it("accepts only the secret-free refresh-cookie deletion as replayable cookie state", () => {
+    const deletion = [
+      "refreshToken=; Path=/api/auth; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax",
+    ];
+    expect(validRefreshCookieDeletion(deletion)).toBe(true);
+    expect(
+      validRefreshCookieDeletion([
+        "refreshToken=live-secret; Path=/api/auth; HttpOnly; SameSite=Lax",
+      ]),
+    ).toBe(false);
+    expect(
+      validRefreshCookieDeletion([
+        "refreshToken=; Domain=example.test; Path=/api/auth; Max-Age=0; HttpOnly; SameSite=Lax",
+      ]),
+    ).toBe(false);
+
+    const serialized = canonicalGatewayJson({
+      version: 1,
+      state: "completed",
+      requestHash: "a".repeat(64),
+      response: { status: 200, body: { data: { success: true } }, headers: {
+        "set-cookie": deletion,
+      } },
+      completedAt: new Date(0).toISOString(),
+    });
+    expect(decodeGatewayIdempotencyState(serialized)).not.toBeNull();
   });
 });

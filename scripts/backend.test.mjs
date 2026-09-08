@@ -15,6 +15,7 @@ import {
   DEMO_PRODUCT,
   PRISMA_OPERATIONS,
   RESTORE_CONFIRMATION,
+  TRIVY_DB_REPOSITORIES,
   backendServices,
   backupLocalDatabases,
   buildBackendQualityArgs,
@@ -27,12 +28,16 @@ import {
   captureComposeFailureEvidence,
   checkBackendHealth,
   classifyDependencyAdvisories,
+  composeServices,
   collectRuntimeDependencyVersions,
   createTrivyEvidenceReport,
   disposableMigrationServices,
+  dropDisposableDatabase,
   downBackend,
   generateBackendDependencyReport,
+  hybridServices,
   missingExpectedDatabases,
+  migrationVerificationServices,
   prismaServices,
   provisionBackend,
   releaseImages,
@@ -46,8 +51,13 @@ import {
   summarizeTrivyImageVulnerabilities,
   restoreLocalDatabases,
   validateBackupManifest,
+  validateRenderedComposeBoundary,
   verifyCleanMigrations,
   verifyDatabaseRecovery,
+  verifyF4Batch3RoleSeeds,
+  verifyF4R2DefaultActors,
+  verifyTenantAuthorityDefaultSeed,
+  verifyTenantAuthorityRegistrationRecords,
   waitForExpectedDatabases,
 } from "./backend.mjs";
 
@@ -88,6 +98,68 @@ function serviceDependencies(contents, serviceName) {
   );
 }
 
+function renderedBoundaryFixture(label) {
+  const services = {
+    postgres: { ports: label === "local" ? [{ target: 5432 }] : [] },
+    redis: { ports: label === "local" ? [{ target: 6379 }] : [] },
+    minio: {
+      ports:
+        label === "local"
+          ? [{ target: 9000 }, { target: 9001 }]
+          : [{ target: 9000 }],
+    },
+  };
+  for (const service of backendServices) {
+    const ports =
+      label === "local"
+        ? [service.httpPort, service.grpcPort]
+            .filter(Number.isInteger)
+            .map((target) => ({ target }))
+        : service.name === "gateway"
+          ? [{ target: 3002 }]
+          : [];
+    services[service.dockerService] = {
+      ports,
+      ...(service.transport === "http-grpc"
+        ? {
+            environment: {
+              PUBLIC_MODE:
+                label === "release" && service.name === "media-service"
+                  ? "OPEN"
+                  : "GATEWAY_ONLY",
+            },
+          }
+        : {}),
+    };
+  }
+
+  services.gateway = {
+    ...services.gateway,
+    ...(label === "local" ? { build: { target: "gateway-runtime" } } : {}),
+    depends_on: {
+      "auth-service": { condition: "service_healthy" },
+      redis: { condition: "service_healthy" },
+    },
+    environment: {
+      GATEWAY_HTTP_PORT: "3002",
+      GATEWAY_REDIS_URL: "redis://redis:6379/0",
+      GATEWAY_OUTBOUND_KEYS: "configured",
+      GATEWAY_APPLICATION_REGISTRY_JSON: "configured",
+      MEDIA_RENDER_HTTP_URL: "http://media-service:3007",
+      ...Object.fromEntries(
+        hybridServices.map((service) => [
+          `${service.name.replace(/-service$/, "").toUpperCase()}_GRPC_URL`,
+          `${service.dockerService}:${service.grpcPort}`,
+        ]),
+      ),
+    },
+    healthcheck: {
+      test: ["CMD", "http://localhost:3002/health/ready"],
+    },
+  };
+  return { services };
+}
+
 function jsonResponse(status, data) {
   return {
     status,
@@ -114,18 +186,21 @@ test("backend inventory is complete, unique, and ordered", () => {
     [
       "user-service",
       "auth-service",
+      "tenant-authority-service",
       "settings-service",
       "media-service",
       "taxonomy-service",
       "product-service",
       "blog-service",
       "order-service",
+      "gateway",
     ],
   );
   assert.deepEqual(
     prismaServices.map((service) => service.database),
     [
       "nebula_users",
+      "nebula_authority",
       "nebula_settings",
       "nebula_media",
       "nebula_taxonomy",
@@ -135,16 +210,30 @@ test("backend inventory is complete, unique, and ordered", () => {
     ],
   );
 
-  assert.equal(new Set(backendServices.map((service) => service.name)).size, 8);
+  assert.equal(
+    new Set(backendServices.map((service) => service.name)).size,
+    10,
+  );
+  assert.equal(hybridServices.length, 9);
+  assert.equal(prismaServices.length, 8);
+  assert.equal(composeServices.length, 10);
   assert.equal(
     new Set(
-      backendServices.flatMap((service) => [
-        service.httpPort,
-        service.grpcPort,
-      ]),
+      backendServices.flatMap((service) =>
+        service.grpcPort === undefined
+          ? [service.httpPort]
+          : [service.httpPort, service.grpcPort],
+      ),
     ).size,
-    16,
+    19,
   );
+
+  const gateway = backendServices.at(-1);
+  assert.equal(gateway.name, "gateway");
+  assert.equal(gateway.transport, "http");
+  assert.equal(gateway.grpcPort, undefined);
+  assert.equal(gateway.database, null);
+  assert.equal(gateway.compose, true);
 
   for (const service of backendServices) {
     const directory = path.join(repositoryRoot, service.directory);
@@ -176,6 +265,36 @@ test("backend inventory is complete, unique, and ordered", () => {
   }
 });
 
+test("runtime Joi schema owners use one exact version", () => {
+  const ownerDirectories = [
+    ...backendServices.map((service) => service.directory),
+    "packages/config",
+    "packages/grpc-auth",
+  ];
+  const versions = ownerDirectories.map((directory) => {
+    const manifest = JSON.parse(
+      readFileSync(
+        path.join(repositoryRoot, directory, "package.json"),
+        "utf8",
+      ),
+    );
+    const version = manifest.dependencies?.joi;
+
+    assert.match(
+      version,
+      /^\d+\.\d+\.\d+$/,
+      `${manifest.name} must pin Joi because its schemas are composed across workspace boundaries`,
+    );
+    return version;
+  });
+
+  assert.equal(
+    new Set(versions).size,
+    1,
+    "all runtime Joi schema owners must resolve the same version",
+  );
+});
+
 test("runtime ports, healthchecks, dependencies, and database initialization match the inventory", () => {
   const localCompose = source("docker-compose.yml");
   const releaseCompose = source("docker-compose.release.yml");
@@ -187,7 +306,7 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
 
   const backendGroup =
     bake.match(/group "backend"\s*\{([\s\S]*?)\}/)?.[1] ?? "";
-  const bakeTargets = [...backendGroup.matchAll(/"([a-z]+-service)"/g)].map(
+  const bakeTargets = [...backendGroup.matchAll(/"([a-z]+(?:-[a-z]+)*)"/g)].map(
     (match) => match[1],
   );
   assert.deepEqual(
@@ -205,6 +324,14 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
   assert.match(
     dockerfile,
     /for target in \/workspace\/node_modules\/\.pnpm\/\*\/node_modules\//,
+  );
+  assert.match(
+    dockerfile,
+    /packages\/protos\/tenant_authority\.proto \/packages\/protos\/tenant_authority\.proto/,
+  );
+  assert.match(
+    dockerfile,
+    /require\.resolve\('@nebula\/protos\/tenant_authority\.proto'\)/,
   );
   assert.match(
     dockerfile,
@@ -252,47 +379,75 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
       false,
       `${service.name} must use docker/backend.Dockerfile`,
     );
-    for (const compose of [localCompose, releaseCompose]) {
-      const block = serviceBlock(compose, service.dockerService);
-      assert.match(block, new RegExp(`-${service.dockerService}:`));
-      assert.match(block, new RegExp(`:${service.httpPort}["']`));
-      assert.match(block, new RegExp(`:${service.grpcPort}["']`));
-    }
-
-    const runtimeName = service.name.replace(/-service$/, "-runtime");
+    const runtimeName = `${service.name.replace(/-service$/, "")}-runtime`;
     assert.match(dockerfile, new RegExp(`AS ${runtimeName}\\b`));
-    assert.match(
-      dockerfile,
-      new RegExp(`EXPOSE ${service.httpPort} ${service.grpcPort}`),
-    );
+    const exposedPorts =
+      service.grpcPort === undefined
+        ? `${service.httpPort}`
+        : `${service.httpPort} ${service.grpcPort}`;
+    assert.match(dockerfile, new RegExp(`EXPOSE ${exposedPorts}`));
     assert.match(
       dockerfile,
       new RegExp(`http://localhost:${service.httpPort}/health/ready`),
     );
 
-    const main = source(`${service.directory}/src/main.ts`);
-    assert.match(main, new RegExp(`defaultHttpPort:\\s*${service.httpPort}`));
-    assert.match(main, new RegExp(`defaultGrpcPort:\\s*${service.grpcPort}`));
-
     const serviceExample = envValues(
       source(`${service.directory}/.env.example`),
     );
-    assert.equal(serviceExample.get("PORT"), String(service.httpPort));
-    assert.equal(serviceExample.get("GRPC_PORT"), String(service.grpcPort));
+    if (service.transport === "http-grpc") {
+      const main = source(`${service.directory}/src/main.ts`);
+      assert.match(main, new RegExp(`defaultHttpPort:\\s*${service.httpPort}`));
+      assert.match(main, new RegExp(`defaultGrpcPort:\\s*${service.grpcPort}`));
+      assert.equal(serviceExample.get("PORT"), String(service.httpPort));
+      assert.equal(serviceExample.get("GRPC_PORT"), String(service.grpcPort));
 
-    const prefix = service.name.replace(/-service$/, "").toUpperCase();
-    assert.equal(
-      rootExample.get(`${prefix}_HTTP_PORT`),
-      String(service.httpPort),
-    );
-    assert.equal(
-      releaseExample.get(`${prefix}_HTTP_PORT`),
-      String(service.httpPort),
-    );
-    assert.equal(
-      releaseExample.get(`${prefix}_GRPC_PORT`),
-      String(service.grpcPort),
-    );
+      const prefix = service.name
+        .replace(/-service$/, "")
+        .replaceAll("-", "_")
+        .toUpperCase();
+      assert.equal(
+        rootExample.get(`${prefix}_HTTP_PORT`),
+        String(service.httpPort),
+      );
+      assert.equal(releaseExample.has(`${prefix}_HTTP_PORT`), false);
+      assert.equal(releaseExample.has(`${prefix}_GRPC_PORT`), false);
+    } else {
+      const prefix = service.name
+        .replace(/-service$/, "")
+        .replaceAll("-", "_")
+        .toUpperCase();
+      assert.equal(
+        serviceExample.get(`${prefix}_HTTP_PORT`),
+        String(service.httpPort),
+      );
+      assert.equal(
+        rootExample.get(`${prefix}_HTTP_PORT`),
+        String(service.httpPort),
+      );
+      if (service.name === "gateway") {
+        assert.equal(
+          releaseExample.get("GATEWAY_HTTP_PORT"),
+          String(service.httpPort),
+        );
+      } else {
+        assert.equal(releaseExample.has(`${prefix}_HTTP_PORT`), false);
+      }
+      assert.equal(serviceExample.has("GRPC_PORT"), false);
+    }
+
+    const localBlock = serviceBlock(localCompose, service.dockerService);
+    const releaseBlock = serviceBlock(releaseCompose, service.dockerService);
+    assert.match(localBlock, new RegExp(`-${service.dockerService}:`));
+    assert.match(releaseBlock, new RegExp(`-${service.dockerService}:`));
+    assert.match(localBlock, new RegExp(`:${service.httpPort}["']`));
+    if (service.grpcPort !== undefined) {
+      assert.match(localBlock, new RegExp(`:${service.grpcPort}["']`));
+      assert.doesNotMatch(releaseBlock, /^    ports:/m);
+    } else if (service.name === "gateway") {
+      assert.match(releaseBlock, /GATEWAY_HOST_PORT:-3002}:3002/);
+    } else {
+      assert.doesNotMatch(releaseBlock, /^    ports:/m);
+    }
 
     const localDependencies = serviceDependencies(
       localCompose,
@@ -304,7 +459,7 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     );
     assert.deepEqual(releaseDependencies, localDependencies);
     for (const [dependency, condition] of Object.entries(localDependencies)) {
-      if (backendServices.some((entry) => entry.dockerService === dependency)) {
+      if (composeServices.some((entry) => entry.dockerService === dependency)) {
         assert.equal(condition, "service_healthy");
       }
     }
@@ -323,8 +478,46 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
       serviceDependencies(compose, "media-service").minio,
       "service_healthy",
     );
+    assert.match(
+      serviceBlock(compose, "tenant-authority-db-init"),
+      /ensure-tenant-authority-db\.sh/,
+    );
+    assert.equal(
+      serviceDependencies(compose, "tenant-authority-service")[
+        "tenant-authority-db-init"
+      ],
+      "service_completed_successfully",
+    );
     assert.doesNotMatch(compose, /condition:\s*service_started/);
   }
+
+  const authorityProvisioner = source(
+    "scripts/db/ensure-tenant-authority-db.sh",
+  );
+  assert.match(authorityProvisioner, /CREATE DATABASE nebula_authority/);
+  assert.match(authorityProvisioner, /CREATE ROLE nebula_authority_runtime/);
+  assert.match(authorityProvisioner, /REVOKE CREATE ON SCHEMA public/);
+  assert.match(
+    authorityProvisioner,
+    /GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public/,
+  );
+  assert.match(
+    authorityProvisioner,
+    /REVOKE DELETE ON ALL TABLES IN SCHEMA public/,
+  );
+  assert.match(
+    authorityProvisioner,
+    /ALTER DEFAULT PRIVILEGES IN SCHEMA public\s+REVOKE DELETE ON TABLES/,
+  );
+  assert.doesNotMatch(
+    authorityProvisioner,
+    /GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES/,
+  );
+  assert.match(
+    authorityProvisioner,
+    /REVOKE INSERT, UPDATE, DELETE ON TABLE public\._prisma_migrations/,
+  );
+  assert.doesNotMatch(authorityProvisioner, /DROP (?:DATABASE|ROLE)/);
 
   const initializedDatabases = [
     ...databaseInit.matchAll(/CREATE DATABASE ([a-z_]+);/g),
@@ -345,8 +538,16 @@ test("existing scripts and wiring tests consume the package inventory", () => {
     /backend\.mjs/,
   );
   assert.match(
+    source("scripts/docker/verify-runtime-imports.mjs"),
+    /env\.validation\.js/,
+  );
+  assert.match(
     source("scripts/docker/save-release-images.ps1"),
-    /backend\.mjs/,
+    /\$repoRoot\s*=\s*Resolve-Path[\s\S]*Join-Path \$repoRoot "scripts\\backend\.mjs"/,
+  );
+  assert.match(
+    source("scripts/docker/save-release-images.ps1"),
+    /SupportsShouldProcess\s*=\s*\$true[\s\S]*\$PSCmdlet\.ShouldProcess/,
   );
   assert.match(source("scripts/docker/build-backend.ps1"), /build-images/);
   assert.doesNotMatch(
@@ -415,6 +616,7 @@ test("root command names point at the consolidated backend tool", () => {
       demoSeed: manifest.scripts["backend:seed"],
       push: manifest.scripts["db:push"],
       verifyMigrations: manifest.scripts["db:verify:migrations"],
+      verifyTenantAuthority: manifest.scripts["db:verify:tenant-authority"],
       backup: manifest.scripts["db:backup"],
       restore: manifest.scripts["db:restore"],
       recovery: manifest.scripts["test:database-recovery"],
@@ -432,6 +634,12 @@ test("root command names point at the consolidated backend tool", () => {
       imageScan: manifest.scripts["scan:images:backend"],
       composeEvidence: manifest.scripts["evidence:compose:backend"],
       failureEvidence: manifest.scripts["evidence:failure:backend"],
+      sharedTests: manifest.scripts["test:shared:backend"],
+      gatewayTests: manifest.scripts["test:gateway:backend"],
+      tenantAuthorityTests: manifest.scripts["test:tenant-authority:backend"],
+      externalClientTests: manifest.scripts["test:external-client"],
+      currentWebTests: manifest.scripts["test:web:current"],
+      f3LiveTests: manifest.scripts["test:f3:live"],
       e2e: manifest.scripts["test:e2e"],
     },
     {
@@ -443,6 +651,8 @@ test("root command names point at the consolidated backend tool", () => {
       demoSeed: "node ./scripts/backend.mjs seed",
       push: "node ./scripts/backend.mjs prisma push",
       verifyMigrations: "node ./scripts/backend.mjs database verify-migrations",
+      verifyTenantAuthority:
+        "node ./scripts/backend.mjs database verify-migrations tenant-authority",
       backup: "node ./scripts/backend.mjs database backup",
       restore: "node ./scripts/backend.mjs database restore",
       recovery: "node ./scripts/backend.mjs database test-recovery",
@@ -460,6 +670,16 @@ test("root command names point at the consolidated backend tool", () => {
       imageScan: "node ./scripts/backend.mjs security images",
       composeEvidence: "node ./scripts/backend.mjs evidence compose",
       failureEvidence: "node ./scripts/backend.mjs evidence failure",
+      sharedTests:
+        "pnpm --filter @packages/config test && pnpm --filter @nebula/grpc-auth test && pnpm --filter @nebula/clients test",
+      gatewayTests:
+        "pnpm --filter @nebula/gateway test && pnpm --filter @nebula/gateway openapi:check",
+      tenantAuthorityTests:
+        "pnpm --filter @nebula/tenant-authority-service test",
+      externalClientTests:
+        "pnpm --filter @nebula/gateway openapi:check && pnpm --filter @nebula/api-client generate:check && pnpm --filter @nebula/api-client lint && pnpm --filter @nebula/api-client check-types && pnpm --filter @nebula/api-client test",
+      currentWebTests: "pnpm --filter web test",
+      f3LiveTests: "pnpm --filter @nebula/api-client test:live",
       e2e: "pnpm build:backend && pnpm -r --workspace-concurrency=1 --filter=./apps/* --if-present run test:e2e",
     },
   );
@@ -475,6 +695,12 @@ test("root command names point at the consolidated backend tool", () => {
 
 test("CI retains only allowlisted backend evidence for fourteen days", () => {
   const workflow = source(".github/workflows/ci.yml");
+  assert.match(workflow, /run: pnpm test:shared:backend/);
+  assert.match(workflow, /run: pnpm test:gateway:backend/);
+  assert.match(workflow, /run: pnpm test:tenant-authority:backend/);
+  assert.match(workflow, /run: pnpm test:external-client/);
+  assert.match(workflow, /run: pnpm test:web:current/);
+  assert.match(workflow, /run: pnpm test:f3:live/);
   const uploadAction =
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
   assert.equal(workflow.split(uploadAction).length - 1, 2);
@@ -832,6 +1058,12 @@ test("Trivy image scans reuse every inventory image and collect failures", () =>
   assert.equal(args.includes("--ignore-unfixed"), false);
   assert.equal(args[args.indexOf("--exit-code") + 1], "0");
   assert.equal(args.at(-1), services[0].defaultImage);
+  assert.deepEqual(
+    args.flatMap((arg, index) =>
+      arg === "--db-repository" ? [args[index + 1]] : [],
+    ),
+    TRIVY_DB_REPOSITORIES,
+  );
 
   const calls = [];
   assert.throws(
@@ -966,6 +1198,7 @@ test("Compose evidence is non-interpolated and sanitized", () => {
     JWT_SECRET: "compose-secret-value",
   };
   const calls = [];
+  const validated = [];
 
   try {
     captureComposeConfigurations({
@@ -979,20 +1212,32 @@ test("Compose evidence is non-interpolated and sanitized", () => {
           stderr: "",
         };
       },
+      validateConfiguration(label) {
+        validated.push(label);
+      },
       outputDirectory: temporary,
       platform: "linux",
     });
 
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 4);
     assert.equal(
       calls.every((call) => call.command === "docker"),
       true,
     );
     assert.equal(
-      calls.every((call) => call.args.includes("--no-interpolate")),
+      calls
+        .filter((_call, index) => index % 2 === 0)
+        .every((call) => call.args.includes("--no-interpolate")),
       true,
     );
-    assert.equal(calls[1].args.includes("docker-compose.release.yml"), true);
+    assert.equal(
+      calls
+        .filter((_call, index) => index % 2 === 1)
+        .every((call) => call.args.includes("--format")),
+      true,
+    );
+    assert.equal(calls[2].args.includes("docker-compose.release.yml"), true);
+    assert.deepEqual(validated, ["local", "release"]);
     for (const output of ["compose-local.yaml", "compose-release.yaml"]) {
       const contents = readFileSync(path.join(temporary, output), "utf8");
       assert.doesNotMatch(contents, /password|compose-secret-value/);
@@ -1001,6 +1246,33 @@ test("Compose evidence is non-interpolated and sanitized", () => {
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
+});
+
+test("rendered Compose boundary permits only the selected release data plane", () => {
+  assert.doesNotThrow(() =>
+    validateRenderedComposeBoundary("local", renderedBoundaryFixture("local")),
+  );
+  assert.doesNotThrow(() =>
+    validateRenderedComposeBoundary(
+      "release",
+      renderedBoundaryFixture("release"),
+    ),
+  );
+
+  const leakedBackend = renderedBoundaryFixture("release");
+  leakedBackend.services["product-service"].ports = [{ target: 3003 }];
+  assert.throws(
+    () => validateRenderedComposeBoundary("release", leakedBackend),
+    /compose_boundary_release_product-service_ports_forbidden/,
+  );
+
+  const closedMedia = renderedBoundaryFixture("release");
+  closedMedia.services["media-service"].environment.PUBLIC_MODE =
+    "GATEWAY_ONLY";
+  assert.throws(
+    () => validateRenderedComposeBoundary("release", closedMedia),
+    /compose_boundary_release_media-service_public_mode_invalid/,
+  );
 });
 
 test("failure evidence keeps bounded Compose diagnostics and redacts secrets", () => {
@@ -1188,9 +1460,10 @@ test("backend boot reuses migration, seed, Bake, Compose, and readiness owners i
     },
   });
 
-  assert.deepEqual(events.slice(0, 3), [
+  assert.deepEqual(events.slice(0, 4), [
     "environment",
     "docker:compose up -d --wait --wait-timeout 120 postgres redis minio",
+    "docker:compose run -T --rm --no-deps tenant-authority-db-init",
     "databases",
   ]);
   assert.equal(
@@ -1217,7 +1490,7 @@ test("backend boot reuses migration, seed, Bake, Compose, and readiness owners i
   );
   assert.deepEqual(
     events.filter((event) => event.startsWith("health:")),
-    backendServices.map((service) => `health:${service.name}`),
+    composeServices.map((service) => `health:${service.name}`),
   );
   assert.equal(events.at(-1), "demo-seed");
 });
@@ -1268,16 +1541,16 @@ test("Prisma actions run sequentially and stop at the first failure", () => {
         },
         logger: { log: (message) => logs.push(message) },
       }),
-    /media-service_nebula_media_failed_exit_7/,
+    /settings-service_nebula_settings_failed_exit_7/,
   );
 
   assert.deepEqual(calls, [
     "@nebula/user-service",
+    "@nebula/tenant-authority-service",
     "@nebula/settings-service",
-    "@nebula/media-service",
   ]);
   assert.equal(logs.length, 3);
-  assert.match(logs[2], /media-service \(nebula_media\)/);
+  assert.match(logs[2], /settings-service \(nebula_settings\)/);
 
   assert.throws(
     () =>
@@ -1318,9 +1591,20 @@ test("clean migration verification uses disposable databases and always cleans u
   );
   assert.deepEqual(
     prismaCalls.map((args) =>
-      args.includes("deploy") ? "migrate-deploy" : "migrate-status",
+      args.includes("deploy")
+        ? "migrate-deploy"
+        : args.includes("db:seed")
+          ? "seed"
+          : "migrate-status",
     ),
-    ["migrate-deploy", "migrate-status", "migrate-deploy", "migrate-status"],
+    [
+      "migrate-deploy",
+      "migrate-status",
+      "migrate-deploy",
+      "migrate-status",
+      "seed",
+      "seed",
+    ],
   );
   assert.deepEqual(
     dockerCalls
@@ -1334,6 +1618,427 @@ test("clean migration verification uses disposable databases and always cleans u
       .map((call) => call.args.at(-1)),
     expected.map((service) => service.database).reverse(),
   );
+  const authorityEvidence = dockerCalls.find(
+    (call) =>
+      call.args.includes("psql") &&
+      call.args.some((arg) =>
+        String(arg).includes(
+          "authority_registration_evidence_requires_empty_database",
+        ),
+      ),
+  );
+  assert.notEqual(authorityEvidence, undefined);
+  assert.equal(
+    authorityEvidence.args[authorityEvidence.args.indexOf("--dbname") + 1],
+    expected.find(
+      (service) => service.packageName === "@nebula/tenant-authority-service",
+    ).database,
+  );
+  const seedEvidence = dockerCalls.find(
+    (call) =>
+      call.args.includes("psql") &&
+      call.args.some((arg) =>
+        String(arg).includes("authority_default_seed_rerun_not_idempotent"),
+      ),
+  );
+  assert.notEqual(seedEvidence, undefined);
+});
+
+test("migration verification can select only tenant authority", () => {
+  assert.deepEqual(migrationVerificationServices(), prismaServices);
+  assert.deepEqual(
+    migrationVerificationServices("tenant-authority").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/tenant-authority-service"],
+  );
+  assert.throws(
+    () => migrationVerificationServices("unknown"),
+    /migration_verification_scope_invalid_unknown/,
+  );
+});
+
+test("F4 Batch 3 role verification preserves the bounded legacy snapshot across item 3 reruns", () => {
+  const dockerCalls = [];
+  const pnpmCalls = [];
+  let auditRuns = 0;
+  const legacyAudit = {
+    backfillStatus: "READY",
+    totalUsers: 3,
+    roleCounts: { user: 1, admin: 1, "root-admin": 1, INVALID: 0 },
+  };
+  const fixture = {
+    version: 1,
+    rootAdminUserId: "11111111-1111-4111-8111-111111111111",
+    siteAdminUserId: "22222222-2222-4222-8222-222222222222",
+    editorUserId: "33333333-3333-4333-8333-333333333333",
+    userId: "44444444-4444-4444-8444-444444444444",
+  };
+
+  const verified = verifyF4Batch3RoleSeeds({
+    runId: "role-seed-success",
+    executeDocker(command, args) {
+      dockerCalls.push({ command, args });
+      return { status: 0 };
+    },
+    executePnpm(args, options = {}) {
+      pnpmCalls.push({ args, input: options.input });
+      if (args.includes("audit:f4-legacy-roles")) {
+        auditRuns += 1;
+        return {
+          status: 0,
+          stdout: JSON.stringify(
+            auditRuns === 1
+              ? legacyAudit
+              : {
+                  ...legacyAudit,
+                  totalUsers: 4,
+                  roleCounts: { ...legacyAudit.roleCounts, user: 2 },
+                },
+          ),
+        };
+      }
+      if (args.includes("export:f4-default-role-fixtures")) {
+        return { status: 0, stdout: JSON.stringify(fixture) };
+      }
+      return { status: 0, stdout: "" };
+    },
+    logger: { log() {} },
+  });
+
+  assert.equal(verified.length, 2);
+  const scriptCalls = pnpmCalls.filter(({ args }) => args.includes("run"));
+  const firstBackfill = scriptCalls.findIndex(({ args }) =>
+    args.includes("backfill:f4-legacy-roles"),
+  );
+  const firstEditorSeed = scriptCalls.findIndex(({ args }) =>
+    args.includes("seed:f4-editor-user"),
+  );
+  assert.ok(firstBackfill >= 0 && firstBackfill < firstEditorSeed);
+  const backfills = scriptCalls.filter(({ args }) =>
+    args.includes("backfill:f4-legacy-roles"),
+  );
+  assert.equal(backfills.length, 3);
+  const actorRuns = pnpmCalls.flatMap(({ args }, index) =>
+    args.includes("backfill:f4-default-actors") ? [index] : [],
+  );
+  assert.equal(actorRuns.length, 3);
+  assert.ok(
+    pnpmCalls
+      .slice(actorRuns[1] + 1, actorRuns[2])
+      .some(
+        ({ args }) =>
+          args.includes("@nebula/tenant-authority-service") &&
+          args.includes("db:seed"),
+      ),
+  );
+  assert.ok(
+    backfills.every(({ input }) => input === JSON.stringify(legacyAudit)),
+  );
+  assert.equal(
+    scriptCalls.filter(({ args }) =>
+      args.includes("verify:batch3-actor-resolution"),
+    ).length,
+    1,
+  );
+  assert.equal(
+    dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+    2,
+  );
+  assert.equal(
+    dockerCalls.filter(({ args }) =>
+      args.some((arg) =>
+        String(arg).includes("f4_batch3_site_role_grant_mismatch"),
+      ),
+    ).length,
+    1,
+  );
+});
+
+test("F4 Batch 3 role verification cleans both disposable databases after a partial failure", () => {
+  const dockerCalls = [];
+
+  assert.throws(
+    () =>
+      verifyF4Batch3RoleSeeds({
+        runId: "role-seed-failure",
+        executeDocker(command, args) {
+          dockerCalls.push({ command, args });
+          return { status: 0 };
+        },
+        executePnpm(args) {
+          if (args.includes("audit:f4-legacy-roles")) {
+            return { status: 7, stdout: "" };
+          }
+          return { status: 0, stdout: "" };
+        },
+        logger: { log() {} },
+      }),
+    /package_script_@nebula\/user-service_audit:f4-legacy-roles_failed_exit_7/,
+  );
+
+  assert.equal(
+    dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+    2,
+  );
+});
+
+function r2ToolingFixture({
+  unexpectedRollbackStatus,
+  failAtDatabase,
+  cleanupFailure = false,
+} = {}) {
+  const dockerCalls = [];
+  const packageCalls = [];
+  const events = [];
+  const executeDocker = (command, args, options = {}) => {
+    const call = { command, args, input: options.input };
+    dockerCalls.push(call);
+    events.push(call);
+    const database = args[args.indexOf("--dbname") + 1];
+    if (args.includes("dropdb") && cleanupFailure) return { status: 8 };
+    if (
+      args.includes("createdb") &&
+      args.at(-1).includes(failAtDatabase ?? "never-match")
+    ) {
+      return { status: 7 };
+    }
+    if (
+      database?.includes("_rollback_verify_") &&
+      options.input?.includes("-- F4 Batch 3R R2:")
+    ) {
+      const reason = database.includes("authority")
+        ? "authority_default_actor_realm_missing"
+        : "product_comment_legacy_user_id_invalid";
+      return unexpectedRollbackStatus === undefined
+        ? {
+            status: 3,
+            stderr: `ERROR:  ${reason}\nCONTEXT: disposable fixture`,
+          }
+        : {
+            status: unexpectedRollbackStatus,
+            stderr: "ERROR:  unrelated_failure",
+          };
+    }
+    return { status: 0 };
+  };
+  const executePnpm = (args) => {
+    const call = { args };
+    packageCalls.push(call);
+    events.push(call);
+    return { status: 0, stdout: "" };
+  };
+  return {
+    dockerCalls,
+    packageCalls,
+    events,
+    executeDocker,
+    executePnpm,
+    logger: { log() {} },
+  };
+}
+
+test("F4 R2 proves six exact old-schema upgrades/rollbacks and cleans every database", () => {
+  const fixture = r2ToolingFixture();
+  const verified = verifyF4R2DefaultActors({ ...fixture, runId: "r2-success" });
+  assert.equal(verified.length, 6);
+  const creates = fixture.dockerCalls.filter(({ args }) =>
+    args.includes("createdb"),
+  );
+  const drops = fixture.dockerCalls.filter(({ args }) =>
+    args.includes("dropdb"),
+  );
+  assert.deepEqual(
+    creates.map(({ args }) => args.at(-1)),
+    verified,
+  );
+  assert.deepEqual(
+    drops.map(({ args }) => args.at(-1)),
+    [...verified].reverse(),
+  );
+  assert.ok(creates.every(({ args }) => args.includes("template0")));
+  assert.ok(verified.every((database) => database.includes("_verify_")));
+  const sqlCalls = fixture.dockerCalls.filter(({ args }) =>
+    args.includes("psql"),
+  );
+  assert.ok(
+    sqlCalls.every(
+      ({ args, input }) =>
+        args.includes("--file=-") && typeof input === "string",
+    ),
+  );
+  assert.ok(
+    sqlCalls.every(({ args }) => args.includes("--set=ON_ERROR_STOP=1")),
+  );
+  for (const [index, count] of [6, 4, 1, 2, 6, 2].entries()) {
+    const calls = sqlCalls.filter(
+      ({ args }) => args[args.indexOf("--dbname") + 1] === verified[index],
+    );
+    // Exact pre-R2 set plus fixture, R2 migration, and verification.
+    assert.equal(calls.length, count + 3);
+  }
+  const evidenceIndices = fixture.events.flatMap(({ args }, index) =>
+    args.includes("backfill:f4-default-actors") ? [index] : [],
+  );
+  const seedIndices = fixture.events.flatMap(({ args }, index) =>
+    args.includes("db:seed") ? [index] : [],
+  );
+  assert.equal(evidenceIndices.length, 3);
+  assert.equal(seedIndices.length, 2);
+  assert.ok(seedIndices[0] < evidenceIndices[0]);
+  assert.ok(
+    evidenceIndices[1] < seedIndices[1] && seedIndices[1] < evidenceIndices[2],
+  );
+  const authorityFixture = fixture.events.findIndex(({ input }) =>
+    input?.includes("Real HMAC-SHA256 refs"),
+  );
+  const authorityMigration = fixture.events.findIndex(({ input }) =>
+    input?.includes("-- F4 Batch 3R R2: additive deterministic"),
+  );
+  assert.ok(
+    seedIndices[0] < authorityFixture && authorityFixture < authorityMigration,
+  );
+  assert.ok(authorityMigration < evidenceIndices[0]);
+  const root = JSON.parse(source("package.json"));
+  assert.equal(
+    root.scripts["db:verify:f4-r2-default-actors"],
+    "node ./scripts/backend.mjs database verify-f4-r2-default-actors",
+  );
+});
+
+for (const status of [0, 3, null]) {
+  test(`F4 R2 rejects unexpected rollback result ${status} and still cleans up`, () => {
+    const fixture = r2ToolingFixture({ unexpectedRollbackStatus: status });
+    assert.throws(
+      () => verifyF4R2DefaultActors({ ...fixture, runId: "r2-unexpected" }),
+      /f4_r2_expected_failure_missing_authority_default_actor_realm_missing/,
+    );
+    assert.equal(
+      fixture.dockerCalls.filter(({ args }) => args.includes("createdb"))
+        .length,
+      5,
+    );
+    assert.equal(
+      fixture.dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+      5,
+    );
+  });
+}
+
+test("F4 R2 cleans only successfully created databases after partial creation failure", () => {
+  const fixture = r2ToolingFixture({ failAtDatabase: "nebula_order_" });
+  assert.throws(
+    () => verifyF4R2DefaultActors({ ...fixture, runId: "r2-partial" }),
+    /local_postgres_create_.*failed_exit_7/,
+  );
+  const drops = fixture.dockerCalls.filter(({ args }) =>
+    args.includes("dropdb"),
+  );
+  assert.equal(drops.length, 2);
+  assert.ok(drops.every(({ args }) => !args.at(-1).includes("nebula_order_")));
+});
+
+test("F4 R2 does not mistake an error prefix or echoed stdout for the expected SQL failure", () => {
+  for (const result of [
+    {
+      status: 3,
+      stderr: "ERROR:  authority_default_actor_realm_missing_extra",
+    },
+    {
+      status: 3,
+      stdout: "ERROR:  authority_default_actor_realm_missing",
+      stderr: "ERROR:  different_failure",
+    },
+  ]) {
+    const fixture = r2ToolingFixture();
+    const execute = fixture.executeDocker;
+    fixture.executeDocker = (command, args, options) => {
+      const actual = execute(command, args, options);
+      return actual.status === 3 ? result : actual;
+    };
+    assert.throws(
+      () => verifyF4R2DefaultActors({ ...fixture, runId: "r2-reason" }),
+      /f4_r2_expected_failure_missing_authority_default_actor_realm_missing/,
+    );
+    assert.equal(
+      fixture.dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+      5,
+    );
+  }
+});
+
+test("F4 R2 reports cleanup failure alongside the original verification failure", () => {
+  const fixture = r2ToolingFixture({
+    failAtDatabase: "nebula_order_",
+    cleanupFailure: true,
+  });
+  assert.throws(
+    () => verifyF4R2DefaultActors({ ...fixture, runId: "r2-both" }),
+    /failed_exit_7; cleanup: .*failed_exit_8/,
+  );
+  assert.equal(
+    fixture.dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+    2,
+  );
+});
+
+test("F4 R2 attempts all cleanup even when one drop fails and never reports success", () => {
+  const fixture = r2ToolingFixture({ cleanupFailure: true });
+  assert.throws(
+    () => verifyF4R2DefaultActors({ ...fixture, runId: "r2-cleanup" }),
+    /local_postgres_drop_.*failed_exit_8/,
+  );
+  assert.equal(
+    fixture.dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+    6,
+  );
+});
+
+test("disposable cleanup refuses normal or invalid database names before executing", () => {
+  let calls = 0;
+  for (const database of [
+    "nebula_authority",
+    "nebula_product",
+    "a_verify_bad;drop",
+    "--verify--",
+  ]) {
+    assert.throws(
+      () =>
+        dropDisposableDatabase(database, {
+          execute() {
+            calls += 1;
+          },
+        }),
+      /refused_to_drop_non_disposable_database|local_database_name_invalid/,
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test("authority record evidence refuses non-database targets", () => {
+  let calls = 0;
+  assert.throws(
+    () =>
+      verifyTenantAuthorityRegistrationRecords("authority;drop database", {
+        executeDocker() {
+          calls += 1;
+          return { status: 0 };
+        },
+      }),
+    /database_name_invalid/,
+  );
+  assert.equal(calls, 0);
+  assert.throws(
+    () =>
+      verifyTenantAuthorityDefaultSeed("authority;drop database", {
+        executeDocker() {
+          calls += 1;
+          return { status: 0 };
+        },
+      }),
+    /database_name_invalid/,
+  );
+  assert.equal(calls, 0);
 });
 
 test("clean migration verification stops after failure and cleans only created databases", () => {
@@ -1357,7 +2062,7 @@ test("clean migration verification stops after failure and cleans only created d
         },
         logger: { log() {} },
       }),
-    /settings-service.*failed_exit_9/,
+    /tenant-authority-service.*failed_exit_9/,
   );
 
   assert.equal(prismaCalls, 3);
@@ -1415,7 +2120,7 @@ test("backup refuses running backends and removes incomplete output", async () =
       },
       logger: { log() {} },
     }),
-    /backup_nebula_settings_failed_exit_5/,
+    /backup_nebula_authority_failed_exit_5/,
   );
   assert.equal(existsSync(failedTarget), false);
   rmSync(temporary, { recursive: true, force: true });
@@ -1575,9 +2280,9 @@ test("recovery proof uses binary data, a temporary failed migration, and disposa
     prismaCalls.map((args) => args[1]),
     [
       "@nebula/user-service",
-      "@nebula/settings-service",
-      "@nebula/settings-service",
-      "@nebula/settings-service",
+      "@nebula/tenant-authority-service",
+      "@nebula/tenant-authority-service",
+      "@nebula/tenant-authority-service",
     ],
   );
   assert.equal(
@@ -1753,12 +2458,14 @@ test("development and release commands derive all backend services", () => {
   assert.deepEqual(buildDevCommands(), [
     "pnpm run dev:user",
     "pnpm run dev:auth",
+    "pnpm run dev:tenant-authority",
     "pnpm run dev:settings",
     "pnpm run dev:media",
     "pnpm run dev:taxonomy",
     "pnpm run dev:product",
     "pnpm run dev:blog",
     "pnpm run dev:order",
+    "pnpm run dev:gateway",
   ]);
   assert.deepEqual(
     releaseImages("example/nebula", "test"),

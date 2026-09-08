@@ -34,7 +34,13 @@ describe("order-service HTTP (cart + checkout + orders)", () => {
     const p = await httpJson<any>(
       "POST",
       `${PRODUCT_HTTP}/products`,
-      { data: { title: "OrderSvc HTTP Product", price: 199.99 } },
+      {
+        data: {
+          title: "OrderSvc HTTP Product",
+          price: 199.99,
+          status: "ACTIVE",
+        },
+      },
       { authorization: `Bearer ${adminToken}` },
     );
     productId = p.data.id;

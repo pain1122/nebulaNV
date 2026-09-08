@@ -1,5 +1,7 @@
 # Web And Admin Apps
 
+Last reviewed: 2026-08-22
+
 The public web app consumes backend APIs and renders SEO-facing pages. The admin panel target is a separate Vite React SPA for app-like admin workflows.
 
 ## Boundary Rule
@@ -30,7 +32,7 @@ Access tokens and refresh flows are separate concerns. Do not persist refresh to
 
 ## Browser Origin Rule
 
-Frozen target policy:
+Implemented F3 boundary:
 
 - Browser applications call the public gateway, not individual backend services.
 - Public CDN/render media allows any origin without credentials because only approved public variants are eligible.
@@ -67,9 +69,31 @@ See [Media Service](media-service.md#download-resistance-policy) for the complet
 
 See [Media Service](media-service.md#sensitive-preview-policy) for the complete policy and current implementation gaps.
 
-## Future Direction
+## Current F3 Compatibility Path
 
-When API contracts stabilize, add typed frontend API clients so backend response changes are caught at build time.
+`apps/web` keeps a thin same-origin BFF for browser session and current UI
+compatibility. Its server configuration contains only the gateway API base,
+registered public client ID, and configured application Origin. Auth, Product,
+and Taxonomy BFF routes use the generated `@nebula/api-client`; no individual
+service HTTP/gRPC URL remains in web source or its current env contracts.
+
+The browser receives access tokens in JSON and stores them in memory plus
+`sessionStorage`; it does not use an access-token cookie. The HttpOnly,
+host-only refresh cookie stays on `Path=/api/auth`. Refresh and logout are POST
+and require the exact application host/Origin plus same-origin Fetch Metadata.
+Concurrent 401 responses share one refresh promise; a failed refresh rejects
+and clears every waiter rather than leaving requests unresolved.
+
+The focused compatibility gate is:
+
+```powershell
+pnpm test:web:current
+```
+
+F7 still owns whether this current app is reused, migrated, or replaced and
+the broader public-storefront/admin split.
+
+## Future Direction
 
 Public website direction:
 
@@ -83,10 +107,13 @@ Public website direction:
 Admin panel direction:
 
 - Vite React SPA is the preferred admin panel direction because the admin is interactive, authenticated, and does not need public SEO.
-- The reusable media filemanager should live in the admin app and call media-service lane routes, not raw S3/Supabase APIs.
+- The reusable media filemanager should live in the admin app and call gateway
+  media lane routes, not a direct media-service or raw S3/Supabase control API.
 
 Current delivery status:
 
 - Admin-panel implementation is postponed until the Vite-based admin project/template is ready.
-- Current `apps/web` is not the active admin deliverable and does not gate backend-only stabilization slices.
+- Current `apps/web` remains a compatibility implementation, not the final
+  admin deliverable. Its focused contract tests gate the F3 browser boundary;
+  it still does not broaden backend-only source/image scans.
 - F7 owns the decision to reuse, migrate, or replace current `apps/web`, separately from the future public Next.js storefront.

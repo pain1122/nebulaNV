@@ -31,6 +31,16 @@ jobs:
         run: pnpm check-types:backend
       - name: Run focused container-free security tests
         run: pnpm test:security
+      - name: Run shared backend unit and contract tests
+        run: pnpm test:shared:backend
+      - name: Run gateway unit and public-contract tests
+        run: pnpm test:gateway:backend
+      - name: Run authority foundation tests
+        run: pnpm test:tenant-authority:backend
+      - name: Verify generated external client and browser/mobile consumers
+        run: pnpm test:external-client
+      - name: Run focused current-web compatibility tests
+        run: pnpm test:web:current
       - name: Build backend sources
         run: pnpm build:backend
       - name: Materialize tracked example environment files
@@ -72,6 +82,8 @@ jobs:
           version: ${{ env.TRIVY_VERSION }}
       - name: Provision live integration services
         run: pnpm backend:boot
+      - name: Prove live F3 gateway client profiles
+        run: pnpm test:f3:live
       - name: Run live integration and e2e tests
         run: pnpm test:e2e
       - name: Scan the tested backend images

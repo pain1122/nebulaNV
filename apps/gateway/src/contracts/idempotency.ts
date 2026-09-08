@@ -26,7 +26,7 @@ export type GatewayIdempotencyScope = Readonly<{
 export type GatewayStoredResponse = Readonly<{
   status: number;
   body: unknown;
-  headers: Readonly<Record<string, string>>;
+  headers: Readonly<Record<string, string | readonly string[]>>;
 }>;
 
 export type GatewayInFlightIdempotencyState = Readonly<{
@@ -143,9 +143,43 @@ function validResponse(value: unknown): value is GatewayStoredResponse {
   ) {
     return false;
   }
-  return Object.entries(value.headers).every(
-    ([key, header]) =>
-      ["location", "etag"].includes(key) && typeof header === "string",
+  return Object.entries(value.headers).every(([key, header]) => {
+    if (["location", "etag"].includes(key)) return typeof header === "string";
+    return key === "set-cookie" && validRefreshCookieDeletion(header);
+  });
+}
+
+export function validRefreshCookieDeletion(value: unknown): boolean {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 1 ||
+    typeof value[0] !== "string"
+  ) {
+    return false;
+  }
+  const attributes = value[0].split(";").map((part) => part.trim());
+  if (attributes[0] !== "refreshToken=") return false;
+  const normalized = attributes.slice(1).map((part) => part.toLowerCase());
+  const expiration = normalized.filter(
+    (part) =>
+      part === "max-age=0" ||
+      part === "expires=thu, 01 jan 1970 00:00:00 gmt",
+  );
+  const allowed = new Set([
+    "path=/api/auth",
+    "httponly",
+    "samesite=lax",
+    "secure",
+    "max-age=0",
+    "expires=thu, 01 jan 1970 00:00:00 gmt",
+  ]);
+  return (
+    normalized.filter((part) => part === "path=/api/auth").length === 1 &&
+    normalized.filter((part) => part === "httponly").length === 1 &&
+    normalized.filter((part) => part === "samesite=lax").length === 1 &&
+    normalized.filter((part) => part === "secure").length <= 1 &&
+    expiration.length === 1 &&
+    normalized.every((part) => allowed.has(part))
   );
 }
 

@@ -93,13 +93,22 @@ Future filemanager actions checklist:
 
 - Create explicit public folder.
 - Rename public folder.
-- Rename public file display name.
+- Add a narrow public-file rename endpoint. It changes the admin-facing
+  `displayName` and descriptive storage key while preserving the Media ID,
+  original bytes, checksum, and content references. It must use verified site
+  scope, reject destination collisions, and make the metadata/object move
+  recoverable and auditable.
 - Move/copy public file.
 - Move/copy public folder.
-- Update media metadata.
+- Add a separate bounded metadata-update contract when its editable fields and
+  authorization are frozen.
 - Bulk delete selected files/folders.
 - Recursive delete non-empty folders through preview/confirm.
 - Decide soft-delete retention versus immediate hard-delete per lane.
+
+Rename is not an image-editing endpoint. F5 will separately select the bounded
+processor and model immutable derived variants; a transform creates a derived
+asset with provenance rather than mutating the original.
 
 ## Protected And Strict Lane
 
@@ -432,6 +441,7 @@ Important Prisma fields:
 - `mimeType`
 - `sizeBytes`
 - `ownerId`
+- `identityRealmId` and `subjectId` (R2 additive owner coordinate)
 - `visibility`
 - `scope`
 - `entityType`
@@ -447,6 +457,15 @@ Important Prisma fields:
 - `promotedAt`
 
 Indexes exist for owner, access class, visibility, scope, owner/scope/entity context, folder path, display name, lifecycle fields, and promoted time.
+
+R2 adds nullable realm/subject columns beside `ownerId`. The migration and
+compatibility trigger map identified owners to default realm
+`b1000000-0000-4000-8000-000000000001` and the same UUID subject. Anonymous
+owners remain all-null; partial, mismatched, wrong-realm, and actorless pairs
+reject. Existing owner readers and resource checks stay primary, with no
+cross-service foreign key or tenant/site scope added here.
+`pnpm db:verify:f4-r2-default-actors` passed populated upgrade, unchanged
+business-row snapshots, zero-row backfill rerun, and legacy-write/denial checks.
 
 Docker migration note:
 

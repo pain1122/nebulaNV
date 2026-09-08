@@ -69,6 +69,23 @@ describe("verified service downstream context", () => {
     expect(downstream.metadata.getMap()).toEqual({});
   });
 
+  it("never propagates a resolution context", () => {
+    const metadata = new Metadata() as MetadataWithContext;
+    metadata.svc = "gateway";
+    metadata.svcKind = "gateway";
+    metadata.requestId = "req-resolution-1";
+    metadata.resolutionContext = {
+      version: "2",
+      purpose: "RESOLUTION",
+      resolutionStage: "AUTHORITY",
+      actor: { userId: "user-1", sessionRef: "session-1" },
+    };
+
+    expect(() => createVerifiedServiceDownstreamContext(metadata)).toThrow(
+      "s2s_resolution_context_not_propagatable",
+    );
+  });
+
   it.each([
     [
       "missing verified ingress",

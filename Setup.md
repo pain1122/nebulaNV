@@ -31,7 +31,7 @@ Create local env files from examples:
 pnpm backend:env
 ```
 
-This inventory-backed command copies the root and eight backend service
+This inventory-backed command copies the root and nine backend runtime
 examples only when their local `.env` files do not already exist. It never
 overwrites existing local values.
 
@@ -69,10 +69,10 @@ pnpm backend:boot
 ```
 
 It waits for PostgreSQL, Redis, and MinIO; verifies all seven databases; runs
-migration deploy and status; applies the base seeds; builds the eight images
-through the sequential inventory-backed Bake runner; starts Compose without
-rebuilding; waits for all readiness endpoints; and applies the idempotent API
-demo seed.
+migration deploy and status; applies the base seeds; builds the nine images
+through the sequential inventory-backed Bake runner; starts the currently
+defined nine Compose runtimes without rebuilding; waits for their readiness
+endpoints; and applies the idempotent API demo seed.
 
 When the databases and images are already prepared, restart the existing stack
 without rebuilding:

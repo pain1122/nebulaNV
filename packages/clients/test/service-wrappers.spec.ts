@@ -6,6 +6,7 @@ import {
   MEDIA_SERVICE_TARGET,
   ORDER_SERVICE_TARGET,
   PRODUCT_SERVICE_TARGET,
+  TENANT_AUTHORITY_SERVICE_TARGET,
   USER_SERVICE_TARGET,
   X_REQUEST_ID_HEADER,
   X_S2S_PATH_HEADER,
@@ -17,6 +18,7 @@ import {
   media,
   orderv1,
   productv1,
+  tenantauthorityv1,
   userv1,
 } from "@nebula/protos";
 import { firstValueFrom, of, type Observable } from "rxjs";
@@ -26,6 +28,7 @@ import { getMedia } from "../src/media.client";
 import { getOrder } from "../src/order.client";
 import { getProduct, getProductTaxonomy } from "../src/product.client";
 import type { GrpcClientSigningPolicy } from "../src/s2s-metadata";
+import { getTenantAuthority } from "../src/tenant-authority.client";
 import { getUser } from "../src/user.client";
 
 type Definition = { path: string };
@@ -54,6 +57,26 @@ const cases: Array<{
   definitions: Record<string, Definition>;
   create: (client: ClientGrpc, policy: GrpcClientSigningPolicy) => object;
 }> = [
+  {
+    serviceName: "TenantAuthorityService",
+    target: TENANT_AUTHORITY_SERVICE_TARGET,
+    create: (client, policy) => getTenantAuthority(client, policy),
+    definitions: {
+      ResolveApplicationRegistration:
+        tenantauthorityv1.TenantAuthorityServiceService
+          .resolveApplicationRegistration,
+      ListAllowedWebOrigins:
+        tenantauthorityv1.TenantAuthorityServiceService.listAllowedWebOrigins,
+      ValidateTargetScope:
+        tenantauthorityv1.TenantAuthorityServiceService.validateTargetScope,
+      ResolveEntitlementScopeRef:
+        tenantauthorityv1.TenantAuthorityServiceService
+          .resolveEntitlementScopeRef,
+      ResolveActorAuthorization:
+        tenantauthorityv1.TenantAuthorityServiceService
+          .resolveActorAuthorization,
+    },
+  },
   {
     serviceName: "AuthService",
     target: AUTH_SERVICE_TARGET,

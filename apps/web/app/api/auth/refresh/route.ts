@@ -1,79 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { errorMessage, parseJsonRecord, stringField } from "@/lib/unknown";
+import {
+  GatewayBffRequestError,
+  assertSameOriginSessionRequest,
+  bffExceptionResponse,
+  gatewayFailureResponse,
+  relayGatewayHeaders,
+  serverGatewayClient,
+} from "@/lib/gateway/server-client";
 
-function baseAuth() {
-  const base = process.env.AUTH_HTTP_URL || "http://127.0.0.1:3001";
-  return base.replace(/\/+$/, "");
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const refreshToken = req.cookies.get("refreshToken")?.value;
-
-    if (!refreshToken) {
-      return NextResponse.json(
-        { ok: false, message: "missing_refresh_token" },
-        { status: 401 },
-      );
-    }
-
-    const upstream = await fetch(`${baseAuth()}/auth/refresh`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-      cache: "no-store",
+    assertSameOriginSessionRequest(request);
+    const result = await serverGatewayClient().request("auth_refresh", {
+      browserCookie: request.headers.get("cookie") ?? undefined,
     });
+    if (!result.ok) return gatewayFailureResponse(result);
 
-    const text = await upstream.text();
-    const json = parseJsonRecord(text);
-
-    if (!upstream.ok) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: stringField(json, "message") || text || "refresh_failed",
-        },
-        { status: upstream.status },
-      );
-    }
-
-    const accessToken = stringField(json, "accessToken");
-    const rotatedRefreshToken = stringField(json, "refreshToken");
-
-    if (!accessToken || !rotatedRefreshToken) {
-      return NextResponse.json(
-        { ok: false, message: "missing_tokens_from_auth_service" },
-        { status: 502 },
-      );
-    }
-
-    const res = NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
-      accessToken,
+      accessToken: result.data.data.accessToken,
+      accessExpiresInSeconds: result.data.data.accessExpiresInSeconds,
+      refreshExpiresInSeconds: result.data.data.refreshExpiresInSeconds,
     });
-
-    res.cookies.set("accessToken", accessToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 8,
-    });
-
-    res.cookies.set("refreshToken", rotatedRefreshToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return res;
-  } catch (e: unknown) {
-    console.error("[/api/auth/refresh]", e);
-    return NextResponse.json(
-      { ok: false, message: errorMessage(e, "refresh_route_failed") },
-      { status: 500 },
-    );
+    relayGatewayHeaders(result, response);
+    return response;
+  } catch (error: unknown) {
+    if (!(error instanceof GatewayBffRequestError)) {
+      console.error("[/api/auth/refresh] gateway request failed");
+    }
+    return bffExceptionResponse(error, "REFRESH_GATEWAY_UNAVAILABLE");
   }
 }

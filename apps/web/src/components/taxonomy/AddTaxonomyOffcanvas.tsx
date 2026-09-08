@@ -82,7 +82,10 @@ function OpenTaxonomyOffcanvas({
 
       const res = await apiFetch("/api/taxonomy/create", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
         body: JSON.stringify({
           scope: "product",
           kind,

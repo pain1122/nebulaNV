@@ -691,6 +691,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
       );
       expect(preview.canDelete).toBe(true);
       expect(preview.fileCount).toBe(1);
+      expect(preview.folderCount).toBe(1);
       expect(preview.totalSizeBytes).toBe("5");
       expect(preview.confirmToken).toBeTruthy();
 
@@ -708,7 +709,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
       expect(confirmed).toEqual({
         deleted: true,
         fileCount: 1,
-        folderCount: 0,
+        folderCount: 1,
         totalSizeBytes: "5",
       });
       id = undefined;

@@ -53,7 +53,13 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     const res = await httpJson<any>(
       "POST",
       `${PRODUCT_HTTP}/products`,
-      { data: { title: "E2E Widget", price: 199.99 } },
+      {
+        data: {
+          title: "E2E Widget",
+          price: 199.99,
+          status: "ACTIVE",
+        },
+      },
       { authorization: `Bearer ${admin}` },
     );
     id = res.data.id;

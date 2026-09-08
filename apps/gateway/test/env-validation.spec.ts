@@ -5,6 +5,7 @@ import {
   TEST_APPLICATION_REGISTRY_JSON,
   TEST_GATEWAY_GRPC_TARGETS,
   TEST_GATEWAY_OUTBOUND_KEYS,
+  TEST_MEDIA_RENDER_HTTP_URL,
 } from "./application-fixture";
 
 function validEnvironment(overrides: Record<string, unknown> = {}) {
@@ -12,6 +13,7 @@ function validEnvironment(overrides: Record<string, unknown> = {}) {
     GATEWAY_APPLICATION_REGISTRY_JSON: TEST_APPLICATION_REGISTRY_JSON,
     GATEWAY_OUTBOUND_KEYS: TEST_GATEWAY_OUTBOUND_KEYS,
     GATEWAY_REDIS_URL: "redis://127.0.0.1:6379/0",
+    MEDIA_RENDER_HTTP_URL: TEST_MEDIA_RENDER_HTTP_URL,
     ...TEST_GATEWAY_GRPC_TARGETS,
     ...overrides,
   };
@@ -59,6 +61,7 @@ describe("gateway environment validation", () => {
       GATEWAY_IDEMPOTENCY_TTL_SECONDS: 86_400,
       GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: 60,
       GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES: 524_288,
+      MEDIA_RENDER_HTTP_URL: TEST_MEDIA_RENDER_HTTP_URL,
     });
   });
 
@@ -81,6 +84,7 @@ describe("gateway environment validation", () => {
       "GATEWAY_IDEMPOTENCY_TTL_SECONDS",
       "GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS",
       "GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES",
+      "MEDIA_RENDER_HTTP_URL",
     ]) {
       expect(rootExample[key]).toBe(gatewayExample[key]);
     }
@@ -151,6 +155,19 @@ describe("gateway environment validation", () => {
         }),
       ).error,
     ).toBeDefined();
+    for (const MEDIA_RENDER_HTTP_URL of [
+      "https://media-service:3007",
+      "http://media-service:3007/path",
+      "http://user:pass@media-service:3007",
+      "http://media-service:3007?target=other",
+      "http://media-service",
+    ]) {
+      expect(
+        envSchema.validate(
+          validEnvironment({ MEDIA_RENDER_HTTP_URL }),
+        ).error,
+      ).toBeDefined();
+    }
     expect(
       envSchema.validate(
         validEnvironment({ GATEWAY_IDEMPOTENCY_TTL_SECONDS: 59 }),

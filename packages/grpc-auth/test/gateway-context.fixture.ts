@@ -1,7 +1,10 @@
-import { createHmac } from "node:crypto";
 import { resolve } from "node:path";
 import { config as loadEnv } from "dotenv";
-import type { S2SActorRole, S2SSignedContext } from "../src/s2s-context";
+import {
+  deriveS2SSessionRef,
+  type S2SActorRole,
+  type S2SSignedContext,
+} from "../src/s2s-context";
 
 type AccessTokenPayload = {
   sub?: unknown;
@@ -68,10 +71,7 @@ export function gatewayTestSignedContext(
     actor: {
       userId: payload.sub,
       role: payload.role as S2SActorRole,
-      sessionRef: createHmac("sha256", secret)
-        .update(`nebula-session-ref:v1:${payload.sid}`)
-        .digest("base64url")
-        .slice(0, 32),
+      sessionRef: deriveS2SSessionRef(secret, payload.sid),
     },
   };
 }

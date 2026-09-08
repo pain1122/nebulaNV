@@ -61,6 +61,15 @@ describe("gateway route-policy aggregate", () => {
     }
   });
 
+  it("keeps cart and personal order routes user-only", () => {
+    for (const policy of GATEWAY_ROUTE_POLICIES.filter((value) =>
+      value.id.startsWith("orders.") && !value.id.startsWith("admin."),
+    )) {
+      expect(policy.actor).toBe("user");
+      expect(policy.applications).toEqual(["storefront-web", "mobile"]);
+    }
+  });
+
   it("records resource-specific pagination without inventing totals", () => {
     expect(gatewayRoutePolicy("blog.posts.list").pagination).toBe(
       "page-limit-total",

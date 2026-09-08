@@ -1,9 +1,9 @@
 import { Controller } from '@nestjs/common';
 import { type HealthProbe, StandardHealthController } from '@packages/config';
-import { Public, S2SReplayStore } from '@nebula/grpc-auth';
+import { OperationalHealth, S2SReplayStore } from '@nebula/grpc-auth';
 import { AuthRedisService } from './auth/redis/auth-redis.service';
 
-@Public()
+@OperationalHealth()
 @Controller('health')
 export class HealthController extends StandardHealthController {
   constructor(

@@ -68,7 +68,13 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     const p = await httpJson<any>(
       "POST",
       `${PRODUCT_HTTP}/products`,
-      { data: { title: "OrderSvc gRPC Product", price: 99.99 } },
+      {
+        data: {
+          title: "OrderSvc gRPC Product",
+          price: 99.99,
+          status: "ACTIVE",
+        },
+      },
       { authorization: `Bearer ${adminToken}` },
     );
     productId = p.data.id;

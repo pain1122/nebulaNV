@@ -16,11 +16,11 @@
 // 3. Apply PUBLIC / INTERNAL / ROLE hierarchy
 //
 //    Priority order:
-//      OPEN mode → allow everything as guest
+//      OPERATIONAL_HEALTH (HTTP only) → allow sanitized health probes
 //      INTERNAL_ONLY → require svc identity
 //      JWT present → enforce role policies
 //      PUBLIC endpoint → allow anonymous depending on PublicMode
-//      Otherwise → reject
+//      Otherwise → reject (including private routes in OPEN mode)
 //
 // 4. Attach user context to request or RPC metadata
 //
@@ -65,6 +65,7 @@ import {
 import {
   IS_PUBLIC_KEY,
   INTERNAL_ONLY_KEY,
+  OPERATIONAL_HEALTH_KEY,
   PUBLIC_FLAGS_KEY,
   REQUIRE_USER_ID_KEY,
   type PublicFlags,
@@ -292,14 +293,19 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
       const contextCarrier = ctx as ExecutionContext & ContextCarrier;
       return Boolean(
         meta?.requestContext ??
+          meta?.resolutionContext ??
           call?.requestContext ??
+          call?.resolutionContext ??
+          contextCarrier.resolutionContext ??
           contextCarrier.requestContext,
       );
     }
 
     return Boolean(
       ctx.switchToHttp().getRequest<HttpRequestWithContext | undefined>()
-        ?.requestContext,
+        ?.requestContext ??
+        ctx.switchToHttp().getRequest<HttpRequestWithContext | undefined>()
+          ?.resolutionContext,
     );
   }
 
@@ -356,8 +362,8 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
   ): void {
     if (
       user.userId !== actor.userId ||
-      user.role !== actor.role ||
-      user.sessionRef !== actor.sessionRef
+      user.sessionRef !== actor.sessionRef ||
+      ("role" in actor && user.role !== actor.role)
     ) {
       this.unauthenticated(ctx, "s2s_actor_bearer_mismatch");
     }
@@ -382,7 +388,7 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
   //
   // Order matters:
   //
-  // 1. OPEN mode → allow everything as guest
+  // 1. Operational HTTP health → allow sanitized infrastructure probes
   // 2. INTERNAL_ONLY → require verified internal service identity
   // 3. JWT present → validate token + enforce role decorators
   // 4. PUBLIC endpoint → allow anonymous depending on PublicMode
@@ -396,6 +402,11 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
       ]) || false;
     const internalOnly =
       this.reflector.getAllAndOverride<boolean>(INTERNAL_ONLY_KEY, [
+        ctx.getHandler?.(),
+        ctx.getClass?.(),
+      ]) || false;
+    const operationalHealth =
+      this.reflector.getAllAndOverride<boolean>(OPERATIONAL_HEALTH_KEY, [
         ctx.getHandler?.(),
         ctx.getClass?.(),
       ]) || false;
@@ -422,6 +433,14 @@ export class GrpcTokenAuthGuard implements CanActivate, OnModuleInit {
     const hasSignedRequestContext = this.hasSignedRequestContext(ctx);
     const requiresActorConsistency =
       svcKind === "gateway" || hasSignedRequestContext || Boolean(signedActor);
+
+    if (operationalHealth) {
+      if (this.isRpc(ctx)) {
+        this.unauthenticated(ctx, "operational_health_http_only");
+      }
+      this.setCtxUser(ctx, { userId: null, role: "guest" });
+      return true;
+    }
 
     if (internalOnly && (!svc || svcKind !== "service")) {
       this.unauthenticated(ctx, "internal_only");

@@ -39,6 +39,12 @@ export type GatewayInputRule =
       fields: readonly string[];
     }>
   | Readonly<{
+      kind: "application-at-least-one";
+      location: GatewayInputLocation;
+      applications: readonly PublicApplicationProfile[];
+      fields: readonly string[];
+    }>
+  | Readonly<{
       kind: "setting-allowlist";
       allowed: readonly string[];
     }>;
@@ -110,6 +116,15 @@ function hasValue(record: Record<string, unknown>, field: string): boolean {
     Object.prototype.hasOwnProperty.call(record, field) &&
     record[field] !== undefined
   );
+}
+
+function hasActionValue(
+  record: Record<string, unknown>,
+  field: string,
+): boolean {
+  if (!hasValue(record, field)) return false;
+  const value = record[field];
+  return value === true || (typeof value === "string" && value.trim() !== "");
 }
 
 function validateLocation(
@@ -207,6 +222,19 @@ export function validateInputProfile(
             });
           }
         }
+      }
+    } else if (rule.kind === "application-at-least-one") {
+      if (
+        input.applicationProfile &&
+        rule.applications.includes(input.applicationProfile) &&
+        !rule.fields.some((field) =>
+          hasActionValue(locations[rule.location], field),
+        )
+      ) {
+        issues.push({
+          field: `${rule.location}.${rule.fields.join("|")}`,
+          code: "required_field",
+        });
       }
     } else {
       const ns = locations.params.ns;

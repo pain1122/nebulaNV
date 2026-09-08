@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -29,7 +30,10 @@ const REQUIRED_STRING_FIELDS = [
   "dockerService",
   "defaultImage",
   "moduleFile",
+  "transport",
 ];
+
+const BACKEND_TRANSPORTS = new Set(["http", "http-grpc"]);
 
 export const PRISMA_OPERATIONS = Object.freeze({
   generate: [
@@ -99,23 +103,38 @@ export function loadBackendServices(root = repositoryRoot) {
       if (service.database !== null && typeof service.database !== "string") {
         throw new Error(`backend_inventory_${index}_database_invalid`);
       }
+      if (!BACKEND_TRANSPORTS.has(service.transport)) {
+        throw new Error(`backend_inventory_${index}_transport_invalid`);
+      }
+      if (typeof service.compose !== "boolean") {
+        throw new Error(`backend_inventory_${index}_compose_invalid`);
+      }
+      if (!Number.isInteger(service.httpPort)) {
+        throw new Error(`backend_inventory_${index}_http_port_invalid`);
+      }
       if (
-        !Number.isInteger(service.httpPort) ||
+        service.transport === "http-grpc" &&
         !Number.isInteger(service.grpcPort)
       ) {
-        throw new Error(`backend_inventory_${index}_ports_invalid`);
+        throw new Error(`backend_inventory_${index}_grpc_port_invalid`);
+      }
+      if (service.transport === "http" && service.grpcPort !== undefined) {
+        throw new Error(`backend_inventory_${index}_grpc_port_forbidden`);
       }
       if (names.has(service.name) || packages.has(service.packageName)) {
         throw new Error(`backend_inventory_${index}_identity_duplicate`);
       }
-      if (ports.has(service.httpPort) || ports.has(service.grpcPort)) {
+      if (
+        ports.has(service.httpPort) ||
+        (service.grpcPort !== undefined && ports.has(service.grpcPort))
+      ) {
         throw new Error(`backend_inventory_${index}_port_duplicate`);
       }
 
       names.add(service.name);
       packages.add(service.packageName);
       ports.add(service.httpPort);
-      ports.add(service.grpcPort);
+      if (service.grpcPort !== undefined) ports.add(service.grpcPort);
 
       return Object.freeze({ ...service });
     }),
@@ -123,8 +142,14 @@ export function loadBackendServices(root = repositoryRoot) {
 }
 
 export const backendServices = loadBackendServices();
+export const hybridServices = Object.freeze(
+  backendServices.filter((service) => service.transport === "http-grpc"),
+);
 export const prismaServices = Object.freeze(
   backendServices.filter((service) => service.database !== null),
+);
+export const composeServices = Object.freeze(
+  backendServices.filter((service) => service.compose),
 );
 
 export const SECURITY_REPORT_DIRECTORY = path.join(
@@ -133,6 +158,11 @@ export const SECURITY_REPORT_DIRECTORY = path.join(
 );
 
 export const CI_EVIDENCE_DIRECTORY = path.join(repositoryRoot, ".ci-evidence");
+
+export const TRIVY_DB_REPOSITORIES = Object.freeze([
+  "aquasec/trivy-db:2",
+  "ghcr.io/aquasecurity/trivy-db:2",
+]);
 
 export const TRIVY_SOURCE_SKIP_DIRECTORIES = Object.freeze([
   ".git",
@@ -420,6 +450,7 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd ?? repositoryRoot,
     env: options.env ?? process.env,
+    input: options.input,
     encoding: options.capture ? "utf8" : undefined,
     maxBuffer: options.capture ? 64 * 1024 * 1024 : undefined,
     stdio: options.capture ? "pipe" : "inherit",
@@ -591,17 +622,22 @@ function runPostgresTool(
     env = process.env,
     execute = run,
     emitCaptured = true,
+    input,
     platform = process.platform,
   } = {},
 ) {
   const result = execute(
     dockerExecutable(platform),
     ["compose", "exec", "-T", "postgres", ...args],
-    { env, capture: true, emitCaptured },
+    { env, capture: true, emitCaptured, input },
   );
   if (result.status !== 0) {
+    // Preserve a closed SQL reason code without echoing SQL, rows, or credentials.
+    const reason = String(result.stderr ?? "").match(
+      /ERROR:\s+([a-z][a-z0-9_]*)(?=[:\s]|$)/,
+    )?.[1];
     throw new Error(
-      `local_postgres_${label ?? "command"}_failed_exit_${result.status ?? "unknown"}`,
+      `local_postgres_${label ?? "command"}_failed_exit_${result.status ?? "unknown"}${reason ? `_${reason}` : ""}`,
     );
   }
   return result;
@@ -616,7 +652,8 @@ function disposableDatabaseName(database, runId) {
   return assertDatabaseName(`${database}_verify_${safeId}`);
 }
 
-function dropDisposableDatabase(database, options) {
+export function dropDisposableDatabase(database, options) {
+  assertDatabaseName(database);
   if (!database.includes("_verify_")) {
     throw new Error("refused_to_drop_non_disposable_database");
   }
@@ -635,6 +672,477 @@ export function disposableMigrationServices(
       ...service,
       database: disposableDatabaseName(service.database, runId),
     }),
+  );
+}
+
+export function migrationVerificationServices(scope) {
+  if (scope === undefined) return prismaServices;
+  if (scope === "tenant-authority") {
+    return prismaServices.filter(
+      (service) => service.packageName === "@nebula/tenant-authority-service",
+    );
+  }
+  throw new Error(`migration_verification_scope_invalid_${scope}`);
+}
+
+export function verifyTenantAuthorityRegistrationRecords(
+  database,
+  { env = process.env, executeDocker = run, platform = process.platform } = {},
+) {
+  const evidenceSql = readFileSync(
+    path.join(
+      repositoryRoot,
+      "scripts",
+      "db",
+      "verify-tenant-authority-records.sql",
+    ),
+    "utf8",
+  );
+  runPostgresTool(
+    [
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--command",
+      evidenceSql,
+    ],
+    {
+      label: `authority_registration_records_${database}`,
+      env,
+      execute: executeDocker,
+      platform,
+    },
+  );
+}
+
+export function verifyTenantAuthorityDefaultSeed(
+  database,
+  { env = process.env, executeDocker = run, platform = process.platform } = {},
+) {
+  const evidenceSql = readFileSync(
+    path.join(
+      repositoryRoot,
+      "scripts",
+      "db",
+      "verify-tenant-authority-seed.sql",
+    ),
+    "utf8",
+  );
+  runPostgresTool(
+    [
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--command",
+      evidenceSql,
+    ],
+    {
+      label: `authority_default_seed_${database}`,
+      env,
+      execute: executeDocker,
+      platform,
+    },
+  );
+}
+
+function runPackageScript(
+  packageName,
+  script,
+  { args = [], env = process.env, execute = runPnpm, input } = {},
+) {
+  const result = execute(
+    [
+      "--silent",
+      "--filter",
+      packageName,
+      "run",
+      script,
+      ...(args.length === 0 ? [] : ["--", ...args]),
+    ],
+    { env, capture: true, emitCaptured: false, input },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `package_script_${packageName}_${script}_failed_exit_${result.status ?? "unknown"}`,
+    );
+  }
+  return String(result.stdout ?? "").trim();
+}
+
+function capturedJson(value, label) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new Error(`${label}_output_invalid_json`);
+  }
+}
+
+function verifySqlFile(
+  database,
+  relativePath,
+  { env = process.env, execute = run, platform = process.platform } = {},
+) {
+  const sql = readFileSync(path.join(repositoryRoot, relativePath), "utf8");
+  runPostgresTool(
+    [
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--command",
+      sql,
+    ],
+    {
+      label: `evidence_${database}`,
+      env,
+      execute,
+      platform,
+    },
+  );
+}
+
+const F4_R2_MIGRATION = "20260905000100_default_actor_backfill";
+const F4_R2_DEFAULT_ACTOR_SERVICES = Object.freeze([
+  Object.freeze({
+    packageName: "@nebula/tenant-authority-service",
+    fixture: "scripts/db/f4-r2-tenant-authority-fixture.sql",
+    verification: "scripts/db/verify-f4-r2-tenant-authority.sql",
+    before: [
+      "20260824000100_authority_foundation",
+      "20260825000100_authority_registration_records",
+      "20260825000200_entitlement_scope_reference",
+      "20260826000100_authority_registration_audit",
+      "20260826000200_membership_authority_foundation",
+      "20260901000100_identity_control_plane_unused",
+    ],
+  }),
+  Object.freeze({
+    packageName: "@nebula/media-service",
+    fixture: "scripts/db/f4-r2-media-fixture.sql",
+    verification: "scripts/db/verify-f4-r2-media.sql",
+    before: [
+      "20251220074224_init_media",
+      "20260225135328_add_access_class",
+      "20260610000100_add_public_library_metadata",
+      "20260629000100_add_media_context_metadata",
+    ],
+  }),
+  Object.freeze({
+    packageName: "@nebula/order-service",
+    fixture: "scripts/db/f4-r2-order-fixture.sql",
+    verification: "scripts/db/verify-f4-r2-order.sql",
+    before: ["20251119063447_init_order"],
+  }),
+  Object.freeze({
+    packageName: "@nebula/product-service",
+    fixture: "scripts/db/f4-r2-product-fixture.sql",
+    verification: "scripts/db/verify-f4-r2-product.sql",
+    before: [
+      "20251002054925_e_tr",
+      "20260720131500_drop_stale_product_category_fk",
+    ],
+  }),
+]);
+
+function f4R2MigrationPaths(service) {
+  const migrationsRoot = path.join(
+    repositoryRoot,
+    service.directory,
+    "prisma",
+    "migrations",
+  );
+  const names = readdirSync(migrationsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const r2Index = names.indexOf(F4_R2_MIGRATION);
+  if (r2Index < 0) {
+    throw new Error(`f4_r2_migration_missing_${service.name}`);
+  }
+  const expected = F4_R2_DEFAULT_ACTOR_SERVICES.find(
+    (entry) => entry.packageName === service.packageName,
+  ).before;
+  if (JSON.stringify(names.slice(0, r2Index)) !== JSON.stringify(expected)) {
+    throw new Error(`f4_r2_pre_migration_set_changed_${service.name}`);
+  }
+  const migrationPath = (name) =>
+    path.join(migrationsRoot, name, "migration.sql");
+  return Object.freeze({
+    before: Object.freeze(names.slice(0, r2Index).map(migrationPath)),
+    r2: migrationPath(F4_R2_MIGRATION),
+  });
+}
+
+function executeSqlText(
+  database,
+  sql,
+  { env = process.env, execute = run, platform = process.platform, label } = {},
+) {
+  runPostgresTool(
+    [
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--file=-",
+    ],
+    {
+      label: label ?? `sql_${database}`,
+      env,
+      execute,
+      emitCaptured: false,
+      input: sql,
+      platform,
+    },
+  );
+}
+
+function executeSqlFile(database, relativePath, options) {
+  executeSqlText(
+    database,
+    readFileSync(path.join(repositoryRoot, relativePath), "utf8"),
+    options,
+  );
+}
+
+function expectSqlTextFailure(
+  database,
+  sql,
+  expectedMessage,
+  { env = process.env, execute = run, platform = process.platform } = {},
+) {
+  const result = execute(
+    dockerExecutable(platform),
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--file=-",
+    ],
+    { env, capture: true, emitCaptured: false, input: sql },
+  );
+  const reportedError = String(result.stderr ?? "")
+    .match(/\bERROR:\s+([^\r\n]+)/)?.[1]
+    ?.trim();
+  if (
+    !Number.isInteger(result.status) ||
+    result.status === 0 ||
+    reportedError !== expectedMessage
+  ) {
+    throw new Error(`f4_r2_expected_failure_missing_${expectedMessage}`);
+  }
+}
+
+function applySqlMigrations(database, paths, options) {
+  for (const migrationPath of paths) {
+    executeSqlText(database, readFileSync(migrationPath, "utf8"), {
+      ...options,
+      label: `migration_${path.basename(path.dirname(migrationPath))}_${database}`,
+    });
+  }
+}
+
+export function verifyF4R2DefaultActors({
+  env = process.env,
+  executeDocker = run,
+  executePnpm = runPnpm,
+  logger = console,
+  platform = process.platform,
+  runId = randomUUID(),
+} = {}) {
+  const selected = F4_R2_DEFAULT_ACTOR_SERVICES.map((entry) => {
+    const service = prismaServices.find(
+      (candidate) => candidate.packageName === entry.packageName,
+    );
+    if (!service) throw new Error(`f4_r2_service_missing_${entry.packageName}`);
+    return Object.freeze({ ...entry, service });
+  });
+  const successServices = disposableMigrationServices(
+    selected.map((entry) => entry.service),
+    runId,
+  );
+  const failureServices = selected
+    .filter(({ service }) =>
+      ["tenant-authority-service", "product-service"].includes(service.name),
+    )
+    .map(({ service }) =>
+      Object.freeze({
+        ...service,
+        database: disposableDatabaseName(`${service.database}_rollback`, runId),
+      }),
+    );
+  const created = [];
+  let failure;
+
+  const authorityEnv = (database) => ({
+    ...databaseEnv(database, env),
+    NODE_ENV: "development",
+    AUTHORITY_AUDIT_HMAC_KEY_ID: "f4-r2-disposable-audit-v2",
+    AUTHORITY_AUDIT_HMAC_KEY: "f4-r2-disposable-audit-integrity-key-only",
+    AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID: "f4-r2-membership-v1",
+    AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY:
+      "f4-r2-membership-integrity-key-only-0001",
+  });
+
+  try {
+    runPostgresTool(
+      ["pg_isready", "--username", "postgres", "--dbname", "postgres"],
+      { label: "readiness", env, execute: executeDocker, platform },
+    );
+
+    for (const [index, disposable] of successServices.entries()) {
+      const entry = selected[index];
+      const paths = f4R2MigrationPaths(entry.service);
+      createLocalDatabase(disposable.database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      created.push(disposable.database);
+      applySqlMigrations(disposable.database, paths.before, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      const serviceEnv =
+        entry.service.name === "tenant-authority-service"
+          ? authorityEnv(disposable.database)
+          : databaseEnv(disposable.database, env);
+      if (entry.service.name === "tenant-authority-service") {
+        runPrismaOperation("seed", {
+          services: [disposable],
+          env: serviceEnv,
+          execute: executePnpm,
+          logger,
+        });
+      }
+      executeSqlFile(disposable.database, entry.fixture, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      applySqlMigrations(disposable.database, [paths.r2], {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      if (entry.service.name === "tenant-authority-service") {
+        for (let runIndex = 0; runIndex < 2; runIndex += 1) {
+          runPackageScript(
+            entry.service.packageName,
+            "backfill:f4-default-actors",
+            {
+              env: serviceEnv,
+              execute: executePnpm,
+            },
+          );
+        }
+        runPrismaOperation("seed", {
+          services: [disposable],
+          env: serviceEnv,
+          execute: executePnpm,
+          logger,
+        });
+        runPackageScript(
+          entry.service.packageName,
+          "backfill:f4-default-actors",
+          {
+            env: serviceEnv,
+            execute: executePnpm,
+          },
+        );
+      }
+      executeSqlFile(disposable.database, entry.verification, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      logger.log(`[backend] F4 R2 upgrade/rerun verified: ${disposable.name}`);
+    }
+
+    for (const disposable of failureServices) {
+      const entry = selected.find(
+        ({ service }) => service.name === disposable.name,
+      );
+      const paths = f4R2MigrationPaths(entry.service);
+      createLocalDatabase(disposable.database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      created.push(disposable.database);
+      applySqlMigrations(disposable.database, paths.before, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      const kind =
+        disposable.name === "tenant-authority-service"
+          ? "authority"
+          : "product";
+      executeSqlFile(
+        disposable.database,
+        `scripts/db/f4-r2-${kind}-rollback-fixture.sql`,
+        { env, execute: executeDocker, platform },
+      );
+      expectSqlTextFailure(
+        disposable.database,
+        readFileSync(paths.r2, "utf8"),
+        kind === "authority"
+          ? "authority_default_actor_realm_missing"
+          : "product_comment_legacy_user_id_invalid",
+        { env, execute: executeDocker, platform },
+      );
+      executeSqlFile(
+        disposable.database,
+        `scripts/db/verify-f4-r2-${kind}-rollback.sql`,
+        { env, execute: executeDocker, platform },
+      );
+      logger.log(
+        `[backend] F4 R2 atomic rollback verified: ${disposable.name}`,
+      );
+    }
+  } catch (error) {
+    failure = error;
+  }
+
+  let cleanupFailure;
+  for (const database of created.reverse()) {
+    try {
+      dropDisposableDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+    } catch (error) {
+      cleanupFailure ??= error;
+    }
+  }
+
+  if (failure && cleanupFailure) {
+    throw new Error(`${failure.message}; cleanup: ${cleanupFailure.message}`);
+  }
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  return [...successServices, ...failureServices].map(
+    (service) => service.database,
   );
 }
 
@@ -691,6 +1199,35 @@ export function verifyCleanMigrations({
         execute: executePrisma,
         logger,
       });
+      if (service.packageName === "@nebula/tenant-authority-service") {
+        verifyTenantAuthorityRegistrationRecords(service.database, {
+          env,
+          executeDocker,
+        });
+        const seedEnv = {
+          ...serviceEnv,
+          NODE_ENV: "development",
+          AUTHORITY_AUDIT_HMAC_KEY_ID: "disposable-verifier-v1",
+          AUTHORITY_AUDIT_HMAC_KEY:
+            "disposable-tenant-authority-verifier-key-only",
+        };
+        runPrismaOperation("seed", {
+          services: [service],
+          env: seedEnv,
+          execute: executePrisma,
+          logger,
+        });
+        runPrismaOperation("seed", {
+          services: [service],
+          env: seedEnv,
+          execute: executePrisma,
+          logger,
+        });
+        verifyTenantAuthorityDefaultSeed(service.database, {
+          env,
+          executeDocker,
+        });
+      }
     }
   } catch (error) {
     failure = error;
@@ -711,6 +1248,295 @@ export function verifyCleanMigrations({
   if (failure) throw failure;
   if (cleanupFailure) throw cleanupFailure;
   return disposable.map((service) => service.database);
+}
+
+export function verifyF4Batch3RoleSeeds({
+  env = process.env,
+  executeDocker = run,
+  executePnpm = runPnpm,
+  logger = console,
+  platform = process.platform,
+  runId = randomUUID(),
+} = {}) {
+  const selected = [
+    "@nebula/user-service",
+    "@nebula/tenant-authority-service",
+  ].map((packageName) => {
+    const service = prismaServices.find(
+      (candidate) => candidate.packageName === packageName,
+    );
+    if (!service) throw new Error(`f4_batch3_service_missing_${packageName}`);
+    return service;
+  });
+  const [userService, authorityService] = disposableMigrationServices(
+    selected,
+    runId,
+  );
+  const created = [];
+  let failure;
+
+  const userEnv = databaseEnv(userService.database, env);
+  const authorityEnv = {
+    ...databaseEnv(authorityService.database, env),
+    NODE_ENV: "development",
+    AUTHORITY_AUDIT_HMAC_KEY_ID: "f4-batch3-disposable-audit-v1",
+    AUTHORITY_AUDIT_HMAC_KEY: "f4-batch3-disposable-audit-integrity-key",
+    AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID:
+      "f4-batch3-disposable-membership-v1",
+    AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY:
+      "f4-batch3-disposable-membership-integrity-key",
+  };
+
+  try {
+    runPostgresTool(
+      ["pg_isready", "--username", "postgres", "--dbname", "postgres"],
+      { label: "readiness", env, execute: executeDocker, platform },
+    );
+
+    for (const service of [userService, authorityService]) {
+      createLocalDatabase(service.database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      created.push(service.database);
+      const serviceEnv =
+        service.packageName === userService.packageName
+          ? userEnv
+          : authorityEnv;
+      runPrismaOperation("migrate-deploy", {
+        services: [service],
+        env: serviceEnv,
+        execute: executePnpm,
+        logger,
+      });
+      runPrismaOperation("migrate-status", {
+        services: [service],
+        env: serviceEnv,
+        execute: executePnpm,
+        logger,
+      });
+    }
+
+    for (let runIndex = 0; runIndex < 2; runIndex += 1) {
+      runPrismaOperation("seed", {
+        services: [authorityService],
+        env: authorityEnv,
+        execute: executePnpm,
+        logger,
+      });
+      runPrismaOperation("seed", {
+        services: [userService],
+        env: userEnv,
+        execute: executePnpm,
+        logger,
+      });
+    }
+    verifyTenantAuthorityDefaultSeed(authorityService.database, {
+      env,
+      executeDocker,
+      platform,
+    });
+
+    const legacyAudit = capturedJson(
+      runPackageScript(userService.packageName, "audit:f4-legacy-roles", {
+        args: ["--json"],
+        env: userEnv,
+        execute: executePnpm,
+      }),
+      "f4_batch3_legacy_audit",
+    );
+    const legacySnapshot = JSON.stringify(legacyAudit);
+    for (let runIndex = 0; runIndex < 2; runIndex += 1) {
+      runPackageScript(
+        authorityService.packageName,
+        "backfill:f4-legacy-roles",
+        {
+          env: authorityEnv,
+          execute: executePnpm,
+          input: legacySnapshot,
+        },
+      );
+    }
+
+    for (let runIndex = 0; runIndex < 2; runIndex += 1) {
+      runPackageScript(userService.packageName, "seed:f4-editor-user", {
+        env: userEnv,
+        execute: executePnpm,
+      });
+    }
+    const fixture = capturedJson(
+      runPackageScript(
+        userService.packageName,
+        "export:f4-default-role-fixtures",
+        { env: userEnv, execute: executePnpm },
+      ),
+      "f4_batch3_role_fixture",
+    );
+    const fixtureSnapshot = JSON.stringify(fixture);
+    for (let runIndex = 0; runIndex < 2; runIndex += 1) {
+      runPackageScript(
+        authorityService.packageName,
+        "seed:f4-default-role-fixtures",
+        {
+          env: authorityEnv,
+          execute: executePnpm,
+          input: fixtureSnapshot,
+        },
+      );
+    }
+
+    // Adversarial second pass: rerun earlier stateful steps after item 3. The
+    // importer intentionally receives its original bounded snapshot; a newly
+    // created editor is not reclassified as pre-migration legacy data.
+    runPrismaOperation("seed", {
+      services: [userService],
+      env: userEnv,
+      execute: executePnpm,
+      logger,
+    });
+    runPrismaOperation("seed", {
+      services: [authorityService],
+      env: authorityEnv,
+      execute: executePnpm,
+      logger,
+    });
+    runPackageScript(authorityService.packageName, "backfill:f4-legacy-roles", {
+      env: authorityEnv,
+      execute: executePnpm,
+      input: legacySnapshot,
+    });
+    runPackageScript(userService.packageName, "seed:f4-editor-user", {
+      env: userEnv,
+      execute: executePnpm,
+    });
+    const rerunFixture = capturedJson(
+      runPackageScript(
+        userService.packageName,
+        "export:f4-default-role-fixtures",
+        { env: userEnv, execute: executePnpm },
+      ),
+      "f4_batch3_role_fixture_rerun",
+    );
+    if (JSON.stringify(rerunFixture) !== fixtureSnapshot) {
+      throw new Error("f4_batch3_role_fixture_rerun_mismatch");
+    }
+    runPackageScript(
+      authorityService.packageName,
+      "seed:f4-default-role-fixtures",
+      {
+        env: authorityEnv,
+        execute: executePnpm,
+        input: fixtureSnapshot,
+      },
+    );
+
+    // R2 must preserve the final role graph across evidence and earlier-seed reruns.
+    executeSqlText(
+      authorityService.database,
+      `
+-- Persist the complete old rows across separate psql/seed processes.
+CREATE TABLE "_r2_snapshot" ("tableName" text PRIMARY KEY, "rows" jsonb NOT NULL);
+DO $$
+DECLARE table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['Membership', 'MembershipEpoch', 'TenantRoleGrant', 'SiteRoleGrant', 'PlatformGrant', 'AuthorityAuditEvent', 'AuthorityInvalidationOutbox'] LOOP
+    EXECUTE format(
+      'INSERT INTO "_r2_snapshot" SELECT %L, COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."id"), ''[]''::jsonb) FROM %I t',
+      table_name, table_name
+    );
+  END LOOP;
+END $$;
+    `,
+      { env, execute: executeDocker, platform },
+    );
+    for (let runIndex = 0; runIndex < 2; runIndex += 1) {
+      runPackageScript(
+        authorityService.packageName,
+        "backfill:f4-default-actors",
+        {
+          env: authorityEnv,
+          execute: executePnpm,
+        },
+      );
+    }
+    runPrismaOperation("seed", {
+      services: [authorityService],
+      env: authorityEnv,
+      execute: executePnpm,
+      logger,
+    });
+    runPackageScript(
+      authorityService.packageName,
+      "backfill:f4-default-actors",
+      {
+        env: authorityEnv,
+        execute: executePnpm,
+      },
+    );
+
+    const postFixtureAudit = capturedJson(
+      runPackageScript(userService.packageName, "audit:f4-legacy-roles", {
+        args: ["--json"],
+        env: userEnv,
+        execute: executePnpm,
+      }),
+      "f4_batch3_post_fixture_audit",
+    );
+    if (
+      postFixtureAudit.backfillStatus !== "READY" ||
+      postFixtureAudit.totalUsers !== legacyAudit.totalUsers + 1 ||
+      postFixtureAudit.roleCounts?.user !== legacyAudit.roleCounts?.user + 1
+    ) {
+      throw new Error("f4_batch3_post_fixture_audit_mismatch");
+    }
+
+    for (const [service, serviceEnv] of [
+      [userService, userEnv],
+      [authorityService, authorityEnv],
+    ]) {
+      runPrismaOperation("migrate-status", {
+        services: [service],
+        env: serviceEnv,
+        execute: executePnpm,
+        logger,
+      });
+    }
+    verifySqlFile(
+      userService.database,
+      "scripts/db/verify-f4-batch3-user-role-seeds.sql",
+      { env, execute: executeDocker, platform },
+    );
+    verifySqlFile(
+      authorityService.database,
+      "scripts/db/verify-f4-batch3-authority-role-seeds.sql",
+      { env, execute: executeDocker, platform },
+    );
+    runPackageScript(
+      authorityService.packageName,
+      "verify:batch3-actor-resolution",
+      { env: authorityEnv, execute: executePnpm },
+    );
+  } catch (error) {
+    failure = error;
+  }
+
+  let cleanupFailure;
+  for (const database of created.reverse()) {
+    try {
+      dropDisposableDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+    } catch (error) {
+      cleanupFailure ??= error;
+    }
+  }
+
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  return [userService.database, authorityService.database];
 }
 
 export const RESTORE_CONFIRMATION = "RESTORE_LOCAL_DATABASES";
@@ -798,7 +1624,7 @@ function runningBackendServices({
       .map((value) => value.trim())
       .filter(Boolean),
   );
-  return backendServices
+  return composeServices
     .map((service) => service.dockerService)
     .filter((service) => running.has(service));
 }
@@ -1454,6 +2280,13 @@ export async function provisionBackend({
     },
   );
 
+  runCompose(["run", "-T", "--rm", "--no-deps", "tenant-authority-db-init"], {
+    label: "tenant-authority-database",
+    env,
+    execute: executeDocker,
+    platform,
+  });
+
   await waitForExpectedDatabases({
     env,
     execute: executeDocker,
@@ -1498,7 +2331,7 @@ export async function provisionBackend({
 
   const deadline = now() + 240_000;
   await Promise.all(
-    backendServices.map((service) =>
+    composeServices.map((service) =>
       waitForHealth(service, deadline, { fetchImpl, now, sleep }),
     ),
   );
@@ -1559,17 +2392,207 @@ function writeSanitizedEvidence(outputPath, value, env) {
   );
 }
 
+function renderedComposeDocument(value, label) {
+  let document = value;
+  if (typeof value === "string") {
+    try {
+      document = JSON.parse(value);
+    } catch {
+      throw new Error(`compose_boundary_${label}_invalid_json`);
+    }
+  }
+  if (!isRecord(document) || !isRecord(document.services)) {
+    throw new Error(`compose_boundary_${label}_services_missing`);
+  }
+  return document;
+}
+
+function renderedService(document, label, name) {
+  const service = document.services[name];
+  if (!isRecord(service)) {
+    throw new Error(`compose_boundary_${label}_${name}_missing`);
+  }
+  return service;
+}
+
+function renderedPortTargets(service) {
+  if (!Array.isArray(service.ports)) return [];
+  return service.ports
+    .map((port) => (isRecord(port) ? Number(port.target) : Number.NaN))
+    .filter(Number.isInteger)
+    .toSorted((left, right) => left - right);
+}
+
+function requireExactValues(actual, expected, error) {
+  if (
+    actual.length !== expected.length ||
+    actual.some((value, index) => value !== expected[index])
+  ) {
+    throw new Error(error);
+  }
+}
+
+function requireGatewayRuntimeContract(document, label) {
+  const gateway = renderedService(document, label, "gateway");
+  const environment = isRecord(gateway.environment) ? gateway.environment : {};
+  const expectedTargets = Object.fromEntries(
+    hybridServices.map((service) => [
+      `${service.name.replace(/-service$/, "").toUpperCase()}_GRPC_URL`,
+      `${service.dockerService}:${service.grpcPort}`,
+    ]),
+  );
+  for (const [name, expected] of Object.entries(expectedTargets)) {
+    if (String(environment[name] ?? "") !== expected) {
+      throw new Error(`compose_boundary_${label}_gateway_${name}_invalid`);
+    }
+  }
+  if (
+    String(environment.GATEWAY_HTTP_PORT ?? "") !== "3002" ||
+    String(environment.GATEWAY_REDIS_URL ?? "").includes("redis:6379") ===
+      false ||
+    String(environment.MEDIA_RENDER_HTTP_URL ?? "") !==
+      "http://media-service:3007" ||
+    !String(environment.GATEWAY_OUTBOUND_KEYS ?? "") ||
+    !String(environment.GATEWAY_APPLICATION_REGISTRY_JSON ?? "")
+  ) {
+    throw new Error(`compose_boundary_${label}_gateway_environment_invalid`);
+  }
+  for (const forbidden of [
+    "S2S_INBOUND_KEYS",
+    "GATEWAY_INBOUND_KEYS",
+    "S2S_REPLAY_STORE",
+    "REDIS_HOST",
+    "PUBLIC_MODE",
+  ]) {
+    if (environment[forbidden] !== undefined) {
+      throw new Error(
+        `compose_boundary_${label}_gateway_${forbidden}_forbidden`,
+      );
+    }
+  }
+  const dependencies = isRecord(gateway.depends_on) ? gateway.depends_on : {};
+  requireExactValues(
+    Object.keys(dependencies).toSorted(),
+    ["auth-service", "redis"],
+    `compose_boundary_${label}_gateway_dependencies_invalid`,
+  );
+  for (const dependency of Object.values(dependencies)) {
+    if (!isRecord(dependency) || dependency.condition !== "service_healthy") {
+      throw new Error(
+        `compose_boundary_${label}_gateway_dependency_health_invalid`,
+      );
+    }
+  }
+  const healthTest = isRecord(gateway.healthcheck)
+    ? gateway.healthcheck.test
+    : undefined;
+  if (
+    !Array.isArray(healthTest) ||
+    !healthTest.some((value) =>
+      String(value).includes("http://localhost:3002/health/ready"),
+    )
+  ) {
+    throw new Error(`compose_boundary_${label}_gateway_healthcheck_invalid`);
+  }
+}
+
+export function validateRenderedComposeBoundary(label, value) {
+  if (label !== "local" && label !== "release") {
+    throw new Error("compose_boundary_label_invalid");
+  }
+  const document = renderedComposeDocument(value, label);
+  requireGatewayRuntimeContract(document, label);
+
+  for (const service of backendServices) {
+    const rendered = renderedService(document, label, service.dockerService);
+    const actualPorts = renderedPortTargets(rendered);
+    if (label === "local") {
+      const expectedPorts = [service.httpPort, service.grpcPort]
+        .filter(Number.isInteger)
+        .toSorted((left, right) => left - right);
+      requireExactValues(
+        actualPorts,
+        expectedPorts,
+        `compose_boundary_local_${service.name}_ports_invalid`,
+      );
+    } else if (service.name === "gateway") {
+      requireExactValues(
+        actualPorts,
+        [3002],
+        "compose_boundary_release_gateway_ports_invalid",
+      );
+      if (rendered.build !== undefined) {
+        throw new Error("compose_boundary_release_gateway_build_forbidden");
+      }
+    } else {
+      requireExactValues(
+        actualPorts,
+        [],
+        `compose_boundary_release_${service.name}_ports_forbidden`,
+      );
+    }
+  }
+
+  if (label === "local") {
+    const gateway = renderedService(document, label, "gateway");
+    if (
+      !isRecord(gateway.build) ||
+      gateway.build.target !== "gateway-runtime"
+    ) {
+      throw new Error("compose_boundary_local_gateway_build_invalid");
+    }
+  } else {
+    for (const name of ["postgres", "redis"]) {
+      requireExactValues(
+        renderedPortTargets(renderedService(document, label, name)),
+        [],
+        `compose_boundary_release_${name}_ports_forbidden`,
+      );
+    }
+    requireExactValues(
+      renderedPortTargets(renderedService(document, label, "minio")),
+      [9000],
+      "compose_boundary_release_minio_ports_invalid",
+    );
+    for (const service of hybridServices) {
+      const rendered = renderedService(document, label, service.dockerService);
+      const environment = isRecord(rendered.environment)
+        ? rendered.environment
+        : {};
+      const expectedMode =
+        service.name === "media-service" ? "OPEN" : "GATEWAY_ONLY";
+      if (environment.PUBLIC_MODE !== expectedMode) {
+        throw new Error(
+          `compose_boundary_release_${service.name}_public_mode_invalid`,
+        );
+      }
+    }
+  }
+
+  for (const service of Object.values(document.services)) {
+    if (!isRecord(service) || !isRecord(service.depends_on)) continue;
+    for (const dependency of Object.values(service.depends_on)) {
+      if (isRecord(dependency) && dependency.condition === "service_started") {
+        throw new Error(`compose_boundary_${label}_service_started_forbidden`);
+      }
+    }
+  }
+  return document;
+}
+
 export function captureComposeConfigurations({
   env = process.env,
   execute = run,
   outputDirectory = CI_EVIDENCE_DIRECTORY,
   platform = process.platform,
+  validateConfiguration = validateRenderedComposeBoundary,
 } = {}) {
   const directory = ensureCiEvidenceDirectory(outputDirectory);
   const configurations = [
     {
       label: "local",
       args: ["compose", "config", "--no-interpolate"],
+      validationArgs: ["compose", "config", "--format", "json"],
       output: "compose-local.yaml",
     },
     {
@@ -1582,6 +2605,16 @@ export function captureComposeConfigurations({
         "docker-compose.release.yml",
         "config",
         "--no-interpolate",
+      ],
+      validationArgs: [
+        "compose",
+        "--env-file",
+        "deploy/.env.production.example",
+        "-f",
+        "docker-compose.release.yml",
+        "config",
+        "--format",
+        "json",
       ],
       output: "compose-release.yaml",
     },
@@ -1603,6 +2636,21 @@ export function captureComposeConfigurations({
       result.stdout,
       env,
     );
+    const rendered = execute(
+      dockerExecutable(platform),
+      configuration.validationArgs,
+      {
+        capture: true,
+        emitCaptured: false,
+        env,
+      },
+    );
+    if (rendered.status !== 0) {
+      throw new Error(
+        `compose_boundary_${configuration.label}_render_failed_exit_${rendered.status ?? "unknown"}`,
+      );
+    }
+    validateConfiguration(configuration.label, rendered.stdout);
   }
 
   return directory;
@@ -1943,6 +2991,10 @@ export function buildTrivySourceArgs(outputPath) {
 export function buildTrivyImageArgs(image, outputPath) {
   return [
     "image",
+    ...TRIVY_DB_REPOSITORIES.flatMap((repository) => [
+      "--db-repository",
+      repository,
+    ]),
     "--scanners",
     "vuln",
     "--severity",
@@ -2218,7 +3270,9 @@ function usage() {
     "  node scripts/backend.mjs build-images [--pull|--clean]",
     "  node scripts/backend.mjs prisma <generate|migrate-dev|migrate-deploy|migrate-status|push|seed>",
     "  node scripts/backend.mjs seed",
-    "  node scripts/backend.mjs database verify-migrations",
+    "  node scripts/backend.mjs database verify-migrations [tenant-authority]",
+    "  node scripts/backend.mjs database verify-f4-batch3-role-seeds",
+    "  node scripts/backend.mjs database verify-f4-r2-default-actors",
     "  node scripts/backend.mjs database backup <directory>",
     `  node scripts/backend.mjs database restore <directory> --confirm=${RESTORE_CONFIRMATION}`,
     "  node scripts/backend.mjs database test-recovery",
@@ -2240,7 +3294,7 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   if (command === "health" && !operation) {
-    await checkBackendHealth();
+    await checkBackendHealth({ services: composeServices });
     return;
   }
   if (command === "down" && !operation) {
@@ -2293,8 +3347,32 @@ export async function main(args = process.argv.slice(2)) {
     await seedBackendDemo();
     return;
   }
-  if (command === "database" && operation === "verify-migrations" && !extra) {
-    verifyCleanMigrations();
+  if (
+    command === "database" &&
+    operation === "verify-migrations" &&
+    !confirmationArg &&
+    !unexpected
+  ) {
+    verifyCleanMigrations({ services: migrationVerificationServices(extra) });
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-f4-r2-default-actors" &&
+    !extra
+  ) {
+    const databases = verifyF4R2DefaultActors();
+    console.log(
+      `[backend] F4 R2 verified and removed ${databases.length} disposable databases`,
+    );
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-f4-batch3-role-seeds" &&
+    !extra
+  ) {
+    verifyF4Batch3RoleSeeds();
     return;
   }
   if (

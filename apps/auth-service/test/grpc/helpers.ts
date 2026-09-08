@@ -6,6 +6,7 @@ import {
   finalizeS2SClientMetadata,
   markS2SMetadata,
   registerS2SClientDefinition,
+  type S2SActorAssertion,
   type S2SSigningIdentity,
 } from '@nebula/grpc-auth';
 
@@ -55,8 +56,20 @@ export function mdBearer(token?: string): grpc.Metadata {
   return md;
 }
 
-export function mdS2S(opts?: { kind?: 'service' | 'gateway' }): grpc.Metadata {
-  const identity = opts?.kind === 'service' ? authAuth : gatewayAuth;
+export function mdS2S(opts?: {
+  kind?: 'service' | 'gateway';
+  actor?: S2SActorAssertion;
+}): grpc.Metadata {
+  const baseIdentity = opts?.kind === 'service' ? authAuth : gatewayAuth;
+  const identity = opts?.actor
+    ? {
+        ...baseIdentity,
+        context: {
+          ...gatewayAuth.context!,
+          actor: opts.actor,
+        },
+      }
+    : baseIdentity;
   return markS2SMetadata(new grpc.Metadata(), {
     ...identity,
     targets: { 'user-service': authUser },
@@ -89,10 +102,11 @@ export function mdAuth(
   params: {
     access?: string;
     s2s?: boolean;
+    actor?: S2SActorAssertion;
   } = {},
 ): grpc.Metadata {
-  const { access, s2s = true } = params;
-  return mergeMd(mdBearer(access), s2s ? mdS2S() : undefined);
+  const { access, s2s = true, actor } = params;
+  return mergeMd(mdBearer(access), s2s ? mdS2S({ actor }) : undefined);
 }
 
 export function loadClient<TClient extends grpc.Client>(opts: {

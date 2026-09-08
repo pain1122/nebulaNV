@@ -14,6 +14,7 @@ import type { GatewayHttpRequest } from "./public-client-boundary";
 import {
   GATEWAY_IDEMPOTENCY_HEADER,
   validateIdempotencyKey,
+  validRefreshCookieDeletion,
   type GatewayStoredResponse,
 } from "../contracts/idempotency";
 import {
@@ -35,6 +36,8 @@ export function GatewayRoutePolicyRef(routeId: string): MethodDecorator {
   const actorDecorator =
     policy.actor === "admin"
       ? Roles("admin", "root-admin")
+      : policy.actor === "user"
+        ? Roles("user")
       : policy.actor === "authenticated"
         ? Roles("user", "admin", "root-admin")
         : Public({ optionalAuth: policy.actor === "optional" });
@@ -68,11 +71,25 @@ function singleHeader(
   return value.trim();
 }
 
-function responseHeaders(response: Response): Readonly<Record<string, string>> {
-  const headers: Record<string, string> = {};
+function responseHeaders(
+  response: Response,
+): Readonly<Record<string, string | readonly string[]>> {
+  const headers: Record<string, string | readonly string[]> = {};
   for (const name of ["location", "etag"] as const) {
     const value = response.getHeader(name);
     if (typeof value === "string") headers[name] = value;
+  }
+  const setCookie = response.getHeader("set-cookie");
+  const cookieValues =
+    typeof setCookie === "string"
+      ? [setCookie]
+      : Array.isArray(setCookie)
+        ? setCookie.filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [];
+  if (validRefreshCookieDeletion(cookieValues)) {
+    headers["set-cookie"] = Object.freeze([...cookieValues]);
   }
   return Object.freeze(headers);
 }
@@ -177,7 +194,7 @@ export class GatewayRoutePolicyInterceptor implements NestInterceptor {
         if (begin.kind === "replay") {
           response.status(begin.response.status);
           for (const [name, value] of Object.entries(begin.response.headers)) {
-            response.setHeader(name, value);
+            response.setHeader(name, Array.isArray(value) ? [...value] : value);
           }
           return of(
             currentRequestResponse(

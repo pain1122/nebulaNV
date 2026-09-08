@@ -15,7 +15,9 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 
 COPY apps/auth-service/package.json apps/auth-service/package.json
+COPY apps/tenant-authority-service/package.json apps/tenant-authority-service/package.json
 COPY apps/blog-service/package.json apps/blog-service/package.json
+COPY apps/gateway/package.json apps/gateway/package.json
 COPY apps/media-service/package.json apps/media-service/package.json
 COPY apps/order-service/package.json apps/order-service/package.json
 COPY apps/product-service/package.json apps/product-service/package.json
@@ -43,6 +45,7 @@ COPY --from=deps /app/packages ./packages
 # Workspace postinstall scripts generate Prisma clients, so schemas must exist
 # before the full development install. Later source copies merge with this tree.
 COPY apps/blog-service/prisma/schema.prisma apps/blog-service/prisma/schema.prisma
+COPY apps/tenant-authority-service/prisma/schema.prisma apps/tenant-authority-service/prisma/schema.prisma
 COPY apps/media-service/prisma/schema.prisma apps/media-service/prisma/schema.prisma
 COPY apps/order-service/prisma/schema.prisma apps/order-service/prisma/schema.prisma
 COPY apps/product-service/prisma/schema.prisma apps/product-service/prisma/schema.prisma
@@ -54,8 +57,10 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
     pnpm install --frozen-lockfile \
     --filter=@nebula/protos... \
     --filter=@nebula/grpc-auth... \
+    --filter=@nebula/gateway... \
     --filter=@nebula/user-service... \
     --filter=@nebula/auth-service... \
+    --filter=@nebula/tenant-authority-service... \
     --filter=@nebula/settings-service... \
     --filter=@nebula/media-service... \
     --filter=@nebula/taxonomy-service... \
@@ -67,7 +72,9 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
 # and the web application are deliberately absent from this build context slice.
 COPY turbo.json tsconfig.base.json ./
 COPY apps/auth-service ./apps/auth-service
+COPY apps/tenant-authority-service ./apps/tenant-authority-service
 COPY apps/blog-service ./apps/blog-service
+COPY apps/gateway ./apps/gateway
 COPY apps/media-service ./apps/media-service
 COPY apps/order-service ./apps/order-service
 COPY apps/product-service ./apps/product-service
@@ -95,6 +102,8 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
       pnpm turbo run build --force --cache-dir=/app/.turbo/runtime-imports-v2 \
         --filter=@nebula/user-service... \
         --filter=@nebula/auth-service... \
+        --filter=@nebula/tenant-authority-service... \
+        --filter=@nebula/gateway... \
         --filter=@nebula/settings-service... \
         --filter=@nebula/media-service... \
         --filter=@nebula/taxonomy-service... \
@@ -105,6 +114,8 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
       pnpm turbo run build --cache-dir=/app/.turbo/runtime-imports-v2 \
         --filter=@nebula/user-service... \
         --filter=@nebula/auth-service... \
+        --filter=@nebula/tenant-authority-service... \
+        --filter=@nebula/gateway... \
         --filter=@nebula/settings-service... \
         --filter=@nebula/media-service... \
         --filter=@nebula/taxonomy-service... \
@@ -141,6 +152,8 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
       --frozen-lockfile \
       --filter=@nebula/user-service... \
       --filter=@nebula/auth-service... \
+      --filter=@nebula/tenant-authority-service... \
+      --filter=@nebula/gateway... \
       --filter=@nebula/settings-service... \
       --filter=@nebula/media-service... \
       --filter=@nebula/taxonomy-service... \
@@ -168,6 +181,7 @@ COPY --from=build /app/packages/protos/order.proto /packages/protos/order.proto
 COPY --from=build /app/packages/protos/product.proto /packages/protos/product.proto
 COPY --from=build /app/packages/protos/settings.proto /packages/protos/settings.proto
 COPY --from=build /app/packages/protos/taxonomy.proto /packages/protos/taxonomy.proto
+COPY --from=build /app/packages/protos/tenant_authority.proto /packages/protos/tenant_authority.proto
 COPY --from=build /app/packages/protos/user.proto /packages/protos/user.proto
 
 # This layer is referenced by every final service image. The layer is shared in
@@ -242,6 +256,18 @@ HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
 
+FROM runtime-base AS tenant-authority-runtime
+WORKDIR /workspace/apps/tenant-authority-service
+COPY --link --from=prod-deps /app/apps/tenant-authority-service/package.json ./package.json
+COPY --link --from=prod-deps /app/apps/tenant-authority-service/node_modules ./node_modules
+COPY --link --from=build /app/apps/tenant-authority-service/dist ./dist
+COPY --link --from=build /app/apps/tenant-authority-service/prisma ./prisma
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p); require.resolve('@nebula/protos/tenant_authority.proto')"
+EXPOSE 3011 50059
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD node -e "fetch('http://localhost:3011/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/main.js"]
+
 FROM runtime-base AS settings-runtime
 WORKDIR /workspace/apps/settings-service
 COPY --link --from=prod-deps /app/apps/settings-service/package.json ./package.json
@@ -312,4 +338,15 @@ RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of 
 EXPOSE 3005 50056
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3005/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/main.js"]
+
+FROM runtime-base AS gateway-runtime
+WORKDIR /workspace/apps/gateway
+COPY --link --from=prod-deps /app/apps/gateway/package.json ./package.json
+COPY --link --from=prod-deps /app/apps/gateway/node_modules ./node_modules
+COPY --link --from=build /app/apps/gateway/dist ./dist
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
+EXPOSE 3002
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD node -e "fetch('http://localhost:3002/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]

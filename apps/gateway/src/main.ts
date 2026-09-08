@@ -27,6 +27,7 @@ export async function bootstrap(): Promise<void> {
     bodyParser: false,
     logger: serviceLogLevels(),
   });
+  app.enableShutdownHooks();
   const config = app.get(ConfigService);
   assertGatewayStartupConfiguration();
 

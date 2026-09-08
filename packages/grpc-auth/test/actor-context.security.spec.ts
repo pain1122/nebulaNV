@@ -140,7 +140,7 @@ describe("verified actor context", () => {
           actor: {
             userId: "user-1",
             role: "user",
-            sessionRef: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
+            sessionRef: expect.stringMatching(/^sr1_[A-Za-z0-9_-]{32}$/),
           },
         }),
       );
@@ -320,6 +320,71 @@ describe("verified actor context", () => {
       expect(metadata.user).toBeUndefined();
     },
   );
+
+  it("binds v2 actor identity to live user/session without authorizing by global role", async () => {
+    const validateToken = jest.fn().mockReturnValue(
+      of({
+        isValid: true,
+        userId: "verified-user",
+        role: "admin",
+        sessionRef: "verified-session",
+      }),
+    );
+    const guard = createGuard(validateToken);
+    const metadata = new Metadata() as MetadataWithContext;
+    metadata.svc = "web-gateway";
+    metadata.svcKind = "gateway";
+    metadata.resolutionContext = {
+      version: "2",
+      purpose: "RESOLUTION",
+      resolutionStage: "AUTHORITY",
+      actor: {
+        userId: "verified-user",
+        sessionRef: "verified-session",
+      },
+    };
+    metadata.signedActor = metadata.resolutionContext.actor;
+    metadata.set("authorization", "Bearer signed-access-token");
+
+    await expect(
+      guard.canActivate(
+        rpcContext(metadata, {} as GrpcServerCallWithContext, {
+          requireUser: true,
+        }),
+      ),
+    ).resolves.toBe(true);
+    expect(metadata.user).toEqual({
+      userId: "verified-user",
+      role: "admin",
+      sessionRef: "verified-session",
+    });
+
+    const mismatched = new Metadata() as MetadataWithContext;
+    mismatched.svc = "web-gateway";
+    mismatched.svcKind = "gateway";
+    mismatched.resolutionContext = {
+      version: "2",
+      purpose: "RESOLUTION",
+      resolutionStage: "AUTHORITY",
+      actor: {
+        userId: "verified-user",
+        sessionRef: "different-session",
+      },
+    };
+    mismatched.signedActor = mismatched.resolutionContext.actor;
+    mismatched.set("authorization", "Bearer signed-access-token");
+    await expect(
+      guard.canActivate(
+        rpcContext(mismatched, {} as GrpcServerCallWithContext, {
+          requireUser: true,
+        }),
+      ),
+    ).rejects.toMatchObject({
+      error: expect.objectContaining({
+        message: "s2s_actor_bearer_mismatch",
+      }),
+    });
+  });
 
   it("rejects either half of a v3 actor/bearer pair", async () => {
     const guard = createGuard();

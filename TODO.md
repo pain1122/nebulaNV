@@ -249,18 +249,18 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
 ### Gateway Boundary
 
 - [x] Create a dedicated gateway application.
-- [ ] Expose versioned external routes under `/api/v1`.
-- [ ] Keep backend HTTP/gRPC ports private in release while retaining local
+- [x] Expose versioned external routes under `/api/v1`.
+- [x] Keep backend HTTP/gRPC ports private in release while retaining local
       diagnostic access.
-- [ ] Route admin, storefront, and mobile traffic through the gateway; reserve
+- [x] Route admin, storefront, and mobile traffic through the gateway; reserve
       the same boundary for future partner traffic.
-- [ ] Resolve and validate registered public-client context, authenticate the
+- [x] Resolve and validate registered public-client context, authenticate the
       user when required, and reserve cryptographic client authentication for
       future confidential partner/server clients.
-- [ ] Resolve trusted tenant, site, channel, and actor context.
-- [ ] Sign forwarded internal context.
+- [x] Resolve trusted tenant, site, channel, and actor context.
+- [x] Sign forwarded internal context.
 - [x] Apply rate limits and request-size limits.
-- [ ] Add end-to-end request/correlation IDs; reserve distributed tracing and
+- [x] Add end-to-end request/correlation IDs; reserve distributed tracing and
       spans for F9.
 - [x] Add gateway health and dependency readiness.
 
@@ -271,9 +271,10 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
 - [x] Define pagination, filtering, and sorting.
 - [x] Define idempotency for create, checkout, upload, and contract operations.
 - [x] Define retry-safe operations.
-- [x] Define API and proto versioning/deprecation rules; external gateway route versions remain unimplemented.
-- [ ] Generate API documentation.
-- [ ] Provide typed web/mobile clients.
+- [x] Define API and proto versioning/deprecation rules; external routes now use
+      the implemented `/api/v1` boundary.
+- [x] Generate API documentation.
+- [x] Provide typed web/mobile clients.
 
 ### Client Types
 
@@ -287,24 +288,24 @@ Historical checkpoint: P0-0D Download Resistance and SEO Media Strategy
 
 ### Current Integration Corrections
 
-- [ ] Fix web refresh helper to use POST.
-- [ ] Characterize and preserve the existing refresh-cookie rotation while
+- [x] Fix web refresh helper to use POST.
+- [x] Characterize and preserve the existing refresh-cookie rotation while
       moving its upstream flow to the gateway.
-- [ ] Add product POST gateway/proxy route.
-- [ ] Map the UI `content` field to backend `description` for product create and
+- [x] Add product POST gateway/proxy route.
+- [x] Map the UI `content` field to backend `description` for product create and
       update while preserving the existing `{ data }`/`{ patch }` envelopes.
-- [ ] Remove frontend assumptions about individual service URLs.
+- [x] Remove frontend assumptions about individual service URLs.
 
 ### F3 Exit Gate
 
-- [ ] External clients configure only the gateway API base URL; they may follow
+- [x] External clients configure only the gateway API base URL; they may follow
       gateway-issued presigned storage/CDN URLs.
-- [ ] Release clients cannot reach backend HTTP/gRPC ports; explicitly required
+- [x] Release clients cannot reach backend HTTP/gRPC ports; explicitly required
       storage data-plane endpoints remain separate from the API boundary.
-- [ ] Ordinary clients cannot directly set or override signed gateway context;
+- [x] Ordinary clients cannot directly set or override signed gateway context;
       accepted public identifiers resolve only their fixed registered context
       and do not claim cryptographic application authenticity.
-- [ ] Typed clients and documentation match runtime behavior.
+- [x] Typed clients and documentation match runtime behavior.
 
 ---
 

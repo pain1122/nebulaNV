@@ -1,0 +1,169 @@
+syntax = "proto3";
+
+package tenant_authority.v1;
+
+// Internal read-only facts owned by tenant-authority-service. A resolved fact
+// is necessary input to authorization; it never grants an operation by itself.
+service TenantAuthorityService {
+  rpc ResolveApplicationRegistration(ResolveApplicationRegistrationRequest)
+      returns (ResolveApplicationRegistrationResponse);
+  rpc ListAllowedWebOrigins(ListAllowedWebOriginsRequest)
+      returns (ListAllowedWebOriginsResponse);
+  rpc ValidateTargetScope(ValidateTargetScopeRequest)
+      returns (ValidateTargetScopeResponse);
+  rpc ResolveEntitlementScopeRef(ResolveEntitlementScopeRefRequest)
+      returns (ResolveEntitlementScopeRefResponse);
+  rpc ResolveActorAuthorization(ResolveActorAuthorizationRequest)
+      returns (ResolveActorAuthorizationResponse);
+}
+
+enum ResolutionStatus {
+  RESOLUTION_STATUS_UNSPECIFIED = 0;
+  RESOLUTION_STATUS_RESOLVED = 1;
+  RESOLUTION_STATUS_NOT_FOUND = 2;
+  RESOLUTION_STATUS_INACTIVE = 3;
+  RESOLUTION_STATUS_IDENTITY_MISMATCH = 4;
+  RESOLUTION_STATUS_SCOPE_MISMATCH = 5;
+  RESOLUTION_STATUS_CONTRADICTORY = 6;
+  RESOLUTION_STATUS_DENIED = 7;
+}
+
+enum ChannelKind {
+  CHANNEL_KIND_UNSPECIFIED = 0;
+  CHANNEL_KIND_WEB = 1;
+  CHANNEL_KIND_ANDROID = 2;
+  CHANNEL_KIND_IOS = 3;
+}
+
+enum ApplicationProfile {
+  APPLICATION_PROFILE_UNSPECIFIED = 0;
+  APPLICATION_PROFILE_STOREFRONT_WEB = 1;
+  APPLICATION_PROFILE_ADMIN_WEB = 2;
+  APPLICATION_PROFILE_MOBILE = 3;
+}
+
+enum ScopeKind {
+  SCOPE_KIND_UNSPECIFIED = 0;
+  SCOPE_KIND_TENANT = 1;
+  SCOPE_KIND_SITE = 2;
+}
+
+enum AuthorizationPath {
+  AUTHORIZATION_PATH_UNSPECIFIED = 0;
+  AUTHORIZATION_PATH_APPLICATION = 1;
+  AUTHORIZATION_PATH_TENANT_MANAGEMENT = 2;
+  AUTHORIZATION_PATH_PARENT_MANAGEMENT = 3;
+  AUTHORIZATION_PATH_PLATFORM_MANAGEMENT = 4;
+  AUTHORIZATION_PATH_SERVICE_OPERATION = 5;
+}
+
+enum ScopedAuthorityRole {
+  SCOPED_AUTHORITY_ROLE_UNSPECIFIED = 0;
+  SCOPED_AUTHORITY_ROLE_PLATFORM_ADMIN = 1;
+  SCOPED_AUTHORITY_ROLE_TENANT_ADMIN = 2;
+  SCOPED_AUTHORITY_ROLE_SITE_ADMIN = 3;
+  SCOPED_AUTHORITY_ROLE_PARENT_MANAGER = 4;
+  SCOPED_AUTHORITY_ROLE_EDITOR = 5;
+  SCOPED_AUTHORITY_ROLE_USER = 6;
+}
+
+message ResolveApplicationRegistrationRequest {
+  // Public lookup evidence only. Existing readable F3 handles become explicit
+  // aliases during the later seed item; they never become authority IDs.
+  string client_handle = 1;
+  optional string canonical_origin = 2;
+}
+
+message ApplicationRegistration {
+  string application_id = 1;
+  string tenant_id = 2;
+  string site_id = 3;
+  string channel_id = 4;
+  ChannelKind channel_kind = 5;
+  ApplicationProfile profile = 6;
+  repeated string allowed_web_origins = 7;
+  string application_revision = 8;
+  string tenant_revision = 9;
+  string site_revision = 10;
+}
+
+message ResolveApplicationRegistrationResponse {
+  ResolutionStatus status = 1;
+  optional ApplicationRegistration registration = 2;
+}
+
+message ListAllowedWebOriginsRequest {}
+
+message ListAllowedWebOriginsResponse {
+  repeated string canonical_origins = 1;
+}
+
+message ValidateTargetScopeRequest {
+  string tenant_id = 1;
+  optional string site_id = 2;
+}
+
+message ValidateTargetScopeResponse {
+  ResolutionStatus status = 1;
+  optional string tenant_revision = 2;
+  optional string site_revision = 3;
+}
+
+message ResolveEntitlementScopeRefRequest {
+  string entitlement_scope_ref = 1;
+  string expected_tenant_id = 2;
+  optional string expected_site_id = 3;
+}
+
+message ResolveEntitlementScopeRefResponse {
+  ResolutionStatus status = 1;
+  ScopeKind scope_kind = 2;
+  optional string tenant_id = 3;
+  optional string site_id = 4;
+  optional string reference_revision = 5;
+}
+
+message ResolveActorAuthorizationRequest {
+  string actor_user_id = 1;
+  optional string actor_tenant_id = 2;
+  string target_tenant_id = 3;
+  optional string target_site_id = 4;
+  optional string application_id = 5;
+  AuthorizationPath authorization_path = 6;
+  string normalized_operation = 7;
+}
+
+message MembershipAuthority {
+  string actor_tenant_id = 1;
+  string membership_id = 2;
+  string membership_epoch_ref = 3;
+  ScopedAuthorityRole effective_role = 4;
+  optional string tenant_role_grant_id = 5;
+  optional string site_id = 6;
+  optional string site_role_grant_id = 7;
+}
+
+message PlatformAuthority {
+  string platform_grant_id = 1;
+  ScopedAuthorityRole effective_role = 2;
+}
+
+message ActorAuthorizationDecision {
+  string actor_user_id = 1;
+  AuthorizationPath authorization_path = 2;
+  string normalized_operation = 3;
+  string target_tenant_id = 4;
+  optional string target_site_id = 5;
+  oneof actor_authority {
+    MembershipAuthority membership_authority = 6;
+    PlatformAuthority platform_authority = 7;
+  }
+  optional string relationship_id = 8;
+  string authority_revision = 9;
+  int64 resolved_at_ms = 10;
+}
+
+message ResolveActorAuthorizationResponse {
+  ResolutionStatus status = 1;
+  optional ActorAuthorizationDecision decision = 2;
+}

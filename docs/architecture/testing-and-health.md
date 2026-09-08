@@ -1,6 +1,6 @@
 ﻿# Testing And Health
 
-Last reviewed: 2026-08-10
+Last reviewed: 2026-08-24
 
 Purpose: define how NebulaNV proves each service is alive, connected, authorized correctly, and still honoring its HTTP/gRPC contract.
 
@@ -32,7 +32,7 @@ pnpm check-types:backend
 pnpm build:backend
 ```
 
-These commands derive the eight backend workspace filters and their package
+These commands derive the ten backend workspace filters and their package
 dependencies from the root inventory. They deliberately exclude the postponed
 `apps/web` prototype. The unqualified root commands remain available for work
 that intentionally includes every workspace.
@@ -80,21 +80,49 @@ Container-free focused security tests:
 pnpm test:security
 ```
 
+Explicit shared and gateway unit/contract lanes:
+
+```powershell
+pnpm test:shared:backend
+pnpm test:gateway:backend
+pnpm test:tenant-authority:backend
+pnpm test:external-client
+pnpm test:web:current
+```
+
+The shared lane covers config, grpc-auth, and internal gRPC clients. The
+gateway lane covers its unit/HTTP/contract suites and the non-mutating OpenAPI
+stale check. The authority lane covers its closed domain catalogs, dedicated
+database configuration, and repository readiness seam. CI calls these names
+directly rather than assuming the wildcard e2e lane discovers them.
+
+The external-client lane runs the OpenAPI/client non-mutating stale checks,
+client lint/type/build/runtime tests, and browser/no-DOM React Native compile
+targets. The current-web lane runs the focused same-origin BFF compatibility
+harness; it does not turn the broader F7 frontend redesign into an F3 gate.
+
 Provision and run the separate live integration/e2e lane:
 
 ```powershell
 pnpm backend:boot
+pnpm test:f3:live
 pnpm test:e2e
 ```
 
 `pnpm test:e2e:provision` remains a compatibility alias for `backend:boot`.
 The command delegates to `scripts/backend.mjs`; the same backend inventory
-supplies its ordered migrations, database checks, base seeds, and eight
-readiness URLs. It waits for healthy infrastructure and every expected
-database, runs migration deploy and status, applies the base seeds, builds the
-official Bake targets sequentially, starts Compose with `--no-build`, waits for
-healthy responses, and runs the API demo seed. A separate backend build or seed
-is therefore unnecessary immediately before provisioning.
+supplies its ordered migrations, database checks, base seeds, and all ten
+readiness URLs. It waits for healthy infrastructure, idempotently provisions
+the authority database/runtime login, verifies every expected database, runs
+migration deploy and status, applies the base seeds, builds the official Bake
+targets sequentially, starts Compose with `--no-build`, waits for healthy
+responses, and runs the API demo seed. A separate backend build or seed is
+therefore unnecessary immediately before provisioning.
+
+`test:f3:live` uses the generated external client against the provisioned
+gateway and proves anonymous storefront, authenticated storefront user,
+authorized admin, registered mobile, and disabled partner execution. It
+refuses production and emits only bounded result labels.
 
 `pnpm test:e2e` first runs the existing inventory-backed `build:backend`
 command so a clean host workspace has the internal-package `dist` entry points
@@ -102,7 +130,7 @@ required by Jest. It then runs the service e2e scripts sequentially. Do not add
 separate Jest aliases or maintain another shared-package list for this step.
 
 CI uses the same backend-only lint, type, source-build, proto, focused security,
-Compose-validation, `backend:boot`, and `test:e2e` entry points. The quality job
+Compose-validation, `backend:boot`, `test:f3:live`, and `test:e2e` entry points. The quality job
 fails if generation or verification changes tracked files. The live job runs
 its tracked-diff check with `if: always()` after boot, e2e, and image scanning,
 so a failed earlier step cannot silently skip the cleanliness proof.
@@ -111,7 +139,7 @@ so a failed earlier step cannot silently skip the cleanliness proof.
 
 F2 keeps the postponed `apps/web` prototype outside the backend gates. The
 existing root backend inventory is also the source for dependency selection and
-the eight image tags; do not maintain a second service or image list.
+the ten image tags; do not maintain a second service or image list.
 
 ```powershell
 pnpm scan:dependencies:backend
@@ -122,14 +150,20 @@ pnpm scan:images:backend
 - `scan:dependencies:backend` runs the pnpm production audit, classifies every
   high/critical package-version finding as backend runtime, backend tooling, or
   deferred web, and fails for any backend-runtime finding. Optional Prisma CLI
-  peers are tooling and are not misclassified as deployed runtime packages.
+  peers are tooling and are not treated as application-reachable runtime
+  dependencies. The image scan remains filesystem-based: if pnpm retains those
+  package bytes in its shared virtual store, their findings are still visible
+  and blocking until the bytes are patched or removed.
 - `scan:source:backend` uses pinned Trivy to detect high/critical secrets and
   configuration defects. It excludes `apps/web`, materialized local env files,
   dependencies, generated/build output, coverage, and vendored frontend assets;
   tracked `.env.example` contracts remain in scope.
 - `scan:images:backend` uses the same Trivy installation and inventory image
-  tags to scan all eight previously built images. It does not rebuild, upload,
-  ignore unfixed findings, or stop after the first affected image.
+  tags to scan all ten previously built images. It does not rebuild, upload,
+  ignore unfixed findings, or stop after the first affected image. Its
+  vulnerability database sources are the official Docker Hub distribution
+  followed by GHCR; this avoids depending on the Google pull-through mirror,
+  which is not reachable in every development network.
 
 JSON output is written under ignored `.security-reports/`. Retained Trivy
 reports contain finding metadata only: raw secret matches, source snippets, and
@@ -161,7 +195,8 @@ pnpm evidence:failure:backend
 - `backend-quality-evidence` contains the classified dependency report, safe
   source-scan report, and non-interpolated sanitized local/release Compose
   configurations.
-- `backend-live-evidence` contains safe reports for the eight tested image tags.
+- `backend-live-evidence` contains safe reports for the ten current inventory
+  image tags.
   On failure it also contains `docker compose ps -a` state and no more than the
   last 200 timestamped, color-free log lines per container.
 
@@ -253,16 +288,17 @@ Every backend service uses the shared `StandardHealthController` contract:
 The common response includes `service`, `time`, and a named `checks` object.
 An optional dependency may report `skipped`; only `error` degrades readiness.
 
-| Service          | Required readiness checks           |
-| ---------------- | ----------------------------------- |
-| auth-service     | auth Redis, S2S replay store        |
-| user-service     | Postgres, S2S replay store          |
-| settings-service | Postgres, S2S replay store          |
-| taxonomy-service | Postgres, S2S replay store          |
-| product-service  | Postgres, S2S replay store          |
-| blog-service     | Postgres, S2S replay store          |
-| order-service    | Postgres, S2S replay store          |
-| media-service    | Postgres, storage, S2S replay store |
+| Service          | Required readiness checks                                                      |
+| ---------------- | ------------------------------------------------------------------------------ |
+| auth-service     | auth Redis, S2S replay store                                                   |
+| user-service     | Postgres, S2S replay store                                                     |
+| settings-service | Postgres, S2S replay store                                                     |
+| taxonomy-service | Postgres, S2S replay store                                                     |
+| product-service  | Postgres, S2S replay store                                                     |
+| blog-service     | Postgres, S2S replay store                                                     |
+| order-service    | Postgres, S2S replay store                                                     |
+| media-service    | Postgres, storage, S2S replay store                                            |
+| gateway          | Startup configuration, application registry, Auth transport, and gateway Redis |
 
 These probes reuse the clients owned by each Nest module. Health controllers
 must not construct separate Prisma, Redis, or storage clients. Readiness does
@@ -284,6 +320,7 @@ for the HTTP readiness contract.
 | product-runtime  | `http://localhost:3003/health/ready` |
 | blog-runtime     | `http://localhost:3004/health/ready` |
 | order-runtime    | `http://localhost:3005/health/ready` |
+| gateway-runtime  | `http://localhost:3002/health/ready` |
 
 Infra healthchecks:
 
@@ -306,7 +343,7 @@ Current proto-level `Ping` methods:
 Current setup behavior:
 
 - Backend boot waits for healthy infrastructure and all expected databases
-  before migrations, then waits for HTTP `/health/ready` on all eight services.
+  before migrations, then waits for HTTP `/health/ready` on all ten runtimes.
 - Media-service setup checks open ports, HTTP `/health`, and gRPC `Ping`.
 - Most other service setup files only check required ports.
 - Port-open checks prove a socket is listening, not that the service can process a real gRPC method.
@@ -316,7 +353,7 @@ requirement of the current HTTP contract.
 
 ## Shutdown Contract
 
-All eight bootstraps call `app.enableShutdownHooks()`. Nest therefore closes
+All ten bootstraps call `app.enableShutdownHooks()`. Nest therefore closes
 the HTTP application and connected microservices when the process receives a
 supported termination signal. Lifecycle-managed providers close the resources
 they own:
@@ -330,35 +367,47 @@ would duplicate the application lifecycle.
 
 ## Current Test Inventory
 
-| Service          | HTTP Tests                                          | gRPC/Security Tests                   |
-| ---------------- | --------------------------------------------------- | ------------------------------------- |
-| auth-service     | `test/app.spec.ts`, auth HTTP/gRPC flow             | Redis/security specs, JWT guard specs |
-| user-service     | `test/http/user.http.e2e.spec.ts`                   | `test/grpc/user.e2e.spec.ts`          |
-| settings-service | `test/http/settings.http.e2e.spec.ts`               | `test/grpc/settings.e2e.spec.ts`      |
-| taxonomy-service | `test/http/taxonomy.http.e2e.spec.ts`               | `test/grpc/taxonomy.e2e.spec.ts`      |
-| media-service    | `test/http/media.http.e2e.spec.ts`                  | `test/grpc/media.e2e.spec.ts`         |
-| product-service  | `test/http/product.http.e2e.spec.ts`, taxonomy HTTP | product/taxonomy gRPC                 |
-| blog-service     | `test/http/blog.http.e2e.spec.ts`, taxonomy HTTP    | blog/taxonomy gRPC                    |
-| order-service    | `test/http/order.http.e2e.spec.ts`                  | `test/grpc/order.e2e.spec.ts`         |
+| Service                  | HTTP Tests                                          | gRPC/Security Tests                                         |
+| ------------------------ | --------------------------------------------------- | ----------------------------------------------------------- |
+| auth-service             | `test/app.spec.ts`, auth HTTP/gRPC flow             | Redis/security specs, JWT guard specs                       |
+| tenant-authority-service | health HTTP plus signed read-only internal gRPC     | domain/config/readiness/read-contract and denial specs      |
+| user-service             | `test/http/user.http.e2e.spec.ts`                   | `test/grpc/user.e2e.spec.ts`                                |
+| settings-service         | `test/http/settings.http.e2e.spec.ts`               | `test/grpc/settings.e2e.spec.ts`                            |
+| taxonomy-service         | `test/http/taxonomy.http.e2e.spec.ts`               | `test/grpc/taxonomy.e2e.spec.ts`                            |
+| media-service            | `test/http/media.http.e2e.spec.ts`                  | `test/grpc/media.e2e.spec.ts`                               |
+| product-service          | `test/http/product.http.e2e.spec.ts`, taxonomy HTTP | product/taxonomy gRPC                                       |
+| blog-service             | `test/http/blog.http.e2e.spec.ts`, taxonomy HTTP    | blog/taxonomy gRPC                                          |
+| order-service            | `test/http/order.http.e2e.spec.ts`                  | `test/grpc/order.e2e.spec.ts`                               |
+| gateway                  | focused route/controller/application specs          | outbound trust, actor, replay, readiness, and OpenAPI specs |
+
+Cross-runtime contract owners:
+
+- `packages/api-client/test`: generated operation/runtime, browser/mobile
+  compile, and bounded live F3 flows;
+- `apps/web/test`: current BFF refresh/cookie/concurrency/auth/product/taxonomy
+  compatibility;
+- `scripts/backend.test.mjs`: inventory, release exposure, health, evidence,
+  and tooling invariants.
 
 ## Dependency Notes
 
-| Service Tests    | Usually Need                                              |
-| ---------------- | --------------------------------------------------------- |
-| auth-service     | user-service, Redis, Postgres                             |
-| user-service     | auth HTTP/gRPC, user-service HTTP/gRPC, Postgres          |
-| settings-service | auth HTTP, settings HTTP/gRPC, Postgres                   |
-| taxonomy-service | auth HTTP, settings HTTP/gRPC, taxonomy runtime, Postgres |
-| media-service    | auth HTTP/gRPC, media HTTP/gRPC, MinIO/S3, Postgres       |
-| product-service  | auth, settings, taxonomy, product runtime, Postgres       |
-| blog-service     | auth, settings, taxonomy, blog runtime, Postgres          |
-| order-service    | auth, settings, product, order runtime, Postgres          |
+| Service Tests            | Usually Need                                              |
+| ------------------------ | --------------------------------------------------------- |
+| auth-service             | user-service, Redis, Postgres                             |
+| tenant-authority-service | dedicated authority Postgres database only                |
+| user-service             | auth HTTP/gRPC, user-service HTTP/gRPC, Postgres          |
+| settings-service         | auth HTTP, settings HTTP/gRPC, Postgres                   |
+| taxonomy-service         | auth HTTP, settings HTTP/gRPC, taxonomy runtime, Postgres |
+| media-service            | auth HTTP/gRPC, media HTTP/gRPC, MinIO/S3, Postgres       |
+| product-service          | auth, settings, taxonomy, product runtime, Postgres       |
+| blog-service             | auth, settings, taxonomy, blog runtime, Postgres          |
+| order-service            | auth, settings, product, order runtime, Postgres          |
 
 Exact setup files live under each service's `test/setup/wait-for-services.ts`.
 
 ## Database Migration Pattern
 
-For all seven Prisma services, use the sequential root commands:
+For all eight Prisma services, use the sequential root commands:
 
 ```powershell
 pnpm prisma:gen

@@ -33,47 +33,50 @@ enum ScanStatus {
 }
 
 model Media {
-  id          String   @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  storage     String   @default("local")
-  bucket      String?
-  path        String
-  filename    String
-  folderPath  String   @default("/")
-  displayName String   @default("")
+  storage          String  @default("local")
+  bucket           String?
+  path             String
+  filename         String
+  folderPath       String  @default("/")
+  displayName      String  @default("")
   originalFilename String?
-  mimeType    String
-  sizeBytes   Int
+  mimeType         String
+  sizeBytes        Int
 
   width       Int?
   height      Int?
   durationSec Int?
 
-  ownerId     String?  @db.Uuid
-  visibility  String   @default("private")
-  scope       String   @default("panel")
-  entityType  String?
-  entityId    String?
+  ownerId         String?     @db.Uuid
+  identityRealmId String?     @db.Uuid
+  subjectId       String?     @db.Uuid
+  visibility      String      @default("private")
+  scope           String      @default("panel")
+  entityType      String?
+  entityId        String?
   // Define access restrictions (PUBLIC, PROTECTED, STRICT)
-  accessClass AccessClass @default(PUBLIC)
+  accessClass     AccessClass @default(PUBLIC)
 
-  sha256      String?  @unique
+  sha256 String? @unique
 
   // ✅ lifecycle + malware pipeline
-  status      MediaStatus @default(PENDING)
-  scanStatus  ScanStatus  @default(NONE)
-  scannedAt   DateTime?
-  scanError   String?
+  status     MediaStatus @default(PENDING)
+  scanStatus ScanStatus  @default(NONE)
+  scannedAt  DateTime?
+  scanError  String?
 
   // ✅ requested fields
-  quarantineReason String?   // why blocked/quarantined
-  etag             String?   // storage metadata to lock integrity
+  quarantineReason String? // why blocked/quarantined
+  etag             String? // storage metadata to lock integrity
   promotedAt       DateTime? // when moved from pending -> ready path
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ownerId])
+  @@index([identityRealmId, subjectId])
   @@index([accessClass])
   @@index([visibility])
   @@index([scope])

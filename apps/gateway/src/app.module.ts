@@ -12,6 +12,17 @@ import { HealthController } from "./health.controller";
 import { gatewayRateLimitTracker } from "./http/rate-limit";
 import { GatewayAuthResolver } from "./auth/gateway-auth-resolver";
 import { GatewayBearerAuthGuard } from "./auth/gateway-bearer-auth.guard";
+import { GatewayAuthApiService } from "./auth/gateway-auth-api.service";
+import { GatewayBrowserSessionService } from "./auth/browser-session";
+import { GatewaySessionTransportGuard } from "./auth/gateway-session-transport.guard";
+import { GatewayUserApiService } from "./user/gateway-user-api.service";
+import { GatewaySettingsApiService } from "./settings/gateway-settings-api.service";
+import { GatewayProductApiService } from "./product/gateway-product-api.service";
+import { GatewayBlogApiService } from "./blog/gateway-blog-api.service";
+import { GatewayTaxonomyApiService } from "./taxonomy/gateway-taxonomy-api.service";
+import { GatewayOrderApiService } from "./order/gateway-order-api.service";
+import { GatewayMediaApiService } from "./media/gateway-media-api.service";
+import { GatewayMediaRenderProxy } from "./media/gateway-media-render.proxy";
 import { GatewayRedisService } from "./state/gateway-redis.service";
 import { GatewayIdempotencyService } from "./state/gateway-idempotency.service";
 import { GatewayRoutePolicyInterceptor } from "./http/gateway-route-policy";
@@ -54,7 +65,18 @@ export { GATEWAY_HTTP_CONTROLLERS } from "./contracts/gateway-http-controllers";
     GatewayIdempotencyService,
     GatewayReadinessService,
     GatewayAuthResolver,
+    GatewayAuthApiService,
+    GatewayBrowserSessionService,
+    GatewayUserApiService,
+    GatewaySettingsApiService,
+    GatewayProductApiService,
+    GatewayBlogApiService,
+    GatewayTaxonomyApiService,
+    GatewayOrderApiService,
+    GatewayMediaApiService,
+    GatewayMediaRenderProxy,
     { provide: APP_GUARD, useClass: GatewayBearerAuthGuard },
+    { provide: APP_GUARD, useClass: GatewaySessionTransportGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: GatewayRoutePolicyInterceptor },
   ],

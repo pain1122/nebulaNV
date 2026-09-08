@@ -1,115 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBearerFromReq } from "@/lib/auth/bearer";
-import { errorMessage } from "@/lib/unknown";
+import {
+  GatewayBffRequestError,
+  bffExceptionResponse,
+  gatewayFailureResponse,
+  idempotencyKeyFromRequest,
+  relayGatewayHeaders,
+  requireAccessToken,
+  serverGatewayClient,
+} from "@/lib/gateway/server-client";
+import {
+  productForCurrentUi,
+  productPatchInput,
+} from "@/lib/gateway/product-adapter";
 
-function getProductServiceBaseUrl() {
-  const httpUrl = process.env.PRODUCT_HTTP_URL;
-  if (httpUrl) return httpUrl.replace(/\/+$/, "");
-  const port = process.env.PRODUCT_HTTP_PORT ?? "3003";
-  return `http://127.0.0.1:${port}`;
-}
+type RouteContext = { params: Promise<{ id: string }> };
 
-function proxyHeaders(req: NextRequest) {
-  const headers = new Headers();
-  const bearer = getBearerFromReq(req);
-  if (bearer) headers.set("authorization", bearer);
-  return headers;
-}
-
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
-  const { id } = await context.params;
-  const base = getProductServiceBaseUrl();
-
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const res = await fetch(`${base}/products/${id}`, {
-      method: "GET",
-      headers: proxyHeaders(req),
-      cache: "no-store",
+    const { id } = await context.params;
+    const result = await serverGatewayClient().request("admin_products_get", {
+      accessToken: requireAccessToken(request),
+      path: { id },
     });
-
-    const contentType = res.headers.get("content-type") ?? "";
-    const isJson = contentType.includes("application/json");
-    const body = isJson ? await res.json() : await res.text();
-
-    if (!res.ok) {
-      return isJson
-        ? NextResponse.json(body, { status: res.status })
-        : new NextResponse(String(body), { status: res.status });
-    }
-
-    return isJson
-      ? NextResponse.json(body, {
-          status: 200,
-          headers: { "cache-control": "no-store" },
-        })
-      : new NextResponse(String(body), {
-          status: 200,
-          headers: { "cache-control": "no-store" },
-        });
-  } catch (e: unknown) {
-    console.error("[web/api/products/[id]] proxy error:", e);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "UPSTREAM_UNREACHABLE",
-        message: errorMessage(e, "Unknown error"),
-      },
-      { status: 502 },
+    if (!result.ok) return gatewayFailureResponse(result);
+    const response = NextResponse.json(
+      { ...result.data, data: productForCurrentUi(result.data.data) },
+      { status: result.status, headers: { "cache-control": "no-store" } },
     );
+    relayGatewayHeaders(result, response);
+    return response;
+  } catch (error: unknown) {
+    console.error("[/api/products/:id] gateway read failed");
+    return bffExceptionResponse(error, "PRODUCT_READ_GATEWAY_UNAVAILABLE");
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
-  const { id } = await context.params;
-  const base = getProductServiceBaseUrl();
-
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const body = await req.text();
-
-    const headers = proxyHeaders(req);
-    headers.set("content-type", "application/json");
-
-    const res = await fetch(`${base}/products/${id}`, {
-      method: "PATCH",
-      headers,
-      body,
-      cache: "no-store",
-    });
-
-    const contentType = res.headers.get("content-type") ?? "";
-    const isJson = contentType.includes("application/json");
-    const out = isJson ? await res.json() : await res.text();
-
-    if (!res.ok) {
-      return isJson
-        ? NextResponse.json(out, { status: res.status })
-        : new NextResponse(String(out), { status: res.status });
+    const { id } = await context.params;
+    let body;
+    try {
+      body = productPatchInput(await request.json());
+    } catch {
+      throw new GatewayBffRequestError(400, "PRODUCT_PATCH_ENVELOPE_REQUIRED");
     }
-
-    return isJson
-      ? NextResponse.json(out, {
-          status: 200,
-          headers: { "cache-control": "no-store" },
-        })
-      : new NextResponse(String(out), {
-          status: 200,
-          headers: { "cache-control": "no-store" },
-        });
-  } catch (e: unknown) {
-    console.error("[web/api/products/[id]] proxy error:", e);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "UPSTREAM_UNREACHABLE",
-        message: errorMessage(e, "Unknown error"),
-      },
-      { status: 502 },
+    const result = await serverGatewayClient().request("admin_products_update", {
+      accessToken: requireAccessToken(request),
+      idempotencyKey: idempotencyKeyFromRequest(request),
+      path: { id },
+      body,
+    });
+    if (!result.ok) return gatewayFailureResponse(result);
+    const response = NextResponse.json(
+      { ...result.data, data: productForCurrentUi(result.data.data) },
+      { status: result.status },
     );
+    relayGatewayHeaders(result, response);
+    return response;
+  } catch (error: unknown) {
+    console.error("[/api/products/:id] gateway update failed");
+    return bffExceptionResponse(error, "PRODUCT_UPDATE_GATEWAY_UNAVAILABLE");
   }
 }

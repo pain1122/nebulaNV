@@ -1,4 +1,4 @@
-x-internal-grpc: &internal-grpc
+x-internal-targets: &internal-targets
   USER_GRPC_URL: user-service:50051
   AUTH_GRPC_URL: auth-service:50052
   PRODUCT_GRPC_URL: product-service:50053
@@ -7,6 +7,10 @@ x-internal-grpc: &internal-grpc
   ORDER_GRPC_URL: order-service:50056
   TAXONOMY_GRPC_URL: taxonomy-service:50057
   MEDIA_GRPC_URL: media-service:50058
+  TENANT_AUTHORITY_GRPC_URL: tenant-authority-service:50059
+
+x-internal-grpc: &internal-grpc
+  <<: *internal-targets
 
 x-common-service-env: &common-service-env
   NODE_ENV: ${NODE_ENV:-production}
@@ -28,8 +32,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-nebula}
-    ports:
-      - "${POSTGRES_HOST_PORT:-15432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
@@ -42,6 +44,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  tenant-authority-db-init:
+    image: postgres:17
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      AUTHORITY_DB_RUNTIME_PASSWORD: ${AUTHORITY_DB_RUNTIME_PASSWORD:?AUTHORITY_DB_RUNTIME_PASSWORD is required}
+    volumes:
+      - ./scripts/db/ensure-tenant-authority-db.sh:/scripts/ensure-tenant-authority-db.sh:ro
+    entrypoint: ["bash", "/scripts/ensure-tenant-authority-db.sh"]
 
   redis:
     image: redis:7-alpine
@@ -69,7 +85,6 @@ services:
     command: server /data --console-address ":9001"
     ports:
       - "${MINIO_HOST_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -104,9 +119,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${USER_HTTP_PORT:-3100}:3100"
-      - "${USER_GRPC_PORT:-50051}:50051"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: user-service
@@ -128,9 +140,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${AUTH_HTTP_PORT:-3001}:3001"
-      - "${AUTH_GRPC_PORT:-50052}:50052"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: auth-service
@@ -147,6 +156,26 @@ services:
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
 
+  tenant-authority-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-tenant-authority-service:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      tenant-authority-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      <<: [*common-service-env, *internal-grpc]
+      SVC_NAME: tenant-authority-service
+      S2S_OUTBOUND_KEYS: "{}"
+      S2S_INBOUND_KEYS: ${TENANT_AUTHORITY_S2S_INBOUND_KEYS:?TENANT_AUTHORITY_S2S_INBOUND_KEYS is required}
+      GATEWAY_INBOUND_KEYS: ${TENANT_AUTHORITY_GATEWAY_INBOUND_KEYS:?TENANT_AUTHORITY_GATEWAY_INBOUND_KEYS is required}
+      AUTHORITY_AUDIT_HMAC_KEY_ID: ${AUTHORITY_AUDIT_HMAC_KEY_ID:?AUTHORITY_AUDIT_HMAC_KEY_ID is required}
+      AUTHORITY_AUDIT_HMAC_KEY: ${AUTHORITY_AUDIT_HMAC_KEY:?AUTHORITY_AUDIT_HMAC_KEY is required}
+      PORT: 3011
+      GRPC_PORT: 50059
+      DATABASE_URL: "postgresql://nebula_authority_runtime:${AUTHORITY_DB_RUNTIME_PASSWORD:?AUTHORITY_DB_RUNTIME_PASSWORD is required}@postgres:5432/nebula_authority?schema=public"
+
   settings-service:
     image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-settings-service:${NEBULA_IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -155,9 +184,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${SETTINGS_HTTP_PORT:-3010}:3010"
-      - "${SETTINGS_GRPC_PORT:-50054}:50054"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: settings-service
@@ -181,9 +207,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${TAXONOMY_HTTP_PORT:-3006}:3006"
-      - "${TAXONOMY_GRPC_PORT:-50057}:50057"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: taxonomy-service
@@ -209,9 +232,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${PRODUCT_HTTP_PORT:-3003}:3003"
-      - "${PRODUCT_GRPC_PORT:-50053}:50053"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: product-service
@@ -237,9 +257,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${BLOG_HTTP_PORT:-3004}:3004"
-      - "${BLOG_GRPC_PORT:-50055}:50055"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: blog-service
@@ -265,9 +282,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${ORDER_HTTP_PORT:-3005}:3005"
-      - "${ORDER_GRPC_PORT:-50056}:50056"
     environment:
       <<: [*common-service-env, *internal-grpc]
       SVC_NAME: order-service
@@ -293,11 +307,9 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-    ports:
-      - "${MEDIA_HTTP_PORT:-3007}:3007"
-      - "${MEDIA_GRPC_PORT:-50058}:50058"
     environment:
       <<: [*common-service-env, *internal-grpc]
+      PUBLIC_MODE: OPEN
       SVC_NAME: media-service
       S2S_OUTBOUND_KEYS: ${MEDIA_S2S_OUTBOUND_KEYS:?MEDIA_S2S_OUTBOUND_KEYS is required}
       S2S_INBOUND_KEYS: ${MEDIA_S2S_INBOUND_KEYS:?MEDIA_S2S_INBOUND_KEYS is required}
@@ -323,6 +335,43 @@ services:
       MEDIA_SYNC_DELETE_MAX_FILES: ${MEDIA_SYNC_DELETE_MAX_FILES:-500}
       MEDIA_PUBLIC_FOLDER: ${MEDIA_PUBLIC_FOLDER:-uploads}
       MEDIA_PRIVATE_FOLDER: ${MEDIA_PRIVATE_FOLDER:-private/objects}
+
+  gateway:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-gateway:${NEBULA_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${GATEWAY_HOST_PORT:-3002}:3002"
+    environment:
+      <<: *internal-targets
+      NODE_ENV: production
+      GATEWAY_HTTP_PORT: 3002
+      GATEWAY_OUTBOUND_KEYS: ${GATEWAY_OUTBOUND_KEYS:?GATEWAY_OUTBOUND_KEYS is required}
+      GATEWAY_APPLICATION_REGISTRY_JSON: ${GATEWAY_APPLICATION_REGISTRY_JSON:?GATEWAY_APPLICATION_REGISTRY_JSON is required}
+      GATEWAY_JSON_LIMIT_BYTES: ${GATEWAY_JSON_LIMIT_BYTES:-262144}
+      GATEWAY_RATE_LIMIT_TTL_MS: ${GATEWAY_RATE_LIMIT_TTL_MS:-60000}
+      GATEWAY_RATE_LIMIT_REQUESTS: ${GATEWAY_RATE_LIMIT_REQUESTS:-120}
+      GATEWAY_REDIS_URL: ${GATEWAY_REDIS_URL:?GATEWAY_REDIS_URL is required}
+      GATEWAY_READINESS_TIMEOUT_MS: ${GATEWAY_READINESS_TIMEOUT_MS:-1500}
+      GATEWAY_IDEMPOTENCY_TTL_SECONDS: ${GATEWAY_IDEMPOTENCY_TTL_SECONDS:-86400}
+      GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS: ${GATEWAY_IDEMPOTENCY_IN_FLIGHT_TTL_SECONDS:-60}
+      GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES: ${GATEWAY_IDEMPOTENCY_MAX_RESPONSE_BYTES:-524288}
+      MEDIA_RENDER_HTTP_URL: ${MEDIA_RENDER_HTTP_URL:-http://media-service:3007}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 5
 
 volumes:
   pgdata:

@@ -8,6 +8,7 @@ import {
   mergeMd,
   CODES,
 } from '../grpc/helpers';
+import type { S2SActorAssertion } from '@nebula/grpc-auth';
 import { httpJson, AUTH_HTTP, subFromJwt, LoginResp } from '../utils/http';
 
 const AUTH_GRPC_URL = process.env.AUTH_GRPC_URL ?? '127.0.0.1:50052';
@@ -24,6 +25,42 @@ const skipIfUnavailable = (e: any) => e?.code === CODES.UNAVAILABLE;
 function tamperToken(token: string): string {
   const replacement = token.endsWith('a') ? 'b' : 'a';
   return `${token.slice(0, -1)}${replacement}`;
+}
+
+async function verifiedGatewayActor(
+  accessToken: string,
+): Promise<S2SActorAssertion> {
+  const validation = await call<{
+    isValid: boolean;
+    userId: string;
+    role: S2SActorAssertion['role'];
+    sessionRef: string;
+  }>(
+    authClient,
+    'validateToken',
+    { token: accessToken },
+    mdS2S({ kind: 'service' }),
+  );
+  if (
+    !validation.isValid ||
+    !validation.userId ||
+    !validation.role ||
+    !validation.sessionRef
+  ) {
+    throw new Error('e2e_verified_gateway_actor_missing');
+  }
+  return {
+    userId: validation.userId,
+    role: validation.role,
+    sessionRef: validation.sessionRef,
+  };
+}
+
+async function mdGatewayAuth(accessToken: string) {
+  return mdAuth({
+    access: accessToken,
+    actor: await verifiedGatewayActor(accessToken),
+  });
 }
 
 describe('Auth HTTP + gRPC end-to-end', () => {
@@ -252,7 +289,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         authClient,
         'getProfile',
         { userId },
-        mdAuth({ access: userTokens.accessToken }),
+        await mdGatewayAuth(userTokens.accessToken),
       );
       expect(self).toHaveProperty('id', userId);
 
@@ -263,7 +300,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
             authClient,
             'getProfile',
             { userId: adminId },
-            mdAuth({ access: userTokens.accessToken }),
+            await mdGatewayAuth(userTokens.accessToken),
           ),
         ).rejects.toMatchObject({ code: CODES.PERMISSION_DENIED });
       }
@@ -283,7 +320,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
           'getProfile',
           { userId: adminId },
           mergeMd(
-            mdAuth({ access: userTokens.accessToken }),
+            await mdGatewayAuth(userTokens.accessToken),
             mdForgedActor(adminId, 'admin'),
           ),
         ),
@@ -301,7 +338,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         authClient,
         'getProfile',
         { userId },
-        mdAuth({ access: adminTokens.accessToken }),
+        await mdGatewayAuth(adminTokens.accessToken),
       );
       expect(res).toHaveProperty('id', userId);
     } catch (e: any) {
@@ -318,7 +355,7 @@ describe('Auth HTTP + gRPC end-to-end', () => {
         authClient,
         'getProfile',
         { userId: '11111111-1111-4111-8111-111111111111' },
-        mdAuth({ access: adminTokens.accessToken }),
+        await mdGatewayAuth(adminTokens.accessToken),
       ),
     ).rejects.toMatchObject({
       code: CODES.NOT_FOUND,

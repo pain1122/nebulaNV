@@ -36,6 +36,24 @@ const context: S2SSignedContext = {
   },
 };
 
+const authorityResolutionContext: S2SSignedContext = {
+  version: "2",
+  purpose: "RESOLUTION",
+  resolutionStage: "AUTHORITY",
+  application: {
+    applicationId: "storefront-web-local",
+    applicationProfile: "storefront-web",
+    tenantId: "single-site-tenant",
+    siteId: "single-site",
+    channelId: "web",
+    channelKind: "WEB",
+  },
+  actor: {
+    userId: "verified-user-id",
+    sessionRef: "non-secret-session-reference",
+  },
+};
+
 function build(opts?: {
   kind?: "service" | "gateway";
   context?: S2SSignedContext;
@@ -106,7 +124,60 @@ describe("S2S v3 signed context", () => {
 
     const oversized = Buffer.alloc(1025, 0x61).toString("base64url");
     expect(() => decodeS2SSignedContext(oversized)).toThrow(
-      "s2s_context_encoding_invalid",
+      "s2s_context_json_invalid",
+    );
+  });
+
+  it("round-trips the exact authority-resolution v2 shape without a role", () => {
+    const encoded = encodeS2SSignedContext(authorityResolutionContext);
+
+    expect(encoded.canonicalJson).toBe(
+      '{"version":"2","purpose":"RESOLUTION","resolutionStage":"AUTHORITY","application":{"applicationId":"storefront-web-local","applicationProfile":"storefront-web","tenantId":"single-site-tenant","siteId":"single-site","channelId":"web","channelKind":"WEB"},"actor":{"userId":"verified-user-id","sessionRef":"non-secret-session-reference"}}',
+    );
+    expect(decodeS2SSignedContext(encoded.encoded)).toEqual(encoded);
+  });
+
+  it("rejects v2 role, null, partial, purpose, and stage expansion", () => {
+    expect(() =>
+      canonicalS2SContext({
+        ...authorityResolutionContext,
+        actor: {
+          ...authorityResolutionContext.actor!,
+          role: "admin",
+        },
+      } as unknown as S2SSignedContext),
+    ).toThrow("s2s_context_actor_unknown_field");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorityResolutionContext,
+        application: null,
+      } as unknown as S2SSignedContext),
+    ).toThrow("s2s_context_application_invalid");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorityResolutionContext,
+        actor: { userId: "verified-user-id" },
+      } as unknown as S2SSignedContext),
+    ).toThrow("s2s_context_actor_required_field_missing");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorityResolutionContext,
+        purpose: "AUTHORIZED",
+      } as unknown as S2SSignedContext),
+    ).toThrow("s2s_context_purpose_unsupported");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorityResolutionContext,
+        resolutionStage: "ACTOR",
+      } as unknown as S2SSignedContext),
+    ).toThrow("s2s_context_resolution_stage_unsupported");
+
+    const duplicateActor = Buffer.from(
+      '{"version":"2","purpose":"RESOLUTION","resolutionStage":"AUTHORITY","actor":{"userId":"verified-user-id","sessionRef":"one"},"actor":{"userId":"verified-user-id","sessionRef":"two"}}',
+      "utf8",
+    ).toString("base64url");
+    expect(() => decodeS2SSignedContext(duplicateActor)).toThrow(
+      "s2s_context_not_canonical",
     );
   });
 

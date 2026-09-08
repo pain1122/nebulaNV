@@ -12,6 +12,8 @@ import {
   INTERNAL_ONLY_KEY,
   IS_PUBLIC_KEY,
   PUBLIC_FLAGS_KEY,
+  S2S_CONTEXT_RECEIVER_KEY,
+  type S2SContextReceiver,
 } from "../src/public.decorator";
 import { S2SGuard } from "../src/s2s.guard";
 import type { MetadataWithContext } from "../src/context";
@@ -67,6 +69,16 @@ const signedContext: S2SSignedContext = {
   },
 };
 
+const authorityResolutionContext: S2SSignedContext = {
+  version: "2",
+  purpose: "RESOLUTION",
+  resolutionStage: "AUTHORITY",
+  actor: {
+    userId: "verified-user",
+    sessionRef: "verified-session",
+  },
+};
+
 type Request = { value?: string };
 const definition = {
   path: "/test.TestService/DoWork",
@@ -97,6 +109,7 @@ function handlerWith(metadata?: {
   internalOnly?: boolean;
   callers?: string[];
   identities?: AllowedS2SIdentity[];
+  contextReceiver?: S2SContextReceiver;
 }): () => void {
   const handler = () => undefined;
   if (metadata?.public) Reflect.defineMetadata(IS_PUBLIC_KEY, true, handler);
@@ -113,6 +126,13 @@ function handlerWith(metadata?: {
     Reflect.defineMetadata(
       ALLOWED_S2S_IDENTITIES_KEY,
       metadata.identities,
+      handler,
+    );
+  }
+  if (metadata?.contextReceiver) {
+    Reflect.defineMetadata(
+      S2S_CONTEXT_RECEIVER_KEY,
+      metadata.contextReceiver,
       handler,
     );
   }
@@ -285,6 +305,96 @@ describe("S2SGuard v2 security contract", () => {
     expect(serviceMetadata.requestContext).toEqual(
       gatewayMetadata.requestContext,
     );
+  });
+
+  it("admits v2 authority resolution only on its exact receiver", async () => {
+    const receiver: S2SContextReceiver = {
+      version: "2",
+      purpose: "RESOLUTION",
+      resolutionStage: "AUTHORITY",
+      requireActor: true,
+    };
+    const request = { value: "resolution" };
+    const metadata = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      context: authorityResolutionContext,
+    });
+    await expect(
+      guard.canActivate(
+        rpcContext(
+          metadata,
+          request,
+          handlerWith({ contextReceiver: receiver }),
+        ),
+      ),
+    ).resolves.toBe(true);
+    expect(metadata.resolutionContext).toEqual(authorityResolutionContext);
+    expect(metadata.requestContext).toBeUndefined();
+    expect(metadata.signedActor).toEqual(authorityResolutionContext.actor);
+
+    const wrongRoute = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      nonce: "wrong-route",
+      context: authorityResolutionContext,
+    });
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(wrongRoute, request))))
+        .message,
+    ).toBe("s2s_context_v2_not_allowed_for_route");
+
+    const legacy = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      nonce: "legacy-route",
+      context: signedContext,
+    });
+    expect(
+      (
+        await rpcError(
+          guard.canActivate(
+            rpcContext(
+              legacy,
+              request,
+              handlerWith({ contextReceiver: receiver }),
+            ),
+          ),
+        )
+      ).message,
+    ).toBe("s2s_resolution_context_required_for_route");
+
+    const missingActor = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      nonce: "missing-actor",
+      context: {
+        version: "2",
+        purpose: "RESOLUTION",
+        resolutionStage: "AUTHORITY",
+      },
+    });
+    expect(
+      (
+        await rpcError(
+          guard.canActivate(
+            rpcContext(
+              missingActor,
+              request,
+              handlerWith({ contextReceiver: receiver }),
+            ),
+          ),
+        )
+      ).message,
+    ).toBe("s2s_resolution_context_required_for_route");
   });
 
   it("requires v3 for gateway callers while keeping ordinary service v2 valid", async () => {

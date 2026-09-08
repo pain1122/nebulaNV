@@ -1,6 +1,6 @@
 # Contracts And Boundaries
 
-Last reviewed: 2026-06-17
+Last reviewed: 2026-08-31
 
 Purpose: define how data shapes move through NebulaNV services without leaking random internal objects across layers.
 
@@ -41,14 +41,14 @@ return service.create(input);
 
 ## Shape Types
 
-| Shape | Used For | Rule |
-| --- | --- | --- |
-| DTO class | HTTP/gRPC input validation | Validate external payloads only. |
-| Generated proto type | gRPC controller boundary | Convert before deep service logic if shapes differ. |
-| Service input type | Controller-to-service call | Stable internal shape. |
-| Prisma generated type | DB filters, writes, records | Keep inside owning service. |
-| View/response type | Public API output | Use mappers when response differs from DB. |
-| `@nebula/clients` proxy type | Cross-service gRPC calls | Prefer typed proxy over raw gRPC stub. |
+| Shape                        | Used For                    | Rule                                                |
+| ---------------------------- | --------------------------- | --------------------------------------------------- |
+| DTO class                    | HTTP/gRPC input validation  | Validate external payloads only.                    |
+| Generated proto type         | gRPC controller boundary    | Convert before deep service logic if shapes differ. |
+| Service input type           | Controller-to-service call  | Stable internal shape.                              |
+| Prisma generated type        | DB filters, writes, records | Keep inside owning service.                         |
+| View/response type           | Public API output           | Use mappers when response differs from DB.          |
+| `@nebula/clients` proxy type | Cross-service gRPC calls    | Prefer typed proxy over raw gRPC stub.              |
 
 ## Naming Rules
 
@@ -190,11 +190,32 @@ For owner-scoped resources, keep these concepts separate:
 
 Spoofed metadata must not override signed JWT payloads.
 
+Current source resolves a compatibility `userId` and role. The F4 target in
+[ADR-0014](decisions/0014-f4-customer-identity-realms-and-federation.md) makes
+the human coordinate `(identityRealmId, subjectId)` and proves it with an exact
+realm/application session. A bare user UUID, email, provider claim, public
+header, request body, query, storage key, or job payload cannot choose a realm,
+link accounts, create membership, or authorize a target. Keep these separate:
+
+- authentication subject: exact realm plus subject and live application
+  session;
+- target authority: exact membership epoch/grant or platform grant;
+- owner reference: realm-qualified subject stored by the domain owner;
+- provider coordinate: exact registered provider plus `(iss, sub)`, consumed
+  only by Realm Auth;
+- target resource: tenant/site and owner-service record checked independently.
+
+Context v1 and strict partial v2 remain labeled compatibility contracts. New
+multi-realm work requires additive context v3; never widen the old `userId`
+field until it silently means a realm subject.
+
 ## Settings And Taxonomy Rules
 
 Settings-service stores safe app/business defaults. It does not own secrets, trust boundaries, auth policy, or role hierarchy.
 
-Taxonomy-service stores global taxonomy records. Domain services should expose scoped facades where needed:
+Taxonomy-service currently stores global taxonomy records. F4 migrates them to
+site ownership before multi-site traffic; domain services continue to expose
+scoped facades:
 
 - Product-service hard-locks product taxonomy scope.
 - Blog-service hard-locks blog taxonomy scope.

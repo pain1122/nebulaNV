@@ -36,12 +36,15 @@ function source(relativePath: string): string {
 type BackendInventoryEntry = {
   name: string;
   moduleFile: string;
+  transport: "http" | "http-grpc";
 };
 
 const manifest = JSON.parse(source("package.json")) as {
   nebula: { backendServices: BackendInventoryEntry[] };
 };
-const services = manifest.nebula.backendServices;
+const services = manifest.nebula.backendServices.filter(
+  (service) => service.transport === "http-grpc",
+);
 
 function expectInOrder(contents: string, markers: readonly string[]): void {
   let previousIndex = -1;

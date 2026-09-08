@@ -1,10 +1,10 @@
 import { Controller } from "@nestjs/common";
 import { type HealthProbe, StandardHealthController } from "@packages/config";
-import { Public, S2SReplayStore } from "@nebula/grpc-auth";
+import { OperationalHealth, S2SReplayStore } from "@nebula/grpc-auth";
 import { PrismaService } from "./prisma.service";
 import { MediaService } from "./media.service";
 
-@Public()
+@OperationalHealth()
 @Controller("health")
 export class HealthController extends StandardHealthController {
   constructor(

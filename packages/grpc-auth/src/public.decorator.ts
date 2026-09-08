@@ -7,6 +7,8 @@ export const INTERNAL_ONLY_KEY = "internalOnly";
 export const REQUIRE_USER_ID_KEY = "requireUserId";
 export const ALLOWED_S2S_CALLERS_KEY = "allowedS2SCallers";
 export const ALLOWED_S2S_IDENTITIES_KEY = "allowedS2SIdentities";
+export const OPERATIONAL_HEALTH_KEY = "operationalHealth";
+export const S2S_CONTEXT_RECEIVER_KEY = "s2sContextReceiver";
 
 export type AllowedS2SIdentity = Readonly<{
   kind: S2SCallerKind;
@@ -19,6 +21,13 @@ export type PublicFlags = {
   /** Allow only if S2S/HMAC signature is valid (no anonymous external). */
   gatewayOnly?: boolean;
 };
+
+export type S2SContextReceiver = Readonly<{
+  version: "2";
+  purpose: "RESOLUTION";
+  resolutionStage: "AUTHORITY";
+  requireActor: true;
+}>;
 
 /**
  * Mark an endpoint as public (no JWT required).
@@ -34,6 +43,15 @@ export function Public(flags: PublicFlags = {}) {
     SetMetadata(IS_PUBLIC_KEY, true),
     SetMetadata(PUBLIC_FLAGS_KEY, flags),
   );
+}
+
+/**
+ * Mark a sanitized HTTP health controller as anonymously reachable by local
+ * container/load-balancer probes even when PUBLIC_MODE=GATEWAY_ONLY.
+ * This metadata never bypasses S2S requirements for RPC handlers.
+ */
+export function OperationalHealth() {
+  return applyDecorators(Public(), SetMetadata(OPERATIONAL_HEALTH_KEY, true));
 }
 
 /** Require a verified gateway caller without making user authentication optional. */
@@ -78,4 +96,21 @@ export function AllowedS2SIdentities(...identities: AllowedS2SIdentity[]) {
 /** Require user context previously attached by verified authentication. */
 export function RequireUserId() {
   return SetMetadata(REQUIRE_USER_ID_KEY, true);
+}
+
+/**
+ * Admit only the frozen context-v2 authority-resolution carrier. This is a
+ * receiver declaration, not permission to construct or propagate AUTHORIZED
+ * context.
+ */
+export function RequireS2SAuthorityResolution() {
+  return SetMetadata(
+    S2S_CONTEXT_RECEIVER_KEY,
+    Object.freeze({
+      version: "2",
+      purpose: "RESOLUTION",
+      resolutionStage: "AUTHORITY",
+      requireActor: true,
+    }) satisfies S2SContextReceiver,
+  );
 }

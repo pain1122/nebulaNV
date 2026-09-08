@@ -25,8 +25,12 @@ describe("service logging wiring", () => {
     ({ name, moduleFile }) => {
       const main = source(`apps/${name}/src/main.ts`);
       const module = source(`apps/${name}/src/${moduleFile}`);
+      const httpBootstrap =
+        name === "gateway"
+          ? `${main}\n${source("apps/gateway/src/http/configure-http.ts")}`
+          : main;
 
-      expect(main).toContain("createHttpRequestLoggingMiddleware");
+      expect(httpBootstrap).toContain("createHttpRequestLoggingMiddleware");
       expect(main).toContain("serviceLogLevels()");
       expect(main).toContain("logServiceReady");
       expect(main).toContain("logFatalStartup");

@@ -1,12 +1,58 @@
 # Auth Service
 
-Last reviewed: 2026-07-21
+Last reviewed: 2026-08-31
 
 ## Purpose
 
 Auth-service owns authentication, token issuance, refresh-token rotation, logout/revocation behavior, Redis-backed token freshness, and auth-facing gRPC methods.
 
-Auth-service does not own user profile persistence. User-service owns users, roles, password hashes, and profile data. Auth-service owns active refresh-session state in Redis.
+In this repository, `auth` means authentication and session authority. Durable
+tenant/site/application registrations, memberships, and scoped access
+authority belong to `tenant-authority-service`; a valid Auth token is necessary
+but does not itself grant access to a tenant resource.
+
+Current implementation: Auth-service does not own user profile persistence or
+a database. User-service owns the one global User/role/password/profile table,
+while Auth owns active refresh-session state in Redis. This remains accurate
+until the additive ADR-0014 migration; it is not the final customer-realm
+topology.
+
+## F4 Identity-Realm Target (Not Implemented)
+
+[ADR-0014](../architecture/decisions/0014-f4-customer-identity-realms-and-federation.md)
+keeps Auth as authentication/session authority but scopes that authority to one
+identity realm and exact application audiences. [ADR-0015](../architecture/decisions/0015-f4-identity-realm-record-and-migration-freeze.md)
+freezes the exact aggregate, reference construction, compatibility bridge, and
+R0-R11 cutover order; none is implemented yet.
+
+Target Auth owns, per realm:
+
+- immutable realm subjects and verified external identity links;
+- local credential hashes plus separate durable monotonically increasing
+  `credentialGeneration` and `sessionGeneration` fences in the same security
+  aggregate;
+- issuer/audience-aware tokens, independent realm keysets, key IDs, and
+  bounded rotation;
+- a durable minimized active-session ledger plus current, selected-other, and
+  all-session revocation;
+- a terminal `PENDING`/`CONSUMED`/`REVOKED` bridge for the bounded legacy-
+  session upgrade, with exact logout and upgrade locking the same row;
+- realm SSO and one-use, short-lived, application-bound subordinate exchange;
+- durable credential/session invalidation events and Redis reconciliation.
+- migration-only encrypted imports from User/current Auth under a bounded
+  fail-closed security-mutation barrier; no direct cross-owner database read or
+  asynchronous dual credential authority.
+
+Tenant-authority-service continues to own only realm/provider/trust/application
+policy metadata plus target memberships and roles. Gateway resolves an
+application and its accepted realm first; it cannot mint identity or select a
+realm/subject/issuer from login input. Realm Auth may accept local credentials
+or a configured OIDC/SAML provider; it never links identities by email.
+
+The current hashed refresh-token storage, Lua rotation/replay containment,
+current/all logout, and live session-existence checks are preserved. Redis
+becomes acceleration and replay state, not the sole durable credential
+generation or recoverable active-session inventory.
 
 ## Main Dependencies
 
@@ -70,8 +116,9 @@ Methods:
 Important behavior:
 
 - `ValidateToken` returns `{ isValid: false }` for invalid tokens instead of
-  throwing. Valid responses include an HMAC-derived `sessionRef` for log
-  correlation; the raw JWT session ID is never returned.
+  throwing. Valid responses include a versioned, safe-identifier
+  `sr1_...` HMAC `sessionRef` for log correlation; the raw JWT session ID is
+  never returned.
 - `ValidateToken` is the sole mixed-kind Auth RPC. Its exact identity policy
   allows `gateway/gateway` plus the existing approved service-kind consumers;
   caller name without the matching kind is insufficient. Other Auth internal
@@ -192,6 +239,33 @@ called by readiness.
 
 ## Known Gaps
 
+- Password change currently updates only User-service's password hash. It does
+  not advance Auth token version, revoke sessions, or prevent a concurrent
+  old-password login from creating a session. This is a confirmed defect
+  against ADR-0014.
+- The gRPC login path currently separates `ValidateUser` from `GetTokens`.
+  `GetTokens` accepts a gateway-signed existing `userId` without a one-use
+  proof binding it to the successful credential check. S2S proves which
+  gateway asked, not that credentials were verified. ADR-0015 selects one
+  Realm Auth-owned atomic `Login` operation with exact application/audience and
+  generation checks; the gateway never receives a subject to feed into a token-
+  mint method. No credential-login grant or compatibility fallback is added.
+- JWT payloads and Redis keys contain no issuer, audience, identity realm, or
+  application binding. One active access/refresh secret pair has no token key
+  ID/previous-key rotation window.
+- Redis holds only session IDs/token hashes. There is no durable user-visible
+  active-session list, selected-other-session revocation, device/application
+  metadata, or stale-restore reconciliation.
+- `revokeAllRefreshSessions` and token-version advance are separate operations;
+  concurrent activity can leave inaccurate/orphaned session-list state even
+  though live token-version/session checks contain many authorization cases.
+  ADR-0015 closes the target design with primary-database `sessionGeneration`
+  CAS, but the implementation remains a confirmed Batch 3R gap.
+- Disablement is temporary Redis state and has no production account-lifecycle
+  caller.
+- Release configuration is one standalone Redis without demonstrated
+  persistence/failover. This is not a local-development defect, but it cannot
+  support the later upper-enterprise availability claim without F9 proof.
 - Some test files still carry lint warnings.
 
 ## Related Files

@@ -10,13 +10,29 @@ async function main() {
   }
 
   // 🔐 passwords for local/dev only (change in prod)
+  const rootAdminEmail =
+    process.env.SEED_ROOT_ADMIN_EMAIL ?? 'root-admin@example.com';
+  const rootAdminPass = process.env.SEED_ROOT_ADMIN_PASS ?? 'RootAdmin123!';
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
   const adminPass = process.env.SEED_ADMIN_PASS ?? 'Admin123!';
   const userEmail = process.env.SEED_USER_EMAIL ?? 'user@example.com';
   const userPass = process.env.SEED_USER_PASS ?? 'User123!';
 
+  const rootAdminHash = await bcrypt.hash(rootAdminPass, 10);
   const adminHash = await bcrypt.hash(adminPass, 10);
   const userHash = await bcrypt.hash(userPass, 10);
+
+  // The local-only root administrator remains distinct from the site admin.
+  const rootAdmin = await prisma.user.upsert({
+    where: { email: rootAdminEmail },
+    update: { password: rootAdminHash, role: 'root-admin' },
+    create: {
+      email: rootAdminEmail,
+      password: rootAdminHash,
+      role: 'root-admin',
+    },
+    select: { id: true, role: true },
+  });
 
   // Upsert Admin
   const admin = await prisma.user.upsert({
@@ -27,7 +43,7 @@ async function main() {
       password: adminHash,
       role: 'admin',
     },
-    select: { id: true, email: true, role: true },
+    select: { id: true, role: true },
   });
 
   // Upsert Normal User
@@ -39,11 +55,12 @@ async function main() {
       password: userHash,
       role: 'user',
     },
-    select: { id: true, email: true, role: true },
+    select: { id: true, role: true },
   });
 
-  console.log('[seed:user-service] admin  ->', admin);
-  console.log('[seed:user-service] user   ->', user);
+  console.log('[seed:user-service] root-admin ->', rootAdmin);
+  console.log('[seed:user-service] admin      ->', admin);
+  console.log('[seed:user-service] user       ->', user);
 }
 
 main()

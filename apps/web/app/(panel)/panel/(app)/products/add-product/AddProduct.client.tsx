@@ -317,7 +317,10 @@ export default function AddProductClient({ productId }: AddProductClientProps) {
         isEdit ? `/api/products/${productId}` : `/api/products`,
         {
           method: isEdit ? "PATCH" : "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": crypto.randomUUID(),
+          },
           body: JSON.stringify(isEdit ? { patch: payload } : { data: payload }),
         },
       );

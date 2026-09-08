@@ -37,6 +37,9 @@ Current source proto files:
 - `product.proto`: ProductService product CRUD, gallery, discount methods, and product taxonomy facade.
 - `blog.proto`: BlogService post CRUD/list and blog taxonomy facade.
 - `order.proto`: OrderService cart, checkout, order lookup/list, and status update.
+- `tenant_authority.proto`: internal TenantAuthorityService registration,
+  origin, target-scope, entitlement-reference, and actor/target authority
+  resolution.
 
 ## Generated Output
 
@@ -92,6 +95,7 @@ that the generated TypeScript remains usable.
 - `taxonomy`
 - `media`
 - `orderv1`
+- `tenantauthorityv1`
 - `messageTypeRegistry`
 
 ## How Services Use This Package
@@ -112,6 +116,7 @@ Examples:
 - Taxonomy-service uses `taxonomy.proto`, `auth.proto`, and `settings.proto`.
 - Media-service uses `media.proto` and `auth.proto`.
 - Order-service uses `order.proto`, `auth.proto`, `product.proto`, and `settings.proto`.
+- Tenant-authority-service uses `tenant_authority.proto`.
 
 ### Generated Types For Controllers And Guards
 

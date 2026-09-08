@@ -87,7 +87,9 @@ Outbound signing never chooses the previous key.
 ## Replay And Time
 
 - Default clock skew: 30 seconds, configurable from 1 to 120 seconds.
-- Every call gets fresh metadata, nonce, timestamp, and request ID.
+- Every public ingress gets a new request ID. Each downstream invocation gets
+  fresh metadata, nonce, timestamp, caller/target proof, and signature; nested
+  causal hops preserve only the guard-verified ingress request ID.
 - Redis claims `kind + caller + target + key ID + nonce` atomically with `SET NX PX`.
 - A duplicate nonce is rejected.
 - An invalid signature is rejected before the nonce claim, so it cannot poison a valid request.
@@ -195,4 +197,61 @@ Release Redis is password-protected, has no host port, and is a healthy dependen
 
 Focused tests cover missing signatures, wrong target/RPC/body, stale and future timestamps, replay and concurrent replay, unsupported versions, invalid signatures, expired previous keys, gateway/service key separation, caller allowlists, gateway-only/internal-only policy, private-route protection in `OPEN`, startup validation, all eight service bootstrap templates, v2 compatibility, required gateway v3, canonical context bounds, and partial/duplicate/unsigned/altered context denial.
 
-This closes the S2S Enforcement slice only. Raw propagated user/role removal, order-status authorization, refresh-token policy, and broader HTTP/gRPC authorization parity remain separate F1 work.
+F3 extends this foundation with gateway v3 context and verified nested
+propagation. Raw propagated user/role headers remain non-authoritative,
+order-status authorization stays enforced by its domain owner, and refresh
+rotation stays owned by Auth-service.
+
+## F4 Default-Realm Compatibility (Receiver Prerequisite Partially Implemented)
+
+[ADR-0010](decisions/0010-f4-signed-context-compatibility.md) preserves this
+implemented S2S v2/v3 envelope and freezes an additive context schema v2. The
+minimum Batch 3 resolver prerequisite now parses only strict
+`RESOLUTION/AUTHORITY`, admits it only on its declared RPC, rejects v2 on
+legacy routes, and refuses resolution propagation. It enables no writer,
+`AUTHORIZED` context, domain consumer, cache, or traffic cutover. The original
+plan placed those in Batch 4; ADR-0014 now keeps v2 receiver-only while Batch
+1R freezes the additive realm-aware v3 path. The envelope already owns caller, target, RPC,
+body digest, time, nonce, request ID, key, and context digest; context v2 will
+not duplicate them.
+
+Under the frozen default-realm compatibility design, context v2 distinguishes
+a non-authorizing, exact-RPC `RESOLUTION` purpose from an `AUTHORIZED` ADR-0009
+decision. It separates Auth actor identity from scoped membership/platform role
+authority and carries explicit target plus authority revision/freshness. If a
+default-realm operation is explicitly migrated to that design, receiver-first
+rollout accepts v1 only on named legacy operations, requires v2 on the migrated
+operation, and forbids dual carriers, automatic downgrade, or gateway fallback
+to context-free S2S v2. Realm-aware operations require context v3 instead.
+
+[ADR-0012](decisions/0012-f4-failure-freshness-audit-and-recovery.md) keeps S2S
+transport freshness separate from authority-decision freshness. It freezes the
+15-second ordinary authority ceiling, live-required sensitive operations,
+60-second anonymous-public-only outage window, per-consumer authenticated cache
+entries, and pairwise/purpose-separated compromise recovery. A valid S2S
+signature never extends expired authority.
+
+## F4 Realm-Aware Target (Not Implemented)
+
+[ADR-0014](decisions/0014-f4-customer-identity-realms-and-federation.md)
+preserves the envelope and strict v2 receiver but requires additive context v3
+for multi-realm traffic. V3 context adds a realm-qualified subject, exact
+application audience and identity-policy proof, and realm/application-bound
+`sr2_` session plus `ar2_` authority references and their key IDs. ADR-0015
+freezes their exact full-length HMAC construction and key-rotation stability.
+It does not carry raw provider claims, email, password/credential facts,
+internal session IDs, internal membership generation, or internal credential/
+session generation.
+
+The rollout remains receiver-first and exact-version. A route is explicitly
+legacy v1, default-realm v2, or realm-aware v3; dual carriers, field unions,
+automatic negotiation, and downgrade after a v3 rejection fail closed. S2S
+still proves workload and message integrity only. Realm Auth independently
+proves the actor/session, Tenant Authority proves target membership/trust, and
+the domain owner repeats resource/operation authorization.
+
+ADR-0015's bounded transition uses separately declared internal v2
+compatibility and v3 methods. The gateway chooses one only after verifying the
+session family; it never puts both carriers on one downstream call. Receivers
+exist before any `sr2_` session, and rollback retains v3 validation until those
+sessions drain or are revoked rather than projecting them into `sr1_`.

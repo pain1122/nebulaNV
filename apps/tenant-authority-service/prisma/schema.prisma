@@ -1,0 +1,615 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "./generated"
+  binaryTargets = ["native", "linux-musl"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantSiteLifecycle {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum ChannelKind {
+  WEB
+  ANDROID
+  IOS
+}
+
+enum ApplicationProfile {
+  STOREFRONT_WEB @map("storefront-web")
+  ADMIN_WEB      @map("admin-web")
+  MOBILE         @map("mobile")
+}
+
+enum ApplicationLifecycle {
+  PENDING_VERIFICATION
+  ACTIVE
+  DISABLED
+  REVOKED
+}
+
+enum WebOriginScheme {
+  HTTP
+  HTTPS
+}
+
+enum IdentityVerificationState {
+  PENDING
+  VERIFIED
+  REVOKED
+}
+
+enum VerificationEvidenceType {
+  DNS_TXT
+  PROVIDER_ACCOUNT
+  SIGNED_ARTIFACT
+  CONTROLLED_NON_PRODUCTION_SEED
+}
+
+enum ParentRelationshipState {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum EntitlementScopeKind {
+  TENANT
+  SITE
+}
+
+enum ApplicationClientHandleKind {
+  CANONICAL
+  LEGACY_ALIAS
+  ROTATED
+}
+
+enum ApplicationClientHandleState {
+  ACTIVE
+  TOMBSTONED
+}
+
+enum AuthorityAuthorizationPath {
+  SERVICE_OPERATION
+  TENANT_MANAGEMENT
+  PARENT_MANAGEMENT
+  PLATFORM_MANAGEMENT
+  RECOVERY
+}
+
+enum AuthorityAuditResult {
+  SUCCEEDED
+  DENIED
+  FAILED
+}
+
+enum AuthorityInvalidationState {
+  PENDING
+  DISPATCHED
+}
+
+enum MembershipLifecycle {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum RoleGrantLifecycle {
+  ACTIVE
+  REVOKED
+}
+
+enum TenantRole {
+  TENANT_ADMIN
+  PARENT_MANAGER
+}
+
+enum SiteRole {
+  SITE_ADMIN
+  EDITOR
+  USER
+}
+
+enum PlatformRole {
+  PLATFORM_ADMIN
+}
+
+enum IdentityRealmKind {
+  PLATFORM_OPERATOR
+  LICENSED_ROOT_CONSUMER
+  LICENSED_ROOT_WORKFORCE
+  SUBORDINATE_CONSUMER
+  SUBORDINATE_WORKFORCE
+}
+
+enum PrincipalClass {
+  PLATFORM_OPERATOR
+  CONSUMER
+  WORKFORCE
+}
+
+enum IdentityProviderKind {
+  NEBULA_LOCAL
+  OIDC
+  SAML
+}
+
+enum IdentityRealmLifecycle {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum ProviderTrustLifecycle {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum ApplicationIdentityPolicyLifecycle {
+  DRAFT
+  ACTIVE
+  DISABLED
+  RETIRED
+}
+
+enum ApplicationLoginMode {
+  LOCAL_LOGIN
+  EXTERNAL_LOGIN
+  ROOT_SSO_EXCHANGE
+  LEGACY_DEFAULT_UPGRADE
+}
+
+enum FederationTrustMode {
+  LOCAL_LOGIN
+  EXTERNAL_LOGIN
+  ROOT_SSO_EXCHANGE
+}
+
+model Tenant {
+  id                       String                @id @default(uuid()) @db.Uuid
+  displayName              String                @db.VarChar(120)
+  lifecycle                TenantSiteLifecycle   @default(PROVISIONING)
+  revision                 BigInt                @default(1)
+  createdAt                DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime              @updatedAt @db.Timestamptz(3)
+  sites                    Site[]
+  parentRelationships      ParentRelationship[]  @relation("ParentTenantRelationships")
+  subordinateRelationships ParentRelationship[]  @relation("SubordinateTenantRelationships")
+  entitlementScopeRefs     EntitlementScopeRef[]
+  memberships              Membership[]
+  ownedIdentityRealms      IdentityRealm[]       @relation("IdentityRealmOwningTenant")
+  licensedRootRealms       IdentityRealm[]       @relation("IdentityRealmLicensedRootTenant")
+
+  @@index([lifecycle])
+}
+
+model Site {
+  id                   String                @id @default(uuid()) @db.Uuid
+  tenantId             String                @db.Uuid
+  displayName          String                @db.VarChar(120)
+  lifecycle            TenantSiteLifecycle   @default(PROVISIONING)
+  isPrimary            Boolean               @default(false)
+  revision             BigInt                @default(1)
+  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime              @updatedAt @db.Timestamptz(3)
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  channels             Channel[]
+  entitlementScopeRefs EntitlementScopeRef[]
+  siteRoleGrants       SiteRoleGrant[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, lifecycle])
+  @@index([tenantId, isPrimary])
+}
+
+model Channel {
+  id           String        @id @default(uuid()) @db.Uuid
+  tenantId     String        @db.Uuid
+  siteId       String        @db.Uuid
+  kind         ChannelKind
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+  site         Site          @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  applications Application[]
+
+  @@unique([siteId, kind])
+  @@unique([id, tenantId, siteId])
+  @@index([tenantId, siteId])
+}
+
+model Application {
+  id                String                      @id @default(uuid()) @db.Uuid
+  clientId          String                      @unique @default(uuid()) @db.Uuid
+  tenantId          String                      @db.Uuid
+  siteId            String                      @db.Uuid
+  channelId         String                      @db.Uuid
+  displayName       String                      @db.VarChar(120)
+  profile           ApplicationProfile
+  lifecycle         ApplicationLifecycle        @default(PENDING_VERIFICATION)
+  revision          BigInt                      @default(1)
+  createdAt         DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                    @updatedAt @db.Timestamptz(3)
+  channel           Channel                     @relation(fields: [channelId, tenantId, siteId], references: [id, tenantId, siteId], onDelete: Restrict, onUpdate: Restrict)
+  webOrigins        WebOrigin[]
+  androidIdentities AndroidIdentity[]
+  iosIdentities     IosIdentity[]
+  clientHandles     ApplicationClientHandle[]
+  identityPolicies  ApplicationIdentityPolicy[]
+
+  @@unique([id, tenantId, siteId])
+  @@index([lifecycle])
+  @@index([tenantId, siteId, lifecycle])
+  @@index([tenantId, siteId, channelId, profile])
+}
+
+model IdentityRealm {
+  id                     String                         @id @default(uuid()) @db.Uuid
+  kind                   IdentityRealmKind
+  owningCustomerTenantId String?                        @db.Uuid
+  licensedRootTenantId   String?                        @db.Uuid
+  isRootDefault          Boolean                        @default(false)
+  authRouteRef           String                         @unique @db.Char(36)
+  lifecycle              IdentityRealmLifecycle         @default(PROVISIONING)
+  revision               BigInt                         @default(1)
+  createdAt              DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime                       @updatedAt @db.Timestamptz(3)
+  owningCustomerTenant   Tenant?                        @relation("IdentityRealmOwningTenant", fields: [owningCustomerTenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  licensedRootTenant     Tenant?                        @relation("IdentityRealmLicensedRootTenant", fields: [licensedRootTenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  providerRegistrations  IdentityProviderRegistration[]
+  federationTrusts       FederationTrust[]
+  memberships            Membership[]                   @relation("MembershipIdentityRealm")
+  platformGrants         PlatformGrant[]                @relation("PlatformGrantIdentityRealm")
+  auditEvents            AuthorityAuditEvent[]          @relation("AuthorityAuditIdentityRealm")
+  invalidationEvents     AuthorityInvalidationOutbox[]  @relation("AuthorityInvalidationIdentityRealm")
+
+  @@unique([id, licensedRootTenantId])
+  @@index([owningCustomerTenantId, lifecycle])
+  @@index([licensedRootTenantId, lifecycle])
+  @@index([kind, lifecycle])
+}
+
+model IdentityProviderRegistration {
+  id               String                 @id @default(uuid()) @db.Uuid
+  identityRealmId  String                 @db.Uuid
+  kind             IdentityProviderKind
+  issuerReference  String                 @db.VarChar(512)
+  lifecycle        ProviderTrustLifecycle @default(PENDING_VERIFICATION)
+  revision         BigInt                 @default(1)
+  createdAt        DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @db.Timestamptz(3)
+  identityRealm    IdentityRealm          @relation(fields: [identityRealmId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  federationTrusts FederationTrust[]
+
+  @@unique([id, identityRealmId])
+  @@index([identityRealmId, lifecycle])
+  @@index([kind, lifecycle])
+}
+
+model ApplicationIdentityPolicy {
+  id                           String                             @id @default(uuid()) @db.Uuid
+  applicationId                String                             @db.Uuid
+  policyVersion                Int
+  audience                     String                             @db.VarChar(255)
+  acceptedPrincipalClasses     PrincipalClass[]
+  loginModes                   ApplicationLoginMode[]
+  legacyDefaultUpgradeEligible Boolean                            @default(false)
+  isCurrent                    Boolean                            @default(true)
+  lifecycle                    ApplicationIdentityPolicyLifecycle @default(DRAFT)
+  revision                     BigInt                             @default(1)
+  createdAt                    DateTime                           @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime                           @updatedAt @db.Timestamptz(3)
+  application                  Application                        @relation(fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  federationTrusts             FederationTrust[]
+
+  @@unique([applicationId, policyVersion])
+  @@unique([id, applicationId, audience])
+  @@index([applicationId, lifecycle, isCurrent])
+}
+
+model FederationTrust {
+  id                          String                        @id @default(uuid()) @db.Uuid
+  applicationIdentityPolicyId String                        @db.Uuid
+  applicationId               String                        @db.Uuid
+  identityRealmId             String                        @db.Uuid
+  providerRegistrationId      String?                       @db.Uuid
+  principalClass              PrincipalClass
+  audience                    String                        @db.VarChar(255)
+  mode                        FederationTrustMode
+  lifecycle                   ProviderTrustLifecycle        @default(PENDING_VERIFICATION)
+  revision                    BigInt                        @default(1)
+  createdAt                   DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt                   DateTime                      @updatedAt @db.Timestamptz(3)
+  applicationIdentityPolicy   ApplicationIdentityPolicy     @relation(fields: [applicationIdentityPolicyId, applicationId, audience], references: [id, applicationId, audience], onDelete: Restrict, onUpdate: Restrict)
+  identityRealm               IdentityRealm                 @relation(fields: [identityRealmId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  providerRegistration        IdentityProviderRegistration? @relation(fields: [providerRegistrationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([applicationId, lifecycle])
+  @@index([identityRealmId, lifecycle])
+  @@index([providerRegistrationId, lifecycle])
+  @@index([applicationIdentityPolicyId, lifecycle])
+}
+
+model ApplicationClientHandle {
+  id            String                       @id @default(uuid()) @db.Uuid
+  applicationId String                       @db.Uuid
+  handle        String                       @unique @db.VarChar(128)
+  kind          ApplicationClientHandleKind
+  state         ApplicationClientHandleState @default(ACTIVE)
+  activeFrom    DateTime                     @default(now()) @db.Timestamptz(3)
+  activeUntil   DateTime?                    @db.Timestamptz(3)
+  tombstonedAt  DateTime?                    @db.Timestamptz(3)
+  createdAt     DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                     @updatedAt @db.Timestamptz(3)
+  application   Application                  @relation(fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([applicationId, state])
+  @@index([state, activeUntil])
+}
+
+model WebOrigin {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  applicationId       String                    @db.Uuid
+  tenantId            String                    @db.Uuid
+  siteId              String                    @db.Uuid
+  scheme              WebOriginScheme
+  hostname            String                    @db.VarChar(253)
+  port                Int
+  canonicalOrigin     String                    @db.VarChar(320)
+  verificationState   IdentityVerificationState @default(PENDING)
+  evidenceType        VerificationEvidenceType?
+  evidenceReference   String?                   @db.VarChar(512)
+  evidenceDigest      String?                   @db.VarChar(128)
+  isNonProductionSeed Boolean                   @default(false)
+  verifiedAt          DateTime?                 @db.Timestamptz(3)
+  revokedAt           DateTime?                 @db.Timestamptz(3)
+  createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz(3)
+  application         Application               @relation(fields: [applicationId, tenantId, siteId], references: [id, tenantId, siteId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([applicationId, verificationState])
+  @@index([tenantId, siteId, verificationState])
+  @@index([canonicalOrigin])
+}
+
+model AndroidIdentity {
+  id                       String                    @id @default(uuid()) @db.Uuid
+  applicationId            String                    @db.Uuid
+  tenantId                 String                    @db.Uuid
+  siteId                   String                    @db.Uuid
+  packageId                String                    @db.VarChar(255)
+  signingCertificateSha256 String                    @db.Char(64)
+  verificationState        IdentityVerificationState @default(PENDING)
+  evidenceType             VerificationEvidenceType?
+  evidenceReference        String?                   @db.VarChar(512)
+  evidenceDigest           String?                   @db.VarChar(128)
+  isNonProductionSeed      Boolean                   @default(false)
+  verifiedAt               DateTime?                 @db.Timestamptz(3)
+  revokedAt                DateTime?                 @db.Timestamptz(3)
+  createdAt                DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                  @updatedAt @db.Timestamptz(3)
+  application              Application               @relation(fields: [applicationId, tenantId, siteId], references: [id, tenantId, siteId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([applicationId, verificationState])
+  @@index([tenantId, siteId, verificationState])
+  @@index([packageId])
+}
+
+model IosIdentity {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  applicationId       String                    @db.Uuid
+  tenantId            String                    @db.Uuid
+  siteId              String                    @db.Uuid
+  teamId              String                    @db.VarChar(32)
+  bundleId            String                    @db.VarChar(255)
+  appStoreId          String?                   @db.VarChar(32)
+  verificationState   IdentityVerificationState @default(PENDING)
+  evidenceType        VerificationEvidenceType?
+  evidenceReference   String?                   @db.VarChar(512)
+  evidenceDigest      String?                   @db.VarChar(128)
+  isNonProductionSeed Boolean                   @default(false)
+  verifiedAt          DateTime?                 @db.Timestamptz(3)
+  revokedAt           DateTime?                 @db.Timestamptz(3)
+  createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz(3)
+  application         Application               @relation(fields: [applicationId, tenantId, siteId], references: [id, tenantId, siteId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([applicationId, verificationState])
+  @@index([tenantId, siteId, verificationState])
+  @@index([teamId, bundleId])
+}
+
+model ParentRelationship {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  parentTenantId      String                  @db.Uuid
+  subordinateTenantId String                  @db.Uuid
+  state               ParentRelationshipState @default(PENDING)
+  revision            BigInt                  @default(1)
+  createdAt           DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                @updatedAt @db.Timestamptz(3)
+  parentTenant        Tenant                  @relation("ParentTenantRelationships", fields: [parentTenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subordinateTenant   Tenant                  @relation("SubordinateTenantRelationships", fields: [subordinateTenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([parentTenantId, state])
+  @@index([subordinateTenantId, state])
+}
+
+model EntitlementScopeRef {
+  id        String               @id @default(uuid()) @db.Uuid
+  scopeKind EntitlementScopeKind
+  tenantId  String               @db.Uuid
+  siteId    String?              @db.Uuid
+  revision  BigInt               @default(1)
+  createdAt DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime             @updatedAt @db.Timestamptz(3)
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  site      Site?                @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([tenantId, scopeKind])
+  @@index([tenantId, siteId])
+}
+
+model AuthorityInvalidationOutbox {
+  id              String                     @id @default(uuid()) @db.Uuid
+  aggregateKind   String                     @db.VarChar(64)
+  aggregateId     String                     @db.Uuid
+  tenantId        String?                    @db.Uuid
+  siteId          String?                    @db.Uuid
+  referenceId     String?                    @db.Uuid
+  identityRealmId String?                    @db.Uuid
+  subjectId       String?                    @db.Uuid
+  revision        BigInt
+  payloadVersion  Int                        @default(1)
+  payload         Json
+  state           AuthorityInvalidationState @default(PENDING)
+  attempts        Int                        @default(0)
+  nextAttemptAt   DateTime                   @default(now()) @db.Timestamptz(3)
+  createdAt       DateTime                   @default(now()) @db.Timestamptz(3)
+  dispatchedAt    DateTime?                  @db.Timestamptz(3)
+  identityRealm   IdentityRealm?             @relation("AuthorityInvalidationIdentityRealm", fields: [identityRealmId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([aggregateKind, aggregateId, revision])
+  @@index([state, nextAttemptAt, createdAt])
+  @@index([aggregateKind, aggregateId, revision])
+  @@index([identityRealmId, subjectId, state])
+}
+
+model AuthorityAuditEvent {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  partitionKey         String                     @db.Char(7)
+  partitionSequence    BigInt
+  occurredAt           DateTime                   @db.Timestamptz(3)
+  eventVersion         Int                        @default(1)
+  schemaVersion        Int                        @default(1)
+  actorUserId          String?                    @db.VarChar(128)
+  actorAuthorityRef    String?                    @db.VarChar(128)
+  actorIdentityRealmId String?                    @db.Uuid
+  actorSubjectId       String?                    @db.Uuid
+  authorizationPath    AuthorityAuthorizationPath
+  operation            String                     @db.VarChar(128)
+  applicationId        String?                    @db.Uuid
+  channelId            String?                    @db.Uuid
+  callerService        String                     @db.VarChar(128)
+  targetService        String                     @db.VarChar(128)
+  targetTenantId       String?                    @db.Uuid
+  targetSiteId         String?                    @db.Uuid
+  targetResourceType   String                     @db.VarChar(64)
+  targetResourceId     String                     @db.VarChar(128)
+  requestId            String                     @db.VarChar(128)
+  result               AuthorityAuditResult
+  reasonCode           String                     @db.VarChar(128)
+  authorityRevision    String                     @db.VarChar(128)
+  change               Json
+  previousEventHash    String?                    @db.Char(64)
+  eventHash            String                     @db.Char(64)
+  integrityKeyId       String                     @db.VarChar(128)
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(3)
+  actorIdentityRealm   IdentityRealm?             @relation("AuthorityAuditIdentityRealm", fields: [actorIdentityRealmId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([partitionKey, partitionSequence])
+  @@index([requestId])
+  @@index([actorUserId, occurredAt])
+  @@index([actorIdentityRealmId, actorSubjectId, occurredAt])
+  @@index([targetTenantId, targetSiteId, occurredAt])
+  @@index([operation, result, occurredAt])
+}
+
+model Membership {
+  id              String              @id @default(uuid()) @db.Uuid
+  tenantId        String              @db.Uuid
+  userId          String              @db.Uuid
+  identityRealmId String?             @db.Uuid
+  subjectId       String?             @db.Uuid
+  state           MembershipLifecycle @default(PENDING)
+  currentEpochId  String?             @unique @db.Uuid
+  revision        BigInt              @default(1)
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  identityRealm   IdentityRealm?      @relation("MembershipIdentityRealm", fields: [identityRealmId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  epochs          MembershipEpoch[]   @relation("MembershipEpochHistory")
+  currentEpoch    MembershipEpoch?    @relation("CurrentMembershipEpoch", fields: [currentEpochId, id], references: [id, membershipId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([tenantId, userId])
+  @@unique([id, tenantId])
+  @@unique([currentEpochId, id])
+  @@index([userId, state])
+  @@index([tenantId, identityRealmId, subjectId, state])
+  @@index([tenantId, state])
+}
+
+model MembershipEpoch {
+  id                 String            @id @default(uuid()) @db.Uuid
+  membershipId       String            @db.Uuid
+  generation         Int
+  membershipEpochRef String            @unique @db.VarChar(48)
+  integrityKeyId     String            @db.VarChar(128)
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  closedAt           DateTime?         @db.Timestamptz(3)
+  membership         Membership        @relation("MembershipEpochHistory", fields: [membershipId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentFor         Membership?       @relation("CurrentMembershipEpoch")
+  tenantRoleGrants   TenantRoleGrant[]
+  siteRoleGrants     SiteRoleGrant[]
+
+  @@unique([id, membershipId])
+  @@unique([membershipId, generation])
+  @@index([membershipId, closedAt])
+}
+
+model TenantRoleGrant {
+  id                String             @id @default(uuid()) @db.Uuid
+  membershipEpochId String             @db.Uuid
+  role              TenantRole
+  state             RoleGrantLifecycle @default(ACTIVE)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+  revokedAt         DateTime?          @db.Timestamptz(3)
+  membershipEpoch   MembershipEpoch    @relation(fields: [membershipEpochId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([role, state])
+  @@index([membershipEpochId, state])
+}
+
+model SiteRoleGrant {
+  id                String             @id @default(uuid()) @db.Uuid
+  membershipEpochId String             @db.Uuid
+  tenantId          String             @db.Uuid
+  siteId            String             @db.Uuid
+  role              SiteRole
+  state             RoleGrantLifecycle @default(ACTIVE)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+  revokedAt         DateTime?          @db.Timestamptz(3)
+  membershipEpoch   MembershipEpoch    @relation(fields: [membershipEpochId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  site              Site               @relation(fields: [siteId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([siteId, role, state])
+  @@index([membershipEpochId, state])
+  @@index([tenantId, siteId, state])
+}
+
+model PlatformGrant {
+  id              String             @id @default(uuid()) @db.Uuid
+  userId          String             @db.Uuid
+  identityRealmId String?            @db.Uuid
+  subjectId       String?            @db.Uuid
+  role            PlatformRole
+  state           RoleGrantLifecycle @default(ACTIVE)
+  revision        BigInt             @default(1)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+  revokedAt       DateTime?          @db.Timestamptz(3)
+  identityRealm   IdentityRealm?     @relation("PlatformGrantIdentityRealm", fields: [identityRealmId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, state])
+  @@index([identityRealmId, subjectId, state])
+  @@index([role, state])
+}

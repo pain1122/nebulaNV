@@ -1,16 +1,46 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-08-11
+Last updated: 2026-09-08
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
 ## 1. Collaboration Contract
 
 - Salar is actively learning the project and wants explanations of syntax, type choices, and service boundaries.
 - The assistant may inspect files freely and should explain findings in plain language.
+- Since 2026-09-08, send shell and verification command sequences to Salar to
+  run. Request brief results instead of full logs to reduce token use. Continue
+  authorized focused file edits and keep explanations concise.
 - The assistant must not edit files unless Salar explicitly says `change it` or directly says to `change` a named file/task in an edit context.
 - If Salar uses wording that sounds equivalent but does not include `change`, such as `do it`, `fix it`, `apply it`, `go ahead`, or `make it happen`, the assistant must ask: `Should I change it?`
 - When not allowed to edit, give exact edit instructions, file paths, and reasoning.
 - Before suggesting code changes, explain what problem the change solves and what contract it affects.
+
+### Per-Batch Evidence Gate
+
+Apply this gate at the start of every roadmap batch and to every checklist item
+within that batch:
+
+1. Start every item with an evidence ledger containing the exact checklist
+   wording, directly applicable ADR clauses, current mechanisms, and required
+   proof.
+2. Every `missing` or `unresolved` claim must list the files and searches used
+   to establish absence. Do not make a negative claim from memory.
+3. Map every completion statement to implementation, test, database, or runtime
+   evidence. Unsupported statements cannot appear in checked-item text.
+4. Migration and seed items require a clean disposable-database execution using
+   current source, not historical local state.
+5. After completing a later stateful item, rerun earlier migration and seed
+   verifiers. This checks whether the later item invalidated earlier evidence.
+6. Use two completion passes:
+   - implementation appears complete;
+   - adversarial evaluation tries clean order, reruns, contradictions, partial
+     state, rollback, and failure behavior.
+
+   Only the second pass permits checking the item.
+
+7. Send command sequences to Salar for execution, including source, database,
+   formatting, and focused verification gates. Request brief results and keep
+   full builds outside the active task unless explicitly authorized.
 
 ## 2. Safety Rules
 
@@ -63,10 +93,11 @@ operation, remains disabled until its isolation work is complete.
 
 - Stack: NestJS microservices plus Next.js web app in a pnpm monorepo.
 - Backend apps: HTTP-only `gateway` plus the hybrid `auth-service`,
+  `tenant-authority-service`,
   `user-service`, `product-service`, `settings-service`, `taxonomy-service`,
   `order-service`, `blog-service`, and `media-service`.
 - Frontend app: `web`.
-- Shared packages: `grpc-auth`, `clients`, `config`, `protos`.
+- Shared packages: `grpc-auth`, `clients`, `config`, `protos`, `api-client`.
 - Runtime target: Node `>=22`, pnpm `10.17.1`.
 - Default branch: `main`.
 - GitHub remote: `origin` -> `https://github.com/pain1122/nebulaNV`.
@@ -75,28 +106,133 @@ operation, remains disabled until its isolation work is complete.
 
 - Product vision and long roadmap: `README.md`.
 - Launch/business scope: `site essentials.md`.
-- Execution board: `TODO.md`.
+- Adopted execution roadmap: `TODO-ALTERNATIVE.md`.
+- Original roadmap and safe comparison: `TODO.md`. Do not rewrite its order to
+  match the alternative roadmap.
 - Developer docs index: `docs/README.md`.
 - Contract/boundary rules: `docs/architecture/contracts-and-boundaries.md`.
 - Boot/runbook: `docs/architecture/local-dev-and-docker-boot.md`.
 - Docker/Compose/release image map: `docs/docker-configs.md`.
 - Shared package notes: `docs/packages/*.md`.
 - Current focus file: `docs/current-focus.md`.
-- Active report file: planned as `docs/reports/active-report.md`; until it exists, use latest files in `docs/reports/`.
+- Current F4 audit: `docs/reports/2026-08-24-f4-authority-audit.md`.
+- Completed F4 Batch 2 evidence:
+  `docs/reports/2026-08-26-f4-batch2-exit-proof.md`.
+- Historical/default-realm F4 Batch 3 item log:
+  `docs/reports/2026-08-26-f4-batch3-execution-checklist.md`.
+- Superseding F4 identity-realm decision:
+  `docs/architecture/decisions/0014-f4-customer-identity-realms-and-federation.md`.
+- Completed F4 Batch 1R record/migration freeze and adversarial reconciliation:
+  `docs/architecture/decisions/0015-f4-identity-realm-record-and-migration-freeze.md`
+  and `docs/reports/2026-08-31-f4-identity-realm-rebaseline.md`.
+- Completed F3 evidence: `docs/reports/2026-08-22-f3-exit-proof.md` and
+  `docs/reports/2026-08-24-f3-execution-checklist.md`.
+
+### Active Milestone
+
+- F3 External API Gateway is complete as of 2026-08-24.
+- F4 Tenant, Site, Channel, Application, And Identity-Realm Authority is active.
+- F4 Batch 1's tenant/site/application/membership architecture and Batch 2
+  implementation evidence remain preserved, but its platform-global
+  identity/session clauses were superseded on 2026-08-31 by ADR-0014 after the
+  product requirement was clarified as upper-enterprise customer-root identity
+  isolation. Batch 1R closed on 2026-08-31 through ADR-0015 and the adversarial
+  rebaseline report. Batch 3R R0 completed on 2026-09-01 with current-source
+  documentation checks and both clean disposable Tenant Authority/role-seed
+  verifiers; it changed no schema, runtime, data, deployment, or traffic. R1
+  completed on 2026-09-05: Tenant Authority now persists the frozen inactive
+  default/operator realms and local providers, four draft application
+  policies, and five pending trusts from one reviewed manifest. Its schema,
+  create-only development seed, audit/outbox evidence, clean migration/rerun,
+  preserved role-seed regression, and no-runtime-consumer boundary passed both
+  completion passes. R1 changes no traffic and adds no Auth/session/provider-
+  secret runtime. R2 completed on 2026-09-08: nullable default-realm actor pairs
+  and v2 evidence preserve legacy readers, IDs, epochs, `meg1_`, grants, and v1
+  history. Four populated upgrades, two atomic rollback cases, earlier seed
+  regressions, all eight service migration checks, 17 Authority suites
+  (79 tests), 50 tooling tests, lint/types, and affected Prisma checks passed.
+  Salar confirmed zero remaining verification databases. Both completion passes
+  and the corrected pair-check/v1-return defects are in the R2 section of the
+  Batch 3R execution report. `R3_REALM_AUTH_SHADOW` is next; its evidence ledger
+  precedes implementation and current User/Auth stays authoritative in shadow.
+  ADR-0015 R0-R11 must execute in order. Do not resume former Batch 3 item 5 or skip
+  to a context writer. The selected target is one or more
+  isolated identity realms per licensed root, a separate NebulaNV platform-
+  operator realm, explicit default-deny subordinate application trust, prompt-
+  free but audience-bound root SSO, optional subordinate/BYO realms, realm-
+  qualified subjects, and no cross-license trust in F4. The legacy customer
+  root UUID remains `TENANT_ADMIN` plus explicit `PARENT_MANAGER`; a distinct
+  operator-realm subject receives `PLATFORM_ADMIN`. Legacy sessions get only a
+  one-use upgrade into the verified presenting compatible default application.
+  R1 seeds all default/operator realm, local-provider, policy, and trust records
+  as non-admitting. Its production-refusing bootstrap seed must conflict rather
+  than reset an evolved lifecycle/outbox state; R6 and later clean verifiers
+  must version their expected post-activation state. R6 activates only the four
+  default-application local-trust cohort; R4 stages no operator session, and R8
+  alone activates the exact admin-web operator trust/session before the
+  transactional grant swap.
+- Batch 3 items 1 through 4 remain valid default-realm compatibility evidence.
+  The general User seed creates only the bounded legacy root-admin/admin/user
+  fixtures; a dedicated item-3 User seed creates
+  the default-realm-migration-source editor identity after the original legacy
+  snapshot is backfilled. The guarded `db:verify:f4-batch3-role-seeds` command proves the
+  complete current-source order and adversarial reruns from clean disposable
+  User and Authority databases, while `db:verify:tenant-authority` rechecks the
+  earlier migration/seed evidence. Item 4 adds the internal typed actor/
+  target/path resolver and the minimum strict context-v2
+  `RESOLUTION/AUTHORITY` receiver prerequisite: live Auth user/session must
+  match, undeclared routes reject v2, and resolution context cannot propagate.
+  It adds no v2 writer, `AUTHORIZED` context, domain consumer, cache, or traffic
+  cutover. Clean disposable evidence resolves every seeded exact role and
+  denies a missing membership. Batch 3 item 5 authority invalidation/refresh is
+  documented but paused; its evidence ledger confirms the scoped revision/
+  outbox mechanism is selected instead of globally bumping Auth sessions.
+  Implementation remains
+  paused until ADR-0015 R11; its earlier Redis Pub/Sub versus Streams choice is
+  not the next decision because the preceding realm/Auth/context gates now own
+  the dependency. ADR-0015 assigns separate durable credential/session
+  generations, a terminal legacy-session bridge, receiver-before-`sr2_`
+  ordering, and drain/revoke-only rollback. It also replaces the split gateway
+  login with one Realm Auth-owned atomic `Login`; one-use grants are only for
+  root-application SSO through the digest-only, PKCE-bound `rsg1_`, and legacy
+  upgrade uses only its durable bridge. The current implementation has
+  hashed refresh tokens, atomic refresh rotation/replay containment,
+  current/all-session logout, and live token-version/session checks. It lacks
+  realm/issuer/audience/application binding, a durable active-session ledger,
+  selected-other-session revocation, and password-change session invalidation.
+  Password change currently updates only User's hash and is a confirmed defect
+  under the new contract. Item 6 freshness/cache/outage semantics must remain
+  separately testable after the realm mechanism is frozen. The dedicated
+  tenant-authority runtime,
+  persistence/read/mutation foundations, deterministic non-production seed,
+  recovery proof, and healthy rebuilt container are verified. The static F3
+  gateway registry remains traffic authority until the ordered Batch 4 adapter
+  cutover.
+- F3's gateway registry and signed tenant/site/application context are a
+  validated single-site bridge, not persistent multi-tenant authority.
+- Do not edit F6-F9, D4-D5/P1, M6-M7, or deferred SaaS roadmap scope for the
+  realm design without Salar's consultation. The known required proposals are
+  F6 premium/target intersection, F7/F8 SSO clients, F9 physical realm HA and
+  capacity/failover proof, D4/D5/P1 cross-subordinate product proof, and realm-
+  qualified future event/analytics actors. F3 remains frozen; its gateway,
+  registry seam, S2S, typed clients, and independent domain checks are
+  preserved.
 
 ## 5. How To Load Context For A Task
 
 For any task, load context in this order:
 
 1. `AI_CONTEXT.md`
-2. `TODO.md` or `docs/current-focus.md` when it exists
-3. `docs/README.md`
-4. `docs/architecture/system-relationships.md` when it exists
-5. `docs/architecture/contracts-and-boundaries.md` when changing DTO/proto/service/Prisma/mapper behavior
-6. Relevant `docs/services/<service>.md`
-7. Relevant `docs/packages/<package>.md` when package docs exist
-8. `docs/docker-configs.md` when changing Compose, Dockerfiles, image release flow, env boundaries, or runtime URLs
-9. Only then inspect source files
+2. `TODO-ALTERNATIVE.md` and `docs/current-focus.md`
+3. `TODO.md` only when comparing the original roadmap or checking historical
+   completion
+4. `docs/README.md`
+5. `docs/architecture/system-relationships.md` when it exists
+6. `docs/architecture/contracts-and-boundaries.md` when changing DTO/proto/service/Prisma/mapper behavior
+7. Relevant `docs/services/<service>.md`
+8. Relevant `docs/packages/<package>.md` when package docs exist
+9. `docs/docker-configs.md` when changing Compose, Dockerfiles, image release flow, env boundaries, or runtime URLs
+10. Only then inspect source files
 
 Use source files as final truth when docs and code disagree.
 
@@ -190,8 +326,38 @@ console.log("safe multiline script")
 
 ## 8. Critical Architecture Rules
 
-- Auth-service owns token issuance, refresh, validation, logout/revocation behavior, and auth-facing gRPC methods.
-- User-service owns users, profiles, roles, and user persistence.
+- Auth-service currently owns token issuance, refresh, validation,
+  logout/revocation behavior, and auth-facing gRPC methods. The F4 target keeps
+  that ownership per identity realm and adds realm issuer/audience,
+  separate credential/session generations, durable active-session and legacy-
+  bridge behavior, and federation. `meg1_` remains a separate Tenant Authority
+  HMAC and is never an Auth generation fence. Gateway and Tenant Authority do
+  not become identity issuers.
+- User-service currently owns global users, profiles, free-string roles,
+  password hashes, and user persistence. ADR-0014 treats that as the default-
+  realm migration source: target profile ownership is realm-scoped, while the
+  local password hash and both Auth generation fences move into the realm Auth
+  consistency aggregate only after an additive verified migration.
+- Tenant-authority-service owns tenant/site/application/membership plus public
+  identity-realm/provider/trust/application-policy metadata. It never owns
+  customer password hashes, raw sessions, provider secrets, or private realm
+  signing keys.
+- Human identity is authoritative only as `(identityRealmId, subjectId)`.
+  Email, phone, name, public client ID, external claims, or a bare legacy UUID
+  cannot link realms or grant a membership/role.
+- F4 domain actor/owner migrations use explicit `identityRealmId` plus
+  `subjectId` columns. The old UUID is default-realm backfill input only; do not
+  substitute a per-service opaque-wrapper design.
+- Realm credential/session migration preserves service database ownership:
+  User and current Auth create bounded encrypted, HMAC-manifested artifacts for
+  the exact Realm Auth importer under a fail-closed mutation barrier. No runner
+  reads both owner stores directly, and no asynchronous copy becomes a second
+  security authority.
+- A direct parent relationship grants no SSO. An exact application identity
+  policy and active federation trust may admit a licensed-root consumer only
+  to that target application's `USER` baseline; personnel and higher roles
+  remain explicit target grants. Premium is an F6 entitlement, not an admin
+  role.
 - Settings-service may influence runtime app/business configuration, frontend/admin-managed defaults, SEO/site settings, and safe database-backed defaults.
 - Settings-service must not define secrets, authentication policy, internal trust boundaries, role hierarchy, storage credentials, database URLs, or whether auth is required.
 - Taxonomy-service owns taxonomy/category/tag/grouping records and taxonomy-specific CRUD.

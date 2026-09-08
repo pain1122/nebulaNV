@@ -46,7 +46,7 @@ describe('AccessTokenValidationService', () => {
     expect(result).toEqual({
       valid: true,
       payload,
-      sessionRef: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
+      sessionRef: expect.stringMatching(/^sr1_[A-Za-z0-9_-]{32}$/),
     });
     if (result.valid) {
       expect(result.sessionRef).not.toContain(payload.sid);

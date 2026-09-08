@@ -7,12 +7,17 @@ function source(path: string): string {
   return readFileSync(resolve(repositoryRoot, path), "utf8");
 }
 
-type BackendInventoryEntry = { name: string };
+type BackendInventoryEntry = {
+  name: string;
+  transport: "http" | "http-grpc";
+};
 
 const manifest = JSON.parse(source("package.json")) as {
   nebula: { backendServices: BackendInventoryEntry[] };
 };
-const services = manifest.nebula.backendServices;
+const services = manifest.nebula.backendServices.filter(
+  (service) => service.transport === "http-grpc",
+);
 
 describe("service HTTP policy wiring", () => {
   it.each(services)(

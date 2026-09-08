@@ -1,8 +1,25 @@
 # User Service
 
-User-service owns persisted user account rows and profile operations.
+Last reviewed: 2026-08-31
+
+Current implementation: User-service owns one platform-global persisted user
+account table, password hashes, compatibility roles, and profile operations.
 
 Auth-service owns token lifecycle and uses user-service as the user data authority.
+
+This section describes current source. Under
+[ADR-0014](../architecture/decisions/0014-f4-customer-identity-realms-and-federation.md),
+the current User UUID becomes the default realm's stable `subjectId`. Target
+profile/contact ownership is realm-scoped, and local password hash plus
+separate `credentialGeneration`/`sessionGeneration` fences move into the realm
+Auth consistency aggregate only after an additive, count/checksum/rollback-
+proven migration. User-service does not become a platform-wide customer
+directory or search other realms by email.
+
+That migration is source-owned: a migration-only User command produces the
+bounded encrypted, HMAC-manifested credential artifact consumed by the exact
+Realm Auth importer. Neither Realm Auth nor a generic runner reads the User
+database directly, and the artifact is not a runtime API or second authority.
 
 ## Owns
 
@@ -112,10 +129,12 @@ Security behavior:
 Database model: `User`
 
 The root Prisma commands include this service first. Its current base seed
-upserts the configurable development admin and normal-user accounts; it does
-not store refresh tokens and refuses to run when `NODE_ENV=production`. The
-ordinary seeded admin is used by the separate API demo seed; no default
-`root-admin` is created. See
+upserts the configurable development `root-admin`, `admin`, and normal-user
+accounts; it does not store refresh tokens and refuses to run when
+`NODE_ENV=production`. The ordinary seeded admin is used by the separate API
+demo seed. The repaired F4 Batch 3 order captures that bounded three-identity
+legacy snapshot before a separate non-production editor seed adds a second
+compatibility `user`. See
 [Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
 for the shared commands and complete database order.
 
@@ -225,6 +244,16 @@ HTTP bind resolution is `USER_HTTP_PORT`, then generic `PORT`, then `3100`. The 
 
 ## Known Gaps
 
+- Current email/phone uniqueness is platform-global and `password` is mandatory;
+  the schema cannot represent two licensed-root realms containing the same
+  email or an external-provider-only subject.
+- Password change writes only the hash. It does not atomically advance a
+  credential generation, invalidate sessions, or prevent concurrent
+  old-password login/session creation.
+- Concurrent password changes can both verify the same old hash and the last
+  write wins; no credential version/conditional update exists.
+- Password update hardcodes bcrypt cost 10 instead of the configured realm Auth
+  hashing policy.
 - `role` is a free string in DB.
 - No soft delete or account status in user DB.
 - Disabled-user state currently belongs to auth Redis behavior, not user DB.

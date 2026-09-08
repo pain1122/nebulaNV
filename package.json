@@ -5,6 +5,8 @@
     "backendServices": [
       {
         "name": "user-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/user-service",
         "directory": "apps/user-service",
         "database": "nebula_users",
@@ -16,6 +18,8 @@
       },
       {
         "name": "auth-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/auth-service",
         "directory": "apps/auth-service",
         "database": null,
@@ -26,7 +30,22 @@
         "moduleFile": "app.module.ts"
       },
       {
+        "name": "tenant-authority-service",
+        "transport": "http-grpc",
+        "compose": true,
+        "packageName": "@nebula/tenant-authority-service",
+        "directory": "apps/tenant-authority-service",
+        "database": "nebula_authority",
+        "dockerService": "tenant-authority-service",
+        "defaultImage": "nebulanv-main-tenant-authority-service:latest",
+        "httpPort": 3011,
+        "grpcPort": 50059,
+        "moduleFile": "app.module.ts"
+      },
+      {
         "name": "settings-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/settings-service",
         "directory": "apps/settings-service",
         "database": "nebula_settings",
@@ -38,6 +57,8 @@
       },
       {
         "name": "media-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/media-service",
         "directory": "apps/media-service",
         "database": "nebula_media",
@@ -49,6 +70,8 @@
       },
       {
         "name": "taxonomy-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/taxonomy-service",
         "directory": "apps/taxonomy-service",
         "database": "nebula_taxonomy",
@@ -60,6 +83,8 @@
       },
       {
         "name": "product-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/product-service",
         "directory": "apps/product-service",
         "database": "nebula_products",
@@ -71,6 +96,8 @@
       },
       {
         "name": "blog-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/blog-service",
         "directory": "apps/blog-service",
         "database": "nebula_blog",
@@ -82,6 +109,8 @@
       },
       {
         "name": "order-service",
+        "transport": "http-grpc",
+        "compose": true,
         "packageName": "@nebula/order-service",
         "directory": "apps/order-service",
         "database": "nebula_order",
@@ -89,6 +118,18 @@
         "defaultImage": "nebulanv-main-order-service:latest",
         "httpPort": 3005,
         "grpcPort": 50056,
+        "moduleFile": "app.module.ts"
+      },
+      {
+        "name": "gateway",
+        "transport": "http",
+        "compose": true,
+        "packageName": "@nebula/gateway",
+        "directory": "apps/gateway",
+        "database": null,
+        "dockerService": "gateway",
+        "defaultImage": "nebulanv-main-gateway:latest",
+        "httpPort": 3002,
         "moduleFile": "app.module.ts"
       }
     ]
@@ -102,6 +143,14 @@
     "check-types": "turbo run check-types",
     "check-types:backend": "node ./scripts/backend.mjs quality check-types",
     "test:security": "pnpm --filter @nebula/grpc-auth test:security && pnpm --filter @nebula/auth-service test:security && pnpm --filter @nebula/media-service test:unit && pnpm --filter @nebula/order-service test:unit",
+    "test:shared:backend": "pnpm --filter @packages/config test && pnpm --filter @nebula/grpc-auth test && pnpm --filter @nebula/clients test",
+    "test:gateway:backend": "pnpm --filter @nebula/gateway test && pnpm --filter @nebula/gateway openapi:check",
+    "test:tenant-authority:backend": "pnpm --filter @nebula/tenant-authority-service test",
+    "api:gen": "pnpm --filter @nebula/gateway openapi:generate && pnpm --filter @nebula/api-client generate",
+    "api:check": "pnpm --filter @nebula/gateway openapi:check && pnpm --filter @nebula/api-client generate:check",
+    "test:external-client": "pnpm --filter @nebula/gateway openapi:check && pnpm --filter @nebula/api-client generate:check && pnpm --filter @nebula/api-client lint && pnpm --filter @nebula/api-client check-types && pnpm --filter @nebula/api-client test",
+    "test:web:current": "pnpm --filter web test",
+    "test:f3:live": "pnpm --filter @nebula/api-client test:live",
     "scan:dependencies:backend": "node ./scripts/backend.mjs security dependencies",
     "scan:source:backend": "node ./scripts/backend.mjs security source",
     "scan:images:backend": "node ./scripts/backend.mjs security images",
@@ -126,11 +175,15 @@
     "backend:seed": "node ./scripts/backend.mjs seed",
     "db:push": "node ./scripts/backend.mjs prisma push",
     "db:verify:migrations": "node ./scripts/backend.mjs database verify-migrations",
+    "db:verify:tenant-authority": "node ./scripts/backend.mjs database verify-migrations tenant-authority",
+    "db:verify:f4-batch3-role-seeds": "node ./scripts/backend.mjs database verify-f4-batch3-role-seeds",
+    "db:verify:f4-r2-default-actors": "node ./scripts/backend.mjs database verify-f4-r2-default-actors",
     "db:backup": "node ./scripts/backend.mjs database backup",
     "db:restore": "node ./scripts/backend.mjs database restore",
     "test:database-recovery": "node ./scripts/backend.mjs database test-recovery",
     "test:backend-tooling": "node --test ./scripts/backend.test.mjs",
     "dev:auth": "pnpm --filter ./apps/auth-service start",
+    "dev:tenant-authority": "pnpm --filter @nebula/tenant-authority-service start",
     "dev:gateway": "pnpm --filter @nebula/gateway start",
     "dev:user": "wait-on tcp:127.0.0.1:50052 && pnpm --filter ./apps/user-service start",
     "dev:settings": "wait-on tcp:127.0.0.1:50052 && pnpm --filter ./apps/settings-service start",
@@ -196,6 +249,8 @@
     "overrides": {
       "@nestjs/testing": "11.1.28",
       "@aws-sdk/xml-builder>fast-xml-parser": "5.5.6",
+      "@nestjs/swagger>js-yaml": "5.2.3",
+      "@prisma/config>deepmerge-ts": "8.0.2",
       "@prisma/config>effect": "3.20.0",
       "defu": "6.1.7",
       "router>path-to-regexp": "8.4.2",

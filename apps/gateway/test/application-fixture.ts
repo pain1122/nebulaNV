@@ -63,6 +63,8 @@ export const TEST_GATEWAY_GRPC_TARGETS = Object.freeze({
   MEDIA_GRPC_URL: "127.0.0.1:50058",
 });
 
+export const TEST_MEDIA_RENDER_HTTP_URL = "http://127.0.0.1:3007";
+
 export const TEST_ADMIN_IDENTITY_HEADERS = {
   Origin: "http://localhost:3000",
   "X-Nebula-Client-ID": "admin-web-local",

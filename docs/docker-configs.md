@@ -9,7 +9,7 @@ Use this as a map. Do not duplicate full deployment instructions here; detailed 
 ## Main Files
 
 - `docker-compose.yml`: local/dev backend stack with build blocks.
-- `docker-bake.hcl`: official eight-image backend target set.
+- `docker-bake.hcl`: official ten-image backend target set.
 - `docker-compose.release.yml`: release stack with prebuilt/preloaded images only.
 - `docker/backend.Dockerfile`: shared multi-stage backend image builder.
 - `.dockerignore`: root Docker build context filter.
@@ -19,7 +19,13 @@ Use this as a map. Do not duplicate full deployment instructions here; detailed 
 - `scripts/docker/save-release-images.ps1`: saves release images into `deploy/nebula-images.tar`.
 - `scripts/docker/load-release-images.ps1`: loads `deploy/nebula-images.tar`.
 - `scripts/db/init-multiple-dbs.sh`: creates per-service Postgres databases on first volume init.
-- Root `package.json` field `nebula.backendServices`: tooling-owned backend package, database, image, and port inventory.
+- `scripts/db/ensure-tenant-authority-db.sh`: idempotently provisions the dedicated
+  authority database/runtime login for new or existing volumes.
+- Root `package.json` field `nebula.backendServices`: tooling-owned backend
+  runtime, transport, Compose admission, database, image, and port
+  inventory. It derives ten runtimes, nine HTTP/gRPC hybrids, and eight
+  Prisma services. Gateway alone is HTTP-only and has no database;
+  tenant-authority-service owns a signed internal read transport.
 - `scripts/backend.mjs`: inventory-backed provisioning, Prisma, development, database verification/recovery, release-image, and security-scan command source.
 
 ## Local Compose
@@ -55,9 +61,11 @@ blog-service:50055
 order-service:50056
 taxonomy-service:50057
 media-service:50058
+tenant-authority-service:50059
 ```
 
-Host ports expose the services for local tests and browser access.
+Host ports expose all nine hybrid HTTP/gRPC pairs, including authority ports
+3011/50059, and gateway port 3002 for local tests and diagnosis.
 
 ## Release Compose
 
@@ -73,6 +81,15 @@ Purpose:
 - Uses required env interpolation for production secrets.
 - Keeps runtime state in Docker volumes.
 - Uses the same Docker service DNS model for internal gRPC and database URLs.
+- Publishes gateway port 3002 and the selected MinIO data port 9000 only.
+- Keeps tenant-authority-service internal, gives it only its dedicated runtime
+  database credential, and supplies S2S/Redis receiver configuration without
+  publishing either authority port to the host.
+- Keeps backend application ports, PostgreSQL, Redis, and MinIO console 9001
+  private.
+- Keeps seven hybrid services in `GATEWAY_ONLY`; media alone uses `OPEN` on the
+  private network for its already-public render stream. Private media routes
+  remain authenticated.
 
 Start command:
 
@@ -100,7 +117,8 @@ Purpose:
 - Runs one shared backend build through Turbo.
 - Builds the four small shared runtime packages before the cached Turbo service build. This refreshes pnpm's injected workspace copies even when Turbo would otherwise restore a shared-package build and skip its post-build synchronization hook.
 - Uses a versioned Docker-only Turbo cache namespace so artifacts admitted by the runtime-import verifier are not mixed with older incompatible compiler output.
-- Creates one production workspace dependency graph instead of eight sequential `pnpm deploy` trees.
+- Creates one production workspace dependency graph instead of per-runtime
+  `pnpm deploy` trees.
 - Keeps the large external production dependency layer keyed only by lockfiles and package manifests.
 - Overlays compiled universal internal packages in separate small layers after dependency installation.
 - Creates one runtime target per backend service.
@@ -191,16 +209,18 @@ Current backend images:
 
 - `nebulanv-main-user-service:latest`
 - `nebulanv-main-auth-service:latest`
+- `nebulanv-main-tenant-authority-service:latest`
 - `nebulanv-main-settings-service:latest`
 - `nebulanv-main-media-service:latest`
 - `nebulanv-main-taxonomy-service:latest`
 - `nebulanv-main-product-service:latest`
 - `nebulanv-main-blog-service:latest`
 - `nebulanv-main-order-service:latest`
+- `nebulanv-main-gateway:latest`
 
 The CI live job scans these exact local tags with pinned Trivy after the live
 e2e suites and before Compose cleanup. `pnpm scan:images:backend` derives the
-tags from the root inventory, scans all eight even when an earlier image is
+tags from the root inventory, scans all ten even when an earlier image is
 affected, and retains every `HIGH` or `CRITICAL` finding in the sanitized
 evidence. During foundation development, application-package findings and
 Debian OS findings with an available fixed version block the gate. Debian OS
@@ -247,6 +267,7 @@ postgres:5432
 The init script creates:
 
 - `nebula_users`
+- `nebula_authority`
 - `nebula_products`
 - `nebula_settings`
 - `nebula_blog`
@@ -258,9 +279,15 @@ Important:
 
 - `scripts/db/init-multiple-dbs.sh` runs only on first Postgres volume initialization.
 - If the `pgdata` volume already exists, changing the script will not recreate databases.
+- The `tenant-authority-db-init` one-shot service closes that existing-volume gap only
+  for the additive authority database/login. It never drops or recreates
+  existing data and must complete before tenant-authority-service starts.
 - Migrations are still a deliberate deployment step, not automatically solved by Compose.
+- `nebula_authority_runtime` is a dedicated non-superuser login. It can connect
+  only to `nebula_authority`; the inventory migration connection remains the
+  schema owner. `AUTHORITY_DB_RUNTIME_PASSWORD` is required in release.
 - `pnpm db:verify:migrations` and `pnpm test:database-recovery` operate only on guarded disposable `_verify_` databases.
-- `pnpm db:backup` and `pnpm db:restore` cover the seven inventory-owned local databases and require all eight backend services to be stopped.
+- `pnpm db:backup` and `pnpm db:restore` cover the eight inventory-owned local databases and require all ten backend runtimes to be stopped.
 - Restore requires `--confirm=RESTORE_LOCAL_DATABASES`; it never removes Docker volumes.
 - The canonical maintenance procedure and backup contents are documented in `docs/architecture/local-dev-and-docker-boot.md`.
 
@@ -293,7 +320,7 @@ Local Compose:
 
 - Loads root `.env`, then the matching service-local `.env`; a service-local duplicate has higher `env_file` precedence.
 - Applies explicit `environment` values after both env files.
-- Keeps shared `HTTP_CORS_ORIGINS` in root `.env`; the shared Compose environment mapping injects that root value into all eight services.
+- Keeps shared `HTTP_CORS_ORIGINS` in root `.env`; the shared Compose environment mapping injects that root value into all nine hybrid services.
 - Overrides Docker-specific database URLs and internal service URLs in `environment`.
 
 Release Compose:
@@ -313,6 +340,9 @@ Important env groups:
 - Internal service registry: `*_GRPC_URL`
 - Per-service database URLs
 - Media S3-compatible storage settings
+- Gateway public boundary: `GATEWAY_APPLICATION_REGISTRY_JSON`,
+  `GATEWAY_OUTBOUND_KEYS`, `GATEWAY_REDIS_URL`, idempotency bounds,
+  `GATEWAY_HTTP_PORT`, and fixed `MEDIA_RENDER_HTTP_URL`
 
 ## Release Image Flow
 
@@ -337,10 +367,10 @@ same 1,029-package install and large runtime copies. The grouped run was stopped
 it is not the supported local build command. Final image export can still take
 time, but sequential output identifies the exact target responsible.
 
-The completed 2026-08-03 `pnpm backend:boot` user gate took roughly 30 minutes
-with warm dependency content: all eight sequential image targets completed,
-Compose reached healthy state for MinIO and every backend service, and the
-idempotent API demo seed completed.
+The current-source 2026-08-22 `pnpm backend:boot` user gate completed all nine
+sequential image targets, reached healthy/ready state for infrastructure and
+all nine backend runtimes, and reported both idempotent demo records as
+existing. Exact duration depends heavily on Docker layer and registry caches.
 
 Save images:
 
@@ -348,8 +378,10 @@ Save images:
 .\scripts\docker\save-release-images.ps1
 ```
 
-The save script derives the eight backend image names from the root inventory;
+The save script derives the ten backend image names from the root inventory;
 the Postgres, Redis, and MinIO images remain explicit infrastructure entries.
+Use `-WhatIf` to verify the resolved repository path and complete 14-image list
+without writing the archive.
 
 Load images on deployment machine:
 

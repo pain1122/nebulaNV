@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "lib": ["ES2021", "DOM"],
+    "rootDir": ".."
+  },
+  "include": ["browser-consumer.ts"],
+  "exclude": []
+}

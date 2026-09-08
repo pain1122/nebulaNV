@@ -5,6 +5,7 @@
             "@nebula/protos": ["packages/protos/dist/index"],
             "@nebula/grpc-auth": ["packages/grpc-auth/dist/index"],
             "@nebula/clients": ["packages/clients/dist/index"],
+            "@nebula/api-client": ["packages/api-client/dist/index"],
             "@apps/*": ["apps/*/src"],
             "@packages/*": ["packages/*/dist"]
         },

@@ -96,6 +96,15 @@ Money storage:
 - Display formatting, currency symbols, separators, locale, and rounding policy belong at the service/frontend presentation layer.
 - Target formatting policy should be settings-service driven.
 
+R2 adds nullable `identityRealmId` and `subjectId` beside `Order.userId` and
+`Cart.userId`. The migration and compatibility triggers use default realm
+`b1000000-0000-4000-8000-000000000001` plus the existing UUID. Partial,
+mismatched, wrong-realm, or actorless pairs reject. Legacy readers and local
+business rules stay primary; no cross-service foreign key or tenant/site scope
+is added. `pnpm db:verify:f4-r2-default-actors` passed populated upgrade,
+unchanged order/cart/item snapshots, zero-row reruns, and new legacy-write
+compatibility and denial checks.
+
 ## Cart Rules
 
 - One active cart per user.

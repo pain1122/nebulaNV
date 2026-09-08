@@ -1,4 +1,4 @@
-x-internal-grpc: &internal-grpc
+x-internal-targets: &internal-targets
   USER_GRPC_URL: user-service:50051
   AUTH_GRPC_URL: auth-service:50052
   PRODUCT_GRPC_URL: product-service:50053
@@ -7,6 +7,10 @@ x-internal-grpc: &internal-grpc
   ORDER_GRPC_URL: order-service:50056
   TAXONOMY_GRPC_URL: taxonomy-service:50057
   MEDIA_GRPC_URL: media-service:50058
+  TENANT_AUTHORITY_GRPC_URL: tenant-authority-service:50059
+
+x-internal-grpc: &internal-grpc
+  <<: *internal-targets
   S2S_REPLAY_STORE: redis
   REDIS_HOST: redis
   REDIS_PORT: 6379
@@ -32,6 +36,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  tenant-authority-db-init:
+    image: postgres:17
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      POSTGRES_USER: postgres
+      PGPASSWORD: postgres
+      AUTHORITY_DB_RUNTIME_PASSWORD: ${AUTHORITY_DB_RUNTIME_PASSWORD:-dev-only-authority-runtime-password}
+    volumes:
+      - ./scripts/db/ensure-tenant-authority-db.sh:/scripts/ensure-tenant-authority-db.sh:ro
+    entrypoint: ["bash", "/scripts/ensure-tenant-authority-db.sh"]
 
   redis:
     image: redis:7-alpine
@@ -133,6 +151,43 @@ services:
     ports:
       - "3001:3001"
       - "50052:50052"
+
+  # Authority persistence foundation. Batch 2 item 1 exposes health only;
+  # gateway traffic remains on StaticApplicationRegistry at G0_F3_BASELINE.
+  tenant-authority-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-tenant-authority-service:${NEBULA_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      target: tenant-authority-runtime
+    container_name: tenant-authority-service
+    depends_on:
+      tenant-authority-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SVC_NAME: tenant-authority-service
+      PUBLIC_MODE: GATEWAY_ONLY
+      PORT: 3011
+      GRPC_PORT: 50059
+      AUTH_GRPC_URL: auth-service:50052
+      S2S_REPLAY_STORE: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      S2S_OUTBOUND_KEYS: "{}"
+      S2S_INBOUND_KEYS: "{}"
+      GATEWAY_INBOUND_KEYS: '{"gateway":{"current":{"id":"gateway-tenant-authority-v1","secret":"dev-only-gateway-to-tenant-authority-key-0001"}}}'
+      AUTHORITY_AUDIT_HMAC_KEY_ID: authority-audit-dev-v1
+      AUTHORITY_AUDIT_HMAC_KEY: dev-only-authority-audit-hmac-key-00000001
+      AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID: authority-membership-epoch-dev-v1
+      AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY: dev-only-membership-epoch-hmac-key-000001
+      DATABASE_URL: "postgresql://nebula_authority_runtime:${AUTHORITY_DB_RUNTIME_PASSWORD:-dev-only-authority-runtime-password}@postgres:5432/nebula_authority?schema=public"
+    ports:
+      - "3011:3011"
+      - "50059:50059"
 
   # 🛒 Product Service
   product-service:
@@ -329,6 +384,39 @@ services:
     ports:
       - "3007:3007"
       - "50058:50058"
+
+  gateway:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-gateway:${NEBULA_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      target: gateway-runtime
+    container_name: gateway
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - apps/gateway/.env
+    ports:
+      - "3002:3002"
+    environment:
+      <<: *internal-targets
+      GATEWAY_HTTP_PORT: 3002
+      GATEWAY_REDIS_URL: redis://redis:6379/0
+      MEDIA_RENDER_HTTP_URL: ${MEDIA_RENDER_HTTP_URL:-http://media-service:3007}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 5
 
 volumes:
   pgdata:

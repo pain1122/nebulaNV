@@ -3,6 +3,7 @@
 `@nebula/clients` provides thin typed wrappers for the manifest-selected Auth,
 User, Settings, Product, product-taxonomy, Blog, blog-taxonomy, generic
 Taxonomy, Order, and Media gRPC calls.
+It also provides the read-only tenant-authority v1 wrapper staged for F4.
 
 ## Exports
 
@@ -16,6 +17,7 @@ Taxonomy, Order, and Media gRPC calls.
 - `getBlogTaxonomy(client, signingPolicy?)`
 - `getOrder(client, signingPolicy?)`
 - `getMedia(client, signingPolicy?)`
+- `getTenantAuthority(client, signingPolicy?)`
 - `GrpcClientSigningPolicy`
 - `buildClientGrpcS2SMetadata(options)`
 - `getSignedMetadata(options)`
@@ -46,7 +48,10 @@ pairwise target key.
 
 If a caller supplies bearer or other application metadata, the wrapper uses `mergeSignedMetadata`. Application fields are retained, reserved S2S envelope fields are discarded, and a fresh signature is always installed. Custom metadata therefore cannot suppress S2S authentication, change the target, replace context, or override the request ID.
 
-Each call and retry must create new metadata because timestamps and nonces are replay-protected.
+Each call and retry creates a fresh signature, timestamp, and nonce because
+replay state is per invocation. A new public gateway ingress creates the
+request ID; every nested causal service hop preserves that verified request ID
+while re-signing as its own service identity with its own pairwise target key.
 
 ## Settings Wrapper
 
@@ -87,6 +92,12 @@ It maps friendly create/update inputs to the protobuf request envelopes before s
 - Media includes the selected administrative lanes, owned protected list/read,
   and two-step public deletion. Compatibility Create/List/Delete, Ping, and
   direct public delete are absent from this gateway-facing proxy.
+- Tenant authority includes application registration, allowed web-origin,
+  target-scope, entitlement-reference, and explicit actor/target authority
+  reads only. The actor resolver still requires the caller to supply the exact
+  v2 resolution signing policy and bearer metadata; the wrapper cannot create
+  trusted actor facts. It has no generic CRUD or mutation method, and a
+  resolved fact does not authorize a domain action.
 
 Each method binds one generated unary definition and signs the actual
 protobuf-shaped request. `GrpcRequestInput<T>` removes generated `$type`
@@ -97,7 +108,9 @@ markers recursively while retaining the generated field types.
 This package does not register Nest clients, resolve service URLs, retry calls,
 or own domain policy. Each consuming runtime owns its `ClientsModule`
 configuration and pairwise outbound key. Gateway registration requires all
-eight deployment-owned `host:port` targets; clients cannot select or override
+eight currently active deployment-owned `host:port` targets; the staged
+tenant-authority target joins that exact gateway set only when its persistent
+adapter is wired. Clients cannot select or override
 those upstreams.
 
 ```powershell

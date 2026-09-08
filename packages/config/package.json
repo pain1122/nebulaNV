@@ -27,7 +27,7 @@
     "@nestjs/microservices": "11.1.28",
     "@nestjs/platform-express": "11.1.28",
     "helmet": "^8.1.0",
-    "joi": "^18.0.1"
+    "joi": "18.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

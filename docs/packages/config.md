@@ -16,6 +16,9 @@ every applicable service:
 - `runtimeEnvSchema` validates `NODE_ENV`;
 - `serviceBindEnvSchema()` validates generic and service-specific HTTP/gRPC
   listener host and port fields;
+- `httpOnlyBindEnvSchema()` and `resolveHttpOnlyBind()` provide the narrower
+  listener contract for gateway-style HTTP-only runtimes without inventing
+  gRPC bind fields;
 - `resolveServiceBind()` applies service-specific, then generic, then default
   listener precedence;
 - `grpcTargetEnvSchema()` validates optional downstream `host:port` client
@@ -152,7 +155,13 @@ pnpm --filter @packages/config check-types
 pnpm --filter @packages/config build
 ```
 
-The package test suite also contains health, HTTP-policy, and logging wiring
-checks for every backend service. Those checks read the canonical
-`nebula.backendServices` inventory from the root `package.json`; they do not
-maintain a second service list.
+The package test suite also contains health and logging checks for all backend
+runtimes plus direct-service HTTP-policy checks for the eight HTTP/gRPC hybrid
+services. Those checks derive their views from the canonical
+`nebula.backendServices` inventory in the root `package.json`; they do not
+maintain a second service list or require fake gateway gRPC fields.
+
+Every runtime health controller uses grpc-auth's `@OperationalHealth()` marker
+with this package's sanitized response shape. That narrow HTTP-only marker
+keeps container probes working under release `GATEWAY_ONLY`; it does not make a
+domain route public or bypass signed gRPC.

@@ -1,84 +1,100 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBearerFromReq } from "@/lib/auth/bearer";
-import { asRecord, errorMessage } from "@/lib/unknown";
+import type { GatewayAdminProductListQueryDto } from "@nebula/api-client";
+import {
+  GatewayBffRequestError,
+  bffExceptionResponse,
+  gatewayFailureResponse,
+  idempotencyKeyFromRequest,
+  relayGatewayHeaders,
+  requireAccessToken,
+  serverGatewayClient,
+} from "@/lib/gateway/server-client";
+import {
+  productCreateInput,
+  productForCurrentUi,
+} from "@/lib/gateway/product-adapter";
 
-function getProductServiceBaseUrl() {
-  const httpUrl = process.env.PRODUCT_HTTP_URL;
-  if (httpUrl) return httpUrl.replace(/\/+$/, "");
-  const port = process.env.PRODUCT_HTTP_PORT ?? "3003";
-  return `http://127.0.0.1:${port}`;
+function positiveInteger(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-const ALLOWED = new Set([
-  "includeDeleted",
-  "page",
-  "limit",
-  "q",
-  "categoryId",
-  "status",
-]);
+function listQuery(request: NextRequest): GatewayAdminProductListQueryDto {
+  const input = new URL(request.url).searchParams;
+  const status = input.get("status");
+  return {
+    ...(input.get("q") ? { q: input.get("q") ?? undefined } : {}),
+    ...(input.get("categoryId")
+      ? { categoryId: input.get("categoryId") ?? undefined }
+      : {}),
+    ...(positiveInteger(input.get("page"))
+      ? { page: positiveInteger(input.get("page")) }
+      : {}),
+    ...(positiveInteger(input.get("limit"))
+      ? { limit: positiveInteger(input.get("limit")) }
+      : {}),
+    ...(status === "DRAFT" || status === "ACTIVE" || status === "ARCHIVED"
+      ? { status }
+      : {}),
+    ...(input.get("includeDeleted") === "true" ? { includeDeleted: true } : {}),
+  };
+}
 
-export async function GET(req: NextRequest) {
-  const base = getProductServiceBaseUrl();
-  const upstreamPath = "/products";
-
-  const url = new URL(req.url);
-  const incoming = url.searchParams;
-
-  const out = new URLSearchParams();
-  for (const [k, v] of incoming.entries()) {
-    if (!ALLOWED.has(k)) continue;
-    out.append(k, v);
-  }
-
-  const upstreamUrl = `${base}${upstreamPath}${out.toString() ? `?${out.toString()}` : ""}`;
-
+export async function GET(request: NextRequest) {
   try {
-    const headers = new Headers();
-    const bearer = getBearerFromReq(req);
-    if (bearer) headers.set("authorization", bearer);
-
-    const res = await fetch(upstreamUrl, {
-      method: "GET",
-      headers,
-      cache: "no-store",
+    const query = listQuery(request);
+    const result = await serverGatewayClient().request("admin_products_list", {
+      accessToken: requireAccessToken(request),
+      query,
     });
+    if (!result.ok) return gatewayFailureResponse(result);
 
-    const contentType = res.headers.get("content-type") ?? "";
-    const isJson = contentType.includes("application/json");
-    const upstreamBody = isJson ? await res.json() : await res.text();
-
-    if (!res.ok) {
-      return isJson
-        ? NextResponse.json(upstreamBody, { status: res.status })
-        : new NextResponse(String(upstreamBody), { status: res.status });
-    }
-
-    // normalize response for panel
-    const page = Math.max(1, Number(incoming.get("page") || 1));
-    const limit = Math.min(
-      100,
-      Math.max(1, Number(incoming.get("limit") || 20)),
-    );
-
-    const upstreamRecord = asRecord(upstreamBody);
-    const items = Array.isArray(upstreamRecord.data) ? upstreamRecord.data : [];
-    const total = Number(upstreamRecord.total ?? items.length);
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    return NextResponse.json(
-      { ok: true, page, limit, total, totalPages, items },
-      { status: 200, headers: { "cache-control": "no-store" } },
-    );
-  } catch (e: unknown) {
-    console.error("[web/api/products] proxy error:", e);
-    return NextResponse.json(
+    const pagination = result.data.meta.pagination;
+    const page = "page" in pagination ? pagination.page : query.page ?? 1;
+    const limit = "limit" in pagination ? pagination.limit : query.limit ?? 20;
+    const total = "total" in pagination ? pagination.total : result.data.data.length;
+    const response = NextResponse.json(
       {
-        ok: false,
-        error: "UPSTREAM_UNREACHABLE",
-        message: errorMessage(e, "Unknown error"),
+        ok: true,
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        items: result.data.data.map(productForCurrentUi),
       },
-      { status: 502 },
+      { status: result.status, headers: { "cache-control": "no-store" } },
     );
+    relayGatewayHeaders(result, response);
+    return response;
+  } catch (error: unknown) {
+    console.error("[/api/products] gateway list failed");
+    return bffExceptionResponse(error, "PRODUCT_LIST_GATEWAY_UNAVAILABLE");
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    let body;
+    try {
+      body = productCreateInput(await request.json());
+    } catch {
+      throw new GatewayBffRequestError(400, "PRODUCT_DATA_ENVELOPE_REQUIRED");
+    }
+    const result = await serverGatewayClient().request("admin_products_create", {
+      accessToken: requireAccessToken(request),
+      idempotencyKey: idempotencyKeyFromRequest(request),
+      body,
+    });
+    if (!result.ok) return gatewayFailureResponse(result);
+    const response = NextResponse.json(
+      { ...result.data, data: productForCurrentUi(result.data.data) },
+      { status: result.status },
+    );
+    relayGatewayHeaders(result, response);
+    return response;
+  } catch (error: unknown) {
+    console.error("[/api/products] gateway create failed");
+    return bffExceptionResponse(error, "PRODUCT_CREATE_GATEWAY_UNAVAILABLE");
   }
 }

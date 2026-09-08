@@ -45,6 +45,7 @@ export type GatewayHttpRequest = Request & {
   actor?: GatewayActorState;
   user?: AuthenticatedActorIdentity;
   accessToken?: string;
+  browserCookieCsrfVerified?: boolean;
 };
 
 function requestPath(request: Request): string {

@@ -26,6 +26,12 @@ describe("auth input profiles", () => {
     expect(
       validateGatewayInput("auth-refresh", {
         applicationProfile: "mobile",
+        body: {},
+      }),
+    ).toEqual([{ field: "body.refreshToken", code: "required_field" }]);
+    expect(
+      validateGatewayInput("auth-refresh", {
+        applicationProfile: "mobile",
         body: { refreshToken: "opaque" },
       }),
     ).toEqual([]);
@@ -43,6 +49,14 @@ describe("auth input profiles", () => {
   });
 
   it("keeps logout controls bounded by application profile", () => {
+    expect(
+      validateGatewayInput("auth-logout", {
+        applicationProfile: "mobile",
+        body: { allDevices: false },
+      }),
+    ).toEqual([
+      { field: "body.refreshToken|allDevices", code: "required_field" },
+    ]);
     expect(
       validateGatewayInput("auth-logout", {
         applicationProfile: "mobile",

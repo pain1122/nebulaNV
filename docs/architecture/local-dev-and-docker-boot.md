@@ -1,6 +1,6 @@
 ﻿# Local Dev And Docker Boot
 
-Last checked: 2026-07-13
+Last checked: 2026-08-24
 
 This document explains how the backend starts locally and in Docker.
 
@@ -10,16 +10,18 @@ It intentionally avoids listing secret values. Environment variable names are sa
 
 Current service ports from app `.env` files:
 
-| Service          | HTTP Port | gRPC Port |
-| ---------------- | --------: | --------: |
-| user-service     |      3100 |     50051 |
-| auth-service     |      3001 |     50052 |
-| product-service  |      3003 |     50053 |
-| settings-service |      3010 |     50054 |
-| blog-service     |      3004 |     50055 |
-| order-service    |      3005 |     50056 |
-| taxonomy-service |      3006 |     50057 |
-| media-service    |      3007 |     50058 |
+| Service                  | HTTP Port | gRPC Port |
+| ------------------------ | --------: | --------: |
+| user-service             |      3100 |     50051 |
+| auth-service             |      3001 |     50052 |
+| tenant-authority-service |      3011 |     50059 |
+| product-service          |      3003 |     50053 |
+| settings-service         |      3010 |     50054 |
+| blog-service             |      3004 |     50055 |
+| order-service            |      3005 |     50056 |
+| taxonomy-service         |      3006 |     50057 |
+| media-service            |      3007 |     50058 |
+| gateway                  |      3002 |         - |
 
 ## Local Backend Startup
 
@@ -36,12 +38,14 @@ Each service is started through root `package.json` scripts:
 ```txt
 dev:auth
 dev:user
+dev:tenant-authority
 dev:settings
 dev:taxonomy
 dev:media
 dev:blog
 dev:product
 dev:order
+dev:gateway
 ```
 
 Most scripts use `wait-on tcp:127.0.0.1:<port>` so a service does not start before the dependency it needs is listening.
@@ -52,6 +56,7 @@ Current intended local startup dependencies:
 
 ```txt
 auth-service
+|-- tenant-authority-service (database + Redis replay; no Auth dependency)
 |-- user-service
 |-- settings-service
 |-- media-service
@@ -70,16 +75,18 @@ auth-service
 
 Operationally, the current local scripts wait on:
 
-| Script         | Waits On                                                        |
-| -------------- | --------------------------------------------------------------- |
-| `dev:auth`     | nothing                                                         |
-| `dev:user`     | auth gRPC `50052`                                               |
-| `dev:settings` | auth gRPC `50052`                                               |
-| `dev:taxonomy` | auth gRPC `50052`, settings gRPC `50054`                        |
-| `dev:media`    | auth gRPC `50052`                                               |
-| `dev:blog`     | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057` |
-| `dev:product`  | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057` |
-| `dev:order`    | auth gRPC `50052`, settings gRPC `50054`, product gRPC `50053`  |
+| Script                 | Waits On                                                                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `dev:auth`             | nothing                                                                                                                          |
+| `dev:tenant-authority` | authority database plus Redis for signed-RPC replay claims                                                                       |
+| `dev:user`             | auth gRPC `50052`                                                                                                                |
+| `dev:settings`         | auth gRPC `50052`                                                                                                                |
+| `dev:taxonomy`         | auth gRPC `50052`, settings gRPC `50054`                                                                                         |
+| `dev:media`            | auth gRPC `50052`                                                                                                                |
+| `dev:blog`             | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057`                                                                  |
+| `dev:product`          | auth gRPC `50052`, settings gRPC `50054`, taxonomy gRPC `50057`                                                                  |
+| `dev:order`            | auth gRPC `50052`, settings gRPC `50054`, product gRPC `50053`                                                                   |
+| `dev:gateway`          | no shell-level wait; startup validates all eight target addresses, registry, pairwise keys, Redis, and fixed Media render origin |
 
 ## Why Startup Can Look Stuck
 
@@ -129,6 +136,12 @@ Per-service `.env` files usually contain:
 - pairwise `S2S_OUTBOUND_KEYS`, `S2S_INBOUND_KEYS`, and `GATEWAY_INBOUND_KEYS`
 - service-specific storage or Redis values
 
+Gateway is the HTTP-only exception. Its app-local env contains
+`GATEWAY_HTTP_PORT`, the eight required `*_GRPC_URL` targets,
+`GATEWAY_OUTBOUND_KEYS`, `GATEWAY_APPLICATION_REGISTRY_JSON`, gateway Redis,
+idempotency bounds, and `MEDIA_RENDER_HTTP_URL`; it has no database, inbound
+S2S/replay, `PUBLIC_MODE`, or gRPC listener fields.
+
 Do not document secret values. Document names, purpose, and expected format only.
 
 ## Local URL Convention
@@ -168,16 +181,18 @@ Core infrastructure:
 - `minio`
 - `minio-init`
 
-The backend stack contains all eight app services:
+The backend stack contains ten backend runtimes:
 
 - `user-service`
 - `auth-service`
+- `tenant-authority-service`
 - `settings-service`
 - `media-service`
 - `taxonomy-service`
 - `blog-service`
 - `product-service`
 - `order-service`
+- `gateway`
 
 For a complete supported boot, run:
 
@@ -186,12 +201,24 @@ pnpm backend:boot
 ```
 
 The command extends the single inventory-backed provisioner. It waits for
-healthy PostgreSQL, Redis, and MinIO; proves all seven expected databases exist;
-completes MinIO bucket initialization; deploys and checks migrations; applies
-all base seeds; builds the eight official Bake targets sequentially; starts
-Compose with `--no-build`; waits for the eight HTTP readiness contracts; and
+healthy PostgreSQL, Redis, and MinIO; idempotently provisions the authority
+database/runtime login; proves all eight expected databases exist; completes
+MinIO bucket initialization; deploys and checks migrations; applies all base
+seeds; builds the ten official Bake targets sequentially; starts
+Compose with `--no-build`; waits for the ten HTTP readiness contracts; and
 runs the idempotent API demo seed. `pnpm test:e2e:provision` is a compatibility
 alias to the same workflow.
+
+After a provisioned boot, the bounded public-client proof is:
+
+```powershell
+pnpm test:f3:live
+```
+
+It exercises the generated client through gateway 3002 for anonymous
+storefront, authenticated storefront, authorized admin, registered mobile, and
+disabled partner execution. It is development-only and prints no credentials
+or tokens.
 
 Plain Compose startup does not run migrations, seeds, or builds. Use it only to
 restart an already-prepared database and existing images:
@@ -229,6 +256,7 @@ x-internal-grpc:
   ORDER_GRPC_URL: order-service:50056
   TAXONOMY_GRPC_URL: taxonomy-service:50057
   MEDIA_GRPC_URL: media-service:50058
+  TENANT_AUTHORITY_GRPC_URL: tenant-authority-service:50059
 ```
 
 Services merge this map into their Docker environment. This keeps local `.env` URLs from leaking into container-to-container calls.
@@ -244,6 +272,7 @@ scripts/db/init-multiple-dbs.sh
 It creates:
 
 - `nebula_users`
+- `nebula_authority`
 - `nebula_products`
 - `nebula_settings`
 - `nebula_blog`
@@ -286,24 +315,27 @@ keep using the service `.env` URLs.
 
 ## Dockerfiles
 
-All eight backend images use the shared multi-target Dockerfile:
+All ten backend images use the shared multi-target Dockerfile:
 
 ```txt
 docker/backend.Dockerfile
 ```
 
-Compose selects one independent runtime target for each service:
+The Compose files and Bake graph select the nine hybrid runtime targets plus
+the HTTP-only gateway target:
 
 - `user-service`
 - `auth-service`
+- `tenant-authority-service`
 - `settings-service`
 - `media-service`
 - `taxonomy-service`
 - `product-service`
 - `blog-service`
 - `order-service`
+- `gateway`
 
-`docker-bake.hcl` defines the official target set. Normal tooling invokes those
+`docker-bake.hcl` defines the official ten-target set. Normal tooling invokes those
 targets sequentially in backend-inventory order. The first target commits the
 shared build, dependency, and runtime-base layers; later targets can reuse those
 completed layers instead of competing to materialize identical pnpm installs
@@ -321,12 +353,13 @@ images rather than being placed in this common foundation.
 ## Prisma Generation
 
 The root `package.json` owns the backend inventory used by local tooling. It
-records all eight backend packages, directories, Docker identities, ports, and
-the seven Prisma database names. `scripts/backend.mjs` reads that inventory and
-runs Prisma services sequentially in this fixed order:
+records all ten backend runtimes, their HTTP or HTTP/gRPC transport,
+directories, Docker identities, ports, Compose admission, and the nine
+Prisma database names. `scripts/backend.mjs` reads that one inventory, derives
+the narrower views, and runs Prisma services sequentially in this fixed order:
 
 ```txt
-user -> settings -> media -> taxonomy -> product -> blog -> order
+user -> authority -> settings -> media -> taxonomy -> product -> blog -> order
 ```
 
 Use the root commands instead of maintaining another service list:
@@ -369,7 +402,7 @@ When adding a service with Prisma, check:
 ## Clean Migration And Local Database Recovery
 
 The inventory-backed database checks use temporary databases whose names
-contain `_verify_`; they do not rewrite the seven normal development databases
+contain `_verify_`; they do not rewrite the eight normal development databases
 or delete Docker volumes:
 
 ```powershell
@@ -384,25 +417,27 @@ failure stops later services. It then recreates only the affected disposable
 database and applies the real migrations. The invalid migration exists only in
 an operating-system temporary copy of the Prisma tree.
 
-Local maintenance backups cover the seven inventory-owned PostgreSQL databases.
+Local maintenance backups cover the eight inventory-owned PostgreSQL databases.
 The target directory must be explicit and must not already exist. It contains
 one binary PostgreSQL custom-format dump per database plus `manifest.json`,
 which records the exact service, database, file, format, and creation time.
 Backups do not include Redis, MinIO objects, secrets, or Docker volumes.
 
-Stop the eight backend services before backup or restore, but leave PostgreSQL
+Stop the ten backend runtimes before backup or restore, but leave PostgreSQL
 running:
 
 ```powershell
 $backendServices = @(
   "user-service",
   "auth-service",
+  "tenant-authority-service",
   "settings-service",
   "media-service",
   "taxonomy-service",
   "product-service",
   "blog-service",
-  "order-service"
+  "order-service",
+  "gateway"
 )
 
 docker compose stop $backendServices
@@ -419,7 +454,7 @@ pnpm backend:seed
 
 Both maintenance commands refuse to run while a backend service is running.
 Restore validates the manifest and every dump before changing a database, then
-drops, recreates, and restores the seven canonical databases in inventory
+drops, recreates, and restores the eight canonical databases in inventory
 order. The explicit confirmation token protects against accidental invocation;
 restore remains destructive to those database contents. Never edit or delete
 Prisma `_prisma_migrations` records manually. Recover a disposable development

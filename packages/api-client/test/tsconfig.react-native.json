@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "lib": ["ES2021"],
+    "types": [],
+    "rootDir": ".."
+  },
+  "include": ["react-native-consumer.ts"],
+  "exclude": []
+}

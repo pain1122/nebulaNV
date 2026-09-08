@@ -10,7 +10,6 @@ export default function Login() {
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false); // UI only for now
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,14 +23,17 @@ export default function Login() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ identifier, password, remember }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       const json = asRecord(await res.json().catch(() => ({})));
 
       if (!res.ok || json.ok !== true) {
+        const gatewayError = asRecord(json.error);
         throw new Error(
-          stringField(json, "message") || `Login failed (${res.status})`,
+          stringField(json, "message") ||
+            stringField(gatewayError, "message") ||
+            `Login failed (${res.status})`,
         );
       }
 
@@ -89,19 +91,6 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="form-check">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="auth-remember-check"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              <label className="form-check-label" htmlFor="auth-remember-check">
-                مرا به خاطر بسپار
-              </label>
             </div>
 
             <div className="mt-4">

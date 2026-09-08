@@ -1,6 +1,14 @@
-// apps/web/app/api/taxonomy/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { errorMessage } from "@/lib/unknown";
+import type { GatewayTaxonomyWriteDto } from "@nebula/api-client";
+import {
+  GatewayBffRequestError,
+  bffExceptionResponse,
+  gatewayFailureResponse,
+  idempotencyKeyFromRequest,
+  relayGatewayHeaders,
+  requireAccessToken,
+  serverGatewayClient,
+} from "@/lib/gateway/server-client";
 
 type UiKind =
   | "product_cat"
@@ -17,76 +25,43 @@ const KIND_MAP: Record<UiKind, string> = {
   product_brand: "brand.default",
 };
 
-function getBase() {
-  const base = process.env.TAXONOMY_HTTP_URL || "http://127.0.0.1:3006";
-  return base.replace(/\/+$/, "");
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const body = (await req.json()) as {
-      kind: UiKind;
-      name: string;
-      slug: string;
+    const input = (await request.json()) as {
+      kind?: UiKind;
+      name?: string;
+      title?: string;
+      slug?: string;
       parentId?: string | null;
       sortOrder?: number;
       isHidden?: boolean;
     };
-
-    const kind = KIND_MAP[body.kind];
-    if (!kind)
-      return NextResponse.json(
-        { ok: false, error: "invalid_kind" },
-        { status: 400 },
-      );
-
-    const upstreamUrl = `${getBase()}/taxonomies`;
-
-    const headers = new Headers();
-    headers.set("content-type", "application/json");
-
-    // forward auth/cookies (same pattern as other proxies)
-    const auth = req.headers.get("authorization");
-    if (auth) headers.set("authorization", auth);
-
-    const cookie = req.headers.get("cookie");
-    if (cookie) headers.set("cookie", cookie);
-
-    const upstream = await fetch(upstreamUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        scope: "product",
-        kind,
-        slug: body.slug,
-        title: body.name,
-        parentId: body.parentId ?? null,
-        sortOrder: body.sortOrder ?? 0,
-        isHidden: body.isHidden ?? false,
-        isTree: true,
-      }),
-      cache: "no-store",
-    });
-
-    const text = await upstream.text();
-
-    return new NextResponse(text, {
-      status: upstream.status,
-      headers: {
-        "content-type":
-          upstream.headers.get("content-type") ?? "application/json",
-        "cache-control": "no-store",
-      },
-    });
-  } catch (e: unknown) {
-    console.error("[/api/taxonomy/create]", e);
-    return NextResponse.json(
+    const kind = input.kind ? KIND_MAP[input.kind] : undefined;
+    if (!kind || !input.slug || !(input.title || input.name)) {
+      throw new GatewayBffRequestError(400, "INVALID_TAXONOMY_INPUT");
+    }
+    const body: GatewayTaxonomyWriteDto = {
+      kind,
+      slug: input.slug,
+      title: input.title || input.name || "",
+      ...(input.parentId ? { parentId: input.parentId } : {}),
+      ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
+      ...(input.isHidden === undefined ? {} : { isHidden: input.isHidden }),
+    };
+    const result = await serverGatewayClient().request(
+      "admin_product_taxonomies_create",
       {
-        ok: false,
-        error: "fetch_failed",
-        message: errorMessage(e, "Unknown error"),
+        accessToken: requireAccessToken(request),
+        idempotencyKey: idempotencyKeyFromRequest(request),
+        body,
       },
-      { status: 500 },
     );
+    if (!result.ok) return gatewayFailureResponse(result);
+    const response = NextResponse.json(result.data, { status: result.status });
+    relayGatewayHeaders(result, response);
+    return response;
+  } catch (error: unknown) {
+    console.error("[/api/taxonomy/create] gateway create failed");
+    return bffExceptionResponse(error, "TAXONOMY_CREATE_GATEWAY_UNAVAILABLE");
   }
 }

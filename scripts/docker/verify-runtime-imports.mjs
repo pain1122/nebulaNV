@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import { backendServices } from "../backend.mjs";
 
 const repositoryRoot = path.resolve(process.argv[2] ?? process.cwd());
@@ -52,6 +53,22 @@ for (const service of services) {
     console.error(
       `Runtime import verification failed: no compiled JavaScript found in ${path.relative(repositoryRoot, distDirectory)}`,
     );
+    process.exit(1);
+  }
+
+  const envSchemaPath = path.join(
+    distDirectory,
+    "config",
+    "env.validation.js",
+  );
+
+  try {
+    await import(pathToFileURL(envSchemaPath).href);
+  } catch (error) {
+    console.error(
+      `Runtime import verification failed: ${path.relative(repositoryRoot, envSchemaPath)} could not be loaded.`,
+    );
+    console.error(error);
     process.exit(1);
   }
 

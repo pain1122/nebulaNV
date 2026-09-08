@@ -1,0 +1,24 @@
+{
+  "name": "@nebula/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Generated, platform-neutral client for the Nebula external gateway API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "node ./scripts/generate-client.mjs",
+    "generate:check": "node ./scripts/generate-client.mjs --check",
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\" \"test/**/*.{ts,mjs}\" \"scripts/**/*.mjs\" \"index.ts\"",
+    "test": "pnpm run build && node --test ./test/client.test.mjs && tsc -p test/tsconfig.browser.json && tsc -p test/tsconfig.react-native.json",
+    "test:live": "pnpm run build && node ./test/f3-live-flows.mjs",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

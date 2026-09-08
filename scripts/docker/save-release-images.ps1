@@ -1,4 +1,4 @@
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true)]
 param(
   [string]$ImagePrefix = "nebulanv-main",
   [string]$ImageTag = "latest",
@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 if ([System.IO.Path]::IsPathRooted($Output)) {
   $outputPath = $Output
@@ -36,4 +37,9 @@ $images += @(
 Write-Host "Saving Docker images to $outputPath"
 $images | ForEach-Object { Write-Host " - $_" }
 
-docker save -o $outputPath @images
+if ($PSCmdlet.ShouldProcess($outputPath, "Save $($images.Count) release images")) {
+  docker save -o $outputPath @images
+  if ($LASTEXITCODE -ne 0) {
+    throw "Docker image archive failed with exit code $LASTEXITCODE."
+  }
+}

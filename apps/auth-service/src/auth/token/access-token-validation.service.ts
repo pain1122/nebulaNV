@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { createHmac } from 'node:crypto';
+import { deriveS2SSessionRef } from '@nebula/grpc-auth';
 import { AuthRedisService } from '../redis/auth-redis.service';
 import { type AccessTokenPayload, isAccessTokenPayload } from '../auth.types';
 
@@ -60,10 +60,7 @@ export class AccessTokenValidationService {
     return {
       valid: true,
       payload,
-      sessionRef: createHmac('sha256', secret)
-        .update(`nebula-session-ref:v1:${payload.sid}`)
-        .digest('base64url')
-        .slice(0, 32),
+      sessionRef: deriveS2SSessionRef(secret, payload.sid),
     };
   }
 }

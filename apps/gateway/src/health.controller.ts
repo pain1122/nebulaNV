@@ -1,9 +1,9 @@
 import { Controller } from "@nestjs/common";
 import { StandardHealthController, type HealthProbe } from "@packages/config";
 import { GatewayReadinessService } from "./gateway-readiness.service";
-import { Public } from "@nebula/grpc-auth";
+import { OperationalHealth } from "@nebula/grpc-auth";
 
-@Public()
+@OperationalHealth()
 @Controller("health")
 export class HealthController extends StandardHealthController {
   constructor(private readonly gatewayReadiness: GatewayReadinessService) {

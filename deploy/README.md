@@ -8,12 +8,18 @@ The deployable package is:
 - `deploy/.env.production`
 - `deploy/nebula-images.tar`
 - `scripts/db/init-multiple-dbs.sh`
+- `scripts/db/ensure-tenant-authority-db.sh`
 
-> Current F3 checkpoint: this runbook still describes the existing eight-image
-> backend release. Gateway inventory/image wiring and the confirmed
-> `save-release-images.ps1` repository-root repair belong to Batch 6. Do not
-> treat the archive step below as a verified gateway release path until those
-> items are completed and the release workflow is rerun.
+> F3 Batch 6 checkpoint: the nine-image inventory, gateway Compose runtime,
+> release reachability boundary, and image-archive path are implemented and
+> covered by rendered-Compose/tooling checks. Rebuild the images after source
+> changes before starting a live release stack.
+
+F3's generated-client and current-web compatibility gates are source/contract
+checks. Before promoting a rebuilt release candidate, also run the bounded
+`pnpm test:f3:live` flow against the provisioned development candidate and the
+normal live/e2e lane. The final image scan must examine the same rebuilt images
+that will be archived.
 
 ## 1. Build Images On A Machine With Internet
 
@@ -35,6 +41,12 @@ shared layers deliberately.
 .\scripts\docker\save-release-images.ps1
 ```
 
+Verify the complete list and repository-root resolution without writing a tar:
+
+```powershell
+.\scripts\docker\save-release-images.ps1 -WhatIf
+```
+
 This creates:
 
 ```text
@@ -43,7 +55,8 @@ deploy/nebula-images.tar
 
 It includes:
 
-- The eight backend runtime images.
+- The ten backend runtime images. The F3 archive contained nine; F4 adds the
+  tenant-authority-service foundation image.
 - `postgres:17`
 - `redis:7-alpine`
 - `minio/minio:latest`
@@ -68,6 +81,7 @@ docker-compose.release.yml
 deploy/.env.production
 deploy/nebula-images.tar
 scripts/db/init-multiple-dbs.sh
+scripts/db/ensure-tenant-authority-db.sh
 ```
 
 Keep the same relative paths, or update the volume path in `docker-compose.release.yml`.
@@ -99,9 +113,26 @@ docker compose --env-file deploy\.env.production -f docker-compose.release.yml p
 ## Notes
 
 - `docker-compose.release.yml` has no `build:` blocks. It runs only preloaded images.
+- Release publishes the gateway API and bundled MinIO data endpoint only;
+  authority and other backend HTTP/gRPC, PostgreSQL, Redis, and MinIO console
+  ports remain private.
+- Replace the example HTTPS application origins and every placeholder secret
+  before deployment.
+- `GATEWAY_APPLICATION_REGISTRY_JSON` is required deployment configuration in
+  F3. Public client IDs are not secrets; records must still be reviewed for
+  exact origins, fixed tenant/site/channel mapping, enabled state, and profile.
+  F4 replaces this static adapter with persistent authority rather than making
+  client-supplied context trusted.
 - Runtime dependencies are inside the backend images because the shared
   `prod-deps` stage runs a frozen, filtered `pnpm install --prod --offline`
   before the compiled first-party artifacts are assembled into each image.
 - Database data is stored in Docker volumes, not inside app images.
+- `AUTHORITY_DB_RUNTIME_PASSWORD` provisions the dedicated non-superuser
+  `nebula_authority_runtime` login on the first Postgres volume initialization.
+  It is not the migration administrator password. Use a 32-128 character
+  random value containing only letters, digits, `_`, and `-`; the same exact
+  bytes are used for role provisioning and the Prisma URL.
 - Migrations still need a proper deployment step. For now, run migrations deliberately before promoting a real production stack.
-- If `POSTGRES_PASSWORD` contains URL-special characters, URL-encode it before using it in database URLs.
+- If `POSTGRES_PASSWORD` contains URL-special characters, URL-encode it before
+  using it in database URLs. Do not URL-encode
+  `AUTHORITY_DB_RUNTIME_PASSWORD`; its contract is already URL-safe.

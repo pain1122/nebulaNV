@@ -17,6 +17,8 @@ export const BLOG_SERVICE = "BLOG_SERVICE" as const;
 export const BLOG_SERVICE_NAME = "BlogService" as const;
 export const TAXONOMY_SERVICE = "TAXONOMY_SERVICE" as const;
 export const TAXONOMY_SERVICE_NAME = "TaxonomyService" as const;
+export const TENANT_AUTHORITY_SERVICE = "TENANT_AUTHORITY_SERVICE" as const;
+export const TENANT_AUTHORITY_SERVICE_NAME = "TenantAuthorityService" as const;
 
 // Stable deployment identities used as S2S audiences.
 export const AUTH_SERVICE_TARGET = "auth-service" as const;
@@ -27,6 +29,8 @@ export const ORDER_SERVICE_TARGET = "order-service" as const;
 export const MEDIA_SERVICE_TARGET = "media-service" as const;
 export const BLOG_SERVICE_TARGET = "blog-service" as const;
 export const TAXONOMY_SERVICE_TARGET = "taxonomy-service" as const;
+export const TENANT_AUTHORITY_SERVICE_TARGET =
+  "tenant-authority-service" as const;
 
 export const GATEWAY_CALLER_ID = "gateway" as const;
 export const GATEWAY_OUTBOUND_TARGETS = Object.freeze([

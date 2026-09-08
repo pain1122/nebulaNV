@@ -9,6 +9,7 @@ import { bearer, tokenFromAuthorization } from "./metadata";
 import {
   normalizeS2SSignedContext,
   type S2SActorAssertion,
+  type S2SLegacyActorAssertion,
   type S2SRequestContext,
   type S2SSignedContext,
 } from "./s2s-context";
@@ -39,8 +40,17 @@ function sameRequestContext(
 function sameActor(left: S2SActorAssertion, right: S2SActorAssertion): boolean {
   return (
     left.userId === right.userId &&
-    left.role === right.role &&
-    left.sessionRef === right.sessionRef
+    left.sessionRef === right.sessionRef &&
+    "role" in left === "role" in right &&
+    (!("role" in left) || !("role" in right) || left.role === right.role)
+  );
+}
+
+function sameActorUser(left: S2SActorAssertion, right: ContextUser): boolean {
+  return (
+    left.userId === right.userId &&
+    left.sessionRef === right.sessionRef &&
+    (!("role" in left) || left.role === right.role)
   );
 }
 
@@ -89,6 +99,9 @@ export function createVerifiedServiceDownstreamContext(
   metadata: MetadataWithContext,
   call?: ContextCarrier,
 ): VerifiedServiceDownstreamContext {
+  if (metadata.resolutionContext || call?.resolutionContext) {
+    throw new Error("s2s_resolution_context_not_propagatable");
+  }
   const svc = consistentValue("caller", metadata.svc, call?.svc);
   const svcKind = consistentValue(
     "caller_kind",
@@ -122,7 +135,7 @@ export function createVerifiedServiceDownstreamContext(
   if (actor && !requestContext) {
     throw new Error("s2s_propagation_actor_context_missing");
   }
-  if (actor && (!token || !user || !sameUser(actor, user))) {
+  if (actor && (!token || !user || !sameActorUser(actor, user))) {
     throw new Error("s2s_propagation_verified_actor_incomplete");
   }
   if (requestContext && !actor && (token || user)) {
@@ -132,11 +145,15 @@ export function createVerifiedServiceDownstreamContext(
     throw new Error("s2s_propagation_v2_actor_incomplete");
   }
 
+  if (requestContext && actor && !("role" in actor)) {
+    throw new Error("s2s_propagation_v1_actor_invalid");
+  }
+  const legacyActor = actor as S2SLegacyActorAssertion | undefined;
   const context = requestContext
     ? normalizeS2SSignedContext({
         version: "1",
         ...requestContext,
-        ...(actor ? { actor } : {}),
+        ...(legacyActor ? { actor: legacyActor } : {}),
       })
     : undefined;
 

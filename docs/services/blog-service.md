@@ -1,6 +1,6 @@
 # Blog Service
 
-Last reviewed: 2026-06-17
+Last reviewed: 2026-08-22
 
 ## Purpose
 
@@ -210,6 +210,5 @@ Tests:
 - Blog-service does not yet validate `coverImageUrl` against media-service.
 - Blog-service does not yet store media IDs for cover images.
 - `DefaultBlogTaxonomyInitializer` exists but appears not registered as a provider.
-- gRPC write authorization tests need tightening.
 - `BlogComment` model exists but no visible HTTP/gRPC comment contract is currently exposed.
 - Local `BlogCategory` model may be legacy or unfinished beside the taxonomy-service facade.

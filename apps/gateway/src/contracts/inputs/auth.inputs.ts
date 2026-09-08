@@ -18,6 +18,12 @@ export const AUTH_INPUT_PROFILES = Object.freeze({
         applications: ["mobile"],
         fields: ["refreshToken"],
       },
+      {
+        kind: "application-at-least-one",
+        location: "body",
+        applications: ["mobile"],
+        fields: ["refreshToken"],
+      },
     ],
   }),
   "auth-logout": profile({
@@ -28,6 +34,12 @@ export const AUTH_INPUT_PROFILES = Object.freeze({
         location: "body",
         applications: ["mobile"],
         fields: ["refreshToken"],
+      },
+      {
+        kind: "application-at-least-one",
+        location: "body",
+        applications: ["mobile"],
+        fields: ["refreshToken", "allDevices"],
       },
     ],
   }),

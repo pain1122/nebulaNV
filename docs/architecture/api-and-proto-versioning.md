@@ -1,6 +1,6 @@
 # API And Proto Versioning
 
-Last reviewed: 2026-07-21
+Last reviewed: 2026-08-22
 
 Purpose: define which NebulaNV HTTP and gRPC contract changes are backward-compatible, when a new version is required, and how contract changes are verified.
 
@@ -9,7 +9,9 @@ Purpose: define which NebulaNV HTTP and gRPC contract changes are backward-compa
 - Internal gRPC contracts live in `packages/protos/*.proto` and generated TypeScript lives in `packages/protos/generated`.
 - The current proto packages and HTTP routes are mostly unversioned. That does not make breaking in-place changes safe.
 - Generated namespaces such as `authv1`, `productv1`, and `orderv1` are TypeScript export names. The wire identity still comes from each proto package, service, method, field number, and field type.
-- External `/api/v1` gateway routes are planned for F3 and are not implemented yet.
+- External `/api/v1` gateway routes are implemented from one validated manifest:
+  70 checked operations across 60 paths, a deterministic OpenAPI artifact, and
+  the generated `@nebula/api-client` consumer contract.
 
 ## Compatibility Rule
 
@@ -55,7 +57,9 @@ The current unversioned service routes accept only additive, behavior-preserving
 - Response fields may be added when clients ignore unknown fields.
 - Existing field names, meanings, status codes, authorization requirements, and error meanings must remain stable unless a security correction is required.
 
-A breaking external contract must use a new route version such as `/api/v2` once the gateway exists. Keep the previous version available until known clients have migrated and the deprecation window recorded for that release has ended.
+A breaking external contract must use a new route version such as `/api/v2`.
+Keep the previous version available until known clients have migrated and the
+deprecation window recorded for that release has ended.
 
 ## Deprecation And Rollout
 
@@ -75,6 +79,8 @@ For proto changes run:
 ```powershell
 pnpm proto:gen
 pnpm proto:check
+pnpm --filter @nebula/gateway openapi:check
+pnpm --filter @nebula/api-client generate:check
 pnpm check-types
 pnpm test:security
 ```

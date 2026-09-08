@@ -5,6 +5,20 @@ import {
   applicationRegistryProvider,
 } from "../src/application/application-registry";
 import { GatewayReadinessService } from "../src/gateway-readiness.service";
+import { GatewayAuthController } from "../src/auth/gateway-auth.controller";
+import { GatewayUserController } from "../src/user/gateway-user.controller";
+import { GatewaySettingsController } from "../src/settings/gateway-settings.controller";
+import { GatewayProductController } from "../src/product/gateway-product.controller";
+import { GatewayBlogController } from "../src/blog/gateway-blog.controller";
+import { GatewayProductTaxonomyController } from "../src/taxonomy/gateway-product-taxonomy.controller";
+import { GatewayBlogTaxonomyController } from "../src/taxonomy/gateway-blog-taxonomy.controller";
+import { GatewayOrderController } from "../src/order/gateway-order.controller";
+import { GatewayMediaPublicController } from "../src/media/gateway-media-public.controller";
+import { GatewayMediaProtectedController } from "../src/media/gateway-media-protected.controller";
+import { GatewayMediaStrictController } from "../src/media/gateway-media-strict.controller";
+import { GatewayMediaOwnedController } from "../src/media/gateway-media-owned.controller";
+import { GatewayMediaRenderController } from "../src/media/gateway-media-render.controller";
+import { GatewayMediaAdminController } from "../src/media/gateway-media-admin.controller";
 import {
   TEST_APPLICATION_REGISTRY_JSON,
   TEST_GATEWAY_GRPC_TARGETS,
@@ -76,7 +90,22 @@ describe("gateway application module", () => {
       262_144,
     );
     expect(moduleRef.get(GatewayReadinessService).probes()).toHaveLength(4);
-    expect(GATEWAY_HTTP_CONTROLLERS).toEqual([]);
+    expect(GATEWAY_HTTP_CONTROLLERS).toEqual([
+      GatewayAuthController,
+      GatewayUserController,
+      GatewaySettingsController,
+      GatewayProductController,
+      GatewayBlogController,
+      GatewayProductTaxonomyController,
+      GatewayBlogTaxonomyController,
+      GatewayOrderController,
+      GatewayMediaPublicController,
+      GatewayMediaProtectedController,
+      GatewayMediaStrictController,
+      GatewayMediaOwnedController,
+      GatewayMediaRenderController,
+      GatewayMediaAdminController,
+    ]);
     const { GATEWAY_GRPC_CLIENT_TARGETS } = await import(
       "../src/downstream/gateway-grpc-clients.module"
     );

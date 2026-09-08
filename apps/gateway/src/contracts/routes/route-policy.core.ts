@@ -7,6 +7,7 @@ export type GatewayActorPolicy =
   | "anonymous"
   | "optional"
   | "session"
+  | "user"
   | "authenticated"
   | "admin";
 

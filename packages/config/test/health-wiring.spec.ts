@@ -10,12 +10,16 @@ function source(path: string): string {
 type BackendInventoryEntry = {
   name: string;
   database: string | null;
+  transport: "http" | "http-grpc";
 };
 
 const manifest = JSON.parse(source("package.json")) as {
   nebula: { backendServices: BackendInventoryEntry[] };
 };
 const services = manifest.nebula.backendServices;
+const hybridServices = services.filter(
+  (service) => service.transport === "http-grpc",
+);
 
 describe("service health and shutdown wiring", () => {
   it.each(services)(
@@ -25,9 +29,18 @@ describe("service health and shutdown wiring", () => {
       const main = source(`apps/${name}/src/main.ts`);
 
       expect(health).toContain("extends StandardHealthController");
-      expect(health).toContain("s2sReplay");
+      expect(health).toContain("@OperationalHealth()");
+      expect(health).not.toContain("@Public()");
       expect(health).not.toContain("new PrismaClient");
       expect(main).toContain("app.enableShutdownHooks()");
+    },
+  );
+
+  it.each(hybridServices)(
+    "$name reports the shared S2S replay dependency",
+    ({ name }) => {
+      const health = source(`apps/${name}/src/health.controller.ts`);
+      expect(health).toContain("s2sReplay");
     },
   );
 
@@ -35,8 +48,8 @@ describe("service health and shutdown wiring", () => {
     const dockerfile = source("docker/backend.Dockerfile");
     const provision = source("scripts/backend.mjs");
 
-    expect(dockerfile.match(/\/health\/ready/g)).toHaveLength(8);
-    expect(provision).toContain("backendServices.map");
+    expect(dockerfile.match(/\/health\/ready/g)).toHaveLength(services.length);
+    expect(provision).toContain("composeServices.map");
     expect(provision).toContain("/health/ready");
     expect(dockerfile).not.toMatch(/localhost:\d+\/health['"]/);
   });
