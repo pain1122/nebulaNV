@@ -1,6 +1,6 @@
 # Auth Service
 
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-08
 
 ## Purpose
 
@@ -23,7 +23,8 @@ topology.
 keeps Auth as authentication/session authority but scopes that authority to one
 identity realm and exact application audiences. [ADR-0015](../architecture/decisions/0015-f4-identity-realm-record-and-migration-freeze.md)
 freezes the exact aggregate, reference construction, compatibility bridge, and
-R0-R11 cutover order; none is implemented yet.
+R0-R11 cutover order. Realm Auth aggregates and cutover remain unimplemented;
+the R3 legacy-family migration prerequisite below is implemented.
 
 Target Auth owns, per realm:
 
@@ -53,6 +54,25 @@ The current hashed refresh-token storage, Lua rotation/replay containment,
 current/all logout, and live session-existence checks are preserved. Redis
 becomes acceleration and replay state, not the sole durable credential
 generation or recoverable active-session inventory.
+
+## R3 Legacy Family Migration Evidence
+
+Legacy login and successful refresh rotation now persist `issuedTokenVersion`
+beside the existing token hash and token ID. The migration-only
+`AuthRedisService.readLegacyFamilyEvidence` atomically compares that version with
+the current non-lazy user version, checks disabled state, finite family expiry,
+family-index membership, and token evidence, and returns an eligible snapshot or
+a bounded quarantine reason. It changes no Redis state and authorizes no request.
+
+Older families without this field retain current login/refresh semantics. A
+successful signed refresh records their version; export quarantines them until
+that evidence exists. A late stale family is never relabeled with the user's
+newer version. Sensitive snapshot fields are only for the future encrypted
+source-owned export and must not enter logs or HTTP/gRPC responses. No complete
+exporter, Realm Auth session, or traffic switch is implemented here.
+
+The focused migration suite requires a disposable Redis port in
+`AUTH_MIGRATION_TEST_REDIS_PORT`; it never uses the application's default port.
 
 ## Main Dependencies
 

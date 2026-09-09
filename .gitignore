@@ -75,6 +75,7 @@ Thumbs.db
 # ----------------------------
 .buildx-cache/
 .nebula-backups/
+.nebula-migration-artifacts/
 
 
 # ----------------------------

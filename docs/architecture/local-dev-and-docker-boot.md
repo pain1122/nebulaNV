@@ -178,13 +178,16 @@ Core infrastructure:
 
 - `postgres`
 - `redis`
+- `realm-auth-default-redis`
+- `realm-auth-db-init`
 - `minio`
 - `minio-init`
 
-The backend stack contains ten backend runtimes:
+The inventory-backed stack contains eleven backend runtimes:
 
 - `user-service`
 - `auth-service`
+- `realm-auth-service` (default-realm R3 shadow; health only)
 - `tenant-authority-service`
 - `settings-service`
 - `media-service`
@@ -201,13 +204,20 @@ pnpm backend:boot
 ```
 
 The command extends the single inventory-backed provisioner. It waits for
-healthy PostgreSQL, Redis, and MinIO; idempotently provisions the authority
-database/runtime login; proves all eight expected databases exist; completes
+healthy PostgreSQL, legacy/default-realm Redis, and MinIO; idempotently provisions
+the Authority and default/operator Realm Auth databases/runtime logins; proves
+all nine inventory databases exist; completes
 MinIO bucket initialization; deploys and checks migrations; applies all base
-seeds; builds the ten official Bake targets sequentially; starts
-Compose with `--no-build`; waits for the ten HTTP readiness contracts; and
+seeds; builds the eleven official Bake targets sequentially; starts
+Compose with `--no-build`; waits for the eleven HTTP readiness contracts; and
 runs the idempotent API demo seed. `pnpm test:e2e:provision` is a compatibility
 alias to the same workflow.
+
+The operator Realm Auth database/role is provisioned, but its service and Redis
+are behind Compose profile `r3-shadow`. Generic boot does not migrate or seed
+that second database yet. The R3 dual-store verifier is implemented; run it
+before accepting imported state. Maintenance backup and restore include both
+Realm Auth databases.
 
 After a provisioned boot, the bounded public-client proof is:
 
@@ -315,17 +325,18 @@ keep using the service `.env` URLs.
 
 ## Dockerfiles
 
-All ten backend images use the shared multi-target Dockerfile:
+All eleven backend images use the shared multi-target Dockerfile:
 
 ```txt
 docker/backend.Dockerfile
 ```
 
 The Compose files and Bake graph select the nine hybrid runtime targets plus
-the HTTP-only gateway target:
+the two HTTP-only Realm Auth shadow and gateway targets:
 
 - `user-service`
 - `auth-service`
+- `realm-auth-service`
 - `tenant-authority-service`
 - `settings-service`
 - `media-service`
@@ -335,7 +346,7 @@ the HTTP-only gateway target:
 - `order-service`
 - `gateway`
 
-`docker-bake.hcl` defines the official ten-target set. Normal tooling invokes those
+`docker-bake.hcl` defines the official eleven-target set. Normal tooling invokes those
 targets sequentially in backend-inventory order. The first target commits the
 shared build, dependency, and runtime-base layers; later targets can reuse those
 completed layers instead of competing to materialize identical pnpm installs
@@ -353,13 +364,13 @@ images rather than being placed in this common foundation.
 ## Prisma Generation
 
 The root `package.json` owns the backend inventory used by local tooling. It
-records all ten backend runtimes, their HTTP or HTTP/gRPC transport,
+records all eleven inventory-backed runtimes, their HTTP or HTTP/gRPC transport,
 directories, Docker identities, ports, Compose admission, and the nine
 Prisma database names. `scripts/backend.mjs` reads that one inventory, derives
 the narrower views, and runs Prisma services sequentially in this fixed order:
 
 ```txt
-user -> authority -> settings -> media -> taxonomy -> product -> blog -> order
+user -> default Realm Auth -> authority -> settings -> media -> taxonomy -> product -> blog -> order
 ```
 
 Use the root commands instead of maintaining another service list:
@@ -402,7 +413,7 @@ When adding a service with Prisma, check:
 ## Clean Migration And Local Database Recovery
 
 The inventory-backed database checks use temporary databases whose names
-contain `_verify_`; they do not rewrite the eight normal development databases
+contain `_verify_`; they do not rewrite the nine inventory development databases
 or delete Docker volumes:
 
 ```powershell
@@ -417,19 +428,22 @@ failure stops later services. It then recreates only the affected disposable
 database and applies the real migrations. The invalid migration exists only in
 an operating-system temporary copy of the Prisma tree.
 
-Local maintenance backups cover the eight inventory-owned PostgreSQL databases.
+Local maintenance backups cover the nine inventory-owned PostgreSQL databases
+plus the profiled operator Realm Auth database.
 The target directory must be explicit and must not already exist. It contains
 one binary PostgreSQL custom-format dump per database plus `manifest.json`,
 which records the exact service, database, file, format, and creation time.
 Backups do not include Redis, MinIO objects, secrets, or Docker volumes.
 
-Stop the ten backend runtimes before backup or restore, but leave PostgreSQL
-running:
+Stop the eleven inventory-backed runtimes and the profiled operator Realm Auth
+runtime before backup or restore, but leave PostgreSQL running:
 
 ```powershell
 $backendServices = @(
   "user-service",
   "auth-service",
+  "realm-auth-service",
+  "operator-realm-auth-service",
   "tenant-authority-service",
   "settings-service",
   "media-service",
@@ -454,8 +468,8 @@ pnpm backend:seed
 
 Both maintenance commands refuse to run while a backend service is running.
 Restore validates the manifest and every dump before changing a database, then
-drops, recreates, and restores the eight canonical databases in inventory
-order. The explicit confirmation token protects against accidental invocation;
+drops, recreates, and restores the ten maintenance databases in manifest order.
+The explicit confirmation token protects against accidental invocation;
 restore remains destructive to those database contents. Never edit or delete
 Prisma `_prisma_migrations` records manually. Recover a disposable development
 database by recreating only that database and applying the repository's real

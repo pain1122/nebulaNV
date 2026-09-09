@@ -86,6 +86,7 @@ describe('AuthRedisService', () => {
       sessionId,
       tokenId: 'refresh-1',
       tokenHash: 'hash-1',
+      issuedTokenVersion: 1,
       ttlSeconds: 60,
     });
 
@@ -97,6 +98,7 @@ describe('AuthRedisService', () => {
         expectedTokenHash: 'hash-1',
         nextTokenId: 'refresh-2a',
         nextTokenHash: 'hash-2a',
+        issuedTokenVersion: 1,
         ttlSeconds: 60,
       }),
       service.rotateRefreshSession({
@@ -106,6 +108,7 @@ describe('AuthRedisService', () => {
         expectedTokenHash: 'hash-1',
         nextTokenId: 'refresh-2b',
         nextTokenHash: 'hash-2b',
+        issuedTokenVersion: 1,
         ttlSeconds: 60,
       }),
     ]);
@@ -120,6 +123,7 @@ describe('AuthRedisService', () => {
       sessionId: 'session-a',
       tokenId: 'refresh-a',
       tokenHash: 'hash-a',
+      issuedTokenVersion: 1,
       ttlSeconds: 60,
     });
     await service.createRefreshSession({
@@ -127,6 +131,7 @@ describe('AuthRedisService', () => {
       sessionId: 'session-b',
       tokenId: 'refresh-b',
       tokenHash: 'hash-b',
+      issuedTokenVersion: 1,
       ttlSeconds: 60,
     });
 
@@ -143,6 +148,7 @@ describe('AuthRedisService', () => {
         sessionId,
         tokenId: `refresh-${sessionId}`,
         tokenHash: `hash-${sessionId}`,
+        issuedTokenVersion: 1,
         ttlSeconds: 60,
       });
     }

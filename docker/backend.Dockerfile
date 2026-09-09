@@ -15,6 +15,7 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 
 COPY apps/auth-service/package.json apps/auth-service/package.json
+COPY apps/realm-auth-service/package.json apps/realm-auth-service/package.json
 COPY apps/tenant-authority-service/package.json apps/tenant-authority-service/package.json
 COPY apps/blog-service/package.json apps/blog-service/package.json
 COPY apps/gateway/package.json apps/gateway/package.json
@@ -29,6 +30,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/clients/package.json packages/clients/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/grpc-auth/package.json packages/grpc-auth/package.json
+COPY packages/migration-artifacts/package.json packages/migration-artifacts/package.json
 COPY packages/protos/package.json packages/protos/package.json
 
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
@@ -52,6 +54,7 @@ COPY apps/product-service/prisma/schema.prisma apps/product-service/prisma/schem
 COPY apps/settings-service/prisma/schema.prisma apps/settings-service/prisma/schema.prisma
 COPY apps/taxonomy-service/prisma/schema.prisma apps/taxonomy-service/prisma/schema.prisma
 COPY apps/user-service/prisma/schema.prisma apps/user-service/prisma/schema.prisma
+COPY apps/realm-auth-service/prisma/schema.prisma apps/realm-auth-service/prisma/schema.prisma
 
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile \
@@ -60,6 +63,7 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
     --filter=@nebula/gateway... \
     --filter=@nebula/user-service... \
     --filter=@nebula/auth-service... \
+    --filter=@nebula/realm-auth-service... \
     --filter=@nebula/tenant-authority-service... \
     --filter=@nebula/settings-service... \
     --filter=@nebula/media-service... \
@@ -72,6 +76,7 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
 # and the web application are deliberately absent from this build context slice.
 COPY turbo.json tsconfig.base.json ./
 COPY apps/auth-service ./apps/auth-service
+COPY apps/realm-auth-service ./apps/realm-auth-service
 COPY apps/tenant-authority-service ./apps/tenant-authority-service
 COPY apps/blog-service ./apps/blog-service
 COPY apps/gateway ./apps/gateway
@@ -84,6 +89,7 @@ COPY apps/user-service ./apps/user-service
 COPY packages/clients ./packages/clients
 COPY packages/config ./packages/config
 COPY packages/grpc-auth ./packages/grpc-auth
+COPY packages/migration-artifacts ./packages/migration-artifacts
 COPY packages/protos ./packages/protos
 
 # A Turbo cache hit skips pnpm's post-build injected-dependency sync. Build the
@@ -96,12 +102,14 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
     --mount=type=cache,id=nebula-turbo,target=/app/.turbo,sharing=locked \
     pnpm --filter=@nebula/protos build && \
     pnpm --filter=@nebula/grpc-auth build && \
+    pnpm --filter=@nebula/migration-artifacts build && \
     pnpm --filter=@packages/config build && \
     pnpm --filter=@nebula/clients build && \
     if [ "$TURBO_FORCE" = "1" ]; then \
       pnpm turbo run build --force --cache-dir=/app/.turbo/runtime-imports-v2 \
         --filter=@nebula/user-service... \
         --filter=@nebula/auth-service... \
+        --filter=@nebula/realm-auth-service... \
         --filter=@nebula/tenant-authority-service... \
         --filter=@nebula/gateway... \
         --filter=@nebula/settings-service... \
@@ -114,6 +122,7 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
       pnpm turbo run build --cache-dir=/app/.turbo/runtime-imports-v2 \
         --filter=@nebula/user-service... \
         --filter=@nebula/auth-service... \
+        --filter=@nebula/realm-auth-service... \
         --filter=@nebula/tenant-authority-service... \
         --filter=@nebula/gateway... \
         --filter=@nebula/settings-service... \
@@ -152,6 +161,7 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
       --frozen-lockfile \
       --filter=@nebula/user-service... \
       --filter=@nebula/auth-service... \
+      --filter=@nebula/realm-auth-service... \
       --filter=@nebula/tenant-authority-service... \
       --filter=@nebula/gateway... \
       --filter=@nebula/settings-service... \
@@ -169,10 +179,12 @@ FROM scratch AS shared-runtime-artifacts
 COPY --from=deps /app/packages/clients/package.json /packages/clients/package.json
 COPY --from=deps /app/packages/config/package.json /packages/config/package.json
 COPY --from=deps /app/packages/grpc-auth/package.json /packages/grpc-auth/package.json
+COPY --from=deps /app/packages/migration-artifacts/package.json /packages/migration-artifacts/package.json
 COPY --from=deps /app/packages/protos/package.json /packages/protos/package.json
 COPY --from=build /app/packages/clients/dist /packages/clients/dist
 COPY --from=build /app/packages/config/dist /packages/config/dist
 COPY --from=build /app/packages/grpc-auth/dist /packages/grpc-auth/dist
+COPY --from=build /app/packages/migration-artifacts/dist /packages/migration-artifacts/dist
 COPY --from=build /app/packages/protos/dist /packages/protos/dist
 COPY --from=build /app/packages/protos/auth.proto /packages/protos/auth.proto
 COPY --from=build /app/packages/protos/blog.proto /packages/protos/blog.proto
@@ -254,6 +266,18 @@ RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of 
 EXPOSE 3001 50052
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/main.js"]
+
+FROM runtime-base AS realm-auth-runtime
+WORKDIR /workspace/apps/realm-auth-service
+COPY --link --from=prod-deps /app/apps/realm-auth-service/package.json ./package.json
+COPY --link --from=prod-deps /app/apps/realm-auth-service/node_modules ./node_modules
+COPY --link --from=build /app/apps/realm-auth-service/dist ./dist
+COPY --link --from=build /app/apps/realm-auth-service/prisma ./prisma
+RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
+EXPOSE 3012
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD node -e "const u=process.env.REALM_AUTH_HTTP_PORT?'http://localhost:'+process.env.REALM_AUTH_HTTP_PORT+'/health/ready':'http://localhost:3012/health/ready'; fetch(u).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
 
 FROM runtime-base AS tenant-authority-runtime

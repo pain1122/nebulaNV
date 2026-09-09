@@ -1,0 +1,52 @@
+{
+  "name": "@nebula/realm-auth-service",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "check-types": "tsc -p tsconfig.build.json --noEmit",
+    "prisma:gen": "prisma generate --schema ./prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
+    "prisma:migrate:status": "prisma migrate status --schema ./prisma/schema.prisma",
+    "db:seed": "ts-node --project tsconfig.json prisma/seed-shadow-boundary.ts DEFAULT",
+    "seed:shadow-boundary": "ts-node --project tsconfig.json prisma/seed-shadow-boundary.ts",
+    "seed:shadow-boundary:operator": "ts-node --project tsconfig.json prisma/seed-shadow-boundary.ts OPERATOR",
+    "import:f4-r3-shadow": "ts-node --project tsconfig.json prisma/import-f4-r3-shadow.ts",
+    "rollback:f4-r3-shadow": "ts-node --project tsconfig.json prisma/rollback-f4-r3-shadow.ts",
+    "compare:f4-r3-shadow-login": "ts-node --project tsconfig.json prisma/compare-f4-r3-shadow-login.ts",
+    "test": "jest --config ./jest.config.ts --runInBand",
+    "postinstall": "pnpm run prisma:gen"
+  },
+  "dependencies": {
+    "@nebula/migration-artifacts": "workspace:^",
+    "@nestjs/common": "11.1.28",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "11.1.28",
+    "@nestjs/platform-express": "11.1.28",
+    "@packages/config": "workspace:*",
+    "@prisma/client": "6.16.2",
+    "bcryptjs": "^3.0.2",
+    "ioredis": "^5.9.2",
+    "joi": "18.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/testing": "11.1.28",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.5.2",
+    "eslint": "^9.36.0",
+    "jest": "30.2.0",
+    "prettier": "^3.6.2",
+    "prisma": "6.16.2",
+    "ts-jest": "^29.4.4",
+    "ts-node": "^10.9.2",
+    "typescript": "5.9.2"
+  }
+}

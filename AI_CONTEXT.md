@@ -7,12 +7,14 @@ Purpose: fast, safe handoff for AI/developer sessions without re-discovering the
 
 - Salar is actively learning the project and wants explanations of syntax, type choices, and service boundaries.
 - The assistant may inspect files freely and should explain findings in plain language.
-- Since 2026-09-08, send shell and verification command sequences to Salar to
-  run. Request brief results instead of full logs to reduce token use. Continue
-  authorized focused file edits and keep explanations concise.
-- The assistant must not edit files unless Salar explicitly says `change it` or directly says to `change` a named file/task in an edit context.
-- If Salar uses wording that sounds equivalent but does not include `change`, such as `do it`, `fix it`, `apply it`, `go ahead`, or `make it happen`, the assistant must ask: `Should I change it?`
-- When not allowed to edit, give exact edit instructions, file paths, and reasoning.
+- Updated workflow: the assistant runs small inspections, formatting, and focused
+  checks directly and continues authorized edits. Leave heavy builds, full e2e,
+  scans, and long verification sequences to Salar to avoid timeouts. Keep tool
+  output and explanations brief; request summaries instead of full logs.
+- This continuation authorizes implementation of the adopted roadmap. Fix
+  confirmed implementation gaps without requesting special approval wording or
+  treating them as new design choices. Consult Salar for changes to frozen
+  requirements or scope, not routine implementation decisions.
 - Before suggesting code changes, explain what problem the change solves and what contract it affects.
 
 ### Per-Batch Evidence Gate
@@ -38,9 +40,9 @@ within that batch:
 
    Only the second pass permits checking the item.
 
-7. Send command sequences to Salar for execution, including source, database,
-   formatting, and focused verification gates. Request brief results and keep
-   full builds outside the active task unless explicitly authorized.
+7. Run small source, formatting, and focused verification gates directly.
+   Send heavy or long-running command sequences to Salar and request brief
+   results. Full builds remain outside the active task unless authorized.
 
 ## 2. Safety Rules
 
@@ -153,8 +155,24 @@ operation, remains disabled until its isolation work is complete.
   (79 tests), 50 tooling tests, lint/types, and affected Prisma checks passed.
   Salar confirmed zero remaining verification databases. Both completion passes
   and the corrected pair-check/v1-return defects are in the R2 section of the
-  Batch 3R execution report. `R3_REALM_AUTH_SHADOW` is next; its evidence ledger
-  precedes implementation and current User/Auth stays authoritative in shadow.
+  Batch 3R execution report. `R3_REALM_AUTH_SHADOW` has an entry evidence ledger
+  in that report. The legacy-family source gap is corrected with issued-version
+  metadata and an atomic, non-mutating migration evidence reader. A shared Realm
+  Auth service now has the durable shadow aggregate migration, fixed default and
+  operator deployment tuples, separate DB roles/Redis placement, database-level
+  session/generation denial in shadow, and an idempotent boundary/key-reference
+  seed. The clean dual-store verifier and operator maintenance-backup coverage
+  are implemented, and Salar's clean dual-store run passed on 2026-09-09. The
+  bounded encrypted User/Auth exports, atomic default-realm importer, exact
+  `lsb1_` derivation, and non-issuing login comparator are implemented in source;
+  their first populated end-to-end verifier passed on 2026-09-09. Completion
+  review added exact copied-graph rerun checks and controlled evidence-retaining
+  shadow rollback; the expanded adversarial/stateful run passed. The second
+  review added bounded retry for the exact Prisma serialization conflict and a
+  simultaneous-import proof; its stateful rerun passed. The updated foundation,
+  Authority, role-seed, R2, all-service migration, and zero-residue regressions
+  then passed, closing R3 on 2026-09-09. Current User/Auth stays authoritative.
+  R4_ADMIN_SPLIT_STAGED is next.
   ADR-0015 R0-R11 must execute in order. Do not resume former Batch 3 item 5 or skip
   to a context writer. The selected target is one or more
   isolated identity realms per licensed root, a separate NebulaNV platform-

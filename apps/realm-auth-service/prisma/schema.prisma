@@ -1,0 +1,397 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "./generated"
+  binaryTargets = ["native", "linux-musl"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RealmKind {
+  PLATFORM_OPERATOR
+  LICENSED_ROOT_CONSUMER
+  LICENSED_ROOT_WORKFORCE
+  SUBORDINATE_CONSUMER
+  SUBORDINATE_WORKFORCE
+}
+
+enum PrincipalClass {
+  PLATFORM_OPERATOR
+  CONSUMER
+  WORKFORCE
+}
+
+enum RealmLifecycle {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum RealmAdmissionMode {
+  SHADOW
+  ACTIVE
+}
+
+enum LoginIdentifierKind {
+  EMAIL
+  PHONE
+}
+
+enum LoginNormalizationVersion {
+  EMAIL_LOWER_TRIM_V1
+  PHONE_PLUS_DIGITS_V1
+}
+
+enum LoginIdentifierState {
+  PENDING_VERIFICATION
+  ACTIVE
+  REVOKED
+}
+
+enum CredentialAlgorithm {
+  BCRYPT
+}
+
+enum IdentityProviderKind {
+  NEBULA_LOCAL
+  OIDC
+  SAML
+}
+
+enum ExternalIdentityState {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum SessionLifecycle {
+  ACTIVE
+  REVOKED
+}
+
+enum LegacySessionBridgeState {
+  PENDING
+  CONSUMED
+  REVOKED
+}
+
+enum RootSsoExchangeGrantState {
+  PENDING
+  CONSUMED
+  REVOKED
+}
+
+enum RealmKeyPurpose {
+  JWT_SIGNING
+  SESSION_REFERENCE
+  LEGACY_SESSION_BRIDGE
+  ARTIFACT_DECRYPTION
+  MIGRATION_INTEGRITY
+  AUDIT_INTEGRITY
+}
+
+enum AuthAuditResult {
+  SUCCEEDED
+  DENIED
+  FAILED
+}
+
+enum AuthOutboxState {
+  PENDING
+  DISPATCHED
+}
+
+enum MigrationSourceOwner {
+  USER_SERVICE
+  AUTH_SERVICE
+}
+
+enum MigrationImportState {
+  IMPORTING
+  COMPLETE
+  REJECTED
+  ROLLED_BACK
+}
+
+model RealmBoundary {
+  singleton          Boolean                @id @default(true)
+  identityRealmId    String                 @unique @db.Uuid
+  authRouteRef       String                 @unique @db.Uuid
+  kind               RealmKind
+  principalClass     PrincipalClass
+  issuer             String                 @unique @db.VarChar(512)
+  lifecycle          RealmLifecycle         @default(PROVISIONING)
+  admissionMode      RealmAdmissionMode     @default(SHADOW)
+  createdAt          DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime               @updatedAt @db.Timestamptz(3)
+  subjects           RealmSubject[]
+  keys               RealmKeyRegistration[]
+  migrationManifests MigrationManifest[]
+}
+
+model RealmKeyRegistration {
+  id                String                @id @db.Uuid
+  identityRealmId   String                @db.Uuid
+  purpose           RealmKeyPurpose
+  keyReference      String                @db.VarChar(512)
+  createdAt         DateTime              @default(now()) @db.Timestamptz(3)
+  retiredAt         DateTime?             @db.Timestamptz(3)
+  boundary          RealmBoundary         @relation(fields: [identityRealmId], references: [identityRealmId], onDelete: Restrict, onUpdate: Restrict)
+  authSessions      AuthSession[]         @relation("AuthSessionReferenceKey")
+  legacyBridges     LegacySessionBridge[] @relation("LegacyBridgeKey")
+  auditEvents       AuthAuditEvent[]      @relation("AuthAuditKey")
+  importedManifests MigrationManifest[]   @relation("ManifestDestinationKey")
+
+  @@unique([identityRealmId, id])
+  @@unique([identityRealmId, purpose, keyReference])
+  @@index([identityRealmId, purpose, retiredAt])
+}
+
+model RealmSubject {
+  id                   String                 @id @db.Uuid
+  identityRealmId      String                 @db.Uuid
+  principalClass       PrincipalClass
+  lifecycle            RealmLifecycle         @default(PROVISIONING)
+  credentialGeneration BigInt                 @default(1)
+  sessionGeneration    BigInt                 @default(1)
+  createdAt            DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime               @updatedAt @db.Timestamptz(3)
+  boundary             RealmBoundary          @relation(fields: [identityRealmId], references: [identityRealmId], onDelete: Restrict, onUpdate: Restrict)
+  loginIdentifiers     LoginIdentifier[]
+  localCredential      LocalCredential?
+  externalIdentities   ExternalIdentityLink[]
+  authSessions         AuthSession[]
+  legacyBridges        LegacySessionBridge[]
+
+  @@unique([identityRealmId, id])
+  @@index([identityRealmId, lifecycle])
+}
+
+model LoginIdentifier {
+  id                   String                    @id @db.Uuid
+  identityRealmId      String                    @db.Uuid
+  subjectId            String                    @db.Uuid
+  kind                 LoginIdentifierKind
+  normalizationVersion LoginNormalizationVersion
+  normalizedValue      String                    @db.VarChar(512)
+  state                LoginIdentifierState
+  revision             BigInt                    @default(1)
+  createdAt            DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                  @updatedAt @db.Timestamptz(3)
+  revokedAt            DateTime?                 @db.Timestamptz(3)
+  subject              RealmSubject              @relation(fields: [identityRealmId, subjectId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([identityRealmId, kind, normalizedValue])
+  @@index([identityRealmId, subjectId, state])
+}
+
+model LocalCredential {
+  identityRealmId String              @db.Uuid
+  subjectId       String              @db.Uuid
+  passwordHash    String              @db.VarChar(512)
+  algorithm       CredentialAlgorithm
+  parameters      Json
+  revision        BigInt              @default(1)
+  changedAt       DateTime            @db.Timestamptz(3)
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
+  subject         RealmSubject        @relation(fields: [identityRealmId, subjectId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([identityRealmId, subjectId])
+}
+
+model ExternalIdentityLink {
+  id                     String                @id @db.Uuid
+  identityRealmId        String                @db.Uuid
+  subjectId              String                @db.Uuid
+  providerRegistrationId String                @db.Uuid
+  providerKind           IdentityProviderKind
+  exactIssuer            String                @db.VarChar(2048)
+  providerSubject        String                @db.VarChar(1024)
+  state                  ExternalIdentityState
+  revision               BigInt                @default(1)
+  createdAt              DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
+  revokedAt              DateTime?             @db.Timestamptz(3)
+  subject                RealmSubject          @relation(fields: [identityRealmId, subjectId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([identityRealmId, providerRegistrationId, exactIssuer, providerSubject])
+  @@index([identityRealmId, subjectId, state])
+}
+
+model AuthSession {
+  id                           String                 @id @db.Uuid
+  identityRealmId              String                 @db.Uuid
+  subjectId                    String                 @db.Uuid
+  sessionRef                   String                 @unique @db.VarChar(47)
+  sessionRefKeyId              String                 @db.Uuid
+  observedCredentialGeneration BigInt
+  observedSessionGeneration    BigInt
+  providerRegistrationId       String                 @db.Uuid
+  providerKind                 IdentityProviderKind
+  applicationId                String                 @db.Uuid
+  audience                     String                 @db.VarChar(512)
+  familyId                     String                 @db.Uuid
+  rotationSequence             BigInt                 @default(0)
+  refreshTokenHash             String                 @db.Char(64)
+  refreshTokenId               String                 @db.Uuid
+  lifecycle                    SessionLifecycle
+  deviceLabel                  String?                @db.VarChar(128)
+  createdAt                    DateTime               @default(now()) @db.Timestamptz(3)
+  lastSeenAt                   DateTime               @default(now()) @db.Timestamptz(3)
+  expiresAt                    DateTime               @db.Timestamptz(3)
+  revokedAt                    DateTime?              @db.Timestamptz(3)
+  subject                      RealmSubject           @relation(fields: [identityRealmId, subjectId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+  sessionRefKey                RealmKeyRegistration   @relation("AuthSessionReferenceKey", fields: [identityRealmId, sessionRefKeyId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+  consumedBridges              LegacySessionBridge[]  @relation("ConsumedBridgeSession")
+  sourceExchangeGrants         RootSsoExchangeGrant[] @relation("ExchangeSourceSession")
+  consumedExchangeGrants       RootSsoExchangeGrant[] @relation("ExchangeConsumedSession")
+
+  @@unique([identityRealmId, id])
+  @@unique([identityRealmId, familyId])
+  @@index([identityRealmId, subjectId, lifecycle, expiresAt])
+  @@index([identityRealmId, applicationId, audience, lifecycle])
+}
+
+model LegacySessionBridge {
+  id                            String                   @id @db.Uuid
+  identityRealmId               String                   @db.Uuid
+  subjectId                     String                   @db.Uuid
+  legacySessionFingerprint      String                   @unique @db.VarChar(48)
+  legacySessionFingerprintKeyId String                   @db.Uuid
+  observedCredentialGeneration  BigInt
+  observedSessionGeneration     BigInt
+  expiresAt                     DateTime                 @db.Timestamptz(3)
+  state                         LegacySessionBridgeState @default(PENDING)
+  consumedAuthSessionId         String?                  @db.Uuid
+  createdAt                     DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime                 @updatedAt @db.Timestamptz(3)
+  consumedAt                    DateTime?                @db.Timestamptz(3)
+  revokedAt                     DateTime?                @db.Timestamptz(3)
+  subject                       RealmSubject             @relation(fields: [identityRealmId, subjectId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+  fingerprintKey                RealmKeyRegistration     @relation("LegacyBridgeKey", fields: [identityRealmId, legacySessionFingerprintKeyId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+  consumedAuthSession           AuthSession?             @relation("ConsumedBridgeSession", fields: [identityRealmId, consumedAuthSessionId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([identityRealmId, subjectId, state, expiresAt])
+}
+
+model RootSsoExchangeGrant {
+  id                        String                    @id @db.Uuid
+  identityRealmId           String                    @db.Uuid
+  sourceAuthSessionId       String                    @db.Uuid
+  codeDigest                String                    @unique @db.Char(64)
+  targetApplicationId       String                    @db.Uuid
+  targetAudience            String                    @db.VarChar(512)
+  requestId                 String                    @db.Uuid
+  registeredRedirect        String                    @db.VarChar(2048)
+  pkceS256Challenge         String                    @db.VarChar(43)
+  applicationPolicyRevision BigInt
+  federationTrustId         String                    @db.Uuid
+  federationTrustRevision   BigInt
+  expiresAt                 DateTime                  @db.Timestamptz(3)
+  state                     RootSsoExchangeGrantState @default(PENDING)
+  consumedAuthSessionId     String?                   @db.Uuid
+  createdAt                 DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                  @updatedAt @db.Timestamptz(3)
+  consumedAt                DateTime?                 @db.Timestamptz(3)
+  revokedAt                 DateTime?                 @db.Timestamptz(3)
+  sourceAuthSession         AuthSession               @relation("ExchangeSourceSession", fields: [identityRealmId, sourceAuthSessionId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+  consumedAuthSession       AuthSession?              @relation("ExchangeConsumedSession", fields: [identityRealmId, consumedAuthSessionId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([identityRealmId, requestId])
+  @@index([identityRealmId, sourceAuthSessionId, state, expiresAt])
+}
+
+model AuthAuditEvent {
+  id                   String               @id @db.Uuid
+  identityRealmId      String               @db.Uuid
+  subjectId            String?              @db.Uuid
+  authSessionId        String?              @db.Uuid
+  applicationId        String?              @db.Uuid
+  purpose              String               @db.VarChar(128)
+  credentialGeneration BigInt?
+  sessionGeneration    BigInt?
+  sequence             BigInt?
+  eventVersion         Int
+  result               AuthAuditResult
+  reason               String               @db.VarChar(256)
+  occurredAt           DateTime             @db.Timestamptz(3)
+  previousHash         String?              @db.Char(64)
+  eventHash            String               @unique @db.Char(64)
+  keyId                String               @db.Uuid
+  createdAt            DateTime             @default(now()) @db.Timestamptz(3)
+  key                  RealmKeyRegistration @relation("AuthAuditKey", fields: [identityRealmId, keyId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([identityRealmId, subjectId, occurredAt])
+  @@index([identityRealmId, authSessionId, occurredAt])
+}
+
+model AuthOutboxEvent {
+  id                   String          @id @db.Uuid
+  identityRealmId      String          @db.Uuid
+  aggregateKind        String          @db.VarChar(64)
+  aggregateId          String          @db.Uuid
+  subjectId            String?         @db.Uuid
+  authSessionId        String?         @db.Uuid
+  applicationId        String?         @db.Uuid
+  credentialGeneration BigInt?
+  sessionGeneration    BigInt?
+  sequence             BigInt?
+  eventVersion         Int
+  payload              Json
+  state                AuthOutboxState @default(PENDING)
+  attempts             Int             @default(0)
+  availableAt          DateTime        @default(now()) @db.Timestamptz(3)
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
+  dispatchedAt         DateTime?       @db.Timestamptz(3)
+
+  @@index([identityRealmId, state, availableAt])
+  @@index([identityRealmId, aggregateKind, aggregateId])
+}
+
+model MigrationManifest {
+  id                   String                   @id @db.Uuid
+  identityRealmId      String                   @db.Uuid
+  sourceOwner          MigrationSourceOwner
+  migrationId          String                   @db.Uuid
+  manifestVersion      Int
+  manifestDigest       String                   @db.Char(64)
+  manifestHmacKeyId    String                   @db.Uuid
+  destinationKeyId     String                   @db.Uuid
+  sourceCreatedAt      DateTime                 @db.Timestamptz(3)
+  expiresAt            DateTime                 @db.Timestamptz(3)
+  sourceRecordCount    Int
+  importedRecordCount  Int                      @default(0)
+  duplicateRecordCount Int                      @default(0)
+  orphanRecordCount    Int                      @default(0)
+  state                MigrationImportState     @default(IMPORTING)
+  createdAt            DateTime                 @default(now()) @db.Timestamptz(3)
+  completedAt          DateTime?                @db.Timestamptz(3)
+  rolledBackAt         DateTime?                @db.Timestamptz(3)
+  boundary             RealmBoundary            @relation(fields: [identityRealmId], references: [identityRealmId], onDelete: Restrict, onUpdate: Restrict)
+  destinationKey       RealmKeyRegistration     @relation("ManifestDestinationKey", fields: [identityRealmId, destinationKeyId], references: [identityRealmId, id], onDelete: Restrict, onUpdate: Restrict)
+  receipts             MigrationRecordReceipt[]
+
+  @@unique([sourceOwner, migrationId])
+  @@unique([identityRealmId, manifestDigest])
+  @@index([identityRealmId, state, expiresAt])
+}
+
+model MigrationRecordReceipt {
+  id          String               @id @db.Uuid
+  manifestId  String               @db.Uuid
+  sourceOwner MigrationSourceOwner
+  migrationId String               @db.Uuid
+  recordHmac  String               @db.Char(64)
+  recordKind  String               @db.VarChar(64)
+  targetId    String?              @db.Uuid
+  importedAt  DateTime             @default(now()) @db.Timestamptz(3)
+  manifest    MigrationManifest    @relation(fields: [manifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([sourceOwner, migrationId, recordHmac])
+  @@index([manifestId, recordKind])
+}

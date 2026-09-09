@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { tmpdir } from "node:os";
@@ -151,6 +151,25 @@ export const prismaServices = Object.freeze(
 export const composeServices = Object.freeze(
   backendServices.filter((service) => service.compose),
 );
+
+const operatorRealmAuthDatabase = Object.freeze({
+  name: "operator-realm-auth-service",
+  database: "nebula_realm_auth_operator",
+  dockerService: "operator-realm-auth-service",
+});
+
+// The operator Realm Auth deployment shares the package and image used by the
+// default deployment, so it is not a second build/migration inventory entry.
+// It is, however, a distinct durable database and runtime for maintenance.
+export const maintenanceDatabaseServices = Object.freeze([
+  ...prismaServices,
+  operatorRealmAuthDatabase,
+]);
+
+const maintenanceDockerServices = Object.freeze([
+  ...composeServices.map((service) => service.dockerService),
+  operatorRealmAuthDatabase.dockerService,
+]);
 
 export const SECURITY_REPORT_DIRECTORY = path.join(
   repositoryRoot,
@@ -768,6 +787,8 @@ function runPackageScript(
     { env, capture: true, emitCaptured: false, input },
   );
   if (result.status !== 0) {
+    writeCaptured(process.stdout, result.stdout, env);
+    writeCaptured(process.stderr, result.stderr, env);
     throw new Error(
       `package_script_${packageName}_${script}_failed_exit_${result.status ?? "unknown"}`,
     );
@@ -919,7 +940,12 @@ function expectSqlTextFailure(
   database,
   sql,
   expectedMessage,
-  { env = process.env, execute = run, platform = process.platform } = {},
+  {
+    env = process.env,
+    execute = run,
+    failureLabel = "f4_r2",
+    platform = process.platform,
+  } = {},
 ) {
   const result = execute(
     dockerExecutable(platform),
@@ -946,7 +972,9 @@ function expectSqlTextFailure(
     result.status === 0 ||
     reportedError !== expectedMessage
   ) {
-    throw new Error(`f4_r2_expected_failure_missing_${expectedMessage}`);
+    throw new Error(
+      `${failureLabel}_expected_failure_missing_${expectedMessage}`,
+    );
   }
 }
 
@@ -1144,6 +1172,1008 @@ export function verifyF4R2DefaultActors({
   return [...successServices, ...failureServices].map(
     (service) => service.database,
   );
+}
+
+const F4_R3_REALM_AUTH_DEPLOYMENTS = Object.freeze([
+  Object.freeze({
+    name: "default",
+    database: "nebula_realm_auth_default",
+    realmId: "b1000000-0000-4000-8000-000000000001",
+    routeRef: "b1100000-0000-4000-8000-000000000001",
+    kind: "LICENSED_ROOT_CONSUMER",
+    principalClass: "CONSUMER",
+    issuer: "urn:nebula:realm-auth:b1000000-0000-4000-8000-000000000001",
+    seedScript: "db:seed",
+    sessionReferenceKeyId: "b5000000-0000-4000-8000-000000000002",
+    legacyBridgeKeyId: "b5000000-0000-4000-8000-000000000003",
+    auditKeyId: "b5000000-0000-4000-8000-000000000006",
+    artifactKeyId: "b5000000-0000-4000-8000-000000000004",
+  }),
+  Object.freeze({
+    name: "operator",
+    database: "nebula_realm_auth_operator",
+    realmId: "b1000000-0000-4000-8000-000000000002",
+    routeRef: "b1100000-0000-4000-8000-000000000002",
+    kind: "PLATFORM_OPERATOR",
+    principalClass: "PLATFORM_OPERATOR",
+    issuer: "urn:nebula:realm-auth:b1000000-0000-4000-8000-000000000002",
+    seedScript: "seed:shadow-boundary:operator",
+    sessionReferenceKeyId: "b5100000-0000-4000-8000-000000000002",
+    legacyBridgeKeyId: "b5100000-0000-4000-8000-000000000003",
+    auditKeyId: "b5100000-0000-4000-8000-000000000006",
+    artifactKeyId: "b5100000-0000-4000-8000-000000000004",
+  }),
+]);
+
+function f4R3FoundationVerificationSql(deployment) {
+  return `
+DO $verify$
+DECLARE
+  boundary_count integer;
+  key_count integer;
+  shadow_record_count integer;
+BEGIN
+  SELECT count(*) INTO boundary_count FROM "RealmBoundary"
+    WHERE singleton
+      AND "identityRealmId" = '${deployment.realmId}'::uuid
+      AND "authRouteRef" = '${deployment.routeRef}'::uuid
+      AND kind = '${deployment.kind}'
+      AND "principalClass" = '${deployment.principalClass}'
+      AND issuer = '${deployment.issuer}'
+      AND lifecycle = 'PROVISIONING'
+      AND "admissionMode" = 'SHADOW';
+  IF boundary_count <> 1 OR (SELECT count(*) FROM "RealmBoundary") <> 1 THEN
+    RAISE EXCEPTION 'realm_auth_boundary_evidence_mismatch';
+  END IF;
+
+  SELECT count(*) INTO key_count FROM "RealmKeyRegistration"
+    WHERE "identityRealmId" = '${deployment.realmId}'::uuid
+      AND "retiredAt" IS NULL;
+  IF key_count <> 6 OR (SELECT count(DISTINCT purpose) FROM "RealmKeyRegistration") <> 6 THEN
+    RAISE EXCEPTION 'realm_auth_key_evidence_mismatch';
+  END IF;
+
+  SELECT
+    (SELECT count(*) FROM "RealmSubject") +
+    (SELECT count(*) FROM "LoginIdentifier") +
+    (SELECT count(*) FROM "LocalCredential") +
+    (SELECT count(*) FROM "ExternalIdentityLink") +
+    (SELECT count(*) FROM "AuthSession") +
+    (SELECT count(*) FROM "LegacySessionBridge") +
+    (SELECT count(*) FROM "RootSsoExchangeGrant") +
+    (SELECT count(*) FROM "AuthAuditEvent") +
+    (SELECT count(*) FROM "AuthOutboxEvent") +
+    (SELECT count(*) FROM "MigrationManifest") +
+    (SELECT count(*) FROM "MigrationRecordReceipt")
+  INTO shadow_record_count;
+  IF shadow_record_count <> 0 THEN
+    RAISE EXCEPTION 'realm_auth_seed_wrote_security_records';
+  END IF;
+END
+$verify$;
+`;
+}
+
+function f4R3SubjectInsert(deployment, subjectId) {
+  return `INSERT INTO "RealmSubject" (
+    id, "identityRealmId", "principalClass", lifecycle,
+    "credentialGeneration", "sessionGeneration", "createdAt", "updatedAt"
+  ) VALUES (
+    '${subjectId}'::uuid, '${deployment.realmId}'::uuid,
+    '${deployment.principalClass}', 'PROVISIONING', 1, 1, now(), now()
+  );`;
+}
+
+function f4R3ExpectedFailureCases(deployment) {
+  const subjectId =
+    deployment.name === "default"
+      ? "c1000000-0000-4000-8000-000000000001"
+      : "c1000000-0000-4000-8000-000000000002";
+  const wrongRealm =
+    deployment.name === "default"
+      ? F4_R3_REALM_AUTH_DEPLOYMENTS[1].realmId
+      : F4_R3_REALM_AUTH_DEPLOYMENTS[0].realmId;
+  const wrongPrincipal =
+    deployment.principalClass === "CONSUMER" ? "PLATFORM_OPERATOR" : "CONSUMER";
+  return [
+    {
+      reason: "realm_auth_wrong_realm",
+      sql: f4R3SubjectInsert({ ...deployment, realmId: wrongRealm }, subjectId),
+    },
+    {
+      reason: "realm_auth_principal_class_mismatch",
+      sql: f4R3SubjectInsert(
+        { ...deployment, principalClass: wrongPrincipal },
+        subjectId,
+      ),
+    },
+    {
+      reason: "realm_auth_shadow_generation_change_forbidden",
+      sql: `BEGIN;
+${f4R3SubjectInsert(deployment, subjectId)}
+UPDATE "RealmSubject" SET "sessionGeneration" = 2 WHERE id = '${subjectId}'::uuid;
+COMMIT;`,
+    },
+    {
+      reason: "realm_auth_shadow_session_forbidden",
+      sql: `BEGIN;
+${f4R3SubjectInsert(deployment, subjectId)}
+INSERT INTO "AuthSession" (
+  id, "identityRealmId", "subjectId", "sessionRef", "sessionRefKeyId",
+  "observedCredentialGeneration", "observedSessionGeneration",
+  "providerRegistrationId", "providerKind", "applicationId", audience,
+  "familyId", "rotationSequence", "refreshTokenHash", "refreshTokenId",
+  lifecycle, "createdAt", "lastSeenAt", "expiresAt"
+) VALUES (
+  'c2000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.realmId}'::uuid, '${subjectId}'::uuid,
+  'sr2_' || repeat('A', 43), '${deployment.sessionReferenceKeyId}'::uuid,
+  1, 1, 'b2000000-0000-4000-8000-000000000001'::uuid,
+  'NEBULA_LOCAL', 'a4000000-0000-4000-8000-000000000001'::uuid,
+  'urn:nebula:test', 'c3000000-0000-4000-8000-000000000001'::uuid,
+  0, repeat('a', 64), 'c4000000-0000-4000-8000-000000000001'::uuid,
+  'ACTIVE', now(), now(), now() + interval '1 hour'
+);
+COMMIT;`,
+    },
+    {
+      reason: "realm_auth_legacy_bridge_key_invalid",
+      sql: `BEGIN;
+${f4R3SubjectInsert(deployment, subjectId)}
+INSERT INTO "LegacySessionBridge" (
+  id, "identityRealmId", "subjectId", "legacySessionFingerprint",
+  "legacySessionFingerprintKeyId", "observedCredentialGeneration",
+  "observedSessionGeneration", "expiresAt", state, "createdAt", "updatedAt"
+) VALUES (
+  'c5000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.realmId}'::uuid, '${subjectId}'::uuid,
+  'lsb1_' || repeat('A', 43), '${deployment.sessionReferenceKeyId}'::uuid,
+  1, 1, now() + interval '1 hour', 'PENDING', now(), now()
+);
+COMMIT;`,
+    },
+    {
+      reason: "realm_auth_terminal_record_immutable",
+      sql: `BEGIN;
+${f4R3SubjectInsert(deployment, subjectId)}
+INSERT INTO "LegacySessionBridge" (
+  id, "identityRealmId", "subjectId", "legacySessionFingerprint",
+  "legacySessionFingerprintKeyId", "observedCredentialGeneration",
+  "observedSessionGeneration", "expiresAt", state, "createdAt", "updatedAt"
+) VALUES (
+  'c5000000-0000-4000-8000-000000000002'::uuid,
+  '${deployment.realmId}'::uuid, '${subjectId}'::uuid,
+  'lsb1_' || repeat('B', 43), '${deployment.legacyBridgeKeyId}'::uuid,
+  1, 1, now() + interval '1 hour', 'PENDING', now(), now()
+);
+UPDATE "LegacySessionBridge" SET state = 'REVOKED', "revokedAt" = now()
+  WHERE id = 'c5000000-0000-4000-8000-000000000002'::uuid;
+UPDATE "LegacySessionBridge" SET state = 'PENDING', "revokedAt" = NULL
+  WHERE id = 'c5000000-0000-4000-8000-000000000002'::uuid;
+COMMIT;`,
+    },
+    {
+      reason: "realm_auth_audit_key_invalid",
+      sql: `INSERT INTO "AuthAuditEvent" (
+  id, "identityRealmId", purpose, "eventVersion", result, reason,
+  "occurredAt", "eventHash", "keyId", "createdAt"
+) VALUES (
+  'c6000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.realmId}'::uuid, 'R3_PROBE', 1, 'DENIED', 'wrong_key', now(),
+  repeat('a', 64), '${deployment.sessionReferenceKeyId}'::uuid, now()
+);`,
+    },
+    {
+      reason: "realm_auth_destination_key_invalid",
+      sql: `INSERT INTO "MigrationManifest" (
+  id, "identityRealmId", "sourceOwner", "migrationId", "manifestVersion",
+  "manifestDigest", "manifestHmacKeyId", "destinationKeyId",
+  "sourceCreatedAt", "expiresAt", "sourceRecordCount", state, "createdAt"
+) VALUES (
+  'c7000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.realmId}'::uuid, 'USER_SERVICE',
+  'c8000000-0000-4000-8000-000000000001'::uuid, 1, repeat('a', 64),
+  'c9000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.auditKeyId}'::uuid, now(), now() + interval '1 hour', 0,
+  'IMPORTING', now()
+);`,
+    },
+  ];
+}
+
+function f4R3ValidAggregateRollbackSql(deployment) {
+  const subjectId =
+    deployment.name === "default"
+      ? "ca000000-0000-4000-8000-000000000001"
+      : "ca000000-0000-4000-8000-000000000002";
+  return `BEGIN;
+${f4R3SubjectInsert(deployment, subjectId)}
+INSERT INTO "LoginIdentifier" (
+  id, "identityRealmId", "subjectId", kind, "normalizationVersion",
+  "normalizedValue", state, revision, "createdAt", "updatedAt"
+) VALUES (
+  'cb000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.realmId}'::uuid, '${subjectId}'::uuid,
+  'EMAIL', 'EMAIL_LOWER_TRIM_V1', 'shadow@example.test', 'ACTIVE', 1, now(), now()
+);
+INSERT INTO "LocalCredential" (
+  "identityRealmId", "subjectId", "passwordHash", algorithm, parameters,
+  revision, "changedAt", "createdAt", "updatedAt"
+) VALUES (
+  '${deployment.realmId}'::uuid, '${subjectId}'::uuid,
+  '$2b$10$' || repeat('a', 53), 'BCRYPT', '{"cost":10}'::jsonb,
+  1, now(), now(), now()
+);
+INSERT INTO "LegacySessionBridge" (
+  id, "identityRealmId", "subjectId", "legacySessionFingerprint",
+  "legacySessionFingerprintKeyId", "observedCredentialGeneration",
+  "observedSessionGeneration", "expiresAt", state, "createdAt", "updatedAt"
+) VALUES (
+  'cc000000-0000-4000-8000-000000000001'::uuid,
+  '${deployment.realmId}'::uuid, '${subjectId}'::uuid,
+  'lsb1_' || repeat('C', 43), '${deployment.legacyBridgeKeyId}'::uuid,
+  1, 1, now() + interval '1 hour', 'PENDING', now(), now()
+);
+UPDATE "LegacySessionBridge" SET state = 'REVOKED', "revokedAt" = now()
+  WHERE id = 'cc000000-0000-4000-8000-000000000001'::uuid;
+DO $verify$
+BEGIN
+  IF (SELECT state FROM "LegacySessionBridge"
+      WHERE id = 'cc000000-0000-4000-8000-000000000001'::uuid) <> 'REVOKED' THEN
+    RAISE EXCEPTION 'realm_auth_valid_transition_missing';
+  END IF;
+END
+$verify$;
+ROLLBACK;`;
+}
+
+export function verifyF4R3RealmAuthFoundation({
+  env = process.env,
+  executeDocker = run,
+  executePnpm = runPnpm,
+  logger = console,
+  platform = process.platform,
+  runId = randomUUID(),
+} = {}) {
+  const service = prismaServices.find(
+    (candidate) => candidate.packageName === "@nebula/realm-auth-service",
+  );
+  if (!service) throw new Error("f4_r3_realm_auth_service_missing");
+  const deployments = F4_R3_REALM_AUTH_DEPLOYMENTS.map((deployment) => ({
+    ...deployment,
+    database: disposableDatabaseName(deployment.database, runId),
+  }));
+  const created = [];
+  let failure;
+
+  try {
+    runPostgresTool(
+      ["pg_isready", "--username", "postgres", "--dbname", "postgres"],
+      { label: "readiness", env, execute: executeDocker, platform },
+    );
+    for (const deployment of deployments) {
+      createLocalDatabase(deployment.database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      created.push(deployment.database);
+      const serviceEnv = databaseEnv(deployment.database, env);
+      const disposableService = {
+        ...service,
+        name: `${deployment.name}-realm-auth-service`,
+        database: deployment.database,
+      };
+      runPrismaOperation("migrate-deploy", {
+        services: [disposableService],
+        env: serviceEnv,
+        execute: executePnpm,
+        logger,
+      });
+      runPrismaOperation("migrate-status", {
+        services: [disposableService],
+        env: serviceEnv,
+        execute: executePnpm,
+        logger,
+      });
+      const first = runPackageScript(
+        service.packageName,
+        deployment.seedScript,
+        {
+          env: serviceEnv,
+          execute: executePnpm,
+        },
+      );
+      const second = runPackageScript(
+        service.packageName,
+        deployment.seedScript,
+        {
+          env: serviceEnv,
+          execute: executePnpm,
+        },
+      );
+      if (first !== "CREATED" || second !== "ALREADY_CURRENT") {
+        throw new Error(`f4_r3_${deployment.name}_seed_rerun_invalid`);
+      }
+      executeSqlText(
+        deployment.database,
+        f4R3FoundationVerificationSql(deployment),
+        { env, execute: executeDocker, platform },
+      );
+      executeSqlText(
+        deployment.database,
+        f4R3ValidAggregateRollbackSql(deployment),
+        { env, execute: executeDocker, platform },
+      );
+      for (const testCase of f4R3ExpectedFailureCases(deployment)) {
+        expectSqlTextFailure(
+          deployment.database,
+          testCase.sql,
+          testCase.reason,
+          {
+            env,
+            execute: executeDocker,
+            failureLabel: "f4_r3",
+            platform,
+          },
+        );
+      }
+      executeSqlText(
+        deployment.database,
+        f4R3FoundationVerificationSql(deployment),
+        { env, execute: executeDocker, platform },
+      );
+      logger.log(
+        `[backend] F4 R3 shadow foundation verified: ${deployment.name}`,
+      );
+    }
+  } catch (error) {
+    failure = error;
+  }
+
+  let cleanupFailure;
+  for (const database of created.reverse()) {
+    try {
+      dropDisposableDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+    } catch (error) {
+      cleanupFailure ??= error;
+    }
+  }
+  if (failure && cleanupFailure) {
+    throw new Error(`${failure.message}; cleanup: ${cleanupFailure.message}`);
+  }
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  return deployments.map((deployment) => deployment.database);
+}
+
+export function verifyF4R3ShadowImport({
+  env = process.env,
+  executeDocker = run,
+  executePnpm = runPnpm,
+  logger = console,
+  platform = process.platform,
+  runId = randomUUID(),
+} = {}) {
+  const userService = prismaServices.find(
+    (candidate) => candidate.packageName === "@nebula/user-service",
+  );
+  const realmService = prismaServices.find(
+    (candidate) => candidate.packageName === "@nebula/realm-auth-service",
+  );
+  if (!userService || !realmService) {
+    throw new Error("f4_r3_shadow_import_service_missing");
+  }
+  const userDatabase = disposableDatabaseName(userService.database, runId);
+  const realmDatabase = disposableDatabaseName(realmService.database, runId);
+  const safeRunId = userDatabase.slice(
+    userDatabase.lastIndexOf("_verify_") + 8,
+  );
+  const redisContainer = `nebula-f4-r3-redis-${safeRunId}`;
+  const artifactDirectory = mkdtempSync(
+    path.join(tmpdir(), "nebula-f4-r3-shadow-"),
+  );
+  const userArtifact = path.join(artifactDirectory, "user.artifact.json");
+  const subjectSelection = path.join(artifactDirectory, "subjects.json");
+  const authArtifact = path.join(artifactDirectory, "auth.artifact.json");
+  const orphanSelection = path.join(artifactDirectory, "orphan-subjects.json");
+  const orphanAuthArtifact = path.join(
+    artifactDirectory,
+    "orphan-auth.artifact.json",
+  );
+  const missingVersionSelection = path.join(
+    artifactDirectory,
+    "missing-version-subjects.json",
+  );
+  const missingVersionArtifact = path.join(
+    artifactDirectory,
+    "missing-version-auth.artifact.json",
+  );
+  const migrationId = randomUUID();
+  const destinationRealmId = "b1000000-0000-4000-8000-000000000001";
+  const destinationKeyId = "b5000000-0000-4000-8000-000000000004";
+  const bridgeKeyId = "b5000000-0000-4000-8000-000000000003";
+  const userHmacKeyId = "d1000000-0000-4000-8000-000000000001";
+  const authHmacKeyId = "d1000000-0000-4000-8000-000000000002";
+  const secret = () => randomBytes(32).toString("base64url");
+  const keyEnv = {
+    F4_R3_DESTINATION_REALM_ID: destinationRealmId,
+    F4_R3_DESTINATION_KEY_ID: destinationKeyId,
+    F4_R3_DESTINATION_KEY: secret(),
+    F4_R3_USER_HMAC_KEY_ID: userHmacKeyId,
+    F4_R3_USER_HMAC_KEY: secret(),
+    F4_R3_AUTH_HMAC_KEY_ID: authHmacKeyId,
+    F4_R3_AUTH_HMAC_KEY: secret(),
+    F4_R3_LEGACY_BRIDGE_KEY_ID: bridgeKeyId,
+    F4_R3_LEGACY_BRIDGE_KEY: secret(),
+  };
+  const subjectId = "e1000000-0000-4000-8000-000000000001";
+  const sessionId = "e4000000-0000-4000-8000-000000000001";
+  const tokenId = "e5000000-0000-4000-8000-000000000001";
+  const orphanSubjectId = "e1000000-0000-4000-8000-000000000002";
+  const missingVersionSubjectId = "e1000000-0000-4000-8000-000000000003";
+  const missingVersionSessionId = "e4000000-0000-4000-8000-000000000003";
+  const created = [];
+  let redisStarted = false;
+  let failure;
+
+  const docker = (args, label, { capture = false } = {}) => {
+    const result = executeDocker(dockerExecutable(platform), args, {
+      env,
+      capture,
+      emitCaptured: false,
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `f4_r3_shadow_import_${label}_failed_exit_${result.status ?? "unknown"}`,
+      );
+    }
+    return result;
+  };
+
+  const expectPackageScriptFailure = (
+    packageName,
+    script,
+    { args = [], commandEnv, reason },
+  ) => {
+    const result = executePnpm(
+      [
+        "--silent",
+        "--filter",
+        packageName,
+        "run",
+        script,
+        ...(args.length === 0 ? [] : ["--", ...args]),
+      ],
+      { env: commandEnv, capture: true, emitCaptured: false },
+    );
+    if (result.status === 0) {
+      throw new Error(`f4_r3_shadow_import_expected_${reason}_failure_missing`);
+    }
+    const output = `${String(result.stdout ?? "")}\n${String(result.stderr ?? "")}`;
+    if (!output.includes(reason)) {
+      throw new Error(`f4_r3_shadow_import_expected_${reason}_failure_invalid`);
+    }
+  };
+
+  const verifyNoImportedRows = () =>
+    executeSqlText(
+      realmDatabase,
+      `DO $verify$
+BEGIN
+  IF (SELECT count(*) FROM "RealmSubject") +
+     (SELECT count(*) FROM "LoginIdentifier") +
+     (SELECT count(*) FROM "LocalCredential") +
+     (SELECT count(*) FROM "LegacySessionBridge") +
+     (SELECT count(*) FROM "AuthSession") +
+     (SELECT count(*) FROM "MigrationManifest") +
+     (SELECT count(*) FROM "MigrationRecordReceipt") <> 0 THEN
+    RAISE EXCEPTION 'f4_r3_shadow_import_failure_not_atomic';
+  END IF;
+END
+$verify$;`,
+      { env, execute: executeDocker, platform },
+    );
+
+  try {
+    runPostgresTool(
+      ["pg_isready", "--username", "postgres", "--dbname", "postgres"],
+      { label: "readiness", env, execute: executeDocker, platform },
+    );
+    for (const database of [userDatabase, realmDatabase]) {
+      createLocalDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      created.push(database);
+    }
+    const disposableUser = {
+      ...userService,
+      name: "f4-r3-source-user-service",
+      database: userDatabase,
+    };
+    const disposableRealm = {
+      ...realmService,
+      name: "f4-r3-destination-realm-auth-service",
+      database: realmDatabase,
+    };
+    runPrismaOperation("migrate-deploy", {
+      services: [disposableUser],
+      env: databaseEnv(userDatabase, env),
+      execute: executePnpm,
+      logger,
+    });
+    runPrismaOperation("migrate-deploy", {
+      services: [disposableRealm],
+      env: databaseEnv(realmDatabase, env),
+      execute: executePnpm,
+      logger,
+    });
+    const realmEnv = {
+      ...databaseEnv(realmDatabase, env),
+      ...keyEnv,
+      REALM_AUTH_DEPLOYMENT: "DEFAULT",
+    };
+    if (
+      runPackageScript(realmService.packageName, "db:seed", {
+        env: realmEnv,
+        execute: executePnpm,
+      }) !== "CREATED"
+    ) {
+      throw new Error("f4_r3_shadow_import_boundary_seed_invalid");
+    }
+    executeSqlText(
+      userDatabase,
+      `INSERT INTO "User" (id, email, phone, password, role, "createdAt", "updatedAt")
+VALUES (
+  '${subjectId}'::uuid, 'shadow@example.test', '+989123456789',
+  '$2b$04$wnet8UUDlx4Cp5BRwYUKA.UvMq6Ru0EV.xYixczWAx5BPFSqtHDJK',
+  'user', now() - interval '1 day', now()
+);`,
+      { env, execute: executeDocker, platform },
+    );
+
+    docker(
+      [
+        "run",
+        "--detach",
+        "--rm",
+        "--name",
+        redisContainer,
+        "--publish",
+        "127.0.0.1::6379",
+        "redis:7-alpine",
+      ],
+      "redis_start",
+      { capture: true },
+    );
+    redisStarted = true;
+    let ready = false;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const result = executeDocker(
+        dockerExecutable(platform),
+        ["exec", redisContainer, "redis-cli", "PING"],
+        { env, capture: true, emitCaptured: false },
+      );
+      if (result.status === 0 && String(result.stdout).trim() === "PONG") {
+        ready = true;
+        break;
+      }
+    }
+    if (!ready) throw new Error("f4_r3_shadow_import_redis_not_ready");
+    const portResult = docker(
+      ["port", redisContainer, "6379/tcp"],
+      "redis_port",
+      { capture: true },
+    );
+    const portMatch = /:(\d+)\s*$/.exec(String(portResult.stdout));
+    if (!portMatch) throw new Error("f4_r3_shadow_import_redis_port_invalid");
+    const redisPort = portMatch[1];
+    const redis = (...args) =>
+      docker(["exec", redisContainer, "redis-cli", ...args], "redis_fixture", {
+        capture: true,
+      });
+    redis("SET", `auth:user:tokenVersion:${subjectId}`, "7");
+    redis(
+      "HSET",
+      `auth:user:${subjectId}:refreshSession:${sessionId}`,
+      "issuedTokenVersion",
+      "7",
+      "tokenHash",
+      "a".repeat(64),
+      "tokenId",
+      tokenId,
+    );
+    redis(
+      "PEXPIRE",
+      `auth:user:${subjectId}:refreshSession:${sessionId}`,
+      "240000",
+    );
+    redis("SADD", `auth:user:${subjectId}:refreshSessions`, sessionId);
+    redis("PEXPIRE", `auth:user:${subjectId}:refreshSessions`, "240000");
+
+    const userExport = capturedJson(
+      runPackageScript(userService.packageName, "export:f4-r3-credentials", {
+        args: [
+          `--artifact=${userArtifact}`,
+          `--subjects=${subjectSelection}`,
+          `--migration-id=${migrationId}`,
+        ],
+        env: { ...databaseEnv(userDatabase, env), ...keyEnv },
+        execute: executePnpm,
+      }),
+      "f4_r3_user_export",
+    );
+    const authExport = capturedJson(
+      runPackageScript("@nebula/auth-service", "export:f4-r3-families", {
+        args: [`--artifact=${authArtifact}`, `--subjects=${subjectSelection}`],
+        env: {
+          ...env,
+          ...keyEnv,
+          REDIS_HOST: "127.0.0.1",
+          REDIS_PORT: redisPort,
+          REDIS_PASSWORD: "",
+        },
+        execute: executePnpm,
+      }),
+      "f4_r3_auth_export",
+    );
+    if (
+      userExport.recordCount !== 1 ||
+      userExport.quarantinedIdentifierCount !== 0 ||
+      authExport.recordCount !== 1 ||
+      authExport.quarantinedFamilyCount !== 0 ||
+      typeof userExport.manifestDigest !== "string" ||
+      typeof authExport.manifestDigest !== "string"
+    ) {
+      throw new Error("f4_r3_shadow_import_export_evidence_invalid");
+    }
+    const importArgs = [
+      `--user-artifact=${userArtifact}`,
+      `--auth-artifact=${authArtifact}`,
+    ];
+    const serializedUserArtifact = readFileSync(userArtifact, "utf8");
+    const tamperedUserArtifact = JSON.parse(serializedUserArtifact);
+    tamperedUserArtifact.ciphertext = `${tamperedUserArtifact.ciphertext.slice(0, -1)}${tamperedUserArtifact.ciphertext.endsWith("A") ? "B" : "A"}`;
+    writeFileSync(userArtifact, JSON.stringify(tamperedUserArtifact), "utf8");
+    expectPackageScriptFailure(
+      realmService.packageName,
+      "import:f4-r3-shadow",
+      {
+        args: importArgs,
+        commandEnv: realmEnv,
+        reason: "migration_artifact_authentication_failed",
+      },
+    );
+    writeFileSync(userArtifact, serializedUserArtifact, "utf8");
+    verifyNoImportedRows();
+    expectPackageScriptFailure(
+      realmService.packageName,
+      "import:f4-r3-shadow",
+      {
+        args: importArgs,
+        commandEnv: { ...realmEnv, F4_R3_USER_HMAC_KEY: secret() },
+        reason: "migration_artifact_manifest_hmac_invalid",
+      },
+    );
+    verifyNoImportedRows();
+    writeFileSync(
+      orphanSelection,
+      `${JSON.stringify({
+        destinationRealmId,
+        migrationId,
+        subjectIds: [subjectId, orphanSubjectId],
+        version: 1,
+      })}\n`,
+      "utf8",
+    );
+    runPackageScript("@nebula/auth-service", "export:f4-r3-families", {
+      args: [
+        `--artifact=${orphanAuthArtifact}`,
+        `--subjects=${orphanSelection}`,
+      ],
+      env: {
+        ...env,
+        ...keyEnv,
+        REDIS_HOST: "127.0.0.1",
+        REDIS_PORT: redisPort,
+        REDIS_PASSWORD: "",
+      },
+      execute: executePnpm,
+    });
+    expectPackageScriptFailure(
+      realmService.packageName,
+      "import:f4-r3-shadow",
+      {
+        args: [
+          `--user-artifact=${userArtifact}`,
+          `--auth-artifact=${orphanAuthArtifact}`,
+        ],
+        commandEnv: realmEnv,
+        reason: "f4_r3_shadow_import_subject_set_mismatch",
+      },
+    );
+    verifyNoImportedRows();
+    redis(
+      "HSET",
+      `auth:user:${missingVersionSubjectId}:refreshSession:${missingVersionSessionId}`,
+      "issuedTokenVersion",
+      "1",
+      "tokenHash",
+      "b".repeat(64),
+      "tokenId",
+      randomUUID(),
+    );
+    redis(
+      "PEXPIRE",
+      `auth:user:${missingVersionSubjectId}:refreshSession:${missingVersionSessionId}`,
+      "240000",
+    );
+    redis(
+      "SADD",
+      `auth:user:${missingVersionSubjectId}:refreshSessions`,
+      missingVersionSessionId,
+    );
+    redis(
+      "PEXPIRE",
+      `auth:user:${missingVersionSubjectId}:refreshSessions`,
+      "240000",
+    );
+    writeFileSync(
+      missingVersionSelection,
+      `${JSON.stringify({
+        destinationRealmId,
+        migrationId,
+        subjectIds: [missingVersionSubjectId],
+        version: 1,
+      })}\n`,
+      "utf8",
+    );
+    expectPackageScriptFailure(
+      "@nebula/auth-service",
+      "export:f4-r3-families",
+      {
+        args: [
+          `--artifact=${missingVersionArtifact}`,
+          `--subjects=${missingVersionSelection}`,
+        ],
+        commandEnv: {
+          ...env,
+          ...keyEnv,
+          REDIS_HOST: "127.0.0.1",
+          REDIS_PORT: redisPort,
+          REDIS_PASSWORD: "",
+        },
+        reason: "current_version_missing_with_families",
+      },
+    );
+    const concurrentImport = capturedJson(
+      runPackageScript(realmService.packageName, "import:f4-r3-shadow", {
+        args: [...importArgs, "--verify-concurrent-idempotency"],
+        env: realmEnv,
+        execute: executePnpm,
+      }),
+      "f4_r3_shadow_import_concurrent",
+    );
+    const secondImport = capturedJson(
+      runPackageScript(realmService.packageName, "import:f4-r3-shadow", {
+        args: importArgs,
+        env: realmEnv,
+        execute: executePnpm,
+      }),
+      "f4_r3_shadow_import_second",
+    );
+    if (
+      concurrentImport.status !== "CONCURRENTLY_IMPORTED" ||
+      JSON.stringify(concurrentImport.importStatuses) !==
+        JSON.stringify(["ALREADY_CURRENT", "IMPORTED"]) ||
+      secondImport.status !== "ALREADY_CURRENT" ||
+      secondImport.subjectCount !== 1
+    ) {
+      throw new Error("f4_r3_shadow_import_rerun_invalid");
+    }
+    executeSqlText(
+      realmDatabase,
+      `DO $verify$
+BEGIN
+  IF (SELECT count(*) FROM "RealmSubject") <> 1 OR
+     (SELECT count(*) FROM "LoginIdentifier") <> 2 OR
+     (SELECT count(*) FROM "LocalCredential") <> 1 OR
+     (SELECT count(*) FROM "LegacySessionBridge") <> 1 OR
+     (SELECT count(*) FROM "AuthSession") <> 0 OR
+     (SELECT count(*) FROM "MigrationManifest" WHERE state = 'COMPLETE') <> 2 OR
+     (SELECT count(*) FROM "MigrationRecordReceipt") <> 2 THEN
+    RAISE EXCEPTION 'f4_r3_shadow_import_count_mismatch';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM "MigrationManifest"
+    WHERE ("sourceOwner" = 'USER_SERVICE' AND "manifestDigest" <> '${userExport.manifestDigest}')
+       OR ("sourceOwner" = 'AUTH_SERVICE' AND "manifestDigest" <> '${authExport.manifestDigest}')
+  ) THEN
+    RAISE EXCEPTION 'f4_r3_shadow_import_digest_mismatch';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM "LegacySessionBridge"
+    WHERE "legacySessionFingerprint" !~ '^lsb1_[A-Za-z0-9_-]{43}$'
+       OR state <> 'PENDING'
+  ) THEN
+    RAISE EXCEPTION 'f4_r3_shadow_import_bridge_mismatch';
+  END IF;
+END
+$verify$;`,
+      { env, execute: executeDocker, platform },
+    );
+    for (const [password, legacyAccepted] of [
+      ["ShadowPass123!", "true"],
+      ["WrongPassword123!", "false"],
+    ]) {
+      const comparison = capturedJson(
+        runPackageScript(
+          realmService.packageName,
+          "compare:f4-r3-shadow-login",
+          {
+            args: ["--kind=EMAIL", "--identifier=shadow@example.test"],
+            env: {
+              ...realmEnv,
+              F4_R3_SHADOW_LOGIN_PASSWORD: password,
+              F4_R3_LEGACY_ACCEPTED: legacyAccepted,
+            },
+            execute: executePnpm,
+          },
+        ),
+        "f4_r3_shadow_login",
+      );
+      if (comparison.comparison !== "MATCH") {
+        throw new Error("f4_r3_shadow_login_comparison_mismatch");
+      }
+    }
+    const rotatedBridgeKeyId = randomUUID();
+    executeSqlText(
+      realmDatabase,
+      `INSERT INTO "RealmKeyRegistration" (
+  id, "identityRealmId", purpose, "keyReference"
+) VALUES (
+  '${rotatedBridgeKeyId}'::uuid,
+  '${destinationRealmId}'::uuid,
+  'LEGACY_SESSION_BRIDGE',
+  'secret://realm-auth/default/legacy-session-bridge-rotated'
+);
+DO $verify$
+BEGIN
+  BEGIN
+    UPDATE "LegacySessionBridge"
+      SET "legacySessionFingerprintKeyId" = '${rotatedBridgeKeyId}'::uuid;
+    RAISE EXCEPTION 'f4_r3_bridge_identity_mutation_accepted';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'realm_auth_legacy_bridge_identity_immutable' THEN
+      RAISE;
+    END IF;
+  END;
+END
+$verify$;`,
+      { env, execute: executeDocker, platform },
+    );
+    executeSqlText(
+      realmDatabase,
+      `DO $verify$
+BEGIN
+  BEGIN
+    UPDATE "LocalCredential" SET revision = revision + 1;
+    RAISE EXCEPTION 'f4_r3_shadow_credential_mutation_accepted';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'realm_auth_shadow_credential_mutation_forbidden' THEN
+      RAISE;
+    END IF;
+  END;
+  BEGIN
+    UPDATE "LoginIdentifier" SET revision = revision + 1;
+    RAISE EXCEPTION 'f4_r3_shadow_identifier_mutation_accepted';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'realm_auth_shadow_credential_mutation_forbidden' THEN
+      RAISE;
+    END IF;
+  END;
+END
+$verify$;
+DELETE FROM "LoginIdentifier" WHERE kind = 'PHONE';`,
+      { env, execute: executeDocker, platform },
+    );
+    expectPackageScriptFailure(
+      realmService.packageName,
+      "import:f4-r3-shadow",
+      {
+        args: importArgs,
+        commandEnv: realmEnv,
+        reason: "f4_r3_shadow_import_existing_manifest_conflict",
+      },
+    );
+    const rollbackArgs = [`--migration-id=${migrationId}`];
+    const firstRollback = capturedJson(
+      runPackageScript(realmService.packageName, "rollback:f4-r3-shadow", {
+        args: rollbackArgs,
+        env: realmEnv,
+        execute: executePnpm,
+      }),
+      "f4_r3_shadow_rollback_first",
+    );
+    const secondRollback = capturedJson(
+      runPackageScript(realmService.packageName, "rollback:f4-r3-shadow", {
+        args: rollbackArgs,
+        env: realmEnv,
+        execute: executePnpm,
+      }),
+      "f4_r3_shadow_rollback_second",
+    );
+    if (
+      firstRollback.status !== "ROLLED_BACK" ||
+      firstRollback.subjectCount !== 1 ||
+      firstRollback.retainedReceiptCount !== 2 ||
+      secondRollback.status !== "ALREADY_ROLLED_BACK" ||
+      secondRollback.subjectCount !== 1
+    ) {
+      throw new Error("f4_r3_shadow_rollback_result_invalid");
+    }
+    executeSqlText(
+      realmDatabase,
+      `DO $verify$
+BEGIN
+  IF (SELECT count(*) FROM "RealmSubject") +
+     (SELECT count(*) FROM "LoginIdentifier") +
+     (SELECT count(*) FROM "LocalCredential") +
+     (SELECT count(*) FROM "LegacySessionBridge") +
+     (SELECT count(*) FROM "AuthSession") <> 0 OR
+     (SELECT count(*) FROM "MigrationManifest" WHERE state = 'ROLLED_BACK' AND "rolledBackAt" IS NOT NULL) <> 2 OR
+     (SELECT count(*) FROM "MigrationRecordReceipt") <> 2 THEN
+    RAISE EXCEPTION 'f4_r3_shadow_rollback_state_invalid';
+  END IF;
+END
+$verify$;`,
+      { env, execute: executeDocker, platform },
+    );
+    logger.log(
+      "[backend] F4 R3 encrypted shadow import verified: adversarial=4 concurrentImports=2 subjects=1 bridges=1 loginComparisons=2 rollback=2",
+    );
+  } catch (error) {
+    failure = error;
+  }
+
+  let cleanupFailure;
+  if (redisStarted) {
+    try {
+      docker(["rm", "--force", redisContainer], "redis_cleanup", {
+        capture: true,
+      });
+    } catch (error) {
+      cleanupFailure ??= error;
+    }
+  }
+  for (const database of created.reverse()) {
+    try {
+      dropDisposableDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+    } catch (error) {
+      cleanupFailure ??= error;
+    }
+  }
+  try {
+    rmSync(artifactDirectory, { recursive: true, force: true });
+  } catch (error) {
+    cleanupFailure ??= error;
+  }
+  if (failure && cleanupFailure) {
+    throw new Error(`${failure.message}; cleanup: ${cleanupFailure.message}`);
+  }
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  return [userDatabase, realmDatabase];
 }
 
 export function verifyCleanMigrations({
@@ -1564,7 +2594,7 @@ function backupManifest() {
     version: 1,
     format: "postgres-custom",
     createdAt: new Date().toISOString(),
-    databases: prismaServices.map((service) => ({
+    databases: maintenanceDatabaseServices.map((service) => ({
       service: service.name,
       database: service.database,
       file: `${service.database}.dump`,
@@ -1624,9 +2654,7 @@ function runningBackendServices({
       .map((value) => value.trim())
       .filter(Boolean),
   );
-  return composeServices
-    .map((service) => service.dockerService)
-    .filter((service) => running.has(service));
+  return maintenanceDockerServices.filter((service) => running.has(service));
 }
 
 function assertDatabaseMaintenance(options) {
@@ -2270,6 +3298,7 @@ export async function provisionBackend({
       "120",
       "postgres",
       "redis",
+      "realm-auth-default-redis",
       "minio",
     ],
     {
@@ -2282,6 +3311,13 @@ export async function provisionBackend({
 
   runCompose(["run", "-T", "--rm", "--no-deps", "tenant-authority-db-init"], {
     label: "tenant-authority-database",
+    env,
+    execute: executeDocker,
+    platform,
+  });
+
+  runCompose(["run", "-T", "--rm", "--no-deps", "realm-auth-db-init"], {
+    label: "realm-auth-databases",
     env,
     execute: executeDocker,
     platform,
@@ -3273,6 +4309,8 @@ function usage() {
     "  node scripts/backend.mjs database verify-migrations [tenant-authority]",
     "  node scripts/backend.mjs database verify-f4-batch3-role-seeds",
     "  node scripts/backend.mjs database verify-f4-r2-default-actors",
+    "  node scripts/backend.mjs database verify-f4-r3-realm-auth-foundation",
+    "  node scripts/backend.mjs database verify-f4-r3-shadow-import",
     "  node scripts/backend.mjs database backup <directory>",
     `  node scripts/backend.mjs database restore <directory> --confirm=${RESTORE_CONFIRMATION}`,
     "  node scripts/backend.mjs database test-recovery",
@@ -3358,12 +4396,34 @@ export async function main(args = process.argv.slice(2)) {
   }
   if (
     command === "database" &&
+    operation === "verify-f4-r3-shadow-import" &&
+    !extra
+  ) {
+    const databases = verifyF4R3ShadowImport();
+    console.log(
+      `[backend] F4 R3 shadow import proof passed; cleaned ${databases.length} disposable databases`,
+    );
+    return;
+  }
+  if (
+    command === "database" &&
     operation === "verify-f4-r2-default-actors" &&
     !extra
   ) {
     const databases = verifyF4R2DefaultActors();
     console.log(
       `[backend] F4 R2 verified and removed ${databases.length} disposable databases`,
+    );
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-f4-r3-realm-auth-foundation" &&
+    !extra
+  ) {
+    const databases = verifyF4R3RealmAuthFoundation();
+    console.log(
+      `[backend] F4 R3 foundation verified and removed ${databases.length} disposable databases`,
     );
     return;
   }

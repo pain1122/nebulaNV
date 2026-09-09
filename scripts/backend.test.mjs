@@ -36,6 +36,7 @@ import {
   downBackend,
   generateBackendDependencyReport,
   hybridServices,
+  maintenanceDatabaseServices,
   missingExpectedDatabases,
   migrationVerificationServices,
   prismaServices,
@@ -56,6 +57,7 @@ import {
   verifyDatabaseRecovery,
   verifyF4Batch3RoleSeeds,
   verifyF4R2DefaultActors,
+  verifyF4R3RealmAuthFoundation,
   verifyTenantAuthorityDefaultSeed,
   verifyTenantAuthorityRegistrationRecords,
   waitForExpectedDatabases,
@@ -186,6 +188,7 @@ test("backend inventory is complete, unique, and ordered", () => {
     [
       "user-service",
       "auth-service",
+      "realm-auth-service",
       "tenant-authority-service",
       "settings-service",
       "media-service",
@@ -200,6 +203,7 @@ test("backend inventory is complete, unique, and ordered", () => {
     prismaServices.map((service) => service.database),
     [
       "nebula_users",
+      "nebula_realm_auth_default",
       "nebula_authority",
       "nebula_settings",
       "nebula_media",
@@ -209,14 +213,29 @@ test("backend inventory is complete, unique, and ordered", () => {
       "nebula_order",
     ],
   );
+  assert.deepEqual(
+    maintenanceDatabaseServices.map((service) => service.database),
+    [
+      "nebula_users",
+      "nebula_realm_auth_default",
+      "nebula_authority",
+      "nebula_settings",
+      "nebula_media",
+      "nebula_taxonomy",
+      "nebula_products",
+      "nebula_blog",
+      "nebula_order",
+      "nebula_realm_auth_operator",
+    ],
+  );
 
   assert.equal(
     new Set(backendServices.map((service) => service.name)).size,
-    10,
+    11,
   );
   assert.equal(hybridServices.length, 9);
-  assert.equal(prismaServices.length, 8);
-  assert.equal(composeServices.length, 10);
+  assert.equal(prismaServices.length, 9);
+  assert.equal(composeServices.length, 11);
   assert.equal(
     new Set(
       backendServices.flatMap((service) =>
@@ -225,7 +244,7 @@ test("backend inventory is complete, unique, and ordered", () => {
           : [service.httpPort, service.grpcPort],
       ),
     ).size,
-    19,
+    20,
   );
 
   const gateway = backendServices.at(-1);
@@ -519,6 +538,49 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
   );
   assert.doesNotMatch(authorityProvisioner, /DROP (?:DATABASE|ROLE)/);
 
+  const realmAuthProvisioner = source("scripts/db/ensure-realm-auth-dbs.sh");
+  for (const value of [
+    "nebula_realm_auth_default",
+    "nebula_realm_auth_operator",
+    "nebula_realm_auth_default_runtime",
+    "nebula_realm_auth_operator_runtime",
+  ]) {
+    assert.match(realmAuthProvisioner, new RegExp(value));
+  }
+  assert.match(
+    realmAuthProvisioner,
+    /GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public/,
+  );
+  assert.match(
+    realmAuthProvisioner,
+    /REVOKE DELETE ON ALL TABLES IN SCHEMA public/,
+  );
+  assert.doesNotMatch(realmAuthProvisioner, /DROP (?:DATABASE|ROLE)/);
+
+  for (const compose of [localCompose, releaseCompose]) {
+    const defaultRealmAuth = serviceBlock(compose, "realm-auth-service");
+    const operatorRealmAuth = serviceBlock(
+      compose,
+      "operator-realm-auth-service",
+    );
+    const defaultRedis = serviceBlock(compose, "realm-auth-default-redis");
+    const operatorRedis = serviceBlock(compose, "realm-auth-operator-redis");
+    assert.match(defaultRealmAuth, /REALM_AUTH_DEPLOYMENT:\s*DEFAULT/);
+    assert.match(operatorRealmAuth, /REALM_AUTH_DEPLOYMENT:\s*OPERATOR/);
+    assert.match(defaultRealmAuth, /nebula_realm_auth_default/);
+    assert.doesNotMatch(defaultRealmAuth, /nebula_realm_auth_operator/);
+    assert.match(operatorRealmAuth, /nebula_realm_auth_operator/);
+    assert.doesNotMatch(operatorRealmAuth, /nebula_realm_auth_default/);
+    assert.match(defaultRealmAuth, /realm-auth-default-redis/);
+    assert.doesNotMatch(defaultRealmAuth, /realm-auth-operator-redis/);
+    assert.match(operatorRealmAuth, /realm-auth-operator-redis/);
+    assert.doesNotMatch(operatorRealmAuth, /realm-auth-default-redis/);
+    assert.match(defaultRedis, /redis:7-alpine/);
+    assert.match(operatorRedis, /redis:7-alpine/);
+    assert.match(operatorRedis, /profiles:\s*\["r3-shadow"\]/);
+    assert.match(operatorRealmAuth, /profiles:\s*\["r3-shadow"\]/);
+  }
+
   const initializedDatabases = [
     ...databaseInit.matchAll(/CREATE DATABASE ([a-z_]+);/g),
   ].map((match) => match[1]);
@@ -671,7 +733,7 @@ test("root command names point at the consolidated backend tool", () => {
       composeEvidence: "node ./scripts/backend.mjs evidence compose",
       failureEvidence: "node ./scripts/backend.mjs evidence failure",
       sharedTests:
-        "pnpm --filter @packages/config test && pnpm --filter @nebula/grpc-auth test && pnpm --filter @nebula/clients test",
+        "pnpm --filter @packages/config test && pnpm --filter @nebula/migration-artifacts test && pnpm --filter @nebula/grpc-auth test && pnpm --filter @nebula/clients test",
       gatewayTests:
         "pnpm --filter @nebula/gateway test && pnpm --filter @nebula/gateway openapi:check",
       tenantAuthorityTests:
@@ -691,6 +753,18 @@ test("root command names point at the consolidated backend tool", () => {
   assert.equal(manifest.dependencies["wait-on"], undefined);
   assert.equal(manifest.devDependencies.concurrently, "^9.2.1");
   assert.equal(manifest.devDependencies["wait-on"], "^9.0.3");
+});
+
+test("R3 Realm Auth commands stay on the consolidated backend tool", () => {
+  const root = JSON.parse(source("package.json"));
+  assert.equal(
+    root.scripts["db:verify:f4-r3-realm-auth-foundation"],
+    "node ./scripts/backend.mjs database verify-f4-r3-realm-auth-foundation",
+  );
+  assert.equal(
+    root.scripts["db:verify:f4-r3-shadow-import"],
+    "node ./scripts/backend.mjs database verify-f4-r3-shadow-import",
+  );
 });
 
 test("CI retains only allowlisted backend evidence for fourteen days", () => {
@@ -1462,10 +1536,11 @@ test("backend boot reuses migration, seed, Bake, Compose, and readiness owners i
 
   assert.deepEqual(events.slice(0, 4), [
     "environment",
-    "docker:compose up -d --wait --wait-timeout 120 postgres redis minio",
+    "docker:compose up -d --wait --wait-timeout 120 postgres redis realm-auth-default-redis minio",
     "docker:compose run -T --rm --no-deps tenant-authority-db-init",
-    "databases",
+    "docker:compose run -T --rm --no-deps realm-auth-db-init",
   ]);
+  assert.equal(events[4], "databases");
   assert.equal(
     events.some((event) => event.includes("minio-init")),
     false,
@@ -1537,7 +1612,7 @@ test("Prisma actions run sequentially and stop at the first failure", () => {
         services: prismaServices.slice(0, 4),
         execute(args) {
           calls.push(args[1]);
-          return { status: calls.length === 3 ? 7 : 0 };
+          return { status: calls.length === 4 ? 7 : 0 };
         },
         logger: { log: (message) => logs.push(message) },
       }),
@@ -1546,11 +1621,12 @@ test("Prisma actions run sequentially and stop at the first failure", () => {
 
   assert.deepEqual(calls, [
     "@nebula/user-service",
+    "@nebula/realm-auth-service",
     "@nebula/tenant-authority-service",
     "@nebula/settings-service",
   ]);
-  assert.equal(logs.length, 3);
-  assert.match(logs[2], /settings-service \(nebula_settings\)/);
+  assert.equal(logs.length, 4);
+  assert.match(logs[3], /settings-service \(nebula_settings\)/);
 
   assert.throws(
     () =>
@@ -1568,7 +1644,11 @@ test("Prisma actions run sequentially and stop at the first failure", () => {
 test("clean migration verification uses disposable databases and always cleans up", () => {
   const dockerCalls = [];
   const prismaCalls = [];
-  const services = prismaServices.slice(0, 2);
+  const services = prismaServices.filter((service) =>
+    ["@nebula/user-service", "@nebula/tenant-authority-service"].includes(
+      service.packageName,
+    ),
+  );
   const expected = disposableMigrationServices(services, "success-run");
 
   const verified = verifyCleanMigrations({
@@ -1994,6 +2074,148 @@ test("F4 R2 attempts all cleanup even when one drop fails and never reports succ
   );
 });
 
+test("F4 R3 verifies both isolated shadow foundations and always removes them", () => {
+  const dockerCalls = [];
+  const pnpmCalls = [];
+  const seedRuns = new Map();
+  const failureReasons = [
+    "realm_auth_wrong_realm",
+    "realm_auth_principal_class_mismatch",
+    "realm_auth_shadow_generation_change_forbidden",
+    "realm_auth_shadow_session_forbidden",
+    "realm_auth_legacy_bridge_key_invalid",
+    "realm_auth_terminal_record_immutable",
+    "realm_auth_audit_key_invalid",
+    "realm_auth_destination_key_invalid",
+    "realm_auth_wrong_realm",
+    "realm_auth_principal_class_mismatch",
+    "realm_auth_shadow_generation_change_forbidden",
+    "realm_auth_shadow_session_forbidden",
+    "realm_auth_legacy_bridge_key_invalid",
+    "realm_auth_terminal_record_immutable",
+    "realm_auth_audit_key_invalid",
+    "realm_auth_destination_key_invalid",
+  ];
+
+  const verified = verifyF4R3RealmAuthFoundation({
+    runId: "r3-unit",
+    executeDocker(command, args, options = {}) {
+      dockerCalls.push({ command, args, input: options.input });
+      const sql = String(options.input ?? "");
+      if (
+        args.includes("psql") &&
+        sql &&
+        !sql.includes("realm_auth_boundary_evidence_mismatch") &&
+        !sql.includes("ROLLBACK;")
+      ) {
+        const reason = failureReasons.shift();
+        assert.notEqual(reason, undefined);
+        return { status: 3, stderr: `ERROR:  ${reason}\n` };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    },
+    executePnpm(args, options = {}) {
+      pnpmCalls.push({ args, env: options.env });
+      const runIndex = args.indexOf("run");
+      if (runIndex >= 0) {
+        const script = args[runIndex + 1];
+        const databaseUrl = String(options.env?.DATABASE_URL ?? "");
+        const key = `${script}:${databaseUrl}`;
+        const count = (seedRuns.get(key) ?? 0) + 1;
+        seedRuns.set(key, count);
+        return {
+          status: 0,
+          stdout: count === 1 ? "CREATED\n" : "ALREADY_CURRENT\n",
+        };
+      }
+      return { status: 0, stdout: "" };
+    },
+    logger: { log() {} },
+  });
+
+  assert.equal(failureReasons.length, 0);
+  assert.equal(verified.length, 2);
+  assert.ok(verified.every((database) => database.includes("_verify_")));
+  assert.equal(
+    dockerCalls.filter(({ args }) => args.includes("createdb")).length,
+    2,
+  );
+  assert.deepEqual(
+    dockerCalls
+      .filter(({ args }) => args.includes("dropdb"))
+      .map(({ args }) => args.at(-1)),
+    [...verified].reverse(),
+  );
+  assert.equal(
+    pnpmCalls.filter(({ args }) => args.includes("deploy")).length,
+    2,
+  );
+  assert.equal(
+    pnpmCalls.filter(({ args }) => args.includes("status")).length,
+    2,
+  );
+  assert.equal(seedRuns.size, 2);
+  assert.ok([...seedRuns.values()].every((count) => count === 2));
+});
+
+test("F4 R3 cleans the first database after second-database creation fails", () => {
+  const drops = [];
+  let creates = 0;
+  let seedRuns = 0;
+  const failureReasons = [
+    "realm_auth_wrong_realm",
+    "realm_auth_principal_class_mismatch",
+    "realm_auth_shadow_generation_change_forbidden",
+    "realm_auth_shadow_session_forbidden",
+    "realm_auth_legacy_bridge_key_invalid",
+    "realm_auth_terminal_record_immutable",
+    "realm_auth_audit_key_invalid",
+    "realm_auth_destination_key_invalid",
+  ];
+  assert.throws(
+    () =>
+      verifyF4R3RealmAuthFoundation({
+        runId: "r3-partial",
+        executeDocker(command, args, options = {}) {
+          if (args.includes("createdb")) {
+            creates += 1;
+            return { status: creates === 2 ? 7 : 0, stderr: "" };
+          }
+          if (args.includes("dropdb")) drops.push(args.at(-1));
+          const sql = String(options.input ?? "");
+          if (
+            args.includes("psql") &&
+            sql &&
+            !sql.includes("realm_auth_boundary_evidence_mismatch") &&
+            !sql.includes("ROLLBACK;")
+          ) {
+            const reason = failureReasons.shift();
+            return { status: 3, stderr: `ERROR:  ${reason}\n` };
+          }
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        executePnpm(args) {
+          const runIndex = args.indexOf("run");
+          if (runIndex >= 0) seedRuns += 1;
+          return {
+            status: 0,
+            stdout:
+              runIndex >= 0
+                ? seedRuns === 1
+                  ? "CREATED\n"
+                  : "ALREADY_CURRENT\n"
+                : "",
+          };
+        },
+        logger: { log() {} },
+      }),
+    /local_postgres_create_.*failed_exit_7/,
+  );
+  assert.equal(creates, 2);
+  assert.equal(drops.length, 1);
+  assert.match(drops[0], /nebula_realm_auth_default_verify_/);
+});
+
 test("disposable cleanup refuses normal or invalid database names before executing", () => {
   let calls = 0;
   for (const database of [
@@ -2044,7 +2266,13 @@ test("authority record evidence refuses non-database targets", () => {
 test("clean migration verification stops after failure and cleans only created databases", () => {
   const dockerCalls = [];
   let prismaCalls = 0;
-  const services = prismaServices.slice(0, 3);
+  const services = prismaServices.filter((service) =>
+    [
+      "@nebula/user-service",
+      "@nebula/tenant-authority-service",
+      "@nebula/settings-service",
+    ].includes(service.packageName),
+  );
   const expected = disposableMigrationServices(services, "failure-run");
 
   assert.throws(
@@ -2093,14 +2321,17 @@ test("backup refuses running backends and removes incomplete output", async () =
       execute(command, args) {
         assert.match(command, /docker/);
         assert.deepEqual(args.slice(0, 3), ["compose", "ps", "--services"]);
-        return { status: 0, stdout: "postgres\nuser-service\n" };
+        return {
+          status: 0,
+          stdout: "postgres\noperator-realm-auth-service\n",
+        };
       },
       async executeBinary() {
         binaryCalls += 1;
       },
       logger: { log() {} },
     }),
-    /backend_services_must_be_stopped_user-service/,
+    /backend_services_must_be_stopped_operator-realm-auth-service/,
   );
   assert.equal(binaryCalls, 0);
   assert.equal(existsSync(runningTarget), false);
@@ -2120,13 +2351,13 @@ test("backup refuses running backends and removes incomplete output", async () =
       },
       logger: { log() {} },
     }),
-    /backup_nebula_authority_failed_exit_5/,
+    /backup_nebula_realm_auth_default_failed_exit_5/,
   );
   assert.equal(existsSync(failedTarget), false);
   rmSync(temporary, { recursive: true, force: true });
 });
 
-test("backup writes one binary dump per inventory database and a strict manifest", async () => {
+test("backup writes one binary dump per maintenance database and a strict manifest", async () => {
   const temporary = mkdtempSync(path.join(tmpdir(), "nebula-backup-test-"));
   const target = path.join(temporary, "complete");
   const binaryCalls = [];
@@ -2145,7 +2376,7 @@ test("backup writes one binary dump per inventory database and a strict manifest
   });
 
   assert.equal(resolved, target);
-  assert.equal(binaryCalls.length, prismaServices.length);
+  assert.equal(binaryCalls.length, maintenanceDatabaseServices.length);
   assert.equal(
     binaryCalls.every((call) => call.args.includes("--format=custom")),
     true,
@@ -2155,7 +2386,7 @@ test("backup writes one binary dump per inventory database and a strict manifest
   );
   assert.deepEqual(
     manifest.databases.map((entry) => entry.database),
-    prismaServices.map((service) => service.database),
+    maintenanceDatabaseServices.map((service) => service.database),
   );
   for (const entry of manifest.databases) {
     assert.equal(existsSync(path.join(target, entry.file)), true);
@@ -2213,18 +2444,18 @@ test("restore validates confirmation and restores only manifest databases", asyn
     logger: { log() {} },
   });
 
-  assert.equal(restoreCalls.length, prismaServices.length);
+  assert.equal(restoreCalls.length, maintenanceDatabaseServices.length);
   assert.equal(
     restoreCalls.every((call) => call.args.includes("pg_restore")),
     true,
   );
   assert.equal(
     postgresCalls.filter((args) => args.includes("dropdb")).length,
-    prismaServices.length,
+    maintenanceDatabaseServices.length,
   );
   assert.equal(
     postgresCalls.filter((args) => args.includes("createdb")).length,
-    prismaServices.length,
+    maintenanceDatabaseServices.length,
   );
   rmSync(temporary, { recursive: true, force: true });
 });
@@ -2280,9 +2511,9 @@ test("recovery proof uses binary data, a temporary failed migration, and disposa
     prismaCalls.map((args) => args[1]),
     [
       "@nebula/user-service",
-      "@nebula/tenant-authority-service",
-      "@nebula/tenant-authority-service",
-      "@nebula/tenant-authority-service",
+      "@nebula/realm-auth-service",
+      "@nebula/realm-auth-service",
+      "@nebula/realm-auth-service",
     ],
   );
   assert.equal(
@@ -2458,6 +2689,7 @@ test("development and release commands derive all backend services", () => {
   assert.deepEqual(buildDevCommands(), [
     "pnpm run dev:user",
     "pnpm run dev:auth",
+    "pnpm run dev:realm-auth",
     "pnpm run dev:tenant-authority",
     "pnpm run dev:settings",
     "pnpm run dev:media",

@@ -1,0 +1,29 @@
+{
+  "name": "@nebula/migration-artifacts",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "jest --config jest.config.ts --runInBand"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.5.2",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.4.0",
+    "jest": "30.2.0",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.4",
+    "typescript": "5.9.2",
+    "typescript-eslint": "^8.44.1"
+  }
+}

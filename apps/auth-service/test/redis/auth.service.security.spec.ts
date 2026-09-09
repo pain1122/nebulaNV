@@ -104,6 +104,7 @@ describe('AuthService security behaviors', () => {
     });
 
     it('returns authoritative access and refresh lifetimes with a new session', async () => {
+      redis.getTokenVersion.mockResolvedValue(7);
       const tokens = await authService.login(user);
 
       expect(tokens).toMatchObject({
@@ -117,7 +118,12 @@ describe('AuthService security behaviors', () => {
       expect(redis.createRefreshSession).toHaveBeenCalledWith(
         expect.objectContaining({
           ttlSeconds: tokens.refreshExpiresInSeconds,
+          issuedTokenVersion: 7,
         }),
+      );
+      expect(jwt.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ typ: 'refresh', tv: 7 }),
+        expect.anything(),
       );
     });
   });
@@ -164,6 +170,8 @@ describe('AuthService security behaviors', () => {
     });
 
     it('rotates one session without bumping the global token version', async () => {
+      redis.getTokenVersion.mockResolvedValue(7);
+      jwt.verify.mockReturnValue({ ...refreshPayload, tv: 7 });
       await authService.refreshTokens('valid-refresh-token');
 
       expect(redis.rotateRefreshSession).toHaveBeenCalledWith(
@@ -171,6 +179,7 @@ describe('AuthService security behaviors', () => {
           userId: user.id,
           sessionId: refreshPayload.sid,
           expectedTokenId: refreshPayload.jti,
+          issuedTokenVersion: 7,
         }),
       );
       expect(redis.bumpTokenVersion).not.toHaveBeenCalled();

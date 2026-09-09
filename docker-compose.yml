@@ -51,12 +51,52 @@ services:
       - ./scripts/db/ensure-tenant-authority-db.sh:/scripts/ensure-tenant-authority-db.sh:ro
     entrypoint: ["bash", "/scripts/ensure-tenant-authority-db.sh"]
 
+  realm-auth-db-init:
+    image: postgres:17
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      POSTGRES_USER: postgres
+      PGPASSWORD: postgres
+      REALM_AUTH_DEFAULT_DB_RUNTIME_PASSWORD: ${REALM_AUTH_DEFAULT_DB_RUNTIME_PASSWORD:-dev-only-realm-auth-default-password}
+      REALM_AUTH_OPERATOR_DB_RUNTIME_PASSWORD: ${REALM_AUTH_OPERATOR_DB_RUNTIME_PASSWORD:-dev-only-realm-auth-operator-password}
+    volumes:
+      - ./scripts/db/ensure-realm-auth-dbs.sh:/scripts/ensure-realm-auth-dbs.sh:ro
+    entrypoint: ["bash", "/scripts/ensure-realm-auth-dbs.sh"]
+
   redis:
     image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  realm-auth-default-redis:
+    image: redis:7-alpine
+    container_name: realm-auth-default-redis
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  realm-auth-operator-redis:
+    profiles: ["r3-shadow"]
+    image: redis:7-alpine
+    container_name: realm-auth-operator-redis
+    restart: unless-stopped
+    ports:
+      - "6382:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -151,6 +191,57 @@ services:
     ports:
       - "3001:3001"
       - "50052:50052"
+
+  # R3 shadow deployments share code but never a DB, role, Redis endpoint,
+  # issuer, route, or key reference. They expose health only and issue no token.
+  realm-auth-service:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-realm-auth-service:${NEBULA_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      target: realm-auth-runtime
+    container_name: realm-auth-service
+    depends_on:
+      realm-auth-db-init:
+        condition: service_completed_successfully
+      realm-auth-default-redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      REALM_AUTH_DEPLOYMENT: DEFAULT
+      REALM_AUTH_HTTP_PORT: 3012
+      REALM_AUTH_IDENTITY_REALM_ID: b1000000-0000-4000-8000-000000000001
+      REALM_AUTH_ROUTE_REF: b1100000-0000-4000-8000-000000000001
+      REALM_AUTH_ISSUER: urn:nebula:realm-auth:b1000000-0000-4000-8000-000000000001
+      REALM_AUTH_REDIS_URL: redis://realm-auth-default-redis:6379/0
+      DATABASE_URL: "postgresql://nebula_realm_auth_default_runtime:${REALM_AUTH_DEFAULT_DB_RUNTIME_PASSWORD:-dev-only-realm-auth-default-password}@postgres:5432/nebula_realm_auth_default?schema=public"
+    ports:
+      - "3012:3012"
+
+  operator-realm-auth-service:
+    profiles: ["r3-shadow"]
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-realm-auth-service:${NEBULA_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      target: realm-auth-runtime
+    container_name: operator-realm-auth-service
+    depends_on:
+      realm-auth-db-init:
+        condition: service_completed_successfully
+      realm-auth-operator-redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      REALM_AUTH_DEPLOYMENT: OPERATOR
+      REALM_AUTH_HTTP_PORT: 3013
+      REALM_AUTH_IDENTITY_REALM_ID: b1000000-0000-4000-8000-000000000002
+      REALM_AUTH_ROUTE_REF: b1100000-0000-4000-8000-000000000002
+      REALM_AUTH_ISSUER: urn:nebula:realm-auth:b1000000-0000-4000-8000-000000000002
+      REALM_AUTH_REDIS_URL: redis://realm-auth-operator-redis:6379/0
+      DATABASE_URL: "postgresql://nebula_realm_auth_operator_runtime:${REALM_AUTH_OPERATOR_DB_RUNTIME_PASSWORD:-dev-only-realm-auth-operator-password}@postgres:5432/nebula_realm_auth_operator?schema=public"
+    ports:
+      - "3013:3013"
 
   # Authority persistence foundation. Batch 2 item 1 exposes health only;
   # gateway traffic remains on StaticApplicationRegistry at G0_F3_BASELINE.

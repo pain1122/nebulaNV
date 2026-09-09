@@ -1166,12 +1166,35 @@ and an adversarial second pass before its checkbox can change.
 
 ## Next Action
 
-Batch 3R R0-R2 are complete. Start `R3_REALM_AUTH_SHADOW` with its evidence
-ledger and ADR-0015's owner, isolation, artifact, generation, and bridge
-requirements. R3 creates non-authoritative Realm Auth shadow state and proves
+Batch 3R R0-R3 are complete. The `R3_REALM_AUTH_SHADOW` entry ledger is recorded
+in the Batch 3R execution report. Its family-version source prerequisite is
+implemented: legacy login/refresh records the issued version, and a migration-
+only atomic reader quarantines unprovable families without lazy initialization.
+The shared Realm Auth service, durable aggregate migration, fixed default/operator
+deployment tuples, isolated DB roles/Redis placement, shadow-mode database fence,
+and idempotent boundary/key-reference seed are implemented; the clean
+default/operator database proof passed on 2026-09-09. Bounded encrypted User and
+Auth exporters, the atomic shadow importer, and login comparator are implemented
+in source, and their first populated disposable proof passed. Completion review
+found and corrected the missing exact-graph rerun and controlled shadow-rollback
+path; the expanded adversarial/rollback verifier then passed. The second review
+added bounded serialization-conflict retry and concurrent-import proof, which
+also passed. The updated foundation, Authority, role-seed, R2, all-service
+migration, and zero-residue checks passed on 2026-09-09, closing R3. Maintenance
+backup/restore covers both Realm Auth databases.
+R3 created non-authoritative Realm Auth shadow state and proved
 source-owned encrypted/HMAC-manifested import and comparison. Current User/Auth
 retains credential/session authority. Issue no realm session, activate no R1
 record, and preserve R2 pairs, legacy readers, epochs, grants, and v1 history.
 Keep `StaticApplicationRegistry` primary and follow the ordered later gates.
+
+The active gate is now `R4_ADMIN_SPLIT_STAGED`. Stage only the separate
+operator-realm subject and recovery credential through an offline/non-issuing
+path, prove its stored lifecycle and credential check, and prepare the
+per-role tenant-grant constraint. Create no AuthSession/token, operator
+PlatformGrant, or traffic change; retain the customer Membership/epoch,
+`TENANT_ADMIN`, and current PlatformGrant.
+
 Consult Salar before editing F6-F9, D4-D5/P1, M6-M7, or deferred SaaS scope.
-Salar runs command sequences and returns brief results under the updated workflow.
+The assistant runs small inspections and focused checks directly; Salar runs
+heavy commands and long verification sequences and returns brief results.

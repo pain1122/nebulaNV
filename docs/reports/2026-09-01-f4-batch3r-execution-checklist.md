@@ -2,10 +2,13 @@
 
 Date: 2026-09-01
 
-Status: R0, R1, and R2 complete. R2 closed on 2026-09-08 with populated
+Status: R0 through R3 complete. R2 closed on 2026-09-08 with populated
 old-schema upgrades, reruns, atomic rollback, earlier-seed regression, and
-cleanup evidence. R3 Realm Auth shadow migration is next. Legacy readers and
-traffic remain primary; the R1 control plane remains inactive.
+cleanup evidence. R3 started on 2026-09-08; its foundation, populated shadow
+import, expanded rollback/adversarial proof, and concurrent stateful rerun
+passed. Both completion reviews, all earlier-gate regressions, and final cleanup
+passed on 2026-09-09. Legacy readers and traffic remain primary; the R1 control
+plane remains inactive.
 
 ## Execution Contract
 
@@ -604,3 +607,331 @@ remain outside this R2 verification scope.
       complete, with the implementation, focused tests, disposable database
       evidence, earlier-gate regressions, and user-confirmed cleanup above.
       Next: R3's evidence ledger and frozen Realm Auth shadow migration.
+
+## R3_REALM_AUTH_SHADOW
+
+### Evidence ledger
+
+Started 2026-09-08 from the committed R0-R2 checkpoint `c5ff235`.
+
+**Exact checklist wording:**
+
+> `R3_REALM_AUTH_SHADOW`: add isolated default/operator Realm Auth durable
+> subject/login/credential/two-generation/session/audit/outbox aggregates,
+> immutable `sr2_`/key ownership, and terminal `lsb1_` legacy bridges.
+> Import only the bounded source-owned encrypted/HMAC-manifested snapshots;
+> shadow-compare counts/checksums/login without issuing a realm session or
+> taking credential authority.
+
+**Directly applicable decisions:**
+
+- ADR-0014 preserves current Auth defenses, service-owned stores, F3 gateway
+  boundaries, and the staged default/operator split.
+- ADR-0015's owner matrix requires a fixed realm per deployment, separate
+  PostgreSQL databases/roles, isolated Redis, issuers, and keysets. Public
+  inputs never select a store. R3 prepares the operator store; R4 stages its
+  subject and recovery credential.
+- RealmSubject owns separate positive credential/session generations. Current
+  Auth's non-lazy token version supplies initial default session generation;
+  credential generation is explicitly seeded, normally to `1`. Missing
+  authoritative token version quarantines a family; export cannot initialize it.
+- Login identifiers use exactly `EMAIL_LOWER_TRIM_V1` or
+  `PHONE_PLUS_DIGITS_V1`. The latter accepts only `^\+[1-9][0-9]{1,14}$`;
+  incompatible legacy phones are quarantined without region guessing.
+- `sr2_` and `lsb1_` use ADR-0015's exact ordered JSON/HMAC inputs, full
+  SHA-256 output, dedicated keys, and immutable key IDs. Bridges persist no
+  raw legacy session ID and have terminal consumed/revoked states.
+- The migration-artifact ownership clause requires separate bounded User and
+  Auth exports, purpose-separated HMAC manifests, envelope encryption to the
+  destination realm, expiry/access bounds, and idempotency by
+  `(sourceOwner, migrationId, recordHmac)`. Evidence contains bounded counts,
+  digests, key IDs, and times, excluding credentials, raw sessions/tokens, and
+  generations. Password hashes are copied without bulk rehash.
+- R3 is a shadow snapshot only. R6 owns the mutation barrier and final
+  reconciliation. Rollback requires proof of no Realm Auth session or
+  generation-changing write. R1 records remain non-admitting and current
+  User/Auth remains primary.
+
+**Current mechanisms inspected:**
+
+- `apps/user-service/prisma/schema.prisma` and
+  `src/user/user.service.ts` retain the global User UUID, unique optional
+  email/phone, bcrypt password hash, role, and timestamps. Email uses trim and
+  lowercase; the phone lookup strips non-digits. User owns password writes.
+- `apps/auth-service/src/auth/auth.service.ts` issues JWTs containing `tv`,
+  `sid`, and `jti`. Login reads token version before creating the family;
+  refresh checks the signed token version and rotates by hash/token ID.
+- `apps/auth-service/src/auth/redis/auth-redis.service.ts` stores only
+  `tokenHash` and `tokenId` in each expiring refresh-family hash. Its Lua script
+  serializes rotation and deletes a family on replay. User-wide token version
+  lives separately; `getTokenVersion` lazily initializes an absent value.
+  Logout-all deletes families then separately increments user token version.
+- `apps/auth-service/src/auth/token/access-token-validation.service.ts` verifies
+  signed tokens, disabled state, current version, and session existence. These
+  legacy decisions remain primary.
+- Existing Auth tests under `test/redis` cover rotation/replay, token versions,
+  logout, and access validation. They were inspected, not executed for this
+  documentation-only entry. `auth-redis.service.spec.ts` flushes its configured
+  Redis database and requires an isolated test target before execution.
+- Root `package.json` registers Auth without a database. `scripts/backend.mjs`
+  loads that inventory; `docker-compose.yml` still has the legacy Auth service.
+  The existing User migration module handles legacy roles, not credentials.
+
+**Absence evidence:**
+
+`rg --files apps` identified eight `prisma/schema.prisma` files: User,
+Authority, Media, Order, Product, Settings, Blog, and Taxonomy; none belonged
+to Auth. The exact patterns `RealmSubject`, `LocalCredential`,
+`LoginIdentifier`, `LegacySessionBridge`, `RootSsoExchangeGrant`,
+`credentialGeneration`, `sessionGeneration`, `envelope.encrypt`,
+`migration.*manifest`, and `migration.*HMAC` returned no matches in TypeScript,
+MJS, or Prisma source under `apps`, `packages`, and `scripts`, excluding
+dependencies, generated output, builds, Next output, and coverage. This is
+evidence for absent R3 implementation in that source scope, not a claim about
+uninspected deployment systems.
+
+The absence evidence above records the state at R3 entry. It is retained as the
+baseline and is superseded for the implemented foundation described below.
+
+### Confirmed migration-source gap and correction
+
+**Classification: confirmed defect against the R3 export requirement.** A
+family hash does not record the token version with which it was issued. Reading
+the user's current version alongside an existing hash cannot establish that
+the family carries that version. A possible source-code interleaving is login
+reading version N, logout-all deleting known families and advancing to N+1,
+then login storing its new family with version N. Current signed-token checks
+reject that stale token; an exporter must not relabel its family as N+1. This
+interleaving is source analysis, not a reproduced runtime test.
+
+The source inspection above describes the pre-change checkpoint. Salar
+confirmed this is an implementation gap within the adopted requirement, not a
+new design choice. The following narrow correction is now implemented:
+
+1. Persist the issued token version beside the existing hash/token ID on
+   successful legacy login and refresh rotation. Keep the token format and
+   current authentication behavior compatible.
+2. Have the source-owned exporter atomically read the family evidence, finite
+   expiry, disabled state, and existing user version without writing or lazy
+   initialization. Export only a well-formed, unexpired family whose stored
+   version equals that current version, subject to the remaining owner checks.
+3. Quarantine missing/malformed/mismatched evidence from migration. Existing
+   families without the new field can qualify after a successful signed refresh
+   or new login; do not guess a version or revoke them merely for lacking export
+   metadata. Families still unqualified at cutover require reauthentication.
+
+An exporter-only change cannot reconstruct the version from a one-way token
+hash. Replacing legacy sessions is unnecessary for this gap. The proposed cost
+is one extra field in each family, two owner call-site updates, exporter checks,
+and tests. Compatibility cost is the migration eligibility of older families
+that never refresh.
+
+Implementation: `auth.service.ts` passes the exact version used to issue the
+token pair to both family writes. `auth-redis.service.ts` persists
+`issuedTokenVersion` in the creation transaction and successful rotation Lua
+write. Its migration-only `readLegacyFamilyEvidence` delegates to
+`src/auth/migration/legacy-family-evidence.ts`, which reads all required Redis
+state in one script without mutation. Missing, malformed, mismatched, disabled,
+expired, unbounded, unindexed, and malformed token evidence cannot qualify.
+Unexpected Redis types/errors fail the read. Positive generations must fit the
+existing JavaScript safe-integer representation. The returned eligible snapshot
+is sensitive internal input for the future encrypted owner export, not a log,
+public endpoint, complete exporter, or authentication decision.
+
+Focused proof on 2026-09-08:
+
+All 36 real-Redis tests (two suites) and 26 Auth security tests (three suites)
+passed. Auth type-check and focused lint passed with no errors; the existing
+mock-assertion style still produces lint warnings. Prettier and whitespace
+checks passed. Both task-owned disposable Redis containers were stopped and
+automatically removed. Slow WSL attempts were terminated and are not counted;
+the complete passing checks ran through native Windows tools. No heavy build,
+full e2e, scan, or database migration verifier was run for this Redis prerequisite.
+
+- Disposable Redis tests execute the real creation/rotation/evidence scripts,
+  reproduce the late-login/logout ordering, preserve the maximum safe generation,
+  reject invalid/missing versions without initialization, qualify a metadata-less
+  family only after successful rotation, and retain replay revocation. Existing
+  Redis regression tests run in the same disposable instance on database 15;
+  the new tests use only unique fixture keys and never flush a database.
+- Auth security tests check that login and refresh persist the same non-default
+  version used for token issuance, alongside existing stale-token, logout, guard,
+  and access-validation regressions.
+- The migration test requires `AUTH_MIGRATION_TEST_REDIS_PORT` targeting a
+  disposable local Redis. To include the earlier Redis suite, point `REDIS_HOST`
+  and `REDIS_PORT` at that instance, use `AUTH_REDIS_TEST_DB=15`, and clear
+  `AUTH_REDIS_TEST_PASSWORD`. Run Jest using `jest.security.config.ts` with
+  `--testMatch '**/legacy-family-evidence.spec.ts' '**/auth-redis.service.spec.ts'`.
+  Do not point the earlier suite's database-flushing hooks at application data.
+
+### Isolated Realm Auth shadow foundation
+
+Implemented in source on 2026-09-08. Salar ran the clean default/operator
+database proof successfully on 2026-09-09.
+
+- New `apps/realm-auth-service` contains one reusable HTTP health/runtime and one
+  Prisma schema. The default and operator deployment tuples have different
+  realm IDs, opaque route references, database names, runtime roles, issuers,
+  ports, and six purpose-separated immutable key IDs/references. Joi validation
+  rejects crossed tuples and arbitrary runtime-selected realm/store values.
+- The first migration adds RealmBoundary, RealmKeyRegistration, RealmSubject,
+  LoginIdentifier, LocalCredential, ExternalIdentityLink, AuthSession,
+  LegacySessionBridge, RootSsoExchangeGrant, AuthAuditEvent, AuthOutboxEvent,
+  MigrationManifest, and MigrationRecordReceipt. Foreign keys, uniqueness,
+  closed enums, value/time checks, key-purpose checks, immutable identifiers,
+  append-only audit/receipt triggers, terminal bridge/grant transitions, and
+  manifest idempotency are represented in the owner database.
+- RealmBoundary is a one-row deployment fence. Database triggers require every
+  security record to use that fixed realm and principal class. While its mode is
+  `SHADOW`, AuthSession writes and RealmSubject generation changes fail with
+  explicit database errors. The schema can hold future session records, but R3
+  cannot accidentally issue one.
+- `seed-shadow-boundary.ts` uses a serializable transaction and advisory lock.
+  It creates only the exact boundary plus six non-secret key references, returns
+  `ALREADY_CURRENT` for an exact rerun, and rejects partial, crossed, retired,
+  or contradictory state instead of repairing it silently.
+- `ensure-realm-auth-dbs.sh` idempotently creates the two databases and separate
+  NOINHERIT runtime roles, revokes public connection/schema creation, grants
+  only runtime select/insert/update and sequence use, withholds table delete and
+  Prisma migration writes, and contains no drop operation.
+- Compose provides dedicated default/operator Redis services and deploys the
+  same image twice with fixed configuration. The operator deployment is behind
+  the explicit `r3-shadow` profile. Current Auth, Gateway routing, R1 lifecycles,
+  tokens, and traffic are unchanged.
+- Root backend inventory now contains the default shadow runtime/database and
+  its shared image target. Existing boot tooling provisions the new roles and
+  starts only the default isolated Redis/runtime. The operator database/profile
+  is deliberately outside generic one-package/one-database Prisma operations;
+  the custom verifier applies and proves the shared schema against both stores.
+- Maintenance backup/restore has a separate ten-database inventory that adds
+  the operator database without duplicating its shared package in build or
+  generic Prisma operations. Its stop fence includes the profiled operator
+  runtime, and its strict manifest includes both Realm Auth databases.
+- `db:verify:f4-r3-realm-auth-foundation` creates isolated default/operator
+  databases, applies the migration, proves two-run boundary seeds, exercises
+  allowed terminal bridge movement and wrong realm/principal/key-purpose plus
+  shadow session/generation denials, verifies no retained rows, and cleans up
+  both databases even after a partial failure.
+
+The first stateful run exposed a confirmed defect in the shared boundary
+trigger: a single boolean expression referenced `RealmSubject` columns while
+executing for `RealmKeyRegistration`, so PostgreSQL reported that `NEW` was not
+valid for the relation. Table dispatch now occurs before table-specific field
+expressions in the boundary and immutable-identity triggers. The focused schema
+test prevents the unsafe expression shape from returning. Salar reran the
+complete verifier; both migrations, two-run seeds, positive/negative database
+checks, and cleanup passed with no errors.
+
+### Encrypted owner snapshots and shadow importer
+
+Implemented in source on 2026-09-09. Salar ran the first populated end-to-end
+proof successfully the same day.
+
+- `@nebula/migration-artifacts` owns one strict canonical artifact format.
+  Source records and manifests use purpose-separated HMAC-SHA256 keys; the
+  entire canonical payload uses destination-bound AES-256-GCM with a 96-bit
+  nonce and authenticated routing fields. Exact UUID/key/source/destination,
+  five-minute lifetime, size/count, ordering, duplicate, digest, record HMAC,
+  manifest HMAC, canonical JSON, and expiry checks fail closed.
+- User-service has a migration-only serializable exporter. It reads at most
+  10,000 users, copies no role/profile field, emits normalized email and only
+  already-canonical `+` phone identifiers, preserves the encoded bcrypt hash
+  and cost, records source timestamps, and reports invalid legacy identifiers
+  only as counts. A separate canonical subject-selection file contains UUIDs
+  only and cannot change the paired import because the importer requires exact
+  User/Auth subject sets and one migration ID.
+- Current Auth has one atomic Redis subject snapshot. It reads the non-lazy
+  token version, disabled state, bounded sorted family index, each finite TTL,
+  issued version, token hash, and token ID in one Lua operation. An untouched
+  subject with no version, family index, or disabled state maps to the legacy
+  initializer's generation 1 without writing it. Missing/invalid versions with
+  indexed families quarantine the subject; malformed, expired, unbounded, or
+  version-mismatched families are excluded and counted.
+- The default Realm Auth importer authenticates/decrypts both owner artifacts,
+  requires their exact subject set, validates every owner-specific field, and
+  creates subject/login/credential/bridge plus manifest/receipt rows in one
+  serializable advisory-locked transaction. It assigns both initial
+  generations only on subject creation, persists only the exact full-HMAC
+  `lsb1_` bridge reference, never creates `AuthSession`, and accepts an exact
+  completed rerun without mutation.
+- The migration-only login comparator reuses the imported bcrypt hash and exact
+  identifier normalization, returns only legacy/shadow booleans plus
+  `MATCH`/`MISMATCH`, and cannot issue or mutate a session. The new populated
+  verifier exercises accepted and rejected passwords while retaining current
+  User/Auth authority.
+- `db:verify:f4-r3-shadow-import` creates disposable User and Realm Auth
+  databases plus an isolated Redis container, produces both real encrypted
+  owner artifacts, imports and reruns them, checks counts/digests/receipts and
+  the absence of Realm Auth sessions, runs two login comparisons, then removes
+  the databases, Redis container, and encrypted files on success or failure.
+- The first populated run passed the real owner exports, encrypted import,
+  exact rerun, SQL count/digest/receipt checks, two login comparisons, absence
+  of Realm Auth sessions, and cleanup. Completion review then found a confirmed
+  removability gap: an exact rerun did not recheck copied rows and no controlled
+  rollback existed. The narrow correction adds database-fenced shadow
+  credential/identifier immutability, exact graph verification before
+  `ALREADY_CURRENT`, and a serializable `ROLLED_BACK` transition that deletes
+  copied security rows only while the realm is `SHADOW` and has no session or
+  runtime evidence. Immutable manifests and receipts remain as audit evidence.
+- Salar ran the expanded verifier successfully on 2026-09-09. It passed four
+  adversarial cases, exact copied-graph checks, immutable bridge key binding,
+  two login comparisons, controlled rollback plus rollback rerun, retained two
+  receipts, and cleanup of both disposable databases and Redis/files.
+- The second review found a concurrent-import gap: the advisory lock serialized
+  writers, but a waiting `SERIALIZABLE` transaction could still receive Prisma
+  `P2034` from its older snapshot. Import and rollback now retry that exact
+  conflict at most three times. The verifier starts two imports concurrently
+  and requires one `IMPORTED` plus one `ALREADY_CURRENT`. A focused owner test
+  also proves Redis read failure rejects the Auth artifact without fallback.
+- Salar ran the concurrent stateful verifier successfully on 2026-09-09. Two
+  simultaneous clients produced one `IMPORTED` and one `ALREADY_CURRENT`, while
+  all four adversarial cases, copied-graph checks, login comparisons, rollback
+  passes, retained evidence, and disposable cleanup continued to pass.
+
+Focused source checks passed: Prisma format/validation/generation, Realm Auth
+types, 37 unit/contract tests, Realm Auth lint, all 53 backend-tooling tests, local
+Compose rendering with and without the `r3-shadow` profile, source Prettier, and
+`git diff --check`. No database migration was executed, no normal database was
+changed, no Realm Auth session or key material was created, and no heavy build,
+full boot/e2e, scan, or prior stateful verifier was run.
+
+### Required proof and completion status
+
+Before checking R3, prove isolated realm configuration and wrong-route/key
+denial; aggregate constraints and terminal bridges; immutable references under
+key rotation; bounded authenticated/encrypted artifacts with tamper, expiry,
+wrong-destination, duplicate, orphan, and partial-import rejection; exact reruns;
+source/shadow count, HMAC, and login comparisons; and absence of issued realm
+sessions or authority cutover. Include deterministic stale-family and missing-
+version tests for the export boundary. Use populated disposable databases for
+clean migration, rollback, and contradiction evidence, then rerun the earlier
+Authority, role-seed, R2 actor, and full migration verifiers.
+
+- [x] Entry requirements and source evidence recorded.
+- [x] Correct the family-version source prerequisite within the adopted R3 scope.
+- [x] Add the isolated shadow schema, fixed deployment boundaries, non-secret
+      key ownership, database/Redis placement, and fail-closed seed foundation.
+- [x] Add the custom clean dual-store verifier and operator-store maintenance
+      backup/restore coverage before importing state.
+- [x] Execute the custom verifier against clean default/operator databases.
+- [x] Execute the first populated encrypted owner-export/import/login verifier.
+- [x] Implement the first completion review and correct its rollback/idempotency
+      defect.
+- [x] Pass the first expanded adversarial/rollback stateful proof.
+- [x] Implement the second completion review and correct its concurrent-import
+      retry gap.
+- [x] Pass the concurrent stateful rerun.
+- [x] Pass the earlier-gate regressions.
+
+R3 closed on 2026-09-09. The final regression run passed the updated
+default/operator foundation, seven-migration Authority clean run and two-run
+seed, clean User/Authority role-seed order, all six R2 upgrade/rollback
+databases, and clean migrations for all nine default Prisma databases. Every
+disposable database was removed; the final catalog count containing
+`_verify_` was zero. The Prisma package-configuration deprecation message is a
+stale-tooling warning for a later major-version upgrade, not an R3 defect. No
+Realm Auth session, production key material, or traffic change was introduced.
+
+Next: R4 stages the operator-realm subject and recovery credential through an
+offline, non-issuing path. It must create no Realm Auth session/token or
+operator PlatformGrant, and current customer administration remains unchanged.

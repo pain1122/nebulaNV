@@ -143,6 +143,7 @@ export class AuthService {
       sessionId,
       tokenId: issued.refreshTokenId,
       tokenHash: issued.refreshTokenHash,
+      issuedTokenVersion: tokenVersion,
       ttlSeconds: issued.refreshExpiresInSeconds,
     });
 
@@ -207,6 +208,7 @@ export class AuthService {
       expectedTokenHash: this.hashToken(oldRt),
       nextTokenId: issued.refreshTokenId,
       nextTokenHash: issued.refreshTokenHash,
+      issuedTokenVersion: tokenVersion,
       ttlSeconds: issued.refreshExpiresInSeconds,
     });
 

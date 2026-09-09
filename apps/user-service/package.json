@@ -33,12 +33,14 @@
     "test:cov": "jest --coverage --config ./jest.config.ts",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand --config ./jest.config.ts",
     "test:e2e": "jest --config ./jest-e2e.json --runInBand",
+    "export:f4-r3-credentials": "ts-node --project tsconfig.json prisma/export-f4-r3-credentials.ts",
     "postinstall": "pnpm run prisma:gen"
   },
   "prisma": {
     "seed": "ts-node --project tsconfig.json prisma/seed.ts"
   },
   "dependencies": {
+    "@nebula/migration-artifacts": "workspace:^",
     "@bufbuild/protobuf": "^2.9.0",
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",

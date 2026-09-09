@@ -1,5 +1,9 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
+import {
+  readLegacyFamilyEvidence,
+  type LegacyFamilyEvidence,
+} from '../migration/legacy-family-evidence';
 
 const USER_DISABLED_KEY = 'auth:user:disabled:';
 const TOKEN_VERSION_KEY = (userId: string) =>
@@ -18,6 +22,7 @@ local nextTokenHash = ARGV[3]
 local nextTokenId = ARGV[4]
 local ttlSeconds = tonumber(ARGV[5])
 local sessionId = ARGV[6]
+local issuedTokenVersion = ARGV[7]
 
 if redis.call('EXISTS', sessionKey) == 0 then
   redis.call('SREM', userSessionsKey, sessionId)
@@ -33,7 +38,7 @@ if storedTokenHash ~= expectedTokenHash or storedTokenId ~= expectedTokenId then
   return -1
 end
 
-redis.call('HSET', sessionKey, 'tokenHash', nextTokenHash, 'tokenId', nextTokenId)
+redis.call('HSET', sessionKey, 'tokenHash', nextTokenHash, 'tokenId', nextTokenId, 'issuedTokenVersion', issuedTokenVersion)
 redis.call('EXPIRE', sessionKey, ttlSeconds)
 redis.call('SADD', userSessionsKey, sessionId)
 local sessionsTtl = redis.call('TTL', userSessionsKey)
@@ -76,6 +81,7 @@ export class AuthRedisService implements OnModuleDestroy {
     sessionId: string;
     tokenId: string;
     tokenHash: string;
+    issuedTokenVersion: number;
     ttlSeconds: number;
   }): Promise<void> {
     const sessionKey = REFRESH_SESSION_KEY(input.userId, input.sessionId);
@@ -84,7 +90,15 @@ export class AuthRedisService implements OnModuleDestroy {
 
     await this.redis
       .multi()
-      .hset(sessionKey, 'tokenHash', input.tokenHash, 'tokenId', input.tokenId)
+      .hset(
+        sessionKey,
+        'tokenHash',
+        input.tokenHash,
+        'tokenId',
+        input.tokenId,
+        'issuedTokenVersion',
+        String(input.issuedTokenVersion),
+      )
       .expire(sessionKey, ttlSeconds)
       .sadd(sessionsKey, input.sessionId)
       .expire(sessionsKey, ttlSeconds)
@@ -104,6 +118,7 @@ export class AuthRedisService implements OnModuleDestroy {
     expectedTokenHash: string;
     nextTokenId: string;
     nextTokenHash: string;
+    issuedTokenVersion: number;
     ttlSeconds: number;
   }): Promise<RefreshSessionRotation> {
     const result = Number(
@@ -118,6 +133,7 @@ export class AuthRedisService implements OnModuleDestroy {
         input.nextTokenId,
         String(Math.max(1, Math.floor(input.ttlSeconds))),
         input.sessionId,
+        String(input.issuedTokenVersion),
       ),
     );
 
@@ -132,6 +148,23 @@ export class AuthRedisService implements OnModuleDestroy {
       .del(REFRESH_SESSION_KEY(userId, sessionId))
       .srem(USER_SESSIONS_KEY(userId), sessionId)
       .exec();
+  }
+
+  // Migration-only owner read. Never use this snapshot to authorize a request.
+  async readLegacyFamilyEvidence(
+    userId: string,
+    sessionId: string,
+  ): Promise<LegacyFamilyEvidence> {
+    return readLegacyFamilyEvidence(
+      this.redis,
+      [
+        REFRESH_SESSION_KEY(userId, sessionId),
+        TOKEN_VERSION_KEY(userId),
+        `${USER_DISABLED_KEY}${userId}`,
+        USER_SESSIONS_KEY(userId),
+      ],
+      sessionId,
+    );
   }
 
   async revokeAllRefreshSessions(userId: string): Promise<void> {
