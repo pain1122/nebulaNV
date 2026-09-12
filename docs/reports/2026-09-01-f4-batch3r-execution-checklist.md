@@ -935,3 +935,96 @@ Realm Auth session, production key material, or traffic change was introduced.
 Next: R4 stages the operator-realm subject and recovery credential through an
 offline, non-issuing path. It must create no Realm Auth session/token or
 operator PlatformGrant, and current customer administration remains unchanged.
+
+## R4_ADMIN_SPLIT_STAGED
+
+### Evidence ledger
+
+Entry review on 2026-09-12 confirmed two required implementation gaps against
+ADR-0015. Tenant Authority still enforced one active tenant role for an entire
+membership epoch, which prevented the frozen future `TENANT_ADMIN` plus
+`PARENT_MANAGER` state. The operator Realm Auth deployment had no staged
+subject or recovery procedure. These are confirmed defects relative to the R4
+gate. Issuing an operator session, activating a trust, or swapping a platform
+grant remains later R8 work.
+
+The narrow R4 implementation adds:
+
+- one additive Authority migration that replaces the epoch-only partial unique
+  index with one active grant per exact `(membershipEpochId, role)` and writes
+  no grant data;
+- one fixed operator-realm subject UUID stored as `PLATFORM_OPERATOR` in
+  `PROVISIONING` with credential and session generations both set to 1;
+- one local bcrypt recovery credential accepted only through an OPERATOR-bound,
+  advisory-locked, serializable offline CLI;
+- exact idempotent staging, password verification, and rollback that deletes
+  only an unused staged subject after proving the complete isolated subject
+  state and absence of identifiers, external links, sessions, bridges, root
+  SSO grants, audit, and outbox rows; and
+- one root disposable verifier covering clean migrations, Authority seed,
+  role cardinality, staged recovery, wrong-password denial, rollback/restaging,
+  preserved customer authority, forbidden operator grants/sessions, and cleanup.
+
+Tracked recovery output contains status values only. No password or hash enters
+the evidence log. R4 does not add a login identifier, token issuer, session,
+context writer, active provider/trust, or operator `PlatformGrant`.
+
+### First completion pass
+
+Focused checks passed from current source: Realm Auth type and lint checks, 6
+suites/44 tests; Tenant Authority type and lint checks, 17 suites/80 tests; all
+55 backend-tooling tests; JavaScript syntax; source formatting; and
+`git diff --check`. Review tightened credential validation to require exact
+bcrypt algorithm, embedded cost, parameter JSON, and revision. It also changed
+recovery and rollback from fixed-subject lookup alone to an exact total-subject
+count, so an unrelated operator subject cannot be misclassified as a valid or
+already-absent staged state.
+
+The first database attempt stopped safely before fixture insertion because the
+new verifier omitted the Authority seed's required disposable HMAC settings.
+After reusing the established Authority verifier environment, the next attempt
+exposed missing `updatedAt` values in the verifier-only Membership and
+PlatformGrant fixture. Both setup defects were corrected; each failed attempt
+removed its two disposable databases.
+
+### Adversarial second pass and completion
+
+`pnpm db:verify:f4-r4-admin-split-staged` passed on 2026-09-12. Its clean
+Authority database applied all eight migrations, and its isolated operator
+Realm Auth database applied the shadow foundation. Two simultaneous staging
+clients produced exactly one `CREATED` and one `ALREADY_CURRENT` through bounded
+retry of only Prisma's serialization-conflict code. The proof also established:
+
+- active `TENANT_ADMIN` and `PARENT_MANAGER` rows can coexist for one epoch,
+  while a second active `TENANT_ADMIN` is rejected;
+- the concurrent stage pair returns one `CREATED` and one `ALREADY_CURRENT`, a
+  later exact rerun remains `ALREADY_CURRENT`, the correct offline password
+  returns `RECOVERY_READY`, and a wrong password is denied;
+- the stored operator subject/credential has the fixed realm, subject,
+  lifecycle, generations, bcrypt cost, and revision, with zero login,
+  federation, session, bridge, root-SSO, audit, or outbox state;
+- rollback returns `ROLLED_BACK`, its rerun returns `ALREADY_ABSENT`, and the
+  documented recovery procedure can stage the credential again;
+- the customer Membership, current epoch, active `TENANT_ADMIN`, and current
+  `PLATFORM_ADMIN` grant remain exact, while no operator PlatformGrant exists;
+  and
+- both disposable databases are removed.
+
+Earlier-gate regressions then passed from the same source: clean Authority
+migration/seed/rerun, User/Authority role seeds and resolution, all four R2
+populated upgrades plus two atomic rollbacks, both R3 Realm Auth foundations,
+and clean migrations for all nine default Prisma databases. The final catalog
+query found zero database names containing `_verify_`. Prisma's package-
+configuration deprecation output remains a stale-tooling warning for a later
+major upgrade, not an R4 defect.
+
+- [x] Implement the per-role active tenant-grant constraint without data writes.
+- [x] Implement exact operator subject and offline recovery staging.
+- [x] Prove concurrent/exact rerun, wrong-password denial, and no-use
+      rollback/recovery.
+- [x] Prove zero operator session/token/grant and unchanged customer authority.
+- [x] Pass focused source checks and the clean stateful verifier.
+
+R4 closed on 2026-09-12. The active gate is
+`R5_V3_RECEIVERS_DORMANT`: add separately declared receivers and strict version
+denial before any v3 writer or `sr2_` session exists.

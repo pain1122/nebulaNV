@@ -21,6 +21,16 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const r4Migration = readFileSync(
+  path.join(
+    serviceRoot,
+    "prisma",
+    "migrations",
+    "20260912000100_tenant_role_per_role_unique",
+    "migration.sql",
+  ),
+  "utf8",
+);
 
 describe("membership authority foundation", () => {
   it("keeps global identity and credentials exclusively in user-service", () => {
@@ -105,5 +115,15 @@ describe("membership authority foundation", () => {
     expect(migration).toMatch(
       /REVOKE DELETE ON TABLE[\s\S]*"Membership"[\s\S]*"MembershipEpoch"[\s\S]*"SiteRoleGrant"[\s\S]*FROM nebula_authority_runtime/,
     );
+  });
+
+  it("prepares one active tenant grant per exact epoch and role", () => {
+    expect(r4Migration).toContain(
+      'DROP INDEX "TenantRoleGrant_one_active_epoch_key"',
+    );
+    expect(r4Migration).toMatch(
+      /CREATE UNIQUE INDEX "TenantRoleGrant_one_active_epoch_role_key"\s+ON "TenantRoleGrant"\("membershipEpochId", "role"\)\s+WHERE "state" = 'ACTIVE'/,
+    );
+    expect(r4Migration).not.toMatch(/INSERT|UPDATE|DELETE FROM/i);
   });
 });

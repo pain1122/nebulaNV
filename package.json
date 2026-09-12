@@ -193,6 +193,7 @@
     "db:verify:f4-r2-default-actors": "node ./scripts/backend.mjs database verify-f4-r2-default-actors",
     "db:verify:f4-r3-realm-auth-foundation": "node ./scripts/backend.mjs database verify-f4-r3-realm-auth-foundation",
     "db:verify:f4-r3-shadow-import": "node ./scripts/backend.mjs database verify-f4-r3-shadow-import",
+    "db:verify:f4-r4-admin-split-staged": "node ./scripts/backend.mjs database verify-f4-r4-admin-split-staged",
     "db:backup": "node ./scripts/backend.mjs database backup",
     "db:restore": "node ./scripts/backend.mjs database restore",
     "test:database-recovery": "node ./scripts/backend.mjs database test-recovery",

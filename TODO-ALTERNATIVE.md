@@ -1753,7 +1753,7 @@ not a claim that commercial SaaS productization exists.
 
 1. Preserve the completed F3 gateway, client, trust, release, and evidence
    contracts; do not restart or redesign them as part of F4.
-2. Batch 1R and Batch 3R R0-R3 are complete. Execute F4 from
+2. Batch 1R and Batch 3R R0-R4 are complete. Execute F4 from
    `docs/current-focus.md`; the `R3_REALM_AUTH_SHADOW` entry ledger is recorded.
    The family-version prerequisite and isolated Realm Auth schema/deployment
    foundation, clean dual-store verifier, and operator maintenance-backup
@@ -1765,8 +1765,12 @@ not a claim that commercial SaaS productization exists.
    corrected the concurrent serializable-import retry gap, and its two-client
    stateful proof passed. The updated foundation, Authority, role-seed, R2,
    all-service migration, and zero-residue regressions passed on 2026-09-09,
-   closing R3. Begin R4_ADMIN_SPLIT_STAGED without issuing a realm session or
-   changing customer administration/traffic.
+   closing R3. R4 then added the fixed provisioning operator subject and
+   offline recovery credential, exact rerun/no-use rollback checks, and the
+   per-epoch/per-role active tenant-grant constraint. Its clean disposable
+   proof passed on 2026-09-12 with zero sessions, tokens, operator grants,
+   customer-authority changes, or database residue. Begin
+   R5_V3_RECEIVERS_DORMANT before any v3 writer or Realm Auth session.
    R2's populated upgrades, reruns, atomic rollback, earlier-seed regressions,
    and cleanup passed; legacy readers and v1 history remain preserved. R1's
    realm/provider/policy/trust records remain inactive. R3 shadow migration

@@ -9,8 +9,9 @@ explicit target/actor authority resolver is implemented. Batch 3 item 5 is
 paused until ADR-0015 R11; Batch 1R's identity-realm correction is complete,
 and corrective Batch 3R R1 persistence is complete. R1 adds only inactive
 control-plane schema and development seed records; it has no runtime reader or
-traffic effect. R2 additive actor backfill completed on 2026-09-08; R3 Realm
-Auth shadow migration is next. The implemented
+traffic effect. R2 additive actor backfill completed on 2026-09-08, R3 Realm
+Auth shadow completed on 2026-09-09, and R4 staged admin split completed on
+2026-09-12. R5 dormant receivers are next. The implemented
 membership and resolver remain default-realm compatibility evidence, not the
 final realm-qualified design.
 Tenant, Site, Channel, Application, WebOrigin,
@@ -116,7 +117,7 @@ Tenant grants use only `TENANT_ADMIN` or `PARENT_MANAGER`; site grants use only
 `SITE_ADMIN`, `EDITOR`, or `USER`; platform grants use only
 `PLATFORM_ADMIN`. These are exact target-bound roles, not a hierarchy. Database
 constraints preserve same-tenant Site scope, at most one active tenant grant
-per epoch, at most one active site grant per epoch/site, current/open epoch
+per exact epoch and role, at most one active site grant per epoch/site, current/open epoch
 consistency, immutable role/target identity, terminal revocation, and retained
 history. ADR-0015 changes the future tenant-grant constraint to at most one
 active grant per `(epoch, tenantRole)` so exact `TENANT_ADMIN` and
@@ -425,10 +426,12 @@ The complete record, including the narrow corrections for the proto artifact,
 Auth-client DI, and operational-health wiring defects, is in
 `docs/reports/2026-08-26-f4-batch2-exit-proof.md`.
 
-Batch 1R and corrective Batch 3R R0-R2 are complete. Inactive control-plane
-records and additive actor pairs have clean migration, rerun, constraint,
-rollback, and earlier-seed regression proof. Next is the R3 Realm Auth shadow
-evidence ledger and source-owned migration, with current User/Auth still
-authoritative. Preserve membership IDs, epochs, `meg1_`, grants, historical
-events, and compatibility readers. Live invalidation resumes only at R11;
-the gateway remains on its static registry until the ordered cutover.
+Batch 1R and corrective Batch 3R R0-R4 are complete. Inactive control-plane
+records, additive actor pairs, Realm Auth shadow state, and the staged operator
+recovery path have clean migration, rerun, constraint, rollback, and earlier-
+gate proof. R4 replaced epoch-only active tenant-role uniqueness with exact
+epoch-and-role uniqueness without changing existing grant data. R5 adds dormant
+context-v3 receivers before any v3 writer or Realm Auth session. Preserve
+membership IDs, epochs, `meg1_`, grants, historical events, and compatibility
+readers. Live invalidation resumes only at R11; the gateway remains on its
+static registry until the ordered cutover.

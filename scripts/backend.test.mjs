@@ -58,6 +58,7 @@ import {
   verifyF4Batch3RoleSeeds,
   verifyF4R2DefaultActors,
   verifyF4R3RealmAuthFoundation,
+  verifyF4R4AdminSplitStaged,
   verifyTenantAuthorityDefaultSeed,
   verifyTenantAuthorityRegistrationRecords,
   waitForExpectedDatabases,
@@ -764,6 +765,14 @@ test("R3 Realm Auth commands stay on the consolidated backend tool", () => {
   assert.equal(
     root.scripts["db:verify:f4-r3-shadow-import"],
     "node ./scripts/backend.mjs database verify-f4-r3-shadow-import",
+  );
+});
+
+test("R4 staged administrator proof stays on the consolidated backend tool", () => {
+  const root = JSON.parse(source("package.json"));
+  assert.equal(
+    root.scripts["db:verify:f4-r4-admin-split-staged"],
+    "node ./scripts/backend.mjs database verify-f4-r4-admin-split-staged",
   );
 });
 
@@ -2214,6 +2223,34 @@ test("F4 R3 cleans the first database after second-database creation fails", () 
   assert.equal(creates, 2);
   assert.equal(drops.length, 1);
   assert.match(drops[0], /nebula_realm_auth_default_verify_/);
+});
+
+test("F4 R4 cleans the Authority database after operator database creation fails", () => {
+  const drops = [];
+  let creates = 0;
+  assert.throws(
+    () =>
+      verifyF4R4AdminSplitStaged({
+        runId: "r4-partial",
+        executeDocker(command, args) {
+          if (args.includes("createdb")) {
+            creates += 1;
+            return { status: creates === 2 ? 7 : 0, stderr: "" };
+          }
+          if (args.includes("dropdb")) drops.push(args.at(-1));
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        executePnpm() {
+          return { status: 0, stdout: "" };
+        },
+        logger: { log() {} },
+        platform: "linux",
+      }),
+    /local_postgres_create_.*failed_exit_7/,
+  );
+  assert.equal(creates, 2);
+  assert.equal(drops.length, 1);
+  assert.match(drops[0], /^nebula_authority_verify_/);
 });
 
 test("disposable cleanup refuses normal or invalid database names before executing", () => {

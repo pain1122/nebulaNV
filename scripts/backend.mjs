@@ -2176,6 +2176,382 @@ $verify$;`,
   return [userDatabase, realmDatabase];
 }
 
+export function verifyF4R4AdminSplitStaged({
+  env = process.env,
+  executeDocker = run,
+  executePnpm = runPnpm,
+  logger = console,
+  platform = process.platform,
+  runId = randomUUID(),
+} = {}) {
+  const authorityService = prismaServices.find(
+    (candidate) => candidate.packageName === "@nebula/tenant-authority-service",
+  );
+  const realmService = prismaServices.find(
+    (candidate) => candidate.packageName === "@nebula/realm-auth-service",
+  );
+  if (!authorityService || !realmService) {
+    throw new Error("f4_r4_admin_split_service_missing");
+  }
+  const authorityDatabase = disposableDatabaseName(
+    authorityService.database,
+    runId,
+  );
+  const operatorDatabase = disposableDatabaseName(
+    "nebula_realm_auth_operator",
+    runId,
+  );
+  const operator = F4_R3_REALM_AUTH_DEPLOYMENTS[1];
+  const operatorSubjectId = "b6000000-0000-4000-8000-000000000001";
+  const recoveryPassword = "R4-Disposable-Recovery-Password!";
+  const created = [];
+  let failure;
+
+  const packageFailure = (packageName, script, input, reason, commandEnv) => {
+    const result = executePnpm(
+      ["--silent", "--filter", packageName, "run", script],
+      {
+        env: commandEnv,
+        capture: true,
+        emitCaptured: false,
+        input,
+      },
+    );
+    const output = `${String(result.stdout ?? "")}\n${String(
+      result.stderr ?? "",
+    )}`;
+    if (result.status === 0 || !output.includes(reason)) {
+      throw new Error(`f4_r4_expected_${reason}_failure_invalid`);
+    }
+  };
+
+  try {
+    runPostgresTool(
+      ["pg_isready", "--username", "postgres", "--dbname", "postgres"],
+      { label: "readiness", env, execute: executeDocker, platform },
+    );
+    for (const database of [authorityDatabase, operatorDatabase]) {
+      createLocalDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+      created.push(database);
+    }
+    const disposableAuthority = {
+      ...authorityService,
+      database: authorityDatabase,
+    };
+    const disposableOperator = {
+      ...realmService,
+      name: "operator-realm-auth-service",
+      database: operatorDatabase,
+    };
+    runPrismaOperation("migrate-deploy", {
+      services: [disposableAuthority],
+      env: databaseEnv(authorityDatabase, env),
+      execute: executePnpm,
+      logger,
+    });
+    runPrismaOperation("migrate-deploy", {
+      services: [disposableOperator],
+      env: databaseEnv(operatorDatabase, env),
+      execute: executePnpm,
+      logger,
+    });
+    const authorityEnv = {
+      ...databaseEnv(authorityDatabase, env),
+      NODE_ENV: "development",
+      AUTHORITY_AUDIT_HMAC_KEY_ID: "f4-r4-disposable-audit-v1",
+      AUTHORITY_AUDIT_HMAC_KEY: "f4-r4-disposable-audit-integrity-key",
+      AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID: "f4-r4-disposable-membership-v1",
+      AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY:
+        "f4-r4-disposable-membership-integrity-key",
+    };
+    const operatorEnv = {
+      ...databaseEnv(operatorDatabase, env),
+      REALM_AUTH_DEPLOYMENT: "OPERATOR",
+      BCRYPT_ROUNDS: "8",
+    };
+    runPackageScript(authorityService.packageName, "db:seed", {
+      env: authorityEnv,
+      execute: executePnpm,
+    });
+    if (
+      runPackageScript(realmService.packageName, operator.seedScript, {
+        env: operatorEnv,
+        execute: executePnpm,
+      }) !== "CREATED"
+    ) {
+      throw new Error("f4_r4_operator_boundary_seed_invalid");
+    }
+    executeSqlText(
+      authorityDatabase,
+      `BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+INSERT INTO "Membership" (
+  id, "tenantId", "userId", state, "currentEpochId", revision, "updatedAt"
+) VALUES (
+  'c1000000-0000-4000-8000-000000000001'::uuid,
+  'a1000000-0000-4000-8000-000000000001'::uuid,
+  'd1000000-0000-4000-8000-000000000001'::uuid,
+  'ACTIVE',
+  'c2000000-0000-4000-8000-000000000001'::uuid,
+  7,
+  '2026-09-12T00:00:00Z'
+);
+INSERT INTO "MembershipEpoch" (
+  id, "membershipId", generation, "membershipEpochRef", "integrityKeyId"
+) VALUES (
+  'c2000000-0000-4000-8000-000000000001'::uuid,
+  'c1000000-0000-4000-8000-000000000001'::uuid,
+  1,
+  'meg1_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+  'f4-r4-disposable-v1'
+);
+INSERT INTO "TenantRoleGrant" (
+  id, "membershipEpochId", role, state
+) VALUES (
+  'c3000000-0000-4000-8000-000000000001'::uuid,
+  'c2000000-0000-4000-8000-000000000001'::uuid,
+  'TENANT_ADMIN',
+  'ACTIVE'
+);
+INSERT INTO "PlatformGrant" (
+  id, "userId", role, state, revision, "updatedAt"
+) VALUES (
+  'c5000000-0000-4000-8000-000000000001'::uuid,
+  'd1000000-0000-4000-8000-000000000001'::uuid,
+  'PLATFORM_ADMIN',
+  'ACTIVE',
+  5,
+  '2026-09-12T00:00:00Z'
+);
+COMMIT;
+BEGIN;
+INSERT INTO "TenantRoleGrant" (
+  id, "membershipEpochId", role, state
+) VALUES (
+  'c3000000-0000-4000-8000-000000000002'::uuid,
+  'c2000000-0000-4000-8000-000000000001'::uuid,
+  'PARENT_MANAGER',
+  'ACTIVE'
+);
+DO $verify$
+BEGIN
+  IF (SELECT count(*) FROM "TenantRoleGrant"
+      WHERE "membershipEpochId" = 'c2000000-0000-4000-8000-000000000001'::uuid
+        AND state = 'ACTIVE') <> 2 THEN
+    RAISE EXCEPTION 'f4_r4_per_role_coexistence_missing';
+  END IF;
+END
+$verify$;
+ROLLBACK;`,
+      { env, execute: executeDocker, platform },
+    );
+    expectSqlTextFailure(
+      authorityDatabase,
+      `DO $verify$
+BEGIN
+  BEGIN
+    INSERT INTO "TenantRoleGrant" (
+      id, "membershipEpochId", role, state
+    ) VALUES (
+      'c3000000-0000-4000-8000-000000000003'::uuid,
+      'c2000000-0000-4000-8000-000000000001'::uuid,
+      'TENANT_ADMIN',
+      'ACTIVE'
+    );
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'authority_tenant_role_duplicate_same_role';
+  END;
+END
+$verify$;`,
+      "authority_tenant_role_duplicate_same_role",
+      {
+        env,
+        execute: executeDocker,
+        failureLabel: "f4_r4",
+        platform,
+      },
+    );
+    const passwordInput = `${recoveryPassword}\n`;
+    const concurrentStage = capturedJson(
+      runPackageScript(
+        realmService.packageName,
+        "verify:r4-operator-concurrent-stage",
+        {
+          env: operatorEnv,
+          execute: executePnpm,
+          input: passwordInput,
+        },
+      ),
+      "f4_r4_operator_stage_concurrent",
+    );
+    const secondStage = capturedJson(
+      runPackageScript(realmService.packageName, "stage:r4-operator", {
+        env: operatorEnv,
+        execute: executePnpm,
+        input: passwordInput,
+      }),
+      "f4_r4_operator_stage_second",
+    );
+    const recovery = capturedJson(
+      runPackageScript(
+        realmService.packageName,
+        "verify:r4-operator-recovery",
+        {
+          env: operatorEnv,
+          execute: executePnpm,
+          input: passwordInput,
+        },
+      ),
+      "f4_r4_operator_recovery",
+    );
+    if (
+      concurrentStage.status !== "CONCURRENTLY_STAGED" ||
+      JSON.stringify(concurrentStage.stageStatuses) !==
+        JSON.stringify(["ALREADY_CURRENT", "CREATED"]) ||
+      secondStage.status !== "ALREADY_CURRENT" ||
+      recovery.status !== "RECOVERY_READY"
+    ) {
+      throw new Error("f4_r4_operator_stage_result_invalid");
+    }
+    packageFailure(
+      realmService.packageName,
+      "verify:r4-operator-recovery",
+      "Wrong-Disposable-Recovery-Password!\n",
+      "r4_operator_staging_credential_mismatch",
+      operatorEnv,
+    );
+    executeSqlText(
+      operatorDatabase,
+      `DO $verify$
+BEGIN
+  IF (SELECT count(*) FROM "RealmSubject"
+      WHERE id = '${operatorSubjectId}'::uuid
+        AND "identityRealmId" = '${operator.realmId}'::uuid
+        AND "principalClass" = 'PLATFORM_OPERATOR'
+        AND lifecycle = 'PROVISIONING'
+        AND "credentialGeneration" = 1
+        AND "sessionGeneration" = 1) <> 1 OR
+     (SELECT count(*) FROM "LocalCredential"
+      WHERE "identityRealmId" = '${operator.realmId}'::uuid
+        AND "subjectId" = '${operatorSubjectId}'::uuid
+        AND algorithm = 'BCRYPT'
+        AND revision = 1
+        AND parameters = '{"cost":8}'::jsonb) <> 1 OR
+     (SELECT count(*) FROM "LoginIdentifier") +
+     (SELECT count(*) FROM "ExternalIdentityLink") +
+     (SELECT count(*) FROM "AuthSession") +
+     (SELECT count(*) FROM "LegacySessionBridge") +
+     (SELECT count(*) FROM "RootSsoExchangeGrant") +
+     (SELECT count(*) FROM "AuthAuditEvent") +
+     (SELECT count(*) FROM "AuthOutboxEvent") <> 0 THEN
+    RAISE EXCEPTION 'f4_r4_operator_stage_state_invalid';
+  END IF;
+END
+$verify$;`,
+      { env, execute: executeDocker, platform },
+    );
+    const firstRollback = capturedJson(
+      runPackageScript(realmService.packageName, "rollback:r4-operator", {
+        env: operatorEnv,
+        execute: executePnpm,
+      }),
+      "f4_r4_operator_rollback_first",
+    );
+    const secondRollback = capturedJson(
+      runPackageScript(realmService.packageName, "rollback:r4-operator", {
+        env: operatorEnv,
+        execute: executePnpm,
+      }),
+      "f4_r4_operator_rollback_second",
+    );
+    const recoveredStage = capturedJson(
+      runPackageScript(realmService.packageName, "stage:r4-operator", {
+        env: operatorEnv,
+        execute: executePnpm,
+        input: passwordInput,
+      }),
+      "f4_r4_operator_recovered_stage",
+    );
+    if (
+      firstRollback.status !== "ROLLED_BACK" ||
+      secondRollback.status !== "ALREADY_ABSENT" ||
+      recoveredStage.status !== "CREATED"
+    ) {
+      throw new Error("f4_r4_operator_recovery_procedure_invalid");
+    }
+    executeSqlText(
+      authorityDatabase,
+      `DO $verify$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'TenantRoleGrant_one_active_epoch_key'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'TenantRoleGrant_one_active_epoch_role_key'
+      AND indexdef LIKE '%("membershipEpochId", role)%'
+  ) OR
+     (SELECT count(*) FROM "Membership"
+      WHERE id = 'c1000000-0000-4000-8000-000000000001'::uuid
+        AND "identityRealmId" = 'b1000000-0000-4000-8000-000000000001'::uuid
+        AND "subjectId" = 'd1000000-0000-4000-8000-000000000001'::uuid
+        AND state = 'ACTIVE' AND revision = 7) <> 1 OR
+     (SELECT count(*) FROM "MembershipEpoch"
+      WHERE id = 'c2000000-0000-4000-8000-000000000001'::uuid
+        AND generation = 1 AND "closedAt" IS NULL) <> 1 OR
+     (SELECT count(*) FROM "TenantRoleGrant"
+      WHERE "membershipEpochId" = 'c2000000-0000-4000-8000-000000000001'::uuid
+        AND role = 'TENANT_ADMIN' AND state = 'ACTIVE') <> 1 OR
+     (SELECT count(*) FROM "TenantRoleGrant") <> 1 OR
+     (SELECT count(*) FROM "PlatformGrant"
+      WHERE id = 'c5000000-0000-4000-8000-000000000001'::uuid
+        AND "identityRealmId" = 'b1000000-0000-4000-8000-000000000001'::uuid
+        AND "subjectId" = 'd1000000-0000-4000-8000-000000000001'::uuid
+        AND role = 'PLATFORM_ADMIN' AND state = 'ACTIVE' AND revision = 5) <> 1 OR
+     EXISTS (
+       SELECT 1 FROM "PlatformGrant"
+       WHERE "identityRealmId" = '${operator.realmId}'::uuid
+          OR "subjectId" = '${operatorSubjectId}'::uuid
+     ) THEN
+    RAISE EXCEPTION 'f4_r4_customer_authority_changed';
+  END IF;
+END
+$verify$;`,
+      { env, execute: executeDocker, platform },
+    );
+    logger.log(
+      "[backend] F4 R4 staged admin split verified: tenantRoles=2 concurrentStages=2 recoveryChecks=2 rollback=2 sessions=0 operatorGrants=0",
+    );
+  } catch (error) {
+    failure = error;
+  }
+
+  let cleanupFailure;
+  for (const database of created.reverse()) {
+    try {
+      dropDisposableDatabase(database, {
+        env,
+        execute: executeDocker,
+        platform,
+      });
+    } catch (error) {
+      cleanupFailure ??= error;
+    }
+  }
+  if (failure && cleanupFailure) {
+    throw new Error(`${failure.message}; cleanup: ${cleanupFailure.message}`);
+  }
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  return [authorityDatabase, operatorDatabase];
+}
+
 export function verifyCleanMigrations({
   services = prismaServices,
   env = process.env,
@@ -4311,6 +4687,7 @@ function usage() {
     "  node scripts/backend.mjs database verify-f4-r2-default-actors",
     "  node scripts/backend.mjs database verify-f4-r3-realm-auth-foundation",
     "  node scripts/backend.mjs database verify-f4-r3-shadow-import",
+    "  node scripts/backend.mjs database verify-f4-r4-admin-split-staged",
     "  node scripts/backend.mjs database backup <directory>",
     `  node scripts/backend.mjs database restore <directory> --confirm=${RESTORE_CONFIRMATION}`,
     "  node scripts/backend.mjs database test-recovery",
@@ -4392,6 +4769,17 @@ export async function main(args = process.argv.slice(2)) {
     !unexpected
   ) {
     verifyCleanMigrations({ services: migrationVerificationServices(extra) });
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-f4-r4-admin-split-staged" &&
+    !extra
+  ) {
+    const databases = verifyF4R4AdminSplitStaged();
+    console.log(
+      `[backend] F4 R4 staged admin split proof passed; cleaned ${databases.length} disposable databases`,
+    );
     return;
   }
   if (

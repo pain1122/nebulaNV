@@ -757,9 +757,10 @@ until ADR-0015 R11 after the preceding corrective Batch 3R work below.
 
 Batch 1R has frozen the exact schema/contract/migration matrix. Execute this
 corrective implementation strictly through ADR-0015 R0-R11. The
-documentation-only R0 rebaseline, inactive R1 control-plane persistence, and
-R2 additive default-actor backfill are complete. R2 preserves legacy readers,
-epochs, grants, and v1 history; R1 remains non-admitting. R3 is next.
+documentation-only R0 rebaseline, inactive R1 control-plane persistence, R2
+additive default-actor backfill, R3 Realm Auth shadow, and R4 staged operator
+split are complete. R2 preserves legacy readers, epochs, grants, and v1
+history; R1 remains non-admitting. R5 is next.
 Each stateful item requires clean disposable
 current-source execution, reruns of the preserved Batch 2/3 seed verifiers,
 and an adversarial second pass before its checkbox can change.
@@ -804,17 +805,25 @@ and an adversarial second pass before its checkbox can change.
       verifiers, and all eight service migration checks passed. Salar
       confirmed zero verification databases remain. Full two-pass evidence:
       [F4 Batch 3R execution checklist](reports/2026-09-01-f4-batch3r-execution-checklist.md#r2_default_actor_backfill).
-- [ ] `R3_REALM_AUTH_SHADOW`: add isolated default/operator Realm Auth durable
+- [x] `R3_REALM_AUTH_SHADOW`: add isolated default/operator Realm Auth durable
       subject/login/credential/two-generation/session/audit/outbox aggregates,
       immutable `sr2_`/key ownership, and terminal `lsb1_` legacy bridges.
       Import only the bounded source-owned encrypted/HMAC-manifested snapshots;
       shadow-compare counts/checksums/login without issuing a realm session or
       taking credential authority.
-- [ ] `R4_ADMIN_SPLIT_STAGED`: create and verify the distinct operator-realm
+- [x] `R4_ADMIN_SPLIT_STAGED`: create and verify the distinct operator-realm
       subject, credential, and recovery procedure through a non-issuing path;
       change future tenant-grant cardinality to one active grant per
       `(epoch, tenantRole)`. Create no AuthSession/token or operator
-      PlatformGrant and leave the customer grants/traffic unchanged.
+      PlatformGrant and leave the customer grants/traffic unchanged. Completed
+      2026-09-12. The fixed provisioning subject, bcrypt recovery credential,
+      exact rerun checks, offline verification, and no-use rollback are confined
+      to the isolated operator Realm Auth store. The Authority migration changes
+      active tenant-role uniqueness from epoch-only to `(epoch, role)` without
+      writing grant data. The clean stateful proof verified distinct-role
+      coexistence, same-role rejection, recovery denial for a wrong password,
+      repeat-safe rollback/restaging, zero sessions/operator grants, unchanged
+      customer authority, and cleanup of both disposable databases.
 - [ ] `R5_V3_RECEIVERS_DORMANT`: implement the frozen exact v3 schema and
       `sr2_`/`ar2_` receivers through `grpc-auth`, typed clients, and separately
       declared downstream methods for every protected original-app/operator
@@ -1166,7 +1175,7 @@ and an adversarial second pass before its checkbox can change.
 
 ## Next Action
 
-Batch 3R R0-R3 are complete. The `R3_REALM_AUTH_SHADOW` entry ledger is recorded
+Batch 3R R0-R4 are complete. The `R3_REALM_AUTH_SHADOW` entry ledger is recorded
 in the Batch 3R execution report. Its family-version source prerequisite is
 implemented: legacy login/refresh records the issued version, and a migration-
 only atomic reader quarantines unprovable families without lazy initialization.
@@ -1187,13 +1196,19 @@ source-owned encrypted/HMAC-manifested import and comparison. Current User/Auth
 retains credential/session authority. Issue no realm session, activate no R1
 record, and preserve R2 pairs, legacy readers, epochs, grants, and v1 history.
 Keep `StaticApplicationRegistry` primary and follow the ordered later gates.
+R4 added the fixed operator provisioning subject, offline recovery credential,
+exact concurrent rerun/no-use rollback checks, and per-epoch/per-role active
+tenant-grant uniqueness. Its focused tests, clean concurrent stateful proof,
+all earlier database gates, all-service migrations, and zero-residue check passed
+on 2026-09-12. It issued no session/token, created no operator PlatformGrant,
+and changed no customer authority or traffic.
 
-The active gate is now `R4_ADMIN_SPLIT_STAGED`. Stage only the separate
-operator-realm subject and recovery credential through an offline/non-issuing
-path, prove its stored lifecycle and credential check, and prepare the
-per-role tenant-grant constraint. Create no AuthSession/token, operator
-PlatformGrant, or traffic change; retain the customer Membership/epoch,
-`TENANT_ADMIN`, and current PlatformGrant.
+The active gate is now `R5_V3_RECEIVERS_DORMANT`. Implement separately declared
+exact context-v3 and `sr2_`/`ar2_` receiver methods for every protected route
+needed by the four original default applications and operator administration.
+Prove unchanged v1/v2 bytes, strict version routing and rejection, no context
+propagation, and default-realm parity. Add no v3 writer or `sr2_` session; the
+R1 records remain non-admitting and the R4 operator subject remains staged.
 
 Consult Salar before editing F6-F9, D4-D5/P1, M6-M7, or deferred SaaS scope.
 The assistant runs small inspections and focused checks directly; Salar runs

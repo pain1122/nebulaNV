@@ -18,6 +18,10 @@
     "seed:shadow-boundary:operator": "ts-node --project tsconfig.json prisma/seed-shadow-boundary.ts OPERATOR",
     "import:f4-r3-shadow": "ts-node --project tsconfig.json prisma/import-f4-r3-shadow.ts",
     "rollback:f4-r3-shadow": "ts-node --project tsconfig.json prisma/rollback-f4-r3-shadow.ts",
+    "stage:r4-operator": "ts-node --project tsconfig.json prisma/r4-operator-staging.ts stage",
+    "verify:r4-operator-concurrent-stage": "ts-node --project tsconfig.json prisma/r4-operator-staging.ts stage-concurrent",
+    "verify:r4-operator-recovery": "ts-node --project tsconfig.json prisma/r4-operator-staging.ts verify",
+    "rollback:r4-operator": "ts-node --project tsconfig.json prisma/r4-operator-staging.ts rollback",
     "compare:f4-r3-shadow-login": "ts-node --project tsconfig.json prisma/compare-f4-r3-shadow-login.ts",
     "test": "jest --config ./jest.config.ts --runInBand",
     "postinstall": "pnpm run prisma:gen"

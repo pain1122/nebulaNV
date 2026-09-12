@@ -44,6 +44,7 @@ export const REALM_AUTH_DEPLOYMENTS = Object.freeze({
     runtimeRole: "nebula_realm_auth_operator_runtime",
     issuer: "urn:nebula:realm-auth:b1000000-0000-4000-8000-000000000002",
     defaultHttpPort: 3013,
+    stagedOperatorSubjectId: "b6000000-0000-4000-8000-000000000001",
     keyRegistrations: {
       jwtSigning: [
         "b5100000-0000-4000-8000-000000000001",

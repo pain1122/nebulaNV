@@ -1,6 +1,6 @@
 # Realm Auth Service
 
-Last reviewed: 2026-09-09
+Last reviewed: 2026-09-12
 
 ## Purpose
 
@@ -78,3 +78,28 @@ on 2026-09-09.
 No login, refresh, logout, session upgrade, federation, public API, or typed
 business RPC exists in this service during R3. Those paths remain ordered behind
 later receiver, barrier, and traffic gates.
+
+## R4 Staged Operator Recovery
+
+R4 adds one fixed `PLATFORM_OPERATOR` subject to the isolated operator database
+with lifecycle `PROVISIONING`, credential/session generations of 1, and one
+local bcrypt recovery credential. The command refuses any deployment other
+than `REALM_AUTH_DEPLOYMENT=OPERATOR`. It accepts the password through standard
+input, emits only a JSON status, and never creates a login identifier, session,
+token, bridge, SSO grant, audit event, outbox event, or Authority grant.
+
+The three package commands are `stage:r4-operator`,
+`verify:r4-operator-recovery`, and `rollback:r4-operator`. Staging is
+idempotent only when the complete stored subject, bcrypt parameters, revision,
+password, and empty related state match. Offline verification compares the
+credential without issuing anything. Rollback deletes only this fixed subject
+and credential after exact no-use/no-session proof; a second rollback reports
+`ALREADY_ABSENT`.
+
+Use the root `pnpm db:verify:f4-r4-admin-split-staged` command for normal proof.
+It supplies a disposable recovery secret, starts two simultaneous stage clients
+and accepts only one create plus one exact-current result, verifies the
+companion Authority constraint and customer-state preservation, and cleans both
+temporary databases. Only Prisma's serializable-conflict code is retried, at
+most three attempts. The clean proof passed on 2026-09-12. R5 receiver work must
+precede any Realm Auth session or context writer.

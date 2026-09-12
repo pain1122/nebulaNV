@@ -172,7 +172,13 @@ operation, remains disabled until its isolation work is complete.
   simultaneous-import proof; its stateful rerun passed. The updated foundation,
   Authority, role-seed, R2, all-service migration, and zero-residue regressions
   then passed, closing R3 on 2026-09-09. Current User/Auth stays authoritative.
-  R4_ADMIN_SPLIT_STAGED is next.
+  R4_ADMIN_SPLIT_STAGED completed on 2026-09-12: the isolated operator store
+  now supports one fixed provisioning subject and offline bcrypt recovery
+  credential with exact rerun/no-use rollback checks, and Tenant Authority
+  permits one active grant per exact `(membershipEpochId, role)`. Its clean
+  verifier proved wrong-password and duplicate-role denial, distinct-role
+  coexistence, unchanged customer authority, zero operator sessions/grants,
+  and zero disposable database residue. R5_V3_RECEIVERS_DORMANT is next.
   ADR-0015 R0-R11 must execute in order. Do not resume former Batch 3 item 5 or skip
   to a context writer. The selected target is one or more
   isolated identity realms per licensed root, a separate NebulaNV platform-
