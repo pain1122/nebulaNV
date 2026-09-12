@@ -18,7 +18,12 @@ It also provides the read-only tenant-authority v1 wrapper staged for F4.
 - `getOrder(client, signingPolicy?)`
 - `getMedia(client, signingPolicy?)`
 - `getTenantAuthority(client, signingPolicy?)`
+- `getDormantAuthV3`, `getDormantUserV3`, `getDormantSettingsV3`
+- `getDormantProductV3`, `getDormantProductTaxonomyV3`
+- `getDormantBlogV3`, `getDormantBlogTaxonomyV3`
+- `getDormantOrderV3`, `getDormantMediaV3`
 - `GrpcClientSigningPolicy`
+- `DormantV3SigningPolicy`
 - `buildClientGrpcS2SMetadata(options)`
 - `getSignedMetadata(options)`
 - settings and taxonomy request/response proxy types
@@ -102,6 +107,19 @@ It maps friendly create/update inputs to the protobuf request envelopes before s
 Each method binds one generated unary definition and signs the actual
 protobuf-shaped request. `GrpcRequestInput<T>` removes generated `$type`
 markers recursively while retaining the generated field types.
+
+## Dormant Context-V3 Receivers
+
+R5 adds a separate typed client family for the 56 protected V3 receiver paths.
+These constructors require `DormantV3SigningPolicy`, whose context is statically
+required to be `S2SAuthorizationContextV3`; there is no context-free or legacy
+default. The ordinary proxies above retain exactly their previous keys and
+generated paths.
+
+The gateway does not import or call the dormant family. R6 must first create
+and verify the Realm Auth session and Tenant Authority decision before it may
+select these methods as one controlled cohort. Merely exporting the typed
+receiver bindings does not issue an `sr2_` session or change traffic.
 
 ## Boundary
 

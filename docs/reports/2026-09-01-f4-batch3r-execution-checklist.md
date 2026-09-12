@@ -1028,3 +1028,75 @@ major upgrade, not an R4 defect.
 R4 closed on 2026-09-12. The active gate is
 `R5_V3_RECEIVERS_DORMANT`: add separately declared receivers and strict version
 denial before any v3 writer or `sr2_` session exists.
+
+## R5_V3_RECEIVERS_DORMANT
+
+### Evidence ledger
+
+Entry review on 2026-09-12 confirmed that the shared S2S envelope could carry
+only context v1 and the narrow context-v2 Authority-resolution shape. The
+domain protobuf services and controllers had no separately addressable v3
+methods. This was the implementation gap identified by ADR-0015's receiver-
+before-session gate. The existing v1/v2 formats, controller handlers, route
+policies, gateway calls, and typed legacy clients already worked and were
+preserved.
+
+The narrow R5 implementation adds:
+
+- one strict context-v3 canonical JSON union containing realm-qualified subject,
+  exact `sr2_`/session key, verified authentication-authority registration,
+  application audience/policy/trust, target, one membership or platform
+  authority, exact `ar2_`/decision key, and decimal resolution time;
+- exact key, UUIDv4, decimal, null-pair, role/relationship, prefix, length, and
+  unknown-field validation with a separate 4096-byte v3 bound;
+- receiver metadata and guard routing that admits v3 only on a declared
+  `AUTHORIZATION/AUTHORIZED` method, rejects v1/v2 on that method, rejects v3 on
+  every legacy/undeclared method, and stores it only as authorization context;
+- an unconditional propagation denial for v3 authority context;
+- 56 additive protobuf RPCs and 56 controller aliases covering every distinct
+  protected RPC in the gateway route manifest across Auth, User, Settings,
+  Product, Product Taxonomy, Blog, Blog Taxonomy, Order, and Media; and
+- a separate typed dormant client family whose constructors require a typed v3
+  signing policy. Existing proxy objects and gateway imports remain unchanged.
+
+Each controller alias is registered as a distinct Nest gRPC method and invokes
+the same function as its legacy counterpart. The alias copies the complete
+handler metadata only after the original decorators have run, preserving role,
+JWT/gateway-only, user-ID, validation-pipe, and other method policies. A source
+inventory prevents future decorator-order regressions.
+
+### Compatibility, adversarial proof, and rollback
+
+The R5 inventory derives its required set from the live gateway route manifest,
+deduplicates it to exactly 56 protected RPCs, and requires a matching controller
+receiver and service-specific protobuf method for each. Every V3 method must
+reuse the exact legacy request and response types. SHA-256 baselines of all
+seven affected pre-R5 proto sources pass after removing only additive `rpc
+...V3` lines, proving the previous source bytes did not change. Generated proto
+staleness and type checks pass.
+
+Shared security tests prove canonical v3 round-trip; full-length `sr2_`, `ar2_`,
+and `meg1_`; strict unknown/partial/mixed/null/role/trust/target rejection;
+separate v1/v2/v3 route admission; v3 denial on legacy routes; legacy denial on
+v3 routes; and no downstream propagation. Decorator tests prove distinct Nest
+gRPC registrations, identical handler results, and copied policy metadata.
+Typed-client tests bind all 56 methods to their generated V3 paths and emit S2S
+envelope v3.
+
+The gateway source contains no V3 method selection and the typed V3 clients are
+not imported there. R5 creates no context producer, session, token, Authority
+decision writer, database migration, seed, cache entry, or traffic switch. The
+R4 stateful proof immediately before this gate already established zero Realm
+Auth sessions/tokens and zero operator grants. Rollback therefore removes or
+disables only the additive receiver RPCs, decorators, and dormant client family;
+the frozen v1/v2 sources and all persistent state remain unchanged.
+
+- [x] Implement the exact realm-aware v3 carrier and strict receiver guard.
+- [x] Add all 56 separate protected-route protobuf/controller receivers.
+- [x] Add the separate typed dormant clients without gateway selection.
+- [x] Prove unchanged legacy proto bytes, request/response parity, and handler
+      policy parity.
+- [x] Prove wrong-version, mixed-shape, and propagation denial.
+- [x] Pass focused source, generated-contract, type, lint, and unit checks.
+
+R5 closed on 2026-09-12. The active gate is `R6.1_DEFAULT_AUTH_SESSION`.

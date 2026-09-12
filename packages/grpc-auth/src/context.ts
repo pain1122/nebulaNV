@@ -2,6 +2,7 @@ import type { Metadata, MetadataValue, ServerUnaryCall } from "@grpc/grpc-js";
 import type { S2SCallerKind } from "./s2s.crypto";
 import type {
   S2SActorAssertion,
+  S2SAuthorizationContextV3,
   S2SRequestContext,
   S2SResolutionAuthorityContext,
 } from "./s2s-context";
@@ -20,6 +21,7 @@ export type ContextCarrier = {
   requestId?: string;
   requestContext?: S2SRequestContext;
   resolutionContext?: S2SResolutionAuthorityContext;
+  authorizationContext?: S2SAuthorizationContextV3;
   signedActor?: S2SActorAssertion;
 };
 

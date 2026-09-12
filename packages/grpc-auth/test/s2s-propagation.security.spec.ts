@@ -86,6 +86,48 @@ describe("verified service downstream context", () => {
     );
   });
 
+  it("never propagates an authorization v3 context", () => {
+    const metadata = new Metadata() as MetadataWithContext;
+    metadata.svc = "gateway";
+    metadata.svcKind = "gateway";
+    metadata.requestId = "req-authorization-1";
+    metadata.authorizationContext = {
+      version: "3",
+      identityRealmId: "b1000000-0000-4000-8000-000000000001",
+      subjectId: "d1000000-0000-4000-8000-000000000001",
+      sessionRef: `sr2_${"A".repeat(43)}`,
+      sessionRefKeyId: "b5100000-0000-4000-8000-000000000001",
+      authenticationAuthorityRef: "b2000000-0000-4000-8000-000000000001",
+      application: {
+        applicationId: "a4000000-0000-4000-8000-000000000001",
+        audience: "urn:nebula:application:a4000000-0000-4000-8000-000000000001",
+        applicationPolicyRevision: "1",
+        federationTrustId: "b4000000-0000-4000-8000-000000000001",
+        federationTrustRevision: "1",
+      },
+      target: {
+        kind: "TENANT",
+        tenantId: "a1000000-0000-4000-8000-000000000001",
+        siteId: null,
+      },
+      actorAuthority: {
+        kind: "MEMBERSHIP",
+        membershipId: "c1000000-0000-4000-8000-000000000001",
+        membershipEpochRef: `meg1_${"C".repeat(43)}`,
+        roleGrantId: "c3000000-0000-4000-8000-000000000001",
+        effectiveRole: "TENANT_ADMIN",
+        parentRelationshipId: null,
+      },
+      authorityRef: `ar2_${"B".repeat(43)}`,
+      authorityRefKeyId: "b5200000-0000-4000-8000-000000000001",
+      resolvedAtUnixMs: "1750000000000",
+    };
+
+    expect(() => createVerifiedServiceDownstreamContext(metadata)).toThrow(
+      "s2s_authorization_context_not_propagatable",
+    );
+  });
+
   it.each([
     [
       "missing verified ingress",

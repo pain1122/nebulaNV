@@ -4,7 +4,9 @@ package settings;
 service SettingsService {
   rpc GetString   (GetReq)      returns (GetStringRes);
   rpc SetString   (SetStringReq) returns (SetStringRes);
+  rpc SetStringV3 (SetStringReq) returns (SetStringRes);
   rpc DeleteString(DeleteReq)   returns (DeleteRes);
+  rpc DeleteStringV3(DeleteReq) returns (DeleteRes);
   rpc EnsureBootstrapString(SetStringReq) returns (SetStringRes);
 }
 

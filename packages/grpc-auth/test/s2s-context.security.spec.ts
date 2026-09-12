@@ -54,6 +54,38 @@ const authorityResolutionContext: S2SSignedContext = {
   },
 };
 
+const authorizationContext: S2SSignedContext = {
+  version: "3",
+  identityRealmId: "b1000000-0000-4000-8000-000000000001",
+  subjectId: "d1000000-0000-4000-8000-000000000001",
+  sessionRef: `sr2_${"A".repeat(43)}`,
+  sessionRefKeyId: "b5100000-0000-4000-8000-000000000001",
+  authenticationAuthorityRef: "b2000000-0000-4000-8000-000000000001",
+  application: {
+    applicationId: "a4000000-0000-4000-8000-000000000001",
+    audience: "urn:nebula:application:a4000000-0000-4000-8000-000000000001",
+    applicationPolicyRevision: "1",
+    federationTrustId: "b4000000-0000-4000-8000-000000000001",
+    federationTrustRevision: "1",
+  },
+  target: {
+    kind: "TENANT",
+    tenantId: "a1000000-0000-4000-8000-000000000001",
+    siteId: null,
+  },
+  actorAuthority: {
+    kind: "MEMBERSHIP",
+    membershipId: "c1000000-0000-4000-8000-000000000001",
+    membershipEpochRef: `meg1_${"C".repeat(43)}`,
+    roleGrantId: "c3000000-0000-4000-8000-000000000001",
+    effectiveRole: "TENANT_ADMIN",
+    parentRelationshipId: null,
+  },
+  authorityRef: `ar2_${"B".repeat(43)}`,
+  authorityRefKeyId: "b5200000-0000-4000-8000-000000000001",
+  resolvedAtUnixMs: "1750000000000",
+};
+
 function build(opts?: {
   kind?: "service" | "gateway";
   context?: S2SSignedContext;
@@ -179,6 +211,71 @@ describe("S2S v3 signed context", () => {
     expect(() => decodeS2SSignedContext(duplicateActor)).toThrow(
       "s2s_context_not_canonical",
     );
+  });
+
+  it("round-trips the exact realm-aware authorization v3 shape", () => {
+    const encoded = encodeS2SSignedContext(authorizationContext);
+
+    expect(encoded.canonicalJson).toBe(JSON.stringify(authorizationContext));
+    expect(encoded.canonicalJson).toContain('"sessionRef":"sr2_');
+    expect(encoded.canonicalJson).toContain('"authorityRef":"ar2_');
+    expect(decodeS2SSignedContext(encoded.encoded)).toEqual(encoded);
+  });
+
+  it("allows an application target to retain its verified site", () => {
+    expect(() =>
+      canonicalS2SContext({
+        ...authorizationContext,
+        target: {
+          kind: "APPLICATION",
+          tenantId: authorizationContext.target.tenantId,
+          siteId: "a2000000-0000-4000-8000-000000000001",
+        },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      canonicalS2SContext({
+        ...authorizationContext,
+        target: {
+          kind: "TENANT",
+          tenantId: authorizationContext.target.tenantId,
+          siteId: "a2000000-0000-4000-8000-000000000001",
+        },
+      }),
+    ).toThrow("s2s_context_target_site_forbidden");
+  });
+
+  it("rejects partial, mixed, internally generated, and contradictory v3 fields", () => {
+    expect(() =>
+      canonicalS2SContext({
+        ...authorizationContext,
+        credentialGeneration: "1",
+      } as unknown as S2SSignedContext),
+    ).toThrow("s2s_context_unknown_field");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorizationContext,
+        sessionRef: "sr1_legacy",
+      } as S2SSignedContext),
+    ).toThrow("s2s_context_session_ref_invalid");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorizationContext,
+        application: {
+          ...authorizationContext.application,
+          federationTrustRevision: null,
+        },
+      } as S2SSignedContext),
+    ).toThrow("s2s_context_federation_trust_pair_invalid");
+    expect(() =>
+      canonicalS2SContext({
+        ...authorizationContext,
+        actorAuthority: {
+          ...authorizationContext.actorAuthority,
+          effectiveRole: "PARENT_MANAGER",
+        },
+      } as S2SSignedContext),
+    ).toThrow("s2s_context_parent_authority_pair_invalid");
   });
 
   it("preserves v2 for ordinary service calls and selects v3 for context", () => {

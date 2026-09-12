@@ -9,5 +9,6 @@ export * from "./src/order.client";
 export * from "./src/blog.client";
 export * from "./src/product.client";
 export * from "./src/media.client";
+export * from "./src/dormant-v3.client";
 export * from "./src/tenant-authority.types";
 export * from "./src/tenant-authority.client";

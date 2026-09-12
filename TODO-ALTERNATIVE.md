@@ -1769,8 +1769,12 @@ not a claim that commercial SaaS productization exists.
    offline recovery credential, exact rerun/no-use rollback checks, and the
    per-epoch/per-role active tenant-grant constraint. Its clean disposable
    proof passed on 2026-09-12 with zero sessions, tokens, operator grants,
-   customer-authority changes, or database residue. Begin
-   R5_V3_RECEIVERS_DORMANT before any v3 writer or Realm Auth session.
+   customer-authority changes, or database residue. R5 then added the exact
+   context-v3 contract, strict receiver routing, and 56 separately declared
+   protobuf/controller/typed-client receiver paths. Its frozen legacy-proto,
+   exact-version, no-propagation, parity, and no-writer proofs passed on
+   2026-09-12. Begin R6.1_DEFAULT_AUTH_SESSION without activating the R1
+   records or the gateway v3 cohort.
    R2's populated upgrades, reruns, atomic rollback, earlier-seed regressions,
    and cleanup passed; legacy readers and v1 history remain preserved. R1's
    realm/provider/policy/trust records remain inactive. R3 shadow migration

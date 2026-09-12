@@ -148,13 +148,9 @@ describe("canonical gRPC security wiring", () => {
     const controller = source(
       "apps/order-service/src/order/grpc/order-grpc.controller.ts",
     );
-    const methodStart = controller.indexOf(
-      '@GrpcMethod("OrderService", "UpdateOrderStatus")',
+    expect(controller).toMatch(
+      /@DormantS2SAuthorizationV3Receiver\("OrderService", "UpdateOrderStatusV3"\)\s*@Roles\("admin", "root-admin"\)\s*@GrpcMethod\("OrderService", "UpdateOrderStatus"\)/,
     );
-    const policy = controller.slice(Math.max(0, methodStart - 80), methodStart);
-
-    expect(methodStart).toBeGreaterThan(-1);
-    expect(policy).toContain('@Roles("admin", "root-admin")');
   });
 
   it("does not exclude root-admin from admin controller policies", () => {

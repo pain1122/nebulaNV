@@ -6,6 +6,7 @@ import { ProductServiceImpl } from "../product.service";
 import {
   createGrpcValidationPipe,
   createVerifiedServiceDownstreamContext,
+  DormantS2SAuthorizationV3Receiver,
   Public,
   Roles,
   type MetadataWithContext,
@@ -57,6 +58,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // CreateProduct (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "CreateProductV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "CreateProduct")
@@ -75,6 +77,7 @@ export class ProductGrpcController {
   // UpdateProduct
   // Admin-only (guard handles user JWT or signed S2S with injected role)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "UpdateProductV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "UpdateProduct")
@@ -115,6 +118,7 @@ export class ProductGrpcController {
     });
   }
 
+  @DormantS2SAuthorizationV3Receiver("ProductService", "AdminGetProductV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "AdminGetProduct")
@@ -122,6 +126,7 @@ export class ProductGrpcController {
     return this.svc.getAdmin(req.id);
   }
 
+  @DormantS2SAuthorizationV3Receiver("ProductService", "AdminListProductsV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "AdminListProducts")
@@ -139,6 +144,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // DeleteProduct (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "DeleteProductV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "DeleteProduct")
@@ -149,6 +155,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // RestoreProduct (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "RestoreProductV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "RestoreProduct")
@@ -159,6 +166,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // HardDeleteProduct (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "HardDeleteProductV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "HardDeleteProduct")
@@ -169,6 +177,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // ApplyDiscountBulk (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "ApplyDiscountBulkV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "ApplyDiscountBulk")
@@ -179,6 +188,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // AddImages (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "AddImagesV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "AddImages")
@@ -198,6 +208,7 @@ export class ProductGrpcController {
     return galleryResponse(req.productId, imgs);
   }
 
+  @DormantS2SAuthorizationV3Receiver("ProductService", "AdminListGalleryV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "AdminListGallery")
@@ -212,6 +223,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // ReorderImages (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "ReorderImagesV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "ReorderImages")
@@ -223,6 +235,7 @@ export class ProductGrpcController {
   // ------------------------------------------------------
   // RemoveImage (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductService", "RemoveImageV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "RemoveImage")

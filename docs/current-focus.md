@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-09-08
+Last updated: 2026-09-12
 
 Status: active planning and execution checklist.
 
@@ -824,11 +824,19 @@ and an adversarial second pass before its checkbox can change.
       coexistence, same-role rejection, recovery denial for a wrong password,
       repeat-safe rollback/restaging, zero sessions/operator grants, unchanged
       customer authority, and cleanup of both disposable databases.
-- [ ] `R5_V3_RECEIVERS_DORMANT`: implement the frozen exact v3 schema and
+- [x] `R5_V3_RECEIVERS_DORMANT`: implement the frozen exact v3 schema and
       `sr2_`/`ar2_` receivers through `grpc-auth`, typed clients, and separately
       declared downstream methods for every protected original-app/operator
       route. Prove v1/v2 bytes and strict mixed-version/no-propagation denial.
-      Add no v3 writer and issue no `sr2_` session.
+      Add no v3 writer and issue no `sr2_` session. Completed 2026-09-12.
+      Context v3 now validates the exact realm, subject, full-length `sr2_` and
+      `ar2_` references and key IDs, application audience/policy/trust, target,
+      one effective membership/platform authority, and decimal resolution time.
+      All 56 protected gateway RPCs have separate protobuf/controller/client
+      receivers that delegate to the unchanged handler and preserve its policy
+      metadata. The gateway still selects only legacy methods. Automated proof
+      freezes the pre-R5 proto bytes, matches every V3 request/response type,
+      rejects wrong-version routes and propagation, and proves handler parity.
 - [ ] `R6.1_DEFAULT_AUTH_SESSION`: bind new tokens, refresh families, Redis
       keys, immutable session references/key IDs, issuer, and validation to the
       exact realm, subject, both Auth generations, and application audience.
@@ -1203,12 +1211,19 @@ all earlier database gates, all-service migrations, and zero-residue check passe
 on 2026-09-12. It issued no session/token, created no operator PlatformGrant,
 and changed no customer authority or traffic.
 
-The active gate is now `R5_V3_RECEIVERS_DORMANT`. Implement separately declared
-exact context-v3 and `sr2_`/`ar2_` receiver methods for every protected route
-needed by the four original default applications and operator administration.
-Prove unchanged v1/v2 bytes, strict version routing and rejection, no context
-propagation, and default-realm parity. Add no v3 writer or `sr2_` session; the
-R1 records remain non-admitting and the R4 operator subject remains staged.
+R5 added the exact context-v3 parser/guard, 56 separately declared protobuf and
+controller receivers, and a separate typed-client family. Every receiver uses
+the unchanged legacy request/response messages and delegates to the unchanged
+handler after copying its route policy metadata. The gateway still selects only
+the legacy client family, so no v3 writer, `sr2_` session, Authority decision,
+or traffic change exists. Frozen-source hashes prove that removing only the
+additive V3 RPC lines restores every pre-R5 proto byte.
+
+The active gate is now `R6.1_DEFAULT_AUTH_SESSION`. Bind new Realm Auth tokens,
+durable sessions, Redis keys, immutable `sr2_` references/key IDs, issuer, and
+validation to the exact realm, subject, both Auth generations, application, and
+audience. Preserve the current rotation/replay/logout mechanisms and keep R1
+records non-admitting until the later R6.2 controlled cutover.
 
 Consult Salar before editing F6-F9, D4-D5/P1, M6-M7, or deferred SaaS scope.
 The assistant runs small inspections and focused checks directly; Salar runs

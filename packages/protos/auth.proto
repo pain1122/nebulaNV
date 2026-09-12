@@ -9,10 +9,13 @@ service AuthService {
   rpc ValidateUser   (ValidateUserRequest)   returns (ValidateUserResponse);
   rpc GetTokens      (GetTokensRequest)      returns (GetTokensResponse);
   rpc RefreshTokens  (RefreshTokensRequest)  returns (GetTokensResponse);
+  rpc RefreshTokensV3(RefreshTokensRequest)  returns (GetTokensResponse);
   rpc Logout         (LogoutRequest)         returns (LogoutResponse);
+  rpc LogoutV3       (LogoutRequest)         returns (LogoutResponse);
   rpc ValidateToken  (ValidateTokenRequest)  returns (ValidateTokenResponse);
 
   rpc GetProfile (GetProfileRequest) returns (user.UserResponse);
+  rpc GetProfileV3(GetProfileRequest) returns (user.UserResponse);
 }
 
 message RegisterRequest {

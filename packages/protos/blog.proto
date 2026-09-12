@@ -99,8 +99,11 @@ service BlogService {
   rpc GetPost   (GetPostRequest)   returns (PostResponse);
 
   rpc CreatePost (CreatePostRequest)  returns (PostResponse);
+  rpc CreatePostV3(CreatePostRequest) returns (PostResponse);
   rpc UpdatePost (UpdatePostRequest)  returns (PostResponse);
+  rpc UpdatePostV3(UpdatePostRequest) returns (PostResponse);
   rpc DeletePost (DeletePostRequest)  returns (BasicResponse);
+  rpc DeletePostV3(DeletePostRequest) returns (BasicResponse);
 }
 
 
@@ -185,6 +188,9 @@ service BlogTaxonomyService {
   rpc List   (ListBlogTaxonomiesRequest)   returns (ListBlogTaxonomiesResponse);
   rpc Get    (GetBlogTaxonomyRequest)      returns (BlogTaxonomyResponse);
   rpc Create (CreateBlogTaxonomyRequest)   returns (BlogTaxonomyResponse);
+  rpc CreateV3(CreateBlogTaxonomyRequest)  returns (BlogTaxonomyResponse);
   rpc Update (UpdateBlogTaxonomyRequest)   returns (BlogTaxonomyResponse);
+  rpc UpdateV3(UpdateBlogTaxonomyRequest)  returns (BlogTaxonomyResponse);
   rpc Delete (DeleteBlogTaxonomyRequest)   returns (DeleteBlogTaxonomyResponse);
+  rpc DeleteV3(DeleteBlogTaxonomyRequest)  returns (DeleteBlogTaxonomyResponse);
 }

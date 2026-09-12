@@ -107,14 +107,22 @@ message UpdateOrderStatusRequest {
 
 service OrderService {
   rpc GetCart          (GetCartRequest)          returns (CartResponse);
+  rpc GetCartV3        (GetCartRequest)          returns (CartResponse);
   rpc AddToCart        (AddToCartRequest)        returns (CartResponse);
+  rpc AddToCartV3      (AddToCartRequest)        returns (CartResponse);
   rpc UpdateCartItem   (UpdateCartItemRequest)   returns (CartResponse);
+  rpc UpdateCartItemV3 (UpdateCartItemRequest)   returns (CartResponse);
   rpc RemoveCartItem   (RemoveCartItemRequest)   returns (CartResponse);
+  rpc RemoveCartItemV3 (RemoveCartItemRequest)   returns (CartResponse);
   rpc Checkout         (CheckoutRequest)         returns (OrderResponse);
+  rpc CheckoutV3       (CheckoutRequest)         returns (OrderResponse);
 
   rpc GetOrder         (GetOrderRequest)         returns (OrderResponse);
+  rpc GetOrderV3       (GetOrderRequest)         returns (OrderResponse);
   rpc ListOrders       (ListOrdersRequest)       returns (ListOrdersResponse);
+  rpc ListOrdersV3     (ListOrdersRequest)       returns (ListOrdersResponse);
   rpc UpdateOrderStatus(UpdateOrderStatusRequest)returns (OrderResponse);
+  rpc UpdateOrderStatusV3(UpdateOrderStatusRequest)returns (OrderResponse);
 
   rpc Ping             (Empty)                   returns (Empty);
 }

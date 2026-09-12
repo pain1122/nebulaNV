@@ -10,6 +10,7 @@ import {
 import type { Media as MediaRecord } from "../../prisma/generated";
 import {
   createGrpcValidationPipe,
+  DormantS2SAuthorizationV3Receiver,
   Public,
   Roles,
   resolveCtxUser,
@@ -274,6 +275,7 @@ export class MediaGrpcController {
     return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
+  @DormantS2SAuthorizationV3Receiver("MediaService", "GetByIdV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "GetById")
   async getById(
@@ -347,6 +349,7 @@ export class MediaGrpcController {
     return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
+  @DormantS2SAuthorizationV3Receiver("MediaService", "ListPublicLibraryV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ListPublicLibrary")
   async listPublicLibrary(
@@ -366,6 +369,7 @@ export class MediaGrpcController {
     return media.ListRes.create({ items: out.files.map(toProtoMedia) });
   }
 
+  @DormantS2SAuthorizationV3Receiver("MediaService", "ListProtectedLibraryV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ListProtectedLibrary")
   async listProtectedLibrary(
@@ -386,6 +390,7 @@ export class MediaGrpcController {
     return media.ListRes.create({ items: out.files.map(toProtoMedia) });
   }
 
+  @DormantS2SAuthorizationV3Receiver("MediaService", "ListStrictLibraryV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ListStrictLibrary")
   async listStrictLibrary(
@@ -406,6 +411,7 @@ export class MediaGrpcController {
     return media.ListRes.create({ items: out.files.map(toProtoMedia) });
   }
 
+  @DormantS2SAuthorizationV3Receiver("MediaService", "ListMyProtectedLibraryV3")
   @UsePipes(Pipe)
   @Roles("user", "admin", "root-admin")
   @GrpcMethod("MediaService", "ListMyProtectedLibrary")
@@ -427,6 +433,10 @@ export class MediaGrpcController {
     return media.ListRes.create({ items: out.files.map(toProtoMedia) });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "PresignPublicLibraryUploadV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "PresignPublicLibraryUpload")
   async presignPublicLibraryUpload(
@@ -445,6 +455,10 @@ export class MediaGrpcController {
     return this.presignResponse(out);
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "PresignProtectedLibraryUploadV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "PresignProtectedLibraryUpload")
   async presignProtectedLibraryUpload(
@@ -463,6 +477,10 @@ export class MediaGrpcController {
     return this.presignResponse(out);
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "PresignStrictLibraryUploadV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "PresignStrictLibraryUpload")
   async presignStrictLibraryUpload(
@@ -481,6 +499,10 @@ export class MediaGrpcController {
     return this.presignResponse(out);
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "FinalizePublicLibraryUploadV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "FinalizePublicLibraryUpload")
   async finalizePublicLibraryUpload(
@@ -499,6 +521,10 @@ export class MediaGrpcController {
     return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "FinalizeProtectedLibraryUploadV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "FinalizeProtectedLibraryUpload")
   async finalizeProtectedLibraryUpload(
@@ -517,6 +543,10 @@ export class MediaGrpcController {
     return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "FinalizeStrictLibraryUploadV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "FinalizeStrictLibraryUpload")
   async finalizeStrictLibraryUpload(
@@ -535,6 +565,10 @@ export class MediaGrpcController {
     return media.MediaRes.create({ media: toProtoMedia(created) });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "CreatePublicLibraryReadUrlV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "CreatePublicLibraryReadUrl")
   async createPublicLibraryReadUrl(
@@ -552,6 +586,10 @@ export class MediaGrpcController {
     return this.readUrlResponse(out);
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "CreateProtectedLibraryReadUrlV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "CreateProtectedLibraryReadUrl")
   async createProtectedLibraryReadUrl(
@@ -569,6 +607,10 @@ export class MediaGrpcController {
     return this.readUrlResponse(out);
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "CreateStrictLibraryReadUrlV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "CreateStrictLibraryReadUrl")
   async createStrictLibraryReadUrl(
@@ -586,6 +628,10 @@ export class MediaGrpcController {
     return this.readUrlResponse(out);
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "CreateMyProtectedReadUrlV3",
+  )
   @UsePipes(Pipe)
   @Roles("user", "admin", "root-admin")
   @GrpcMethod("MediaService", "CreateMyProtectedReadUrl")
@@ -622,6 +668,10 @@ export class MediaGrpcController {
     return media.DeleteRes.create({ deleted });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "DeleteProtectedLibraryByIdV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "DeleteProtectedLibraryById")
   async deleteProtectedLibraryById(
@@ -635,6 +685,10 @@ export class MediaGrpcController {
     return media.DeleteRes.create({ deleted });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "DeleteStrictLibraryByIdV3",
+  )
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "DeleteStrictLibraryById")
   async deleteStrictLibraryById(
@@ -648,6 +702,10 @@ export class MediaGrpcController {
     return media.DeleteRes.create({ deleted });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "PreviewPublicLibraryDeleteV3",
+  )
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "PreviewPublicLibraryDelete")
@@ -702,6 +760,10 @@ export class MediaGrpcController {
     });
   }
 
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "ConfirmPublicLibraryDeleteV3",
+  )
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("MediaService", "ConfirmPublicLibraryDelete")

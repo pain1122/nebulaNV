@@ -4,23 +4,23 @@ This document records the implemented trust boundary for service, signed
 request context, and user identity. Persistent tenant membership and domain
 scope remain F4 target architecture.
 
-Implementation status: the trusted-field table below describes the current
-single/default-realm F3/F4 receiver behavior. It must not be read as an
-implemented multi-realm claim. ADR-0014 adds a realm-qualified target through
-a new context version while preserving these current denial mechanisms.
+Implementation status: the trusted-field table includes R5's dormant
+realm-aware authorization receiver. No multi-realm session, decision writer,
+or traffic path exists yet; those remain ordered R6 and later work.
 
 ## Trusted Context Fields
 
-| Context field    | Meaning                                          | May be created by | Required proof                                                         |
-| ---------------- | ------------------------------------------------ | ----------------- | ---------------------------------------------------------------------- |
-| `svc`            | Calling service or gateway name                  | `S2SGuard`        | Valid request-bound S2S v2/v3 envelope                                 |
-| `svcKind`        | `service` or `gateway`                           | `S2SGuard`        | Valid request-bound S2S v2/v3 envelope                                 |
-| `requestId`      | Signed internal request identity                 | `S2SGuard`        | Valid request-bound S2S v2/v3 envelope                                 |
-| `requestContext` | Application, tenant, site, and channel assertion | `S2SGuard`        | Valid canonical S2S v3 context and signature                           |
-| `signedActor`    | Workload-forwarded actor consistency assertion   | `S2SGuard`        | Valid canonical S2S v3 context and signature; not human identity proof |
-| `user.userId`    | Authenticated human actor                        | JWT guard         | Valid access JWT and the guard's configured validation path            |
-| `user.role`      | Authenticated actor role                         | JWT guard         | Same verified token result as `userId`                                 |
-| `user.email`     | Optional authenticated actor email               | JWT guard         | Same verified token result as `userId`                                 |
+| Context field          | Meaning                                                          | May be created by | Required proof                                                         |
+| ---------------------- | ---------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------- |
+| `svc`                  | Calling service or gateway name                                  | `S2SGuard`        | Valid request-bound S2S v2/v3 envelope                                 |
+| `svcKind`              | `service` or `gateway`                                           | `S2SGuard`        | Valid request-bound S2S v2/v3 envelope                                 |
+| `requestId`            | Signed internal request identity                                 | `S2SGuard`        | Valid request-bound S2S v2/v3 envelope                                 |
+| `requestContext`       | Application, tenant, site, and channel assertion                 | `S2SGuard`        | Valid canonical S2S v3 context and signature                           |
+| `signedActor`          | Workload-forwarded actor consistency assertion                   | `S2SGuard`        | Valid canonical S2S v3 context and signature; not human identity proof |
+| `authorizationContext` | Realm subject/session, audience, target, and effective authority | `S2SGuard`        | Exact declared context-v3 authorization receiver only                  |
+| `user.userId`          | Authenticated human actor                                        | JWT guard         | Valid access JWT and the guard's configured validation path            |
+| `user.role`            | Authenticated actor role                                         | JWT guard         | Same verified token result as `userId`                                 |
+| `user.email`           | Optional authenticated actor email                               | JWT guard         | Same verified token result as `userId`                                 |
 
 Raw `x-user-id`, `x-user-role`, and `x-user-email` values are application input, not trusted context. `resolveCtxUser()` reads only the `user` object attached by a verified guard. `@RequireUserId()` checks that verified object and cannot manufacture identity from headers or gRPC metadata.
 
@@ -137,6 +137,11 @@ and persists each live `sr2_` so key rotation cannot change it. Provider tokens,
 email, raw OIDC/SAML claims, credential/session generations, and raw session IDs
 never become propagated domain authority. V3 follows the same receiver-first,
 strict-shape, independent Auth/Authority/domain, and no-downgrade rules.
+
+R5 now provides that strict parser and all 56 dormant protected-route
+receivers. It attaches this shape only as `authorizationContext`, refuses
+nested propagation, and leaves `requestContext`, `signedActor`, and `user`
+meanings unchanged. No gateway writer or Realm Auth session exists until R6.
 
 [ADR-0012](decisions/0012-f4-failure-freshness-audit-and-recovery.md) gives
 `resolvedAtMs` and `authorityRevision` executable target semantics: ordinary

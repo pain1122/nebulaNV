@@ -231,7 +231,7 @@ transport freshness separate from authority-decision freshness. It freezes the
 entries, and pairwise/purpose-separated compromise recovery. A valid S2S
 signature never extends expired authority.
 
-## F4 Realm-Aware Target (Not Implemented)
+## F4 Realm-Aware Receiver Foundation (R5 Implemented)
 
 [ADR-0014](decisions/0014-f4-customer-identity-realms-and-federation.md)
 preserves the envelope and strict v2 receiver but requires additive context v3
@@ -242,6 +242,13 @@ freezes their exact full-length HMAC construction and key-rotation stability.
 It does not carry raw provider claims, email, password/credential facts,
 internal session IDs, internal membership generation, or internal credential/
 session generation.
+
+R5 implements the exact canonical parser, strict declared-route admission,
+non-propagation rule, and a separate `...V3` receiver beside each of the 56
+protected gateway RPCs. Each receiver reuses the legacy protobuf message types
+and handler/policy metadata. A separate typed client family exists for those
+paths, while the gateway still contains no V3 selection and no context writer.
+Realm Auth session issuance and active traffic remain R6 work.
 
 The rollout remains receiver-first and exact-version. A route is explicitly
 legacy v1, default-realm v2, or realm-aware v3; dual carriers, field unions,

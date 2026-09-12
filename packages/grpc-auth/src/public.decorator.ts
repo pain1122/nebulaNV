@@ -22,12 +22,19 @@ export type PublicFlags = {
   gatewayOnly?: boolean;
 };
 
-export type S2SContextReceiver = Readonly<{
-  version: "2";
-  purpose: "RESOLUTION";
-  resolutionStage: "AUTHORITY";
-  requireActor: true;
-}>;
+export type S2SContextReceiver =
+  | Readonly<{
+      version: "2";
+      purpose: "RESOLUTION";
+      resolutionStage: "AUTHORITY";
+      requireActor: true;
+    }>
+  | Readonly<{
+      version: "3";
+      purpose: "AUTHORIZATION";
+      resolutionStage: "AUTHORIZED";
+      requireActor: true;
+    }>;
 
 /**
  * Mark an endpoint as public (no JWT required).
@@ -110,6 +117,22 @@ export function RequireS2SAuthorityResolution() {
       version: "2",
       purpose: "RESOLUTION",
       resolutionStage: "AUTHORITY",
+      requireActor: true,
+    }) satisfies S2SContextReceiver,
+  );
+}
+
+/**
+ * Admit only the frozen realm-aware context-v3 authorization carrier. R5
+ * receiver methods may declare this before any v3 writer or sr2_ session exists.
+ */
+export function RequireS2SAuthorizationV3() {
+  return SetMetadata(
+    S2S_CONTEXT_RECEIVER_KEY,
+    Object.freeze({
+      version: "3",
+      purpose: "AUTHORIZATION",
+      resolutionStage: "AUTHORIZED",
       requireActor: true,
     }) satisfies S2SContextReceiver,
   );

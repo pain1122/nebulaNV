@@ -9,6 +9,7 @@ import {
   Public,
   InternalOnly,
   AllowedS2SCallers,
+  DormantS2SAuthorizationV3Receiver,
   resolveCtxUser,
   type CtxUser,
   type RpcContextWithContext,
@@ -36,6 +37,7 @@ export class UserGrpcController {
     return resolveCtxUser(meta, call);
   }
 
+  @DormantS2SAuthorizationV3Receiver('UserService', 'GetUserV3')
   @Roles('user', 'admin', 'root-admin')
   @GrpcMethod('UserService', 'GetUser')
   async getUser(
@@ -57,6 +59,7 @@ export class UserGrpcController {
     });
   }
 
+  @DormantS2SAuthorizationV3Receiver('UserService', 'ListUsersV3')
   @Roles('admin', 'root-admin')
   @GrpcMethod('UserService', 'ListUsers')
   async listUsers(
@@ -110,6 +113,7 @@ export class UserGrpcController {
     });
   }
 
+  @DormantS2SAuthorizationV3Receiver('UserService', 'UpdateProfileV3')
   @Roles('user', 'admin', 'root-admin')
   @GrpcMethod('UserService', 'UpdateProfile')
   async updateProfile(

@@ -178,7 +178,10 @@ operation, remains disabled until its isolation work is complete.
   permits one active grant per exact `(membershipEpochId, role)`. Its clean
   verifier proved wrong-password and duplicate-role denial, distinct-role
   coexistence, unchanged customer authority, zero operator sessions/grants,
-  and zero disposable database residue. R5_V3_RECEIVERS_DORMANT is next.
+  and zero disposable database residue. R5_V3_RECEIVERS_DORMANT completed on
+  2026-09-12 with an exact v3 carrier, 56 separate receiver paths, frozen
+  legacy-proto parity, strict routing/no-propagation, and no active writer or
+  new session. R6.1_DEFAULT_AUTH_SESSION is next.
   ADR-0015 R0-R11 must execute in order. Do not resume former Batch 3 item 5 or skip
   to a context writer. The selected target is one or more
   isolated identity realms per licensed root, a separate NebulaNV platform-

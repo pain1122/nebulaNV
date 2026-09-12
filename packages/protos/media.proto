@@ -299,6 +299,7 @@ service MediaService {
   rpc Create(CreateReq) returns (MediaRes);
 
   rpc GetById(GetByIdReq) returns (MediaRes);
+  rpc GetByIdV3(GetByIdReq) returns (MediaRes);
   rpc List(ListReq) returns (ListRes);
   rpc DeleteById(DeleteByIdReq) returns (DeleteRes);
 
@@ -307,27 +308,45 @@ service MediaService {
 
   // Explicit lane families for filemanager/backend jobs.
   rpc ListPublicLibrary(ListReq) returns (ListRes);
+  rpc ListPublicLibraryV3(ListReq) returns (ListRes);
   rpc ListProtectedLibrary(ListReq) returns (ListRes);
+  rpc ListProtectedLibraryV3(ListReq) returns (ListRes);
   rpc ListStrictLibrary(ListReq) returns (ListRes);
+  rpc ListStrictLibraryV3(ListReq) returns (ListRes);
   rpc ListMyProtectedLibrary(ListMyProtectedLibraryReq) returns (ListRes);
+  rpc ListMyProtectedLibraryV3(ListMyProtectedLibraryReq) returns (ListRes);
 
   rpc PresignPublicLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
+  rpc PresignPublicLibraryUploadV3(PresignUploadReq) returns (PresignUploadRes);
   rpc PresignProtectedLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
+  rpc PresignProtectedLibraryUploadV3(PresignUploadReq) returns (PresignUploadRes);
   rpc PresignStrictLibraryUpload(PresignUploadReq) returns (PresignUploadRes);
+  rpc PresignStrictLibraryUploadV3(PresignUploadReq) returns (PresignUploadRes);
 
   rpc FinalizePublicLibraryUpload(FinalizeUploadReq) returns (MediaRes);
+  rpc FinalizePublicLibraryUploadV3(FinalizeUploadReq) returns (MediaRes);
   rpc FinalizeProtectedLibraryUpload(FinalizeUploadReq) returns (MediaRes);
+  rpc FinalizeProtectedLibraryUploadV3(FinalizeUploadReq) returns (MediaRes);
   rpc FinalizeStrictLibraryUpload(FinalizeUploadReq) returns (MediaRes);
+  rpc FinalizeStrictLibraryUploadV3(FinalizeUploadReq) returns (MediaRes);
 
   rpc CreatePublicLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+  rpc CreatePublicLibraryReadUrlV3(ReadUrlReq) returns (ReadUrlRes);
   rpc CreateProtectedLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+  rpc CreateProtectedLibraryReadUrlV3(ReadUrlReq) returns (ReadUrlRes);
   rpc CreateStrictLibraryReadUrl(ReadUrlReq) returns (ReadUrlRes);
+  rpc CreateStrictLibraryReadUrlV3(ReadUrlReq) returns (ReadUrlRes);
   rpc CreateMyProtectedReadUrl(CreateMyProtectedReadUrlReq) returns (ReadUrlRes);
+  rpc CreateMyProtectedReadUrlV3(CreateMyProtectedReadUrlReq) returns (ReadUrlRes);
 
   rpc DeletePublicLibraryById(DeleteByIdReq) returns (DeleteRes);
   rpc DeleteProtectedLibraryById(DeleteByIdReq) returns (DeleteRes);
+  rpc DeleteProtectedLibraryByIdV3(DeleteByIdReq) returns (DeleteRes);
   rpc DeleteStrictLibraryById(DeleteByIdReq) returns (DeleteRes);
+  rpc DeleteStrictLibraryByIdV3(DeleteByIdReq) returns (DeleteRes);
 
   rpc PreviewPublicLibraryDelete(PreviewPublicLibraryDeleteReq) returns (PreviewPublicLibraryDeleteRes);
+  rpc PreviewPublicLibraryDeleteV3(PreviewPublicLibraryDeleteReq) returns (PreviewPublicLibraryDeleteRes);
   rpc ConfirmPublicLibraryDelete(ConfirmPublicLibraryDeleteReq) returns (ConfirmPublicLibraryDeleteRes);
+  rpc ConfirmPublicLibraryDeleteV3(ConfirmPublicLibraryDeleteReq) returns (ConfirmPublicLibraryDeleteRes);
 }

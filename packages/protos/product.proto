@@ -259,23 +259,35 @@ message GalleryResponse {
 // -----------------------------------------
 service ProductService {
   rpc CreateProduct (CreateProductRequest) returns (ProductResponse);
+  rpc CreateProductV3 (CreateProductRequest) returns (ProductResponse);
   rpc UpdateProduct (UpdateProductRequest) returns (ProductResponse);
+  rpc UpdateProductV3 (UpdateProductRequest) returns (ProductResponse);
   rpc GetProduct    (GetProductRequest)    returns (ProductResponse);
   rpc ListProducts  (ListProductsRequest)  returns (ListProductsResponse);
   rpc AdminGetProduct   (GetProductRequest)          returns (ProductResponse);
+  rpc AdminGetProductV3 (GetProductRequest)          returns (ProductResponse);
   rpc AdminListProducts (AdminListProductsRequest)   returns (ListProductsResponse);
+  rpc AdminListProductsV3 (AdminListProductsRequest) returns (ListProductsResponse);
 
   rpc DeleteProduct      (DeleteProductRequest)      returns (ProductResponse); // soft
+  rpc DeleteProductV3    (DeleteProductRequest)      returns (ProductResponse);
   rpc RestoreProduct     (RestoreProductRequest)     returns (ProductResponse);
+  rpc RestoreProductV3   (RestoreProductRequest)     returns (ProductResponse);
   rpc HardDeleteProduct  (HardDeleteProductRequest)  returns (ProductResponse);
+  rpc HardDeleteProductV3(HardDeleteProductRequest)  returns (ProductResponse);
 
   rpc ApplyDiscountBulk (ApplyDiscountBulkRequest) returns (BulkResult);
+  rpc ApplyDiscountBulkV3(ApplyDiscountBulkRequest) returns (BulkResult);
 
   rpc AddImages     (AddImagesRequest)     returns (GalleryResponse);
+  rpc AddImagesV3   (AddImagesRequest)     returns (GalleryResponse);
   rpc ListGallery   (ListGalleryRequest)   returns (GalleryResponse);
   rpc AdminListGallery (AdminListGalleryRequest) returns (GalleryResponse);
+  rpc AdminListGalleryV3(AdminListGalleryRequest) returns (GalleryResponse);
   rpc ReorderImages (ReorderImagesRequest) returns (GalleryResponse);
+  rpc ReorderImagesV3(ReorderImagesRequest) returns (GalleryResponse);
   rpc RemoveImage   (RemoveImageRequest)   returns (GalleryResponse);
+  rpc RemoveImageV3 (RemoveImageRequest)   returns (GalleryResponse);
 }
 
 
@@ -359,6 +371,9 @@ service ProductTaxonomyService {
   rpc List   (ListProductTaxonomiesRequest)   returns (ListProductTaxonomiesResponse);
   rpc Get    (GetProductTaxonomyRequest)      returns (ProductTaxonomyResponse);
   rpc Create (CreateProductTaxonomyRequest)   returns (ProductTaxonomyResponse);
+  rpc CreateV3(CreateProductTaxonomyRequest)  returns (ProductTaxonomyResponse);
   rpc Update (UpdateProductTaxonomyRequest)   returns (ProductTaxonomyResponse);
+  rpc UpdateV3(UpdateProductTaxonomyRequest)  returns (ProductTaxonomyResponse);
   rpc Delete (DeleteProductTaxonomyRequest)   returns (DeleteProductTaxonomyResponse);
+  rpc DeleteV3(DeleteProductTaxonomyRequest)  returns (DeleteProductTaxonomyResponse);
 }

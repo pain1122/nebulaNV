@@ -99,6 +99,9 @@ export function createVerifiedServiceDownstreamContext(
   metadata: MetadataWithContext,
   call?: ContextCarrier,
 ): VerifiedServiceDownstreamContext {
+  if (metadata.authorizationContext || call?.authorizationContext) {
+    throw new Error("s2s_authorization_context_not_propagatable");
+  }
   if (metadata.resolutionContext || call?.resolutionContext) {
     throw new Error("s2s_resolution_context_not_propagatable");
   }

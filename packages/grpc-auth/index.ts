@@ -11,6 +11,7 @@ export * from "./src/s2s-replay.store";
 export * from "./src/s2s.transport";
 export * from "./src/s2s.deferred";
 export * from "./src/s2s-propagation";
+export * from "./src/v3-receiver.decorator";
 export * from "./src/grpc-security";
 export * from "./src/env.validation";
 export * from "./src/grpc-error.util";

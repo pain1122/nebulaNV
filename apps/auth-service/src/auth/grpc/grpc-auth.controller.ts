@@ -13,6 +13,7 @@ import {
   toRpc,
   resolveCtxUser,
   AllowedS2SIdentities,
+  DormantS2SAuthorizationV3Receiver,
   type RpcContextWithContext,
 } from '@nebula/grpc-auth';
 import { AuthUserDto, toAuthRole } from '../auth.types';
@@ -62,6 +63,7 @@ export class AuthGrpcController {
   }
 
   // -------- Protected (requires Access Token in gRPC metadata) --------
+  @DormantS2SAuthorizationV3Receiver('AuthService', 'GetProfileV3')
   @Roles('user', 'admin', 'root-admin')
   @UseGuards(JwtAuthGuard)
   @GrpcMethod('AuthService', 'GetProfile')
@@ -148,6 +150,7 @@ export class AuthGrpcController {
     return authv1.GetTokensResponse.create(await this.authService.login(user));
   }
 
+  @DormantS2SAuthorizationV3Receiver('AuthService', 'RefreshTokensV3')
   @Public({ gatewayOnly: true })
   @GrpcMethod('AuthService', 'RefreshTokens')
   async refreshTokens(data: RefreshTokensRequest): Promise<GetTokensResponse> {
@@ -163,6 +166,7 @@ export class AuthGrpcController {
     }
   }
 
+  @DormantS2SAuthorizationV3Receiver('AuthService', 'LogoutV3')
   @GatewayOnly()
   @Roles('user', 'admin', 'root-admin')
   @UseGuards(JwtAuthGuard)

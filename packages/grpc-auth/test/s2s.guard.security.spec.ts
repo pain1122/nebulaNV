@@ -79,6 +79,38 @@ const authorityResolutionContext: S2SSignedContext = {
   },
 };
 
+const authorizationContext: S2SSignedContext = {
+  version: "3",
+  identityRealmId: "b1000000-0000-4000-8000-000000000001",
+  subjectId: "d1000000-0000-4000-8000-000000000001",
+  sessionRef: `sr2_${"A".repeat(43)}`,
+  sessionRefKeyId: "b5100000-0000-4000-8000-000000000001",
+  authenticationAuthorityRef: "b2000000-0000-4000-8000-000000000001",
+  application: {
+    applicationId: "a4000000-0000-4000-8000-000000000001",
+    audience: "urn:nebula:application:a4000000-0000-4000-8000-000000000001",
+    applicationPolicyRevision: "1",
+    federationTrustId: "b4000000-0000-4000-8000-000000000001",
+    federationTrustRevision: "1",
+  },
+  target: {
+    kind: "TENANT",
+    tenantId: "a1000000-0000-4000-8000-000000000001",
+    siteId: null,
+  },
+  actorAuthority: {
+    kind: "MEMBERSHIP",
+    membershipId: "c1000000-0000-4000-8000-000000000001",
+    membershipEpochRef: `meg1_${"C".repeat(43)}`,
+    roleGrantId: "c3000000-0000-4000-8000-000000000001",
+    effectiveRole: "TENANT_ADMIN",
+    parentRelationshipId: null,
+  },
+  authorityRef: `ar2_${"B".repeat(43)}`,
+  authorityRefKeyId: "b5200000-0000-4000-8000-000000000001",
+  resolvedAtUnixMs: "1750000000000",
+};
+
 type Request = { value?: string };
 const definition = {
   path: "/test.TestService/DoWork",
@@ -395,6 +427,71 @@ describe("S2SGuard v2 security contract", () => {
         )
       ).message,
     ).toBe("s2s_resolution_context_required_for_route");
+  });
+
+  it("admits authorization v3 only on its separately declared receiver", async () => {
+    const receiver: S2SContextReceiver = {
+      version: "3",
+      purpose: "AUTHORIZATION",
+      resolutionStage: "AUTHORIZED",
+      requireActor: true,
+    };
+    const request = { value: "authorized" };
+    const metadata = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      context: authorizationContext,
+    });
+    await expect(
+      guard.canActivate(
+        rpcContext(
+          metadata,
+          request,
+          handlerWith({ contextReceiver: receiver }),
+        ),
+      ),
+    ).resolves.toBe(true);
+    expect(metadata.authorizationContext).toEqual(authorizationContext);
+    expect(metadata.requestContext).toBeUndefined();
+    expect(metadata.resolutionContext).toBeUndefined();
+    expect(metadata.signedActor).toBeUndefined();
+
+    const wrongRoute = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      nonce: "authorization-wrong-route",
+      context: authorizationContext,
+    });
+    expect(
+      (await rpcError(guard.canActivate(rpcContext(wrongRoute, request))))
+        .message,
+    ).toBe("s2s_context_v3_not_allowed_for_route");
+
+    const legacy = signed({
+      request,
+      kind: "gateway",
+      caller: "gateway",
+      key: gateway,
+      nonce: "authorization-legacy-route",
+      context: signedContext,
+    });
+    expect(
+      (
+        await rpcError(
+          guard.canActivate(
+            rpcContext(
+              legacy,
+              request,
+              handlerWith({ contextReceiver: receiver }),
+            ),
+          ),
+        )
+      ).message,
+    ).toBe("s2s_authorization_context_v3_required_for_route");
   });
 
   it("requires v3 for gateway callers while keeping ordinary service v2 valid", async () => {

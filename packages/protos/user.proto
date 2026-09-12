@@ -5,8 +5,11 @@ package user;
 service UserService {
   rpc FindUser            (FindUserRequest) returns (UserResponse);
   rpc GetUser             (GetUserRequest)  returns (UserResponse);
+  rpc GetUserV3           (GetUserRequest)  returns (UserResponse);
   rpc ListUsers           (ListUsersRequest) returns (ListUsersResponse);
+  rpc ListUsersV3         (ListUsersRequest) returns (ListUsersResponse);
   rpc UpdateProfile       (UpdateProfileRequest)       returns (UserResponse);
+  rpc UpdateProfileV3     (UpdateProfileRequest)       returns (UserResponse);
   rpc CreateUser          (CreateUserRequest)          returns (UserResponse);
   rpc FindUserWithHash    (FindUserWithHashRequest)    returns (FindUserWithHashResponse);
   rpc GetUserWithHash     (GetUserWithHashRequest) returns (GetUserWithHashResponse);

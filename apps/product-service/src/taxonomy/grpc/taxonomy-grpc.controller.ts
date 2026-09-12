@@ -4,6 +4,7 @@ import { GrpcMethod } from "@nestjs/microservices";
 import type { ServerUnaryCall } from "@grpc/grpc-js";
 import {
   createVerifiedServiceDownstreamContext,
+  DormantS2SAuthorizationV3Receiver,
   Roles,
   Public,
   type MetadataWithContext,
@@ -110,6 +111,7 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Create (needs kind)
   // -----------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductTaxonomyService", "CreateV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductTaxonomyService", "Create")
   async create(
@@ -140,6 +142,7 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Update (by ID only)
   // -----------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductTaxonomyService", "UpdateV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductTaxonomyService", "Update")
   async update(
@@ -170,6 +173,7 @@ export class TaxonomyGrpcController {
   // -----------------------------
   // Delete (by ID only)
   // -----------------------------
+  @DormantS2SAuthorizationV3Receiver("ProductTaxonomyService", "DeleteV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductTaxonomyService", "Delete")
   async delete(

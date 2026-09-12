@@ -3,6 +3,7 @@ import { GrpcMethod } from "@nestjs/microservices";
 import { Metadata, status } from "@grpc/grpc-js";
 import {
   AllowedS2SCallers,
+  DormantS2SAuthorizationV3Receiver,
   getContextService,
   InternalOnly,
   Public,
@@ -43,6 +44,7 @@ export class SettingsGrpcController {
   }
 
   // Writes: require admin/root-admin via JWT context
+  @DormantS2SAuthorizationV3Receiver("SettingsService", "SetStringV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("SettingsService", "SetString")
   async setString(
@@ -106,6 +108,7 @@ export class SettingsGrpcController {
     return settings.SetStringRes.create({ value });
   }
 
+  @DormantS2SAuthorizationV3Receiver("SettingsService", "DeleteStringV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("SettingsService", "DeleteString")
   async deleteString(

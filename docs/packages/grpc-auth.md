@@ -25,8 +25,8 @@ freezes additive context v3 for realm-qualified subjects and exact application
 audiences. Existing v2 parsing and its `sr1_`/`ar1_` meanings do not change;
 realm traffic requires new realm/application-keyed `sr2_` session and `ar2_`
 decision references, receiver-first rollout, exact-field rejection, and no
-v2 fallback after a v3 denial. This is target behavior, not current package
-behavior.
+v2 fallback after a v3 denial. R5 now implements the parser and dormant
+receivers; R6 still owns every context writer and Realm Auth session.
 
 ## Main Exports
 
@@ -52,7 +52,8 @@ behavior.
 - `createVerifiedServiceDownstreamContext(...)`
 - `Public`, `GatewayOnly`, `InternalOnly`, `AllowedS2SCallers`,
   `AllowedS2SIdentities`, `RequireUserId`,
-  `RequireS2SAuthorityResolution`
+  `RequireS2SAuthorityResolution`, `RequireS2SAuthorizationV3`,
+  `DormantS2SAuthorizationV3Receiver`
 - role decorators and context helpers
 
 ## Enforced Rules
@@ -79,9 +80,10 @@ behavior.
   bypass; ordinary public/private domain routes retain their normal policy.
 - `S2SGuard` attaches verified service identity (`svc`, `svcKind`, and
   `requestId`). After a valid v3 envelope it separately attaches
-  either legacy `requestContext` or the exact resolver-only
-  `resolutionContext`, plus `signedActor`; it never turns the signed actor
-  assertion into authoritative `user` identity.
+  legacy `requestContext`, the exact resolver-only `resolutionContext`, or the
+  exact realm-aware `authorizationContext` according to its schema version.
+  Legacy request/resolution shapes may attach `signedActor`; authorization v3
+  never aliases its realm subject into that legacy field.
 - A JWT guard attaches `user` only after token verification. Auth-service also
   supplies a non-secret, versioned `sr1_...` HMAC `sessionRef`; the prefix
   guarantees the signed-context safe-identifier grammar even when the
@@ -97,6 +99,11 @@ behavior.
   `RequireS2SAuthorityResolution()`, with purpose `RESOLUTION`, stage
   `AUTHORITY`, and an actor. Legacy/undeclared routes reject v2 and that route
   rejects v1. No writer is enabled by this receiver support.
+- Context v3 is admitted only by a separately registered `...V3` RPC carrying
+  exact `AUTHORIZATION/AUTHORIZED` receiver metadata. It requires full-length
+  `sr2_`, `ar2_`, and `meg1_` references, rejects unknown/partial/mixed fields,
+  and is never propagated to another service. The legacy method beside each
+  alias retains its existing context contract.
 - Legacy service-v2 bearer calls remain compatible during receiver-first
   migration. They still receive authoritative auth-service validation but do
   not gain a signed application/site context.
@@ -175,7 +182,8 @@ inbound HTTP headers into downstream metadata. `x-s2s-context` and
 `x-s2s-context-sha256` are reserved, single-value carriers. Their decoded JSON
 is canonical, exact-schema, unpadded base64url, and at most 1024 bytes.
 Context v2 uses a separate exact canonical shape and a 2048-byte limit; the
-decoder enforces the version-specific bound after reading the version.
+realm-aware context v3 shape has a 4096-byte limit. The decoder enforces the
+version-specific bound after reading the version.
 
 The HTTP-only gateway does not reuse `GrpcTokenAuthGuard`, because that guard's
 Auth lookup intentionally signs as its ordinary service caller. The gateway's

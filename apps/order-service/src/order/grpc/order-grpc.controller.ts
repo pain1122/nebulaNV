@@ -3,6 +3,7 @@ import { GrpcMethod } from "@nestjs/microservices";
 import { status, type ServerUnaryCall } from "@grpc/grpc-js";
 import {
   createVerifiedServiceDownstreamContext,
+  DormantS2SAuthorizationV3Receiver,
   Public,
   RequireUserId,
   Roles,
@@ -49,6 +50,7 @@ export class OrderGrpcController {
     return {};
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "GetCartV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "GetCart")
@@ -65,6 +67,7 @@ export class OrderGrpcController {
     );
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "AddToCartV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "AddToCart")
@@ -85,6 +88,7 @@ export class OrderGrpcController {
     );
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "UpdateCartItemV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "UpdateCartItem")
@@ -103,6 +107,7 @@ export class OrderGrpcController {
     );
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "RemoveCartItemV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "RemoveCartItem")
@@ -120,6 +125,7 @@ export class OrderGrpcController {
     );
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "CheckoutV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "Checkout")
@@ -133,6 +139,7 @@ export class OrderGrpcController {
     return this.svc.checkout(ctxUser.userId, req.note);
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "GetOrderV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "GetOrder")
@@ -146,6 +153,7 @@ export class OrderGrpcController {
     return this.svc.getOrderForUser(ctxUser.userId, req.id);
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "ListOrdersV3")
   @Roles("user")
   @RequireUserId()
   @GrpcMethod("OrderService", "ListOrders")
@@ -160,6 +168,7 @@ export class OrderGrpcController {
     return this.svc.listOrdersForUser(ctxUser.userId, orderStatus);
   }
 
+  @DormantS2SAuthorizationV3Receiver("OrderService", "UpdateOrderStatusV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("OrderService", "UpdateOrderStatus")
   async updateOrderStatus(

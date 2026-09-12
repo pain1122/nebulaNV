@@ -1,6 +1,11 @@
 import { Controller, UsePipes } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { createGrpcValidationPipe, Public, Roles } from "@nebula/grpc-auth";
+import {
+  createGrpcValidationPipe,
+  DormantS2SAuthorizationV3Receiver,
+  Public,
+  Roles,
+} from "@nebula/grpc-auth";
 import { BlogService } from "../blog.service";
 import { toProtoPost } from "../blog.mapper";
 import {
@@ -49,6 +54,7 @@ export class BlogGrpcController {
   // ------------------------------------------------------
   // CreatePost (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("BlogService", "CreatePostV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("BlogService", "CreatePost")
@@ -63,6 +69,7 @@ export class BlogGrpcController {
   // ------------------------------------------------------
   // UpdatePost (Admin only)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("BlogService", "UpdatePostV3")
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("BlogService", "UpdatePost")
@@ -77,6 +84,7 @@ export class BlogGrpcController {
   // ------------------------------------------------------
   // DeletePost (Admin only) → soft-delete (ARCHIVED)
   // ------------------------------------------------------
+  @DormantS2SAuthorizationV3Receiver("BlogService", "DeletePostV3")
   @Roles("admin", "root-admin")
   @GrpcMethod("BlogService", "DeletePost")
   async delete(req: { id: string }) {

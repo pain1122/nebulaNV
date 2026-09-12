@@ -337,20 +337,31 @@ export class S2SGuard implements CanActivate {
     }
 
     if (contextReceiver) {
-      if (
-        version !== S2S_PROTOCOL_VERSION_V3 ||
-        signedContext?.version !== contextReceiver.version ||
-        signedContext.purpose !== contextReceiver.purpose ||
-        signedContext.resolutionStage !== contextReceiver.resolutionStage ||
-        (contextReceiver.requireActor && !signedContext.actor)
-      ) {
+      const receiverMatches =
+        contextReceiver.version === "2"
+          ? signedContext?.version === "2" &&
+            signedContext.purpose === contextReceiver.purpose &&
+            signedContext.resolutionStage === contextReceiver.resolutionStage &&
+            (!contextReceiver.requireActor || Boolean(signedContext.actor))
+          : signedContext?.version === "3";
+      if (version !== S2S_PROTOCOL_VERSION_V3 || !receiverMatches) {
         return this.unauthenticated(
           ctx,
-          "s2s_resolution_context_required_for_route",
+          contextReceiver.version === "2"
+            ? "s2s_resolution_context_required_for_route"
+            : "s2s_authorization_context_v3_required_for_route",
         );
       }
-    } else if (signedContext?.version === "2") {
-      return this.unauthenticated(ctx, "s2s_context_v2_not_allowed_for_route");
+    } else if (
+      signedContext?.version === "2" ||
+      signedContext?.version === "3"
+    ) {
+      return this.unauthenticated(
+        ctx,
+        signedContext.version === "2"
+          ? "s2s_context_v2_not_allowed_for_route"
+          : "s2s_context_v3_not_allowed_for_route",
+      );
     }
 
     const replayTtlMs = Math.max(1_000, issuedAtMs + maxSkewMs - now + 1_000);
@@ -431,15 +442,23 @@ export class S2SGuard implements CanActivate {
         if (signedContext.version === "1") {
           carrier.requestContext = requestContextFromSigned(signedContext);
           delete carrier.resolutionContext;
-        } else {
+          delete carrier.authorizationContext;
+        } else if (signedContext.version === "2") {
           carrier.resolutionContext = signedContext;
           delete carrier.requestContext;
+          delete carrier.authorizationContext;
+        } else {
+          carrier.authorizationContext = signedContext;
+          delete carrier.requestContext;
+          delete carrier.resolutionContext;
         }
-        if (signedContext.actor) carrier.signedActor = signedContext.actor;
-        else delete carrier.signedActor;
+        if (signedContext.version !== "3" && signedContext.actor) {
+          carrier.signedActor = signedContext.actor;
+        } else delete carrier.signedActor;
       } else {
         delete carrier.requestContext;
         delete carrier.resolutionContext;
+        delete carrier.authorizationContext;
         delete carrier.signedActor;
       }
     };
