@@ -2,7 +2,11 @@
 
 Date: 2026-09-14
 
-Status: adopted planning decision.
+Status: partially superseded by the
+[Backend Ecommerce Roadmap Correction](2026-09-14-backend-ecommerce-roadmap-correction.md).
+The F4 pause, default-site compatibility rule, M3S policy, and post-product
+cloud/tenant direction remain adopted. The frontend-first order and release
+gates below are historical.
 
 ## Decision
 

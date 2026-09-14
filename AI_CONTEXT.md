@@ -117,9 +117,11 @@ operation, remains disabled until its isolation work is complete.
 - Docker/Compose/release image map: `docs/docker-configs.md`.
 - Shared package notes: `docs/packages/*.md`.
 - Current focus file: `docs/current-focus.md`.
-- Current roadmap rebaseline:
+- Current backend-ecommerce roadmap correction:
+  `docs/reports/2026-09-14-backend-ecommerce-roadmap-correction.md`.
+- Partially superseded demo-first rebaseline:
   `docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md`.
-- Current F7 source/migration inventory:
+- Historical F7 source/migration inventory:
   `docs/reports/2026-09-14-f7-batch0-web-source-migration-inventory.md`.
 - Current F4 depth audit:
   `docs/reports/2026-09-12-f4-implementation-depth-audit.md`.
@@ -153,13 +155,21 @@ operation, remains disabled until its isolation work is complete.
 - The F4 state is recorded in
   `docs/reports/2026-09-12-f4-implementation-depth-audit.md` and the archived
   `docs/reports/2026-09-14-f4-paused-execution-checklist.md`.
-- F7 Web And Admin Foundation is the active phase. Batch 0 selected separate
-  Next.js admin and storefront applications after inventorying the combined
-  `apps/web`; current tests, type check, lint, and the user-run production build
-  pass. Batch 1 owns the named application extraction.
+- D1 Default-Site Commerce Domain is the active phase. It audits and completes
+  the Product/catalog backend, variants, governed Media references, Taxonomy,
+  shop currency, gateway parity, deterministic data, migrations, and live
+  evidence without frontend source changes.
+- D2 then completes cart, idempotent demo checkout, immutable Order snapshots,
+  stock/currency behavior, status transitions, concurrency, and rollback. D1
+  and D2 close the frontend-independent B0 Backend Ecommerce Release.
+- After B0 and after the user supplies the Vite admin, F7 imports it without a
+  Next.js conversion and D3 proves the administration workflows. D4 storefront
+  work starts only from concrete client requirements and is not a B0/P0 gate.
 - The adopted sequence is
-  `F7 -> D1-D4 -> M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`.
-  General M6 remains deferred.
+  `D1 -> D2 -> B0 -> F7 -> D3 -> P0 -> M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`,
+  with F7 waiting for the supplied admin. D4 is a separate non-gating
+  storefront track that waits for client requirements. General M6 remains
+  deferred.
 - Every phase before resumed F4 is explicit default-site/single-realm
   compatibility work. It must preserve gateway/service ownership and accept no
   public tenant/site override, but it cannot claim multi-tenant isolation.
@@ -169,8 +179,8 @@ operation, remains disabled until its isolation work is complete.
   proves primary-cloud bucket/KMS/lifecycle/migration structure from measured
   product evidence.
 - Untracked R6.1 Realm Auth experiment files remain outside the committed
-  baseline. Do not edit, import, test, delete, or move them during F7 without a
-  separate user decision.
+  baseline. Do not edit, import, test, delete, or move them during D1/D2 without
+  a separate user decision.
 
 ## 5. How To Load Context For A Task
 

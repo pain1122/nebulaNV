@@ -1,23 +1,23 @@
 # TODO Alternative: NebulaNV Product And AI Roadmap
 
-Status: adopted after F3 closure on 2026-08-24 and rebaselined to the
-demo-first order on 2026-09-14. `TODO.md` remains the original roadmap and safe
-comparison; this file owns the selected future phase order.
+Status: adopted after F3 closure on 2026-08-24 and corrected to the
+backend-ecommerce-first order on 2026-09-14. `TODO.md` remains the original
+roadmap and safe comparison; this file owns the selected future phase order.
 
 Created: 2026-08-22
 
 ## Purpose
 
-Build one complete, demonstrable NebulaNV product before expanding into the
-selected content, media, worker, 3D, and AI capabilities that strengthen its
-portfolio and product story.
+Build and prove one coherent NebulaNV backend from the existing foundations
+through basic ecommerce before frontend finalization or broader product
+expansion.
 
-The 2026-09-14 rebaseline prioritizes a usable product before completing the
-remaining speculative platform foundation. It preserves completed F4 R0-R5 as
-a dormant checkpoint, builds the web commerce demonstration against the
-existing default-realm/single-site boundary, and returns to the remaining
-tenant implementation after cloud deployment has supplied concrete operational
-requirements.
+The 2026-09-14 correction preserves completed F4 R0-R5 as a dormant checkpoint,
+hardens Product and Order through a gateway-only backend ecommerce release, and
+uses the separately developed Vite admin only after those contracts are stable.
+Storefront structure, production client endpoints, and deployment topology wait
+for concrete client requirements. Remaining tenant implementation resumes after
+cloud deployment has supplied operational evidence.
 
 The selected growth path retains M2 Blog, CMS, And Composition; narrows M3 to
 M3S compatibility and demonstrated advanced-media needs; gives M5 only the
@@ -37,7 +37,9 @@ following coherently:
 
 ```text
 gateway-only external access
--> working admin and storefront commerce flow in explicit single-site mode
+-> complete product, cart, checkout, and order backend in explicit single-site mode
+-> admin-validated commerce workflow after the supplied Vite panel is integrated
+-> client-driven storefront only after its requirements are known
 -> governed media and content lifecycle
 -> bounded web showroom and storage-compatible advanced media
 -> mobile commerce flow and evidence-backed module boundary
@@ -137,24 +139,31 @@ AI/cloud guidance to recheck when the applicable phase starts:
 
 ## Explicit Scope Decisions
 
-Decision record:
-[2026-09-14 Demo-First Roadmap Rebaseline](docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md).
+Decision records:
+
+- [2026-09-14 Backend Ecommerce Roadmap Correction](docs/reports/2026-09-14-backend-ecommerce-roadmap-correction.md)
+- [2026-09-14 Demo-First Roadmap Rebaseline](docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md), partially superseded
 
 Committed active path:
 
 1. Preserve completed F0-F3 and their regression gates.
 2. Preserve completed F4 R0-R5 and pause F4 at the audited dormant boundary.
-3. Execute `F7 -> D1 -> D2 -> D3 -> D4` and close the working web commerce
-   demo checkpoint.
-4. Execute `M2 -> F5 -> M5 -> M3S` with only consumer-driven media, storage,
+3. Execute `D1 -> D2` and close the frontend-independent B0 Backend Ecommerce
+   Release through gateway APIs and live integration evidence.
+4. When the user-supplied Vite admin is ready, execute `F7 -> D3` and close the
+   P0 Admin-Validated Ecommerce Demo. Do not build or convert an admin now.
+5. Treat D4 as a non-gating client-delivery track after B0. Start it only after
+   concrete storefront requirements exist; its framework, origin, routes, and
+   deployment shape remain unselected until then.
+6. Execute `M2 -> F5 -> M5 -> M3S` with only consumer-driven media, storage,
    and worker compatibility.
-5. Execute `F8 -> F6 -> D5` and close the full commerce portfolio release.
-6. Execute `AI0 -> M7` against the proven default-site product without making
+7. Execute `F8 -> F6 -> D5` and close the full commerce portfolio release.
+8. Execute `AI0 -> M7` against the proven default-site product without making
    a tenant-isolation claim.
-7. Execute F9 cloud and operations work from the actual application/runtime
+9. Execute F9 cloud and operations work from the actual application/runtime
    shape, then revisit M3S provider policy from that cloud evidence.
-8. Resume F4 at R6.1 and complete the remaining realm, tenant, domain-scope,
-   migration, and isolation gates.
+10. Resume F4 at R6.1 and complete the remaining realm, tenant, domain-scope,
+    migration, and isolation gates.
 
 Deferred, not deleted:
 
@@ -180,13 +189,15 @@ Deferred, not deleted:
 | F4             | R0-R5 preserved; R6.1 onward resumes after F9                                |
 | F5             | Retained after M2 with current-provider compatibility and bounded media jobs |
 | F6             | Moved after F8 so the module contract follows proven web/mobile consumers    |
-| F7             | Next active phase; establishes the admin/storefront product shells           |
+| F7             | Runs after B0 when Vite source exists; integrates admin without conversion   |
 | F8             | Moved after the web showroom/media sequence and before F6/D5                 |
 | F9             | Moved before resumed F4; supplies actual cloud/storage operating evidence    |
-| D1-D4          | Moved immediately after F7; closes a working web commerce demo checkpoint    |
+| D1-D2          | Next active phases; close the backend ecommerce release before frontend work |
+| D3             | Runs with F7 after B0 to prove the supplied Vite admin against stable APIs   |
+| D4             | Client-driven storefront work after concrete requirements are available      |
 | D5             | Retained after F8/F6; closes the full commerce portfolio release             |
 | M1             | Deferred until real merchant/payment scope exists                            |
-| M2             | Moved after the working web commerce checkpoint                              |
+| M2             | Retained after backend/admin commerce proof; UI breadth follows real needs   |
 | M3             | Narrowed to M3S; storage remains a compatibility feature until cloud proof   |
 | M4             | Deferred in full                                                             |
 | M5             | Retained as a bounded web-first showroom using only proven processing needs  |
@@ -203,9 +214,13 @@ EA0 Repository Agent Lab (parallel, read-only first, non-gating)
 F0-F2 complete
 -> F3 gateway
 -> F4 R0-R5 dormant checkpoint (complete and audited)
--> F7 web/admin shells
--> D1-D4 web commerce vertical
--> Working Web Commerce Demo / Release P0
+-> D1 product/catalog backend
+-> D2 cart/checkout/order backend
+-> Backend Ecommerce Release B0 (gateway-only, frontend-independent)
+-> wait for supplied Vite admin source
+-> F7 admin integration foundation
+-> D3 admin workflow proof
+-> Admin-Validated Ecommerce Demo / Release P0
 -> M2 content/composition
 -> F5 bounded media lifecycle/CDN
 -> M5 bounded web-first 3D showroom
@@ -221,20 +236,28 @@ F0-F2 complete
 -> Multi-Tenant Foundation Release P2
 ```
 
+D4 client-driven storefront delivery may start after B0 when a named client's
+requirements are known. It does not block P0 or the backend-centered sequence.
+
 Release definitions:
 
-- **P0 Working Web Commerce Demo:** F7 and D1-D4 pass against the preserved F3
-  gateway and current default-realm/single-site backend. Checkout remains a
-  clearly labeled demo without real payment collection.
+- **B0 Backend Ecommerce Release:** D1 and D2 pass against the preserved F3
+  gateway. A deterministic API workflow proves catalogue administration,
+  customer cart, idempotent demo checkout, durable order snapshots, ownership,
+  role denial, failure rollback, and permitted order transitions without a UI.
+- **P0 Admin-Validated Ecommerce Demo:** F7 imports the supplied Vite admin and
+  D3 proves the operator workflows against B0. It does not require a storefront
+  or fix production client/deployment endpoints.
 - **P1 Commerce Portfolio Product:** M2, F5, M5, M3S, F8, F6, and D5 pass on top
-  of P0. It includes content, governed media, a bounded showroom, and mobile,
-  but still makes no multi-tenant claim.
+  of B0/P0 and any client-driven D4 work selected by then. It includes content,
+  governed media, a bounded showroom, and mobile, but still makes no
+  multi-tenant claim.
 - **P2 Multi-Tenant Foundation:** AI0, M7, F9, and the resumed F4 exit pass.
   Only this release may claim tenant/realm isolation. General M6 and commercial
   SaaS breadth remain separate future work.
 
 The phase specifications below are physically arranged in execution order.
-Completed checkpoints appear first, the active demo-first sequence follows, and
+Completed checkpoints appear first, the active backend-first sequence follows, and
 parallel or deferred work is kept after the active sequence.
 
 ## Phase Entry Gates
@@ -246,13 +269,14 @@ parallel or deferred work is kept after the active sequence.
 | F4    | F9 and all earlier active phases pass; resume from audited R5 checkpoint | Tenant/realm isolation and scoped domains  |
 | F5    | M2 supplies concrete media consumers; current media policy remains green | Governed bounded media lifecycle           |
 | F6    | F8 and M5 expose concrete capability/module needs                        | Evidence-backed independent module pattern |
-| F7    | F3 gateway/client contracts remain green                                 | Independent admin/storefront shells        |
+| F7    | B0 passes and the user supplies the Vite admin source                    | Integrated admin foundation                |
 | F8    | M3S and M5 define proven media/showroom needs                            | Default-site mobile core                   |
 | F9    | Web/mobile/media/AI runtime shapes are implemented and measurable        | Primary-cloud operating evidence           |
-| D1    | F7 shells and current single-site gateway contracts pass                 | Default-site demo catalog                  |
+| D1    | F3 and current single-site gateway contracts pass                        | Complete default-site catalog backend      |
 | D2    | D1 product invariants are stable                                         | Demo cart/order flow                       |
-| D3-D4 | D1/D2 operations and F7 shells exist                                     | P0 working web commerce demo               |
-| M2    | P0 supplies real admin/storefront content consumers                      | Governed CMS/composition corpus            |
+| D3    | B0 passes, F7 passes, and the supplied Vite admin exists                 | P0 admin-validated ecommerce demo          |
+| D4    | B0 passes and concrete client storefront requirements are documented     | Client-specific public commerce flow       |
+| M2    | B0/P0 supplies stable backend and admin content operations               | Governed CMS/composition corpus            |
 | M5    | F5 baseline assets and the storefront/admin consumers pass               | Bounded web-first showroom                 |
 | M3S   | F5 and M5 reveal exact compatibility needs                               | Portable media/storage seams               |
 | D5    | F8, F6, and D1/D2 contracts pass                                         | P1 mobile commerce                         |
@@ -265,7 +289,7 @@ timeboxed, non-production, and needed to remove a decision blocker. A spike may
 not silently create public contracts, migrations, shadow data authority, or a
 second runtime pattern that the owning phase must later inherit.
 
-## Demo-First Compatibility Contract
+## Backend-First Compatibility Contract
 
 Until resumed F4 exits, every active phase operates in the existing
 default-realm/single-site mode:
@@ -373,210 +397,254 @@ Detailed execution and final evidence remain in `docs/current-focus.md` and
 
 ---
 
-# RELEASE P0 - WORKING WEB COMMERCE
+# RELEASE B0 - BACKEND ECOMMERCE
 
-Execution order: `F7 -> D1 -> D2 -> D3 -> D4`.
+Execution order: `D1 -> D2`.
 
-## F7 - Web And Admin Foundation
-
-Purpose: establish separate, tested storefront and admin applications that
-consume the proven F3 gateway contracts and can host the commerce demo before
-the remaining tenant, media, module, mobile, and cloud foundations are built.
-
-### Application Split And Shared Frontend
-
-- [ ] Freeze `apps/storefront` as the public Next.js application and retain
-      Next.js for `apps/admin` from the current working compatibility source.
-      Reconsider Vite only after measured runtime or maintenance evidence.
-- [ ] Decide through a migration inventory how current `apps/web` code is
-      reused, moved, or retired; do not maintain three accidental authorities.
-- [ ] Share only UI primitives, intent-oriented schemas, theme tokens, and the
-      external gateway client; never Prisma, internal gRPC, or service URLs.
-- [ ] Standardize authentication/refresh, the current configured application
-      context, request IDs, and error envelopes. Reserve no tenant or capability
-      behavior that the active backend cannot yet prove.
-- [ ] Define loading, empty, denied, expired, degraded, offline, and unexpected
-      failure states.
-- [ ] Establish localization, RTL, accessibility, theme-token, unit,
-      integration, and browser-e2e foundations.
-
-### Admin Shell
-
-- [ ] Implement login/logout/refresh, protected routes, and safe error
-      boundaries.
-- [ ] Add navigation from the current verified Auth role and gateway routes.
-      Keep future capability and parent-target seams non-authoritative and
-      hidden until F6 and resumed F4 implement them.
-- [ ] Build reusable list, form, filter, pagination, validation-error, and
-      optimistic-concurrency patterns.
-- [ ] Add a media picker against the current gateway/media contract without
-      exposing provider credentials or assuming the later F5 lifecycle.
-
-### Storefront Shell
-
-- [ ] Resolve the configured storefront application/origin and load the current
-      default-site theme/configuration.
-- [ ] Use the public external client for product/content data.
-- [ ] Establish SEO, canonical, robots, sitemap-input, error, and not-found
-      behavior.
-- [ ] Build the CDN media component and product list/detail skeleton.
-- [ ] Define capability-based placeholders for later CMS/AI/3D features; do not
-      ship fake implementations.
-
-### F7 Exit Gate
-
-- [ ] Admin and storefront build, test, and deploy independently.
-- [ ] Both use only gateway and approved CDN/storage data-plane URLs.
-- [ ] Neither owns backend contracts, tenant policy, Prisma, or internal service
-      addresses.
-- [ ] Authentication, configured application context, accessibility, RTL, and
-      core failure states have CI coverage.
+This release is frontend-independent. Its proof uses the public gateway,
+generated external client, deterministic fixtures, service integration tests,
+and live database scenarios. A UI is neither an entry gate nor an exit gate.
 
 ## D1 - Default-Site Commerce Domain
 
-Purpose: provide the product/catalog authority used consistently by the current
-default-site admin and storefront, then mobile, content, and later AI/3D work.
-General tenant/site persistence and isolation remain resumed F4 work.
+Purpose: complete the Product/catalog authority for a coherent default-site
+ecommerce backend. General tenant/site persistence and isolation remain resumed
+F4 work.
 
 ### Product Model And Lifecycle
 
-- [ ] Finalize the current default-site product model without premium
-      AI/showroom fields.
-- [ ] Support draft, active, and archived lifecycle with explicit public/admin
-      visibility rules.
-- [ ] Support title, slug, excerpt, description, SKU, price, currency, basic
-      stock, and availability with validated invariants.
+- [ ] Audit and finalize title, slug, excerpt, description, base SKU, price,
+      currency, stock, availability, and `DRAFT | ACTIVE | ARCHIVED` lifecycle.
 - [ ] Preserve deterministic current global slug/SKU uniqueness and record the
       later F4 scoped-uniqueness migration requirement.
-- [ ] Support category, tag, and brand through authoritative taxonomy contracts.
-- [ ] Use validated current Media IDs for thumbnail/gallery roles, ordering, alt
-      text, and channel overrides.
-- [ ] Preserve authoritative public reads that cannot expose drafts, archived,
-      or deleted records through query flags.
+- [ ] Add bounded product variants with option values, per-variant SKU,
+      price/stock overrides, active/deleted state, and deterministic ordering.
+- [ ] Define explicit concurrency behavior for product and variant mutations.
+- [ ] Preserve authoritative public reads that cannot expose draft, archived,
+      deleted, unavailable, or invalid records through query flags.
+- [ ] Keep advanced comments, sets, VR, showroom, recommendation, and premium
+      fields outside the basic ecommerce contract unless current evidence makes
+      one necessary.
+
+### Taxonomy, Media, And Currency
+
+- [ ] Support the minimum category, tag, and brand relationships through
+      authoritative Taxonomy contracts.
+- [ ] Replace product-facing raw URL authority with validated Media IDs and
+      semantic thumbnail/gallery roles, including migration compatibility for
+      existing rows.
+- [ ] Validate Media records through a versioned service contract; do not read
+      the Media database or require a file-manager UI.
+- [ ] Define one settings-backed shop-currency invariant shared with D2 and
+      remove disagreement between code fallbacks and database defaults.
+- [ ] Define deterministic downstream failure behavior so Taxonomy, Media, or
+      Settings failures cannot create partially valid product state.
 
 ### Contracts And Evidence
 
-- [ ] Complete gateway/HTTP/gRPC parity for the selected product operations.
+- [ ] Complete HTTP/gRPC/gateway/OpenAPI/generated-client parity for the
+      selected public and administrative Product operations.
 - [ ] Keep external DTOs separate from service inputs, proto types, and Prisma.
-- [ ] Add lifecycle, taxonomy, media-reference, concurrency, actor-policy, and
-      denial tests. Record cross-site coverage as an F4 exit dependency.
-- [ ] Add deterministic seed products that exercise active/draft/archived and
-      media/taxonomy relationships.
+- [ ] Add lifecycle, variant, taxonomy, media-reference, currency, concurrency,
+      actor-policy, denial, dependency-failure, and rollback tests.
+- [ ] Add deterministic base/variant seed products exercising active, draft,
+      archived, Media, and Taxonomy relationships.
+- [ ] Prove clean migration, populated upgrade, rerun, malformed-data denial,
+      transactional rollback, and gateway-only live behavior.
 
 ### D1 Exit Gate
 
-- [ ] Admin can manage default-site products while anonymous clients see only
-      active public records.
+- [ ] Authorized API clients can manage complete default-site products and
+      anonymous clients see only valid public catalogue records.
+- [ ] Required operations work through the gateway and generated client without
+      direct service, database, storage, or frontend coupling.
+- [ ] Product and variant commercial invariants are stable enough for D2.
 - [ ] No route accepts a caller-selected tenant/site override; general
       cross-tenant isolation remains explicitly unclaimed until F4.
-- [ ] Product core contains no showroom, recommendation, or premium-module
-      implementation fields.
 
 ## D2 - Cart, Checkout, And Order
 
-Purpose: demonstrate a coherent commerce transaction without pretending to
-collect or reconcile production payment.
+Purpose: complete and prove the backend commerce transaction without pretending
+to collect or reconcile production payment.
 
 ### Cart And Checkout
 
-- [ ] Implement the current default-site cart and items with verified user
-      ownership.
-- [ ] Validate product lifecycle, availability, currency, price, and basic stock
-      at the authoritative boundaries.
+- [ ] Finalize the default-site cart and items with verified user ownership.
+- [ ] Support base and variant selections and snapshot selected options.
+- [ ] Validate lifecycle, availability, configured currency, price, and basic
+      stock at every authoritative boundary.
 - [ ] Define quantity/update/remove behavior and deterministic totals.
-- [ ] Implement idempotent checkout using the gateway contract and bounded
-      replay behavior.
-- [ ] Snapshot product identity, SKU, title, unit price, currency, and quantity
-      into order items so later catalog edits do not rewrite orders.
-- [ ] Clearly label checkout as demo/no-production-payment and never collect real
-      payment credentials or fabricate a settled provider transaction.
+- [ ] Implement idempotent checkout with bounded replay and conflict behavior.
+- [ ] Define stock decrement/reservation behavior suitable for the demo and
+      prove failure rollback; broader inventory remains M1.
+- [ ] Snapshot product/variant identity, SKU, title, options, unit price,
+      currency, and quantity so catalogue edits cannot rewrite orders.
+- [ ] Clearly label checkout as demo/no-production-payment and never collect
+      real payment credentials or fabricate a settled provider transaction.
 
 ### Orders
 
-- [ ] Add user order list/detail restricted to the verified owner.
-- [ ] Add admin order list/detail and retain admin-authorized status changes.
-- [ ] Define permitted status transitions, concurrency behavior, and audit.
-- [ ] Prevent client-supplied user, price, or status authority and accept no
-      caller-selected tenant/site override.
-- [ ] Add integration tests for repeat checkout, stale product state, ownership
-      denial, admin policy, and failure rollback.
+- [ ] Preserve user order list/detail restricted to the verified owner.
+- [ ] Complete admin order list/detail and authorized status changes through the
+      gateway.
+- [ ] Define permitted status transitions, concurrency behavior, idempotency,
+      and audit facts.
+- [ ] Replace Prisma-shaped external results with explicit service and gateway
+      response mapping.
+- [ ] Prevent client-supplied user, price, currency, totals, status, application,
+      or site authority.
+- [ ] Add integration tests for replay, stale product/variant state, ownership
+      denial, role denial, invalid transitions, dependency failure, and complete
+      transaction rollback.
 
 ### D2 Exit Gate
 
-- [ ] A user can create a cart and produce one durable idempotent demo order.
+- [ ] A user can create a cart and produce one durable idempotent demo order
+      entirely through gateway APIs.
 - [ ] Orders retain immutable commercial snapshots and correct user ownership.
-- [ ] User/admin reads and status transitions enforce their distinct policies.
-- [ ] The UI and documentation never imply production payment capability.
+- [ ] User/admin reads and status transitions enforce distinct policies.
+- [ ] Currency, totals, stock behavior, error envelopes, and rollback are
+      deterministic and covered by live evidence.
+
+## Backend Ecommerce Exit Gate - Release B0
+
+- [ ] Deterministic setup can authenticate an admin, create and publish a
+      product, authenticate a customer, mutate a cart, perform idempotent demo
+      checkout, read the order, and perform one permitted admin transition.
+- [ ] The complete proof runs through the public gateway and generated external
+      client without a frontend or direct service/database access.
+- [ ] Product visibility, variants, Media references, Taxonomy, currency, price
+      snapshots, stock behavior, ownership, role denial, replay, degraded
+      dependencies, and rollback pass focused and live evidence.
+- [ ] Data can be reset/reseeded deterministically and every migration has
+      upgrade/rerun/rollback evidence appropriate to its risk.
+- [ ] The release is labeled default-site/single-realm and demo-payment only.
+- [ ] No frontend, production endpoint, file-manager, advanced storage,
+      entitlement, mobile, AI, cloud, or tenant completion is claimed.
+
+---
+
+# RELEASE P0 - ADMIN-VALIDATED ECOMMERCE
+
+Execution order: `F7 -> D3`, after B0 and after the user supplies the Vite admin
+source. Backend work does not wait for this source.
+
+## F7 - Admin Integration Foundation
+
+Purpose: import and adapt the separately developed Vite admin as a consumer of
+the stable B0 gateway contracts. F7 does not create a storefront or convert the
+admin to Next.js.
+
+### Admin Import And Runtime Boundary
+
+- [ ] Import the supplied source as `apps/admin` and inventory its routes,
+      dependencies, state, environment, build, tests, and assets before edits.
+- [ ] Keep Vite unless evidence at integration time proves an unmet requirement.
+- [ ] Configure gateway base URL, public client ID, application origin, and
+      deployment paths through environment/registry settings rather than fixed
+      production assumptions.
+- [ ] Use the generated external client and public gateway only; never Prisma,
+      internal gRPC, service URLs, S2S keys, or trusted-context construction.
+- [ ] Select and prove the browser session/BFF/proxy topology against the real
+      deployment requirements available at F7 entry.
+- [ ] Preserve current `apps/web` as a rollback/compatibility implementation
+      until D3 parity passes.
+
+### Integration Foundations
+
+- [ ] Integrate login, refresh, logout, authorization failures, request IDs, and
+      gateway error envelopes.
+- [ ] Establish loading, empty, denied, expired, degraded, offline, validation,
+      conflict, and unexpected-error behavior.
+- [ ] Preserve the panel's chosen localization, RTL/LTR, accessibility, theme,
+      and test structure while adapting it to NebulaNV.
+- [ ] Do not implement the file-manager UI during F7. Use deterministic Media
+      records until F5 supplies its later administration workflow.
+
+### F7 Exit Gate
+
+- [ ] The supplied Vite admin builds and authenticates through the gateway at a
+      configurable local/test origin.
+- [ ] Its session and proxy behavior matches the chosen deployment contract.
+- [ ] It owns no backend, identity, media, storage, tenant, or entitlement
+      policy.
+- [ ] Current `apps/web` remains available as rollback until D3 exits.
 
 ## D3 - Admin Product Flow
 
-Purpose: provide the operator side of the working demonstration through the
-real gateway and current Auth, media, taxonomy, product, and order contracts.
+Purpose: prove the operator side of B0 through the supplied Vite admin and the
+real gateway contracts.
 
-- [ ] Authenticate/refresh/logout an admin through the gateway.
-- [ ] Display the configured default-site/application context without presenting
-      it as user-selectable or multi-tenant authority.
-- [ ] List, filter, create, edit, publish/archive, and inspect products.
-- [ ] Select only taxonomy records exposed by the current gateway contract.
-- [ ] Upload/select current Media records and assign semantic product roles;
-      migrate to F5 lifecycle states when F5 begins.
-- [ ] Set validated price, currency, stock, and availability.
-- [ ] View orders and perform permitted status transitions.
-- [ ] Handle validation, conflict, denied, expired-session, degraded dependency,
-      empty, and unexpected-error states.
-- [ ] Add frontend unit/integration/e2e coverage against the external client;
-      do not mock away gateway envelope and policy behavior in all tests.
+- [ ] Authenticate, refresh, and log out an admin through the gateway.
+- [ ] Display current application context as configuration, not user-selected
+      tenant/site authority.
+- [ ] List, filter, create, edit, publish/archive, and inspect base and variant
+      products.
+- [ ] Select only Taxonomy and deterministic Media records exposed by the
+      gateway contracts.
+- [ ] Set validated price, currency, stock, availability, and variant options.
+- [ ] View orders and perform only permitted status transitions.
+- [ ] Handle validation, conflict, denial, expired session, degraded dependency,
+      empty state, replay, and unexpected errors.
+- [ ] Add unit/integration/browser evidence against the generated external
+      client without mocking away all gateway envelope and policy behavior.
 
 ### D3 Exit Gate
 
-- [ ] An authorized admin can publish a complete default-site product with
-      taxonomy and current Media records without direct service/database/storage
-      access.
-- [ ] An insufficient-role actor is denied; wrong-site denial remains an F4
-      exit requirement.
-- [ ] Admin behavior survives refresh, conflict, and degraded-service cases.
+- [ ] An authorized admin can publish a complete product and manage the
+      resulting demo order without direct service/database/storage access.
+- [ ] Insufficient roles are denied; cross-site denial remains an F4 exit
+      requirement.
+- [ ] Admin behavior survives refresh, conflict, replay, and degraded-service
+      cases.
+- [ ] B0 gateway-only proof remains green.
+
+## Admin-Validated Ecommerce Exit Gate - Release P0
+
+- [ ] The Vite admin exercises B0 Product, Taxonomy, Media-reference, and Order
+      contracts through the gateway.
+- [ ] Backend behavior remains independently testable without the panel.
+- [ ] The release records configurable client/deployment inputs and does not
+      present local endpoints as permanent production design.
+- [ ] Storefront, file-manager, payment-provider, tenant, cloud, and broader
+      product completion remain unclaimed.
+
+---
+
+# CLIENT-DRIVEN STOREFRONT
 
 ## D4 - Storefront Product Flow
 
-Purpose: prove anonymous discovery and authenticated commerce for the
-configured default storefront without internal-service knowledge.
+Status: deferred until B0 passes and concrete client requirements are recorded.
+It is not an entry or exit gate for B0 or P0.
 
-- [ ] Resolve the configured storefront from the F3 origin/application contract;
-      expose no public tenant/site selector.
-- [ ] Render product listing/detail with taxonomy, price/availability, and CDN
-      media from public gateway contracts.
-- [ ] Add basic SEO title/description, canonical, robots, structured-data, and
-      media-sitemap inputs without leaking provider/private media URLs.
-- [ ] Implement register/login/refresh/logout through the gateway/BFF contract.
-- [ ] Implement cart, demo checkout, order confirmation, and authenticated order
-      history/detail.
-- [ ] Define not-found versus unavailable/archived behavior without exposing
+Purpose: implement public commerce for a named client/deployment using stable
+B0 APIs without forcing its framework, route layout, origin, SSR/SSG behavior,
+or hosting topology into the backend roadmap.
+
+- [ ] Record the client's SEO, rendering, routing, localization, branding,
+      accessibility, session, domain, origin, and deployment requirements.
+- [ ] Select or integrate the frontend framework from those requirements.
+- [ ] Resolve the configured application through the gateway contract; expose
+      no public tenant/site selector.
+- [ ] Render product listing/detail with Taxonomy, price/availability, variants,
+      and authorized Media delivery.
+- [ ] Implement register/login/refresh/logout, cart, demo checkout, confirmation,
+      and authenticated order history/detail through gateway APIs.
+- [ ] Define not-found versus unavailable/archived behavior without revealing
       hidden product existence.
-- [ ] Cover anonymous/authenticated, wrong-origin/application,
-      insufficient-role, missing-media, degraded-service, and checkout-replay
-      scenarios.
+- [ ] Cover anonymous/authenticated, wrong-origin/application, role denial,
+      missing-media, degraded-service, and checkout-replay scenarios.
 
 ### D4 Exit Gate
 
-- [ ] A storefront visitor can discover an active product, authenticate, check
-      out, and inspect the resulting order through gateway APIs.
-- [ ] Draft/archived products and non-public media remain hidden.
-- [ ] Storefront has no internal service URL, Prisma, storage credential, or
-      trusted-context construction.
-
-### Working Web Commerce Demo - Release P0
-
-- [ ] An admin can authenticate, create and publish a complete product, and
-      manage the resulting demo order entirely through gateway APIs.
-- [ ] A storefront visitor can browse the public catalog, authenticate, use the
-      cart, complete idempotent demo checkout, and inspect order history.
-- [ ] Product lifecycle, price snapshots, ownership, role denial, media access,
-      gateway envelopes, refresh/logout, failure states, accessibility, and RTL
-      pass focused and browser-level evidence.
-- [ ] The demo can reset/reseed deterministic non-production data and records
-      setup, accounts, limitations, and verification commands.
-- [ ] The release is labeled default-site/single-realm and makes no tenant,
-      entitlement, cloud, advanced-media, or mobile completion claim.
+- [ ] The named client can discover products and complete the B0 transaction
+      through configured gateway and approved Media data-plane URLs.
+- [ ] Draft/archived products and non-public Media remain hidden.
+- [ ] The client owns no backend policy, internal service address, Prisma,
+      storage credential, or trusted-context construction.
+- [ ] Backend contracts remain usable by other clients with different routes,
+      origins, frameworks, and deployment shapes.
 
 ---
 
@@ -1346,7 +1414,8 @@ site admin publishes governed media, products, and composed content
 -> analytics and selected AI insights remain default-site and reversible
 ```
 
-- [ ] P0 Web Commerce and P1 Commerce Portfolio gates remain green.
+- [ ] B0 Backend Ecommerce, P0 Admin-Validated Ecommerce, and P1 Commerce
+      Portfolio gates remain green.
 - [ ] AI0, M2, F5, M5, M3S, F8, F6, D5, and M7 exit gates pass.
 - [ ] The complete external path uses gateway plus approved CDN/storage URLs.
 - [ ] Wrong-actor/application and unauthorized data, media, content, vector,
@@ -1918,23 +1987,27 @@ not a claim that commercial SaaS productization exists.
 
 1. Preserve F0-F3 and the audited F4 R0-R5 checkpoint. Do not continue R6.1,
    activate dormant Realm Auth/context v3/Tenant Authority consumers, or alter
-   the completed F4 evidence during the demo-first phases.
-2. Execute F7 from `docs/current-focus.md`. Start with the read-only
-   `apps/web` route/import/asset/configuration/build inventory and write the
-   file-level admin/storefront disposition matrix before moving code.
-3. Complete `F7 -> D1 -> D2 -> D3 -> D4` and close the explicitly
-   default-site/single-realm P0 working web commerce demo.
-4. Continue in the adopted order:
+   the completed F4 evidence during the backend-first phases.
+2. Execute D1 from `docs/current-focus.md`: audit and close the Product,
+   variant, Taxonomy, Media-reference, currency, gateway, migration, seed, and
+   live-proof gaps without changing frontend source.
+3. Complete D2 and close B0 through a deterministic gateway-only Product,
+   cart, idempotent demo-checkout, Order, denial, replay, and rollback proof.
+4. When Salar supplies the Vite admin, execute `F7 -> D3` and close P0. Keep
+   client origins, proxy paths, domains, and deployment endpoints configurable.
+   D4 is a separate non-gating track that begins only after concrete storefront
+   requirements are documented.
+5. Continue later work in the adopted order:
    `M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`.
    General M6 remains deferred; each owning phase may implement only its bounded
    proven jobs, indexes, or cache behavior.
-5. Treat M3S storage as compatibility work. Retain media-service policy and
+6. Treat M3S storage as compatibility work. Retain media-service policy and
    MinIO local storage, implement only required S3-compatible operations and
    provider-neutral tests, and send measured requirements to F9. F9 selects and
    proves the primary provider topology before any full storage structure,
    migration, replication, lifecycle/KMS, or multi-cloud work.
-6. Label every pre-F4 release as default-site/single-realm. Do not claim
+7. Label every pre-F4 release as default-site/single-realm. Do not claim
    cross-tenant, cross-license, realm-isolated session, or tenant-scoped
    AI/analytics behavior until resumed F4 exits.
-7. The assistant runs small inspections and focused checks directly. Salar runs
+8. The assistant runs small inspections and focused checks directly. Salar runs
    commands likely to exceed the session timeout and returns bounded results.

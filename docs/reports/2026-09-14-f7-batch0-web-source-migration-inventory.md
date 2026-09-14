@@ -2,12 +2,19 @@
 
 Date: 2026-09-14
 
-Status: complete.
+Status: historical inventory complete. Its frontend-first execution decision
+was superseded on 2026-09-14 by the
+[Backend Ecommerce Roadmap Correction](2026-09-14-backend-ecommerce-roadmap-correction.md).
+The route, dependency, BFF, asset, and verification evidence remains useful for
+the later Vite-admin integration.
 
-Authority: this report supplies the file and runtime evidence for F7 Batch 0 in
-[`docs/current-focus.md`](../current-focus.md). It does not claim F7 completion.
+Authority: historical F7 discovery evidence only. It does not control current
+execution and does not claim F7 completion.
 
-## Decision
+## Superseded Decision
+
+Historical only: the following Next.js-admin/storefront choice was replaced by
+the linked backend-first correction.
 
 F7 will retain Next.js for the admin application and create a separate Next.js
 storefront. The current `apps/web` application is the code source and rollback
@@ -73,7 +80,10 @@ There is no root storefront route, order BFF, media BFF, error boundary,
 not-found boundary, loading boundary, sitemap, robots handler, or public product
 route in the current application.
 
-## Source Disposition Matrix
+## Superseded Source Disposition Matrix
+
+Historical only: admin move/delete actions below are not authorized. The file
+inventory remains useful for later D3 parity checks.
 
 ### Application Shell And Routes
 
@@ -148,7 +158,7 @@ the migrated admin runtime proves it is unreachable.
 The root `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, and `window.svg` are
 unused create-next-app assets and can be deleted during cutover.
 
-## Framework Decision Evidence
+## Superseded Framework Decision Evidence
 
 ### Current implementation
 
@@ -182,7 +192,10 @@ concrete same-origin deployment plan.
 Classification: preserving Next.js is the narrow F7 implementation choice.
 Moving admin to Vite is optional future optimization.
 
-## Frozen Migration Order
+## Superseded Migration Order
+
+Historical only: do not execute this order. The active order is in
+[`docs/current-focus.md`](../current-focus.md).
 
 1. Preserve `apps/web` unchanged as the source-level rollback baseline while
    creating the named application directories.
@@ -202,7 +215,11 @@ Moving admin to Vite is optional future optimization.
 Temporary coexistence during steps 2-7 is a migration state, not a supported
 three-application architecture.
 
-## Finding Classification
+## Superseded Finding Classification
+
+Historical only: these classifications described the abandoned frontend-first
+execution plan. The underlying route and asset observations remain evidence;
+the required treatments do not control current work.
 
 | Finding                                       | Classification                                 | Treatment                                                       |
 | --------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------- |

@@ -2,10 +2,10 @@
 
 Last reviewed: 2026-09-14
 
-The public web app consumes backend APIs and renders SEO-facing pages. F7 uses
-separate Next.js applications for the public storefront and administration
-workflows. The existing Next.js admin/session mechanism is retained because the
-F7 source inventory found no framework defect that justifies a Vite conversion.
+Frontend applications consume versioned gateway APIs after the backend
+ecommerce contract is stable. The administration panel is a user-owned Vite
+project imported later during F7/D3. A storefront is selected and implemented
+during D4 only after concrete client requirements exist.
 
 ## Boundary Rule
 
@@ -93,14 +93,16 @@ The focused compatibility gate is:
 pnpm test:web:current
 ```
 
-F7 still owns whether this current app is reused, migrated, or replaced and
-the broader public-storefront/admin split.
+`apps/web` remains a compatibility implementation until the supplied Vite admin
+passes later F7/D3 parity. D1/D2 do not modify or replace it.
 
 ## Future Direction
 
-Public website direction:
+Public website direction, deferred to client-driven D4:
 
-- Next.js remains the preferred public website framework because SEO, metadata, and public rendering matter.
+- Select the framework from the named client's SEO, rendering, routing,
+  localization, deployment, and maintenance requirements. Do not freeze it in
+  the backend roadmap.
 - Public pages should store/use media IDs and render public images through `GET /media/render/:id?variant=web`.
 - All approved public `variant=web` media is index-eligible by default, but image sitemap output should be generated from indexable public content records that reference those media IDs.
 - Product, blog, page, category, and settings forms should own semantic image usage fields such as featured image media ID, gallery order, alt text, captions, and display role.
@@ -109,21 +111,23 @@ Public website direction:
 
 Admin panel direction:
 
-- Next.js remains the F7 admin framework so the working same-origin BFF,
-  refresh-cookie behavior, route code, and focused tests can move without a
-  second framework migration.
-- A later Vite conversion is optional and requires measured runtime or
-  maintenance evidence plus a concrete same-origin proxy/session deployment
-  contract.
-- The reusable media filemanager should live in the admin app and call gateway
-  media lane routes, not a direct media-service or raw S3/Supabase control API.
+- Keep the supplied admin as a Vite SPA. It does not need SSR or SSG.
+- Import it as `apps/admin` during F7, then customize its working screens in D3 to use
+  the generated gateway client and current product contracts.
+- Choose and prove its session/BFF/proxy path from the real deployment contract
+  available at integration time; do not weaken gateway CORS.
+- Add the reusable media file manager during F5, after the backend ecommerce
+  release. It must call gateway Media routes rather than direct service or raw
+  storage control APIs.
 
 Current delivery status:
 
-- F7 Batch 0 selected a staged source extraction into named Next.js admin and
-  storefront applications; the production build baseline remains to be run.
+- D1 Product/catalog backend hardening is active. D2 and the frontend-independent
+  B0 backend ecommerce proof follow.
 - Current `apps/web` remains a compatibility implementation, not the final
   admin deliverable. Its focused contract tests gate the F3 browser boundary;
   it still does not broaden backend-only source/image scans.
-- The F7 decision and file disposition are recorded in
-  [the Batch 0 source inventory](../reports/2026-09-14-f7-batch0-web-source-migration-inventory.md).
+- The active order is recorded in the
+  [backend ecommerce roadmap correction](../reports/2026-09-14-backend-ecommerce-roadmap-correction.md).
+  The [F7 Batch 0 source inventory](../reports/2026-09-14-f7-batch0-web-source-migration-inventory.md)
+  is retained only as historical discovery evidence for later admin integration.

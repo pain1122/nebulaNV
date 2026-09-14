@@ -109,7 +109,7 @@ The guiding rule is: **storage holds bytes, media-service enforces access, worke
 
 ---
 
-## Roadmap (demo-first rebaseline)
+## Roadmap (backend-ecommerce-first rebaseline)
 
 The detailed source of truth is [`TODO-ALTERNATIVE.md`](TODO-ALTERNATIVE.md).
 The active execution checklist is [`docs/current-focus.md`](docs/current-focus.md).
@@ -118,15 +118,16 @@ The active execution checklist is [`docs/current-focus.md`](docs/current-focus.m
 | --- | --- | --- |
 | Complete | F0-F3 | Preserve media/security/quality foundations and the gateway |
 | Paused after R5 | F4 | Preserve dormant authority/Realm Auth/V3 work; resume after F9 |
-| 1 | F7 | Split and stabilize admin/storefront applications |
-| 2 | D1-D4 | Deliver the working default-site web commerce demo |
-| 3 | M2 | Add CMS, composition, and content |
-| 4 | F5 | Add bounded media processing and delivery |
-| 5 | M5 | Deliver a web-first 3D showroom with bounded jobs |
-| 6 | M3S | Add demonstrated advanced media and storage compatibility only |
-| 7 | F8 | Add the default-site mobile foundation and showroom renderer |
-| 8 | F6 | Generalize a small module/capability boundary from proven consumers |
-| 9 | D5 | Complete mobile commerce |
+| 1 | D1 | Complete and harden the Product/catalog backend |
+| 2 | D2 | Complete cart, idempotent demo checkout, and Order backend |
+| B0 | Backend release | Prove ecommerce through gateway APIs without a frontend |
+| 3 | F7, D3 | When supplied, integrate the Vite admin and prove operator workflows |
+| Non-gating after B0 | D4 | Build a storefront only from concrete client requirements |
+| 5 | M2 | Add CMS, composition, and content |
+| 6 | F5 | Add bounded media processing and delivery; file-manager work starts here |
+| 7 | M5 | Deliver a bounded 3D showroom with proven jobs |
+| 8 | M3S | Add demonstrated advanced media and storage compatibility only |
+| 9 | F8, F6, D5 | Add mobile commerce and evidence-backed module compatibility |
 | 10 | AI0, M7 | Add evaluated default-site AI/RAG and analytics |
 | 11 | F9 | Prove the primary cloud and actual storage topology |
 | 12 | F4 | Resume at R6.1 and complete tenant/realm isolation |
