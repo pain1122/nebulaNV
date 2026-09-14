@@ -1,8 +1,11 @@
 # Web And Admin Apps
 
-Last reviewed: 2026-08-22
+Last reviewed: 2026-09-14
 
-The public web app consumes backend APIs and renders SEO-facing pages. The admin panel target is a separate Vite React SPA for app-like admin workflows.
+The public web app consumes backend APIs and renders SEO-facing pages. F7 uses
+separate Next.js applications for the public storefront and administration
+workflows. The existing Next.js admin/session mechanism is retained because the
+F7 source inventory found no framework defect that justifies a Vite conversion.
 
 ## Boundary Rule
 
@@ -106,14 +109,21 @@ Public website direction:
 
 Admin panel direction:
 
-- Vite React SPA is the preferred admin panel direction because the admin is interactive, authenticated, and does not need public SEO.
+- Next.js remains the F7 admin framework so the working same-origin BFF,
+  refresh-cookie behavior, route code, and focused tests can move without a
+  second framework migration.
+- A later Vite conversion is optional and requires measured runtime or
+  maintenance evidence plus a concrete same-origin proxy/session deployment
+  contract.
 - The reusable media filemanager should live in the admin app and call gateway
   media lane routes, not a direct media-service or raw S3/Supabase control API.
 
 Current delivery status:
 
-- Admin-panel implementation is postponed until the Vite-based admin project/template is ready.
+- F7 Batch 0 selected a staged source extraction into named Next.js admin and
+  storefront applications; the production build baseline remains to be run.
 - Current `apps/web` remains a compatibility implementation, not the final
   admin deliverable. Its focused contract tests gate the F3 browser boundary;
   it still does not broaden backend-only source/image scans.
-- F7 owns the decision to reuse, migrate, or replace current `apps/web`, separately from the future public Next.js storefront.
+- The F7 decision and file disposition are recorded in
+  [the Batch 0 source inventory](../reports/2026-09-14-f7-batch0-web-source-migration-inventory.md).

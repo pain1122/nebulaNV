@@ -109,22 +109,31 @@ The guiding rule is: **storage holds bytes, media-service enforces access, worke
 
 ---
 
-## 🏗 Roadmap (v2.4)
+## Roadmap (demo-first rebaseline)
 
-| Phase | Status | Key Focus |
-|--------|---------|------------|
-| **1 – Foundation & Infrastructure** | ✅ Done | Monorepo, Docker, CI/CD, shared packages |
-| **2 – Core Services (MVP)** | ✅ Done | Auth, User, Product, Order, Blog, Media |
-| **3 – Frontend MVP + Media System** | 🔄 In Progress | Admin panel, storefront, media manager |
-| **4 – State-Service + Multi-DB + Polyglot** | ⏳ Planned | Redis cluster, Go state-service, multi-DB setup |
-| **5 – Web Application Launch** | ⏳ Planned | Next.js full app with SEO, SSR, dashboard |
-| **6 – Product Feature Expansion** | ⏳ Planned | Variants, filters, FTS search, discounts, invoices |
-| **7 – VR Showroom & 3D Support** | ⏳ Planned | React Three Fiber, WebXR, Rust 3D engine |
-| **8 – Mobile Applications** | ⏳ Planned | React Native/Flutter, offline mode, notifications |
-| **9 – Event-Driven Refactor** | ⏳ Planned | Kafka/NATS backbone, observability dashboards |
-| **10 – Multi-Tenant Conversion** | ⏳ Planned | Tenant IDs, isolated schemas, subdomain routing |
-| **11 – AI & Polyglot Expansion** | ⏳ Planned | AI recommender, Python analytics, Go search |
-| **12 – Security & Compliance** | ⏳ Planned | Vault, GDPR, zero-trust network, Snyk CI |
+The detailed source of truth is [`TODO-ALTERNATIVE.md`](TODO-ALTERNATIVE.md).
+The active execution checklist is [`docs/current-focus.md`](docs/current-focus.md).
+
+| Order | Phase | Current intent |
+| --- | --- | --- |
+| Complete | F0-F3 | Preserve media/security/quality foundations and the gateway |
+| Paused after R5 | F4 | Preserve dormant authority/Realm Auth/V3 work; resume after F9 |
+| 1 | F7 | Split and stabilize admin/storefront applications |
+| 2 | D1-D4 | Deliver the working default-site web commerce demo |
+| 3 | M2 | Add CMS, composition, and content |
+| 4 | F5 | Add bounded media processing and delivery |
+| 5 | M5 | Deliver a web-first 3D showroom with bounded jobs |
+| 6 | M3S | Add demonstrated advanced media and storage compatibility only |
+| 7 | F8 | Add the default-site mobile foundation and showroom renderer |
+| 8 | F6 | Generalize a small module/capability boundary from proven consumers |
+| 9 | D5 | Complete mobile commerce |
+| 10 | AI0, M7 | Add evaluated default-site AI/RAG and analytics |
+| 11 | F9 | Prove the primary cloud and actual storage topology |
+| 12 | F4 | Resume at R6.1 and complete tenant/realm isolation |
+
+M3S keeps media-service as policy authority and MinIO as local storage. It uses
+only required S3-compatible operations until F9 selects and proves the primary
+cloud. General M6 infrastructure and commercial SaaS expansion remain deferred.
 
 ---
 

@@ -70,6 +70,11 @@ For most backend tasks, read in this order:
 
 ## Reports
 
+- [2026-09-14 F7 Batch 0 Web Source And Migration Inventory](reports/2026-09-14-f7-batch0-web-source-migration-inventory.md)
+- [2026-09-14 Demo-First Roadmap Rebaseline](reports/2026-09-14-demo-first-roadmap-rebaseline.md)
+- [2026-09-14 F4 Paused Execution Checklist](reports/2026-09-14-f4-paused-execution-checklist.md)
+- [2026-09-12 F4 Implementation Depth Audit](reports/2026-09-12-f4-implementation-depth-audit.md)
+- [2026-09-01 F4 Batch 3R Execution Checklist](reports/2026-09-01-f4-batch3r-execution-checklist.md)
 - [2026-08-31 F4 Identity-Realm Rebaseline](reports/2026-08-31-f4-identity-realm-rebaseline.md)
 - [2026-08-26 F4 Batch 3 Execution Checklist](reports/2026-08-26-f4-batch3-execution-checklist.md)
 - [2026-08-26 F4 Batch 2 Exit Proof](reports/2026-08-26-f4-batch2-exit-proof.md)

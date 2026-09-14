@@ -117,7 +117,16 @@ operation, remains disabled until its isolation work is complete.
 - Docker/Compose/release image map: `docs/docker-configs.md`.
 - Shared package notes: `docs/packages/*.md`.
 - Current focus file: `docs/current-focus.md`.
-- Current F4 audit: `docs/reports/2026-08-24-f4-authority-audit.md`.
+- Current roadmap rebaseline:
+  `docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md`.
+- Current F7 source/migration inventory:
+  `docs/reports/2026-09-14-f7-batch0-web-source-migration-inventory.md`.
+- Current F4 depth audit:
+  `docs/reports/2026-09-12-f4-implementation-depth-audit.md`.
+- Archived paused F4 checklist:
+  `docs/reports/2026-09-14-f4-paused-execution-checklist.md`.
+- Original F4 authority audit:
+  `docs/reports/2026-08-24-f4-authority-audit.md`.
 - Completed F4 Batch 2 evidence:
   `docs/reports/2026-08-26-f4-batch2-exit-proof.md`.
 - Historical/default-realm F4 Batch 3 item log:
@@ -133,117 +142,35 @@ operation, remains disabled until its isolation work is complete.
 ### Active Milestone
 
 - F3 External API Gateway is complete as of 2026-08-24.
-- F4 Tenant, Site, Channel, Application, And Identity-Realm Authority is active.
-- F4 Batch 1's tenant/site/application/membership architecture and Batch 2
-  implementation evidence remain preserved, but its platform-global
-  identity/session clauses were superseded on 2026-08-31 by ADR-0014 after the
-  product requirement was clarified as upper-enterprise customer-root identity
-  isolation. Batch 1R closed on 2026-08-31 through ADR-0015 and the adversarial
-  rebaseline report. Batch 3R R0 completed on 2026-09-01 with current-source
-  documentation checks and both clean disposable Tenant Authority/role-seed
-  verifiers; it changed no schema, runtime, data, deployment, or traffic. R1
-  completed on 2026-09-05: Tenant Authority now persists the frozen inactive
-  default/operator realms and local providers, four draft application
-  policies, and five pending trusts from one reviewed manifest. Its schema,
-  create-only development seed, audit/outbox evidence, clean migration/rerun,
-  preserved role-seed regression, and no-runtime-consumer boundary passed both
-  completion passes. R1 changes no traffic and adds no Auth/session/provider-
-  secret runtime. R2 completed on 2026-09-08: nullable default-realm actor pairs
-  and v2 evidence preserve legacy readers, IDs, epochs, `meg1_`, grants, and v1
-  history. Four populated upgrades, two atomic rollback cases, earlier seed
-  regressions, all eight service migration checks, 17 Authority suites
-  (79 tests), 50 tooling tests, lint/types, and affected Prisma checks passed.
-  Salar confirmed zero remaining verification databases. Both completion passes
-  and the corrected pair-check/v1-return defects are in the R2 section of the
-  Batch 3R execution report. `R3_REALM_AUTH_SHADOW` has an entry evidence ledger
-  in that report. The legacy-family source gap is corrected with issued-version
-  metadata and an atomic, non-mutating migration evidence reader. A shared Realm
-  Auth service now has the durable shadow aggregate migration, fixed default and
-  operator deployment tuples, separate DB roles/Redis placement, database-level
-  session/generation denial in shadow, and an idempotent boundary/key-reference
-  seed. The clean dual-store verifier and operator maintenance-backup coverage
-  are implemented, and Salar's clean dual-store run passed on 2026-09-09. The
-  bounded encrypted User/Auth exports, atomic default-realm importer, exact
-  `lsb1_` derivation, and non-issuing login comparator are implemented in source;
-  their first populated end-to-end verifier passed on 2026-09-09. Completion
-  review added exact copied-graph rerun checks and controlled evidence-retaining
-  shadow rollback; the expanded adversarial/stateful run passed. The second
-  review added bounded retry for the exact Prisma serialization conflict and a
-  simultaneous-import proof; its stateful rerun passed. The updated foundation,
-  Authority, role-seed, R2, all-service migration, and zero-residue regressions
-  then passed, closing R3 on 2026-09-09. Current User/Auth stays authoritative.
-  R4_ADMIN_SPLIT_STAGED completed on 2026-09-12: the isolated operator store
-  now supports one fixed provisioning subject and offline bcrypt recovery
-  credential with exact rerun/no-use rollback checks, and Tenant Authority
-  permits one active grant per exact `(membershipEpochId, role)`. Its clean
-  verifier proved wrong-password and duplicate-role denial, distinct-role
-  coexistence, unchanged customer authority, zero operator sessions/grants,
-  and zero disposable database residue. R5_V3_RECEIVERS_DORMANT completed on
-  2026-09-12 with an exact v3 carrier, 56 separate receiver paths, frozen
-  legacy-proto parity, strict routing/no-propagation, and no active writer or
-  new session. R6.1_DEFAULT_AUTH_SESSION is next.
-  ADR-0015 R0-R11 must execute in order. Do not resume former Batch 3 item 5 or skip
-  to a context writer. The selected target is one or more
-  isolated identity realms per licensed root, a separate NebulaNV platform-
-  operator realm, explicit default-deny subordinate application trust, prompt-
-  free but audience-bound root SSO, optional subordinate/BYO realms, realm-
-  qualified subjects, and no cross-license trust in F4. The legacy customer
-  root UUID remains `TENANT_ADMIN` plus explicit `PARENT_MANAGER`; a distinct
-  operator-realm subject receives `PLATFORM_ADMIN`. Legacy sessions get only a
-  one-use upgrade into the verified presenting compatible default application.
-  R1 seeds all default/operator realm, local-provider, policy, and trust records
-  as non-admitting. Its production-refusing bootstrap seed must conflict rather
-  than reset an evolved lifecycle/outbox state; R6 and later clean verifiers
-  must version their expected post-activation state. R6 activates only the four
-  default-application local-trust cohort; R4 stages no operator session, and R8
-  alone activates the exact admin-web operator trust/session before the
-  transactional grant swap.
-- Batch 3 items 1 through 4 remain valid default-realm compatibility evidence.
-  The general User seed creates only the bounded legacy root-admin/admin/user
-  fixtures; a dedicated item-3 User seed creates
-  the default-realm-migration-source editor identity after the original legacy
-  snapshot is backfilled. The guarded `db:verify:f4-batch3-role-seeds` command proves the
-  complete current-source order and adversarial reruns from clean disposable
-  User and Authority databases, while `db:verify:tenant-authority` rechecks the
-  earlier migration/seed evidence. Item 4 adds the internal typed actor/
-  target/path resolver and the minimum strict context-v2
-  `RESOLUTION/AUTHORITY` receiver prerequisite: live Auth user/session must
-  match, undeclared routes reject v2, and resolution context cannot propagate.
-  It adds no v2 writer, `AUTHORIZED` context, domain consumer, cache, or traffic
-  cutover. Clean disposable evidence resolves every seeded exact role and
-  denies a missing membership. Batch 3 item 5 authority invalidation/refresh is
-  documented but paused; its evidence ledger confirms the scoped revision/
-  outbox mechanism is selected instead of globally bumping Auth sessions.
-  Implementation remains
-  paused until ADR-0015 R11; its earlier Redis Pub/Sub versus Streams choice is
-  not the next decision because the preceding realm/Auth/context gates now own
-  the dependency. ADR-0015 assigns separate durable credential/session
-  generations, a terminal legacy-session bridge, receiver-before-`sr2_`
-  ordering, and drain/revoke-only rollback. It also replaces the split gateway
-  login with one Realm Auth-owned atomic `Login`; one-use grants are only for
-  root-application SSO through the digest-only, PKCE-bound `rsg1_`, and legacy
-  upgrade uses only its durable bridge. The current implementation has
-  hashed refresh tokens, atomic refresh rotation/replay containment,
-  current/all-session logout, and live token-version/session checks. It lacks
-  realm/issuer/audience/application binding, a durable active-session ledger,
-  selected-other-session revocation, and password-change session invalidation.
-  Password change currently updates only User's hash and is a confirmed defect
-  under the new contract. Item 6 freshness/cache/outage semantics must remain
-  separately testable after the realm mechanism is frozen. The dedicated
-  tenant-authority runtime,
-  persistence/read/mutation foundations, deterministic non-production seed,
-  recovery proof, and healthy rebuilt container are verified. The static F3
-  gateway registry remains traffic authority until the ordered Batch 4 adapter
-  cutover.
-- F3's gateway registry and signed tenant/site/application context are a
-  validated single-site bridge, not persistent multi-tenant authority.
-- Do not edit F6-F9, D4-D5/P1, M6-M7, or deferred SaaS roadmap scope for the
-  realm design without Salar's consultation. The known required proposals are
-  F6 premium/target intersection, F7/F8 SSO clients, F9 physical realm HA and
-  capacity/failover proof, D4/D5/P1 cross-subordinate product proof, and realm-
-  qualified future event/analytics actors. F3 remains frozen; its gateway,
-  registry seam, S2S, typed clients, and independent domain checks are
-  preserved.
+- F4 is paused after the audited R0-R5 checkpoint at commit `3285c00`.
+  Tenant Authority persistence, Realm Auth shadow/staged records, default-actor
+  backfills, and 56 context-v3 receivers are preserved, but current Auth/User,
+  the static gateway registry, and context v1/v2 remain the active path.
+- F4 R6.1 onward, gateway Authority cutover, domain tenant/site migration,
+  subordinate SSO, second-root isolation, invalidation, and final isolation
+  evidence remain implementation gaps. Resume only at R6.1 after F9; do not
+  activate a later F4 gate out of order.
+- The F4 state is recorded in
+  `docs/reports/2026-09-12-f4-implementation-depth-audit.md` and the archived
+  `docs/reports/2026-09-14-f4-paused-execution-checklist.md`.
+- F7 Web And Admin Foundation is the active phase. Batch 0 selected separate
+  Next.js admin and storefront applications after inventorying the combined
+  `apps/web`; current tests, type check, lint, and the user-run production build
+  pass. Batch 1 owns the named application extraction.
+- The adopted sequence is
+  `F7 -> D1-D4 -> M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`.
+  General M6 remains deferred.
+- Every phase before resumed F4 is explicit default-site/single-realm
+  compatibility work. It must preserve gateway/service ownership and accept no
+  public tenant/site override, but it cannot claim multi-tenant isolation.
+- M3S storage is a compatibility feature before F9. Media-service remains the
+  policy authority, MinIO remains local storage, and only demonstrated
+  S3-compatible operations/provider-neutral tests may be added. F9 selects and
+  proves primary-cloud bucket/KMS/lifecycle/migration structure from measured
+  product evidence.
+- Untracked R6.1 Realm Auth experiment files remain outside the committed
+  baseline. Do not edit, import, test, delete, or move them during F7 without a
+  separate user decision.
 
 ## 5. How To Load Context For A Task
 

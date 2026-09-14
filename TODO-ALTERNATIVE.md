@@ -1,7 +1,8 @@
 # TODO Alternative: NebulaNV Product And AI Roadmap
 
-Status: adopted after F3 closure on 2026-08-24. `TODO.md` remains the original
-roadmap and safe comparison; this file owns the selected future phase order.
+Status: adopted after F3 closure on 2026-08-24 and rebaselined to the
+demo-first order on 2026-09-14. `TODO.md` remains the original roadmap and safe
+comparison; this file owns the selected future phase order.
 
 Created: 2026-08-22
 
@@ -11,17 +12,18 @@ Build one complete, demonstrable NebulaNV product before expanding into the
 selected content, media, worker, 3D, and AI capabilities that strengthen its
 portfolio and product story.
 
-This alternative preserves all nine platform-foundation phases and the full
-commerce demo. It changes the growth path after the commerce gate:
+The 2026-09-14 rebaseline prioritizes a usable product before completing the
+remaining speculative platform foundation. It preserves completed F4 R0-R5 as
+a dormant checkpoint, builds the web commerce demonstration against the
+existing default-realm/single-site boundary, and returns to the remaining
+tenant implementation after cloud deployment has supplied concrete operational
+requirements.
 
-- add a product-grade Agentic AI and RAG foundation;
-- retain M2 Blog, CMS, And Composition;
-- narrow M3 to advanced media needed by protected delivery, AI, and 3D;
-- move M6 State, Search, Events, And Workers before M5;
-- retain M5 3D Showroom and M7 AI And Analytics;
-- defer M1 Commerce Expansion, M4 Streaming And Realtime, M8 Extended Mobile,
-  and the non-selected parts of M3;
-- keep full commercial SaaS productization outside this active roadmap.
+The selected growth path retains M2 Blog, CMS, And Composition; narrows M3 to
+M3S compatibility and demonstrated advanced-media needs; gives M5 only the
+bounded processing/jobs it actually needs; and defers the generalized M6 State,
+Search, Events, And Workers platform. M1, M4, M8, the non-selected parts of M3,
+and full commercial SaaS productization also remain deferred.
 
 The repository-aware engineering agent is a separate, non-gating track. It may
 start before the product AI phase, but it is not tenant-facing product AI and
@@ -34,21 +36,20 @@ The active roadmap ends with a product that can demonstrate all of the
 following coherently:
 
 ```text
-verified tenant/site/app identity
--> gateway-only external access
--> admin, storefront, and mobile commerce flow
+gateway-only external access
+-> working admin and storefront commerce flow in explicit single-site mode
 -> governed media and content lifecycle
--> tenant-isolated retrieval and permission-checked agent tools
--> reliable search/event/worker infrastructure
--> entitled 3D showroom on web and mobile with safe fallback
--> tenant-scoped analytics and evaluated AI capabilities
--> reproducible cloud/Kubernetes deployment and recovery evidence
+-> bounded web showroom and storage-compatible advanced media
+-> mobile commerce flow and evidence-backed module boundary
+-> permission-checked AI/RAG and evaluated analytics in default-site mode
+-> reproducible cloud deployment and recovery evidence
+-> completed tenant/realm isolation and multi-tenant migration evidence
 ```
 
-The result is a portfolio-grade, production-shaped platform. It is not a claim
-of production payment processing, streaming, full offline mobile behavior, or
-commercial multi-tenant SaaS operations unless those deferred tracks are later
-completed and proven.
+The intermediate demo releases are portfolio-grade single-site products. They
+are not claims of tenant isolation, production payment processing, streaming,
+full offline mobile behavior, or commercial SaaS operations. The multi-tenant
+claim becomes available only after resumed F4 exits.
 
 ## Roadmap Authority And Evidence Rules
 
@@ -102,11 +103,13 @@ AI/cloud guidance to recheck when the applicable phase starts:
 - Internal service calls require verified S2S identity.
 - Raw actor, role, tenant, site, channel, app, service, entitlement, or model
   metadata is never trusted identity or authority.
-- Every applicable row, cache key, object key, job, event, search document,
-  vector record, AI trace, and audit record carries authoritative tenant/site
-  scope.
-- Tenant/site and document authorization is applied before retrieval; filtering
-  an already mixed result set is not an isolation boundary.
+- Before resumed F4, every new record keeps a stable service owner and any
+  current default-site compatibility reference the implemented workflow needs.
+  F4 inventories, backfills, and enforces authoritative tenant/site scope before
+  multi-tenant activation.
+- Current actor/application and document authorization is applied before
+  retrieval. After F4, tenant/site authorization is also applied before results
+  can mix; filtering an already mixed result set is never an isolation boundary.
 - Each service owns its database and domain. AI, analytics, search, and workers
   do not become shadow transactional authorities.
 - Cross-service access uses versioned HTTP/gRPC contracts or explicitly
@@ -118,11 +121,13 @@ AI/cloud guidance to recheck when the applicable phase starts:
 - Retrieved content, user prompts, model output, tool output, and stored logs
   are all untrusted input at their next boundary.
 - AI-generated output cannot directly authorize an action. Tools independently
-  enforce the verified actor, tenant/site, entitlement, resource, and operation.
+  enforce the currently verified actor/application, capability, resource, and
+  operation, plus tenant/site/entitlement after those authorities are active.
 - Consequential writes require explicit product policy, idempotency, audit, and
   human confirmation unless a separately reviewed contract proves otherwise.
-- Premium implementations remain separate modules/services/workers; core
-  schemas contain contracts and integration hooks, not premium fields.
+- Optional heavy implementations remain separable where an implemented failure,
+  deployment, or dependency boundary justifies it; core schemas do not absorb
+  unrelated premium implementation fields.
 - No arbitrary runtime plugin loading, arbitrary agent shell/database access,
   or customer-controlled executable code.
 - Every migration, deployment, contract change, model/index change, agent tool
@@ -132,17 +137,24 @@ AI/cloud guidance to recheck when the applicable phase starts:
 
 ## Explicit Scope Decisions
 
+Decision record:
+[2026-09-14 Demo-First Roadmap Rebaseline](docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md).
+
 Committed active path:
 
 1. Preserve completed F0-F3 and their regression gates.
-2. Complete F4-F9 and the Foundation Definition Of Done.
-3. Complete D1-D5 and the Commerce Demo Exit Gate.
-4. Complete AI0 Agentic AI And RAG Foundation.
-5. Complete M2 Blog, CMS, And Composition.
-6. Complete the selected M3 Advanced Media scope.
-7. Complete M6 State, Search, Events, And Workers.
-8. Complete M5 3D Showroom.
-9. Complete M7 AI And Analytics and the final representation gate.
+2. Preserve completed F4 R0-R5 and pause F4 at the audited dormant boundary.
+3. Execute `F7 -> D1 -> D2 -> D3 -> D4` and close the working web commerce
+   demo checkpoint.
+4. Execute `M2 -> F5 -> M5 -> M3S` with only consumer-driven media, storage,
+   and worker compatibility.
+5. Execute `F8 -> F6 -> D5` and close the full commerce portfolio release.
+6. Execute `AI0 -> M7` against the proven default-site product without making
+   a tenant-isolation claim.
+7. Execute F9 cloud and operations work from the actual application/runtime
+   shape, then revisit M3S provider policy from that cloud evidence.
+8. Resume F4 at R6.1 and complete the remaining realm, tenant, domain-scope,
+   migration, and isolation gates.
 
 Deferred, not deleted:
 
@@ -153,26 +165,35 @@ Deferred, not deleted:
 - M4 streaming, transcoding, realtime presence/messaging, and classroom model;
 - M8 broad offline, push, deep-link, and store-automation expansion beyond the
   F8/D5/M5 mobile contract;
+- M6 generalized state, search, event, and worker infrastructure until multiple
+  completed consumers prove a shared platform is smaller than bounded local
+  implementations;
 - S1-S5 commercial plans, reseller productization, white-label delivery,
   licensed-module operations at scale, and compliance-scale operations.
 
 ### Original Roadmap Disposition
 
-| Original scope | Alternative disposition                                                         |
-| -------------- | ------------------------------------------------------------------------------- |
-| F0-F2          | Completed mechanisms preserved; regression gates remain active                  |
-| F3             | Complete; exit proof preserved and regression gates remain active               |
-| F4-F9          | Retained as mandatory foundation phases with clarified AI/3D/cloud dependencies |
-| D1-D5          | Retained in order; Commerce Demo Exit Gate becomes Release P1                   |
-| M1             | Deferred until real merchant/payment scope exists                               |
-| M2             | Retained immediately after AI0                                                  |
-| M3             | Narrowed to M3S; selected preview/bundle/provider/audit/CDN work retained       |
-| M4             | Deferred in full                                                                |
-| M5             | Retained after M6 supplies the worker/search/event substrate                    |
-| M6             | Retained and moved before M5                                                    |
-| M7             | Retained as the final active growth phase                                       |
-| M8             | Deferred; required F8/D5 mobile core and M5 mobile 3D remain committed          |
-| S1-S5          | Deferred while F4/F6/F9 remain productization-ready                             |
+| Original scope | Alternative disposition                                                      |
+| -------------- | ---------------------------------------------------------------------------- |
+| F0-F2          | Completed mechanisms preserved; regression gates remain active               |
+| F3             | Complete; exit proof preserved and regression gates remain active            |
+| F4             | R0-R5 preserved; R6.1 onward resumes after F9                                |
+| F5             | Retained after M2 with current-provider compatibility and bounded media jobs |
+| F6             | Moved after F8 so the module contract follows proven web/mobile consumers    |
+| F7             | Next active phase; establishes the admin/storefront product shells           |
+| F8             | Moved after the web showroom/media sequence and before F6/D5                 |
+| F9             | Moved before resumed F4; supplies actual cloud/storage operating evidence    |
+| D1-D4          | Moved immediately after F7; closes a working web commerce demo checkpoint    |
+| D5             | Retained after F8/F6; closes the full commerce portfolio release             |
+| M1             | Deferred until real merchant/payment scope exists                            |
+| M2             | Moved after the working web commerce checkpoint                              |
+| M3             | Narrowed to M3S; storage remains a compatibility feature until cloud proof   |
+| M4             | Deferred in full                                                             |
+| M5             | Retained as a bounded web-first showroom using only proven processing needs  |
+| M6             | General platform deferred; owning phases may add bounded local jobs/adapters |
+| M7             | Retained after AI0, before cloud and resumed tenant implementation           |
+| M8             | Deferred; required F8/D5 mobile core and M5 mobile 3D remain committed       |
+| S1-S5          | Deferred while F4/F6/F9 remain productization-ready                          |
 
 ## Dependency And Release Map
 
@@ -181,58 +202,97 @@ EA0 Repository Agent Lab (parallel, read-only first, non-gating)
 
 F0-F2 complete
 -> F3 gateway
--> F4 tenant/site/channel/app and licensed-root identity-realm authority
--> F5 media lifecycle/CDN
--> F6 modules/entitlements
+-> F4 R0-R5 dormant checkpoint (complete and audited)
 -> F7 web/admin shells
--> F8 mobile foundation
--> F9 cloud/Kubernetes operations
--> Foundation Definition Of Done
--> D1-D5 commerce vertical
--> Commerce Demo Exit Gate / Release P1
--> AI0 product AI/RAG foundation
+-> D1-D4 web commerce vertical
+-> Working Web Commerce Demo / Release P0
 -> M2 content/composition
--> selected M3 advanced media
--> M6 state/search/events/workers
--> M5 3D showroom
--> M7 AI/analytics
--> Representation Release P2
+-> F5 bounded media lifecycle/CDN
+-> M5 bounded web-first 3D showroom
+-> M3S media/storage compatibility
+-> F8 mobile foundation
+-> F6 evidence-backed modules/entitlements
+-> D5 mobile commerce
+-> Commerce Portfolio Release P1
+-> AI0 product AI/RAG foundation
+-> M7 evaluated AI/analytics
+-> F9 cloud/Kubernetes operations and primary-provider proof
+-> resume F4 at R6.1 and complete tenant/realm isolation
+-> Multi-Tenant Foundation Release P2
 ```
 
 Release definitions:
 
-- **P0 Foundation:** F0-F9 pass, but no claim of a complete end-user product.
-- **P1 Commerce Portfolio Product:** D1-D5 and the commerce exit gate pass. It
-  uses demo checkout without real payment collection.
-- **P2 AI And Showroom Product:** AI0, M2, selected M3, M6, M5, and M7 pass on
-  top of P1, including web/mobile 3D and evaluated tenant-scoped AI.
+- **P0 Working Web Commerce Demo:** F7 and D1-D4 pass against the preserved F3
+  gateway and current default-realm/single-site backend. Checkout remains a
+  clearly labeled demo without real payment collection.
+- **P1 Commerce Portfolio Product:** M2, F5, M5, M3S, F8, F6, and D5 pass on top
+  of P0. It includes content, governed media, a bounded showroom, and mobile,
+  but still makes no multi-tenant claim.
+- **P2 Multi-Tenant Foundation:** AI0, M7, F9, and the resumed F4 exit pass.
+  Only this release may claim tenant/realm isolation. General M6 and commercial
+  SaaS breadth remain separate future work.
+
+The phase specifications below are physically arranged in execution order.
+Completed checkpoints appear first, the active demo-first sequence follows, and
+parallel or deferred work is kept after the active sequence.
 
 ## Phase Entry Gates
 
-| Phase | May start implementation when                                           | Unlocks                                  |
-| ----- | ----------------------------------------------------------------------- | ---------------------------------------- |
-| EA0   | Any timeboxed window that does not delay the active product phase       | Internal retrieval/agent learning only   |
-| F3    | F2 remains green                                                        | One controlled external boundary         |
-| F4    | F3 exit gate passes                                                     | Authoritative tenant/site/app scope      |
-| F5    | F4 context and storage-key ownership are frozen                         | Governed automatic media lifecycle       |
-| F6    | F4 entitlement ownership and F5 media/module needs are known            | Independent feature-module pattern       |
-| F7    | F3 client, F4 context, F5 media, and F6 capability contracts are stable | Admin/storefront shells                  |
-| F8    | F3 client plus F4/F6 application/capability contracts are stable        | Site-bound mobile core                   |
-| F9    | Runtime/module/frontend/mobile shapes are stable enough to deploy       | Production-shaped foundation gate        |
-| D1    | Foundation Definition Of Done passes                                    | Authoritative demo catalog               |
-| D2    | D1 product invariants are stable                                        | Demo cart/order flow                     |
-| D3-D5 | Required D1/D2 operations and F7/F8 shells exist                        | P1 end-to-end clients                    |
-| AI0   | P1 commerce gate and F4/F9 isolation/operations pass                    | Product RAG and bounded read-only agency |
-| M2    | AI0 source/revision/ACL hooks and P1 content consumers are defined      | Governed CMS/composition corpus          |
-| M3S   | F5 is stable and M2/M5 asset needs are explicit                         | Advanced governed assets/bundles         |
-| M6    | Media, CMS, and AI provide concrete consumers                           | General events/search/workers            |
-| M5    | M3S assets, M6 workers, F6 modules, and F8 clients pass                 | Web/mobile showroom                      |
-| M7    | AI0 plus M2/M3S/M6/M5 data and failure contracts are proven             | Evaluated analytics/intelligence         |
+| Phase | May start implementation when                                            | Unlocks                                    |
+| ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
+| EA0   | Any timeboxed window that does not delay the active product phase        | Internal retrieval/agent learning only     |
+| F3    | F2 remains green                                                         | One controlled external boundary           |
+| F4    | F9 and all earlier active phases pass; resume from audited R5 checkpoint | Tenant/realm isolation and scoped domains  |
+| F5    | M2 supplies concrete media consumers; current media policy remains green | Governed bounded media lifecycle           |
+| F6    | F8 and M5 expose concrete capability/module needs                        | Evidence-backed independent module pattern |
+| F7    | F3 gateway/client contracts remain green                                 | Independent admin/storefront shells        |
+| F8    | M3S and M5 define proven media/showroom needs                            | Default-site mobile core                   |
+| F9    | Web/mobile/media/AI runtime shapes are implemented and measurable        | Primary-cloud operating evidence           |
+| D1    | F7 shells and current single-site gateway contracts pass                 | Default-site demo catalog                  |
+| D2    | D1 product invariants are stable                                         | Demo cart/order flow                       |
+| D3-D4 | D1/D2 operations and F7 shells exist                                     | P0 working web commerce demo               |
+| M2    | P0 supplies real admin/storefront content consumers                      | Governed CMS/composition corpus            |
+| M5    | F5 baseline assets and the storefront/admin consumers pass               | Bounded web-first showroom                 |
+| M3S   | F5 and M5 reveal exact compatibility needs                               | Portable media/storage seams               |
+| D5    | F8, F6, and D1/D2 contracts pass                                         | P1 mobile commerce                         |
+| AI0   | P1 is stable and default-site authorization is explicit                  | Bounded product RAG and read-only agency   |
+| M7    | AI0 plus implemented product/content/showroom data is available          | Evaluated default-site intelligence        |
+| M6    | Deferred until multiple measured consumers justify a shared platform     | Future generalized infrastructure          |
 
 Architecture/discovery spikes may occur before an entry gate only when they are
 timeboxed, non-production, and needed to remove a decision blocker. A spike may
 not silently create public contracts, migrations, shadow data authority, or a
 second runtime pattern that the owning phase must later inherit.
+
+## Demo-First Compatibility Contract
+
+Until resumed F4 exits, every active phase operates in the existing
+default-realm/single-site mode:
+
+- The configured default tenant/site/application values are compatibility
+  context. They do not prove general tenant isolation.
+- New product work uses service-owned records and versioned gateway contracts.
+  It does not activate dormant Realm Auth, context v3, Tenant Authority reads,
+  or a second tenant as a side effect.
+- Add a future-scope field only when the current feature needs it or an existing
+  verified contract already requires it. Do not build speculative tenant,
+  provider, event, worker, or storage structures merely to anticipate F4/F9.
+- Keep stable identifiers and migration inventories so resumed F4 can backfill
+  and enforce authoritative scope without rewriting product behavior.
+- Every pre-F4 release and runbook must identify itself as
+  default-site/single-realm. Cross-tenant and cross-license guarantees remain
+  unavailable until F4 exits.
+- Owning phases may implement a bounded queue, polling loop, index, or cache for
+  a concrete consumer. They must not present it as the generalized M6 platform.
+
+For storage specifically, M3S is a compatibility feature before F9. Media
+service remains the policy authority; MinIO remains the local byte store; code
+uses the narrow S3-compatible operations the current workflows require. M3S
+does not choose a permanent provider topology, multi-cloud abstraction,
+bucket/region layout, replication model, lifecycle regime, KMS design, or
+provider migration system. F9 selects and proves the primary cloud. Only then
+may an evidence-backed follow-up harden provider-specific storage structure.
 
 ## Scope Change Control
 
@@ -252,91 +312,7 @@ provider matrix, and measured CPU demand before GPU infrastructure.
 
 ---
 
-# PARALLEL ENGINEERING AI TRACK
-
-## EA0 - Repository Agent And Evaluation Lab
-
-Purpose: gain practical RAG, agent, tool-calling, and evaluation experience
-while improving navigation of NebulaNV's existing evidence. EA0 is an internal
-engineering tool, not a customer feature and not a release authority.
-
-EA0 may run in a separate timebox during later foundation work. It must not
-delay an active foundation exit gate or silently modify production behavior.
-
-### Corpus Governance
-
-- [ ] Inventory candidate sources and classify each as authoritative,
-      operational, generated, historical, superseded, or excluded.
-- [ ] Define metadata for path, heading, owner, status, effective/review date,
-      source commit/hash, domain, and supersession relationships.
-- [ ] Keep `TODO.md`, `docs/current-focus.md`, architecture documents, audits,
-      reports, generated contracts, and runtime evidence distinguishable.
-- [ ] Exclude `.env` secrets, credentials, backups, database dumps, image
-      archives, dependency caches, and unbounded raw logs.
-- [ ] Preserve source path and heading boundaries in chunks so every retrieval
-      result can be inspected in its original context.
-- [ ] Invalidate or re-index changed/deleted sources deterministically; do not
-      let an obsolete chunk survive because its filename still exists.
-- [ ] Define retention for indexed logs/test evidence separately from durable
-      architecture and contract documents.
-
-### Retrieval And Answers
-
-- [ ] Build a reproducible ingestion command that never mutates source files.
-- [ ] Store chunk/content hashes and ingestion/index versions.
-- [ ] Apply repository/workspace scope before retrieval.
-- [ ] Return file/heading citations for repository claims.
-- [ ] Prefer an explicit insufficient-evidence result over an invented answer.
-- [ ] Distinguish implementation evidence from plans and historical reports in
-      ranking and response policy.
-- [ ] Test stale/superseded-document conflicts and require the current source
-      of truth to win.
-
-### Tools And Agency
-
-- [ ] Start with read-only tools for search, file inspection, test ownership,
-      dependency maps, and bounded test-result summaries.
-- [ ] Give each tool a typed schema, exact filesystem/repository scope, timeout,
-      output limit, and redaction policy.
-- [ ] Do not expose unrestricted shell, database, cloud, GitHub, or secret-store
-      access to the model.
-- [ ] Treat retrieved documents, code comments, issues, logs, and tool output as
-      untrusted data that cannot override agent policy.
-- [ ] Require explicit human approval and a visible diff before any later
-      source-writing experiment.
-- [ ] Record model, prompt, retrieval/index, tool-contract, input-corpus, and
-      evaluation versions for every assessed run.
-
-### Evaluation And Safety
-
-- [ ] Create a versioned evaluation set covering architecture ownership,
-      current-focus status, commands, security boundaries, stale documents,
-      insufficient evidence, and conflicting sources.
-- [ ] Add retrieval relevance, citation correctness, answer correctness,
-      refusal/abstention, tool-selection, tool-argument, latency, token, and
-      cost measurements.
-- [ ] Add malicious-document and indirect-prompt-injection cases.
-- [ ] Add secret-seeking, path-escape, oversized-output, unauthorized-write,
-      and destructive-tool cases.
-- [ ] Separate deterministic assertions from model-judged scores and retain
-      human-reviewed examples for subjective quality.
-- [ ] Pin an evaluation baseline before changing prompts, chunking, embedding,
-      ranking, models, or tools.
-
-### EA0 Exit Gate
-
-- [ ] Repository answers cite inspectable sources and distinguish plans from
-      implementation.
-- [ ] Stale or superseded documents cannot silently outrank active authority.
-- [ ] The agent cannot read excluded secrets or write repository files through
-      its normal tool set.
-- [ ] Evaluation runs are reproducible enough to compare two configurations.
-- [ ] Security-denial and insufficient-evidence cases pass.
-- [ ] The lab has a concise runbook and bounded local/cloud cost report.
-
----
-
-# PLATFORM FOUNDATION
+# COMPLETED CHECKPOINTS
 
 ## F0-F2 - Preserve Completed Foundations
 
@@ -395,18 +371,1109 @@ Detailed execution and final evidence remain in `docs/current-focus.md` and
 - [x] Typed clients, OpenAPI, runtime behavior, and documentation agree.
 - [x] The complete F3 quality/live proof passes from current source.
 
+---
+
+# RELEASE P0 - WORKING WEB COMMERCE
+
+Execution order: `F7 -> D1 -> D2 -> D3 -> D4`.
+
+## F7 - Web And Admin Foundation
+
+Purpose: establish separate, tested storefront and admin applications that
+consume the proven F3 gateway contracts and can host the commerce demo before
+the remaining tenant, media, module, mobile, and cloud foundations are built.
+
+### Application Split And Shared Frontend
+
+- [ ] Freeze `apps/storefront` as the public Next.js application and retain
+      Next.js for `apps/admin` from the current working compatibility source.
+      Reconsider Vite only after measured runtime or maintenance evidence.
+- [ ] Decide through a migration inventory how current `apps/web` code is
+      reused, moved, or retired; do not maintain three accidental authorities.
+- [ ] Share only UI primitives, intent-oriented schemas, theme tokens, and the
+      external gateway client; never Prisma, internal gRPC, or service URLs.
+- [ ] Standardize authentication/refresh, the current configured application
+      context, request IDs, and error envelopes. Reserve no tenant or capability
+      behavior that the active backend cannot yet prove.
+- [ ] Define loading, empty, denied, expired, degraded, offline, and unexpected
+      failure states.
+- [ ] Establish localization, RTL, accessibility, theme-token, unit,
+      integration, and browser-e2e foundations.
+
+### Admin Shell
+
+- [ ] Implement login/logout/refresh, protected routes, and safe error
+      boundaries.
+- [ ] Add navigation from the current verified Auth role and gateway routes.
+      Keep future capability and parent-target seams non-authoritative and
+      hidden until F6 and resumed F4 implement them.
+- [ ] Build reusable list, form, filter, pagination, validation-error, and
+      optimistic-concurrency patterns.
+- [ ] Add a media picker against the current gateway/media contract without
+      exposing provider credentials or assuming the later F5 lifecycle.
+
+### Storefront Shell
+
+- [ ] Resolve the configured storefront application/origin and load the current
+      default-site theme/configuration.
+- [ ] Use the public external client for product/content data.
+- [ ] Establish SEO, canonical, robots, sitemap-input, error, and not-found
+      behavior.
+- [ ] Build the CDN media component and product list/detail skeleton.
+- [ ] Define capability-based placeholders for later CMS/AI/3D features; do not
+      ship fake implementations.
+
+### F7 Exit Gate
+
+- [ ] Admin and storefront build, test, and deploy independently.
+- [ ] Both use only gateway and approved CDN/storage data-plane URLs.
+- [ ] Neither owns backend contracts, tenant policy, Prisma, or internal service
+      addresses.
+- [ ] Authentication, configured application context, accessibility, RTL, and
+      core failure states have CI coverage.
+
+## D1 - Default-Site Commerce Domain
+
+Purpose: provide the product/catalog authority used consistently by the current
+default-site admin and storefront, then mobile, content, and later AI/3D work.
+General tenant/site persistence and isolation remain resumed F4 work.
+
+### Product Model And Lifecycle
+
+- [ ] Finalize the current default-site product model without premium
+      AI/showroom fields.
+- [ ] Support draft, active, and archived lifecycle with explicit public/admin
+      visibility rules.
+- [ ] Support title, slug, excerpt, description, SKU, price, currency, basic
+      stock, and availability with validated invariants.
+- [ ] Preserve deterministic current global slug/SKU uniqueness and record the
+      later F4 scoped-uniqueness migration requirement.
+- [ ] Support category, tag, and brand through authoritative taxonomy contracts.
+- [ ] Use validated current Media IDs for thumbnail/gallery roles, ordering, alt
+      text, and channel overrides.
+- [ ] Preserve authoritative public reads that cannot expose drafts, archived,
+      or deleted records through query flags.
+
+### Contracts And Evidence
+
+- [ ] Complete gateway/HTTP/gRPC parity for the selected product operations.
+- [ ] Keep external DTOs separate from service inputs, proto types, and Prisma.
+- [ ] Add lifecycle, taxonomy, media-reference, concurrency, actor-policy, and
+      denial tests. Record cross-site coverage as an F4 exit dependency.
+- [ ] Add deterministic seed products that exercise active/draft/archived and
+      media/taxonomy relationships.
+
+### D1 Exit Gate
+
+- [ ] Admin can manage default-site products while anonymous clients see only
+      active public records.
+- [ ] No route accepts a caller-selected tenant/site override; general
+      cross-tenant isolation remains explicitly unclaimed until F4.
+- [ ] Product core contains no showroom, recommendation, or premium-module
+      implementation fields.
+
+## D2 - Cart, Checkout, And Order
+
+Purpose: demonstrate a coherent commerce transaction without pretending to
+collect or reconcile production payment.
+
+### Cart And Checkout
+
+- [ ] Implement the current default-site cart and items with verified user
+      ownership.
+- [ ] Validate product lifecycle, availability, currency, price, and basic stock
+      at the authoritative boundaries.
+- [ ] Define quantity/update/remove behavior and deterministic totals.
+- [ ] Implement idempotent checkout using the gateway contract and bounded
+      replay behavior.
+- [ ] Snapshot product identity, SKU, title, unit price, currency, and quantity
+      into order items so later catalog edits do not rewrite orders.
+- [ ] Clearly label checkout as demo/no-production-payment and never collect real
+      payment credentials or fabricate a settled provider transaction.
+
+### Orders
+
+- [ ] Add user order list/detail restricted to the verified owner.
+- [ ] Add admin order list/detail and retain admin-authorized status changes.
+- [ ] Define permitted status transitions, concurrency behavior, and audit.
+- [ ] Prevent client-supplied user, price, or status authority and accept no
+      caller-selected tenant/site override.
+- [ ] Add integration tests for repeat checkout, stale product state, ownership
+      denial, admin policy, and failure rollback.
+
+### D2 Exit Gate
+
+- [ ] A user can create a cart and produce one durable idempotent demo order.
+- [ ] Orders retain immutable commercial snapshots and correct user ownership.
+- [ ] User/admin reads and status transitions enforce their distinct policies.
+- [ ] The UI and documentation never imply production payment capability.
+
+## D3 - Admin Product Flow
+
+Purpose: provide the operator side of the working demonstration through the
+real gateway and current Auth, media, taxonomy, product, and order contracts.
+
+- [ ] Authenticate/refresh/logout an admin through the gateway.
+- [ ] Display the configured default-site/application context without presenting
+      it as user-selectable or multi-tenant authority.
+- [ ] List, filter, create, edit, publish/archive, and inspect products.
+- [ ] Select only taxonomy records exposed by the current gateway contract.
+- [ ] Upload/select current Media records and assign semantic product roles;
+      migrate to F5 lifecycle states when F5 begins.
+- [ ] Set validated price, currency, stock, and availability.
+- [ ] View orders and perform permitted status transitions.
+- [ ] Handle validation, conflict, denied, expired-session, degraded dependency,
+      empty, and unexpected-error states.
+- [ ] Add frontend unit/integration/e2e coverage against the external client;
+      do not mock away gateway envelope and policy behavior in all tests.
+
+### D3 Exit Gate
+
+- [ ] An authorized admin can publish a complete default-site product with
+      taxonomy and current Media records without direct service/database/storage
+      access.
+- [ ] An insufficient-role actor is denied; wrong-site denial remains an F4
+      exit requirement.
+- [ ] Admin behavior survives refresh, conflict, and degraded-service cases.
+
+## D4 - Storefront Product Flow
+
+Purpose: prove anonymous discovery and authenticated commerce for the
+configured default storefront without internal-service knowledge.
+
+- [ ] Resolve the configured storefront from the F3 origin/application contract;
+      expose no public tenant/site selector.
+- [ ] Render product listing/detail with taxonomy, price/availability, and CDN
+      media from public gateway contracts.
+- [ ] Add basic SEO title/description, canonical, robots, structured-data, and
+      media-sitemap inputs without leaking provider/private media URLs.
+- [ ] Implement register/login/refresh/logout through the gateway/BFF contract.
+- [ ] Implement cart, demo checkout, order confirmation, and authenticated order
+      history/detail.
+- [ ] Define not-found versus unavailable/archived behavior without exposing
+      hidden product existence.
+- [ ] Cover anonymous/authenticated, wrong-origin/application,
+      insufficient-role, missing-media, degraded-service, and checkout-replay
+      scenarios.
+
+### D4 Exit Gate
+
+- [ ] A storefront visitor can discover an active product, authenticate, check
+      out, and inspect the resulting order through gateway APIs.
+- [ ] Draft/archived products and non-public media remain hidden.
+- [ ] Storefront has no internal service URL, Prisma, storage credential, or
+      trusted-context construction.
+
+### Working Web Commerce Demo - Release P0
+
+- [ ] An admin can authenticate, create and publish a complete product, and
+      manage the resulting demo order entirely through gateway APIs.
+- [ ] A storefront visitor can browse the public catalog, authenticate, use the
+      cart, complete idempotent demo checkout, and inspect order history.
+- [ ] Product lifecycle, price snapshots, ownership, role denial, media access,
+      gateway envelopes, refresh/logout, failure states, accessibility, and RTL
+      pass focused and browser-level evidence.
+- [ ] The demo can reset/reseed deterministic non-production data and records
+      setup, accounts, limitations, and verification commands.
+- [ ] The release is labeled default-site/single-realm and makes no tenant,
+      entitlement, cloud, advanced-media, or mobile completion claim.
+
+---
+
+# RELEASE P1 - COMMERCE PORTFOLIO
+
+Execution order: `M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5`.
+
+## M2 - Blog, CMS, And Composition
+
+Purpose: add a governed content/composition system that produces useful
+storefront/mobile experiences and an authoritative corpus for later search and
+AI without turning the editor into arbitrary executable code.
+
+### Blog And Content Ownership
+
+- [ ] Complete default-site blog authoring/publishing and resolve taxonomy
+      duplication through the current authoritative taxonomy contracts.
+- [ ] Replace blog cover/content URLs with validated Media IDs and add SEO,
+      locale, author/editor, lifecycle, and revision ownership.
+- [ ] Add custom pages, navigation/menu ownership, and default storefront/admin
+      placement.
+- [ ] Define draft, preview, scheduled publish where required, publish, archive,
+      restore, and immutable published revision behavior.
+- [ ] Protect editor concurrency with optimistic versioning or an equally
+      explicit conflict contract.
+- [ ] Use short-lived/noindex preview access and prevent previews from exposing
+      protected/strict content.
+
+### Composition Schema And Registry
+
+- [ ] Select one canonical JSON-compatible schema source for runtime validation,
+      generated types, editor forms, renderer inputs, and migration tests.
+- [ ] Define versioned pages, revisions, sections, slots, block instances,
+      themes, layout presets, data bindings, and renderer-capability manifests.
+- [ ] Build a curated block registry with schema version, migration, allowed
+      slots, platform support, fallback, cost profile, and data dependencies.
+- [ ] Store declarative allowlisted data bindings, not copied product/blog/media
+      records or arbitrary queries.
+- [ ] Keep checkout, auth, profile, order, payment, and other sensitive screens
+      outside free-form composition.
+- [ ] Prohibit arbitrary CSS/HTML/JavaScript and sanitize structured rich text,
+      URLs, links, embeds, and external resources under explicit CSP rules.
+
+### Web, Mobile, Cache, And Failure Behavior
+
+- [ ] Build the first high-quality web block set around real product, taxonomy,
+      blog, media, settings, and menu contracts.
+- [ ] Add a minimal admin editor for approved blocks and safe properties.
+- [ ] Render through the storefront with SSR where appropriate, intent-oriented
+      layout, responsive media, and precise dependency tags.
+- [ ] Record semantic native renderer and fallback requirements for F8; M2
+      implements the web renderer first.
+- [ ] Invalidate affected pages/blocks when product, media, settings, taxonomy,
+      menu, theme, or content revisions change without flushing the entire site.
+- [ ] Preserve last valid published content or block-level fallback when a
+      migration, service, media reference, or renderer fails.
+
+### Accessibility, RTL, Performance, And AI Hooks
+
+- [ ] Enforce alt/decorative semantics, heading structure, link labels, carousel
+      controls, contrast, reduced motion, and other selected accessibility rules
+      before publishing.
+- [ ] Test localization/RTL in schemas, themes, editor, web, and supported native
+      renderers rather than applying direction only at the final DOM layer.
+- [ ] Define publish-time and measured runtime budgets for client JavaScript,
+      media weight, fonts, third-party scripts, and heavy blocks.
+- [ ] Expose versioned, permission-aware published/draft content contracts for
+      AI0 ingestion; AI indexing must not read the CMS database directly.
+- [ ] Index only lifecycle/role-authorized revisions, remove superseded/deleted
+      revisions, and preserve source citations.
+- [ ] Keep AI suggestions as reviewed drafts; models cannot publish content.
+
+### M2 Exit Gate
+
+- [ ] Admin can author, preview, publish, restore, and audit a default-site page
+      and blog content through curated schemas.
+- [ ] Storefront renders the semantic content, and the F8 native handoff records
+      declared platform fallbacks.
+- [ ] Old published block versions migrate or continue rendering safely.
+- [ ] Sanitization, accessibility, RTL, cache invalidation, concurrency,
+      fallback, and performance-budget tests pass.
+- [ ] AI retrieval respects revision lifecycle and current role/application
+      permissions.
+
+## F5 - Media Processing And CDN Foundation
+
+Purpose: turn the existing upload/finalize policy into a bounded, auditable
+media lifecycle for the implemented content and showroom consumers while
+preserving the current storage provider through the compatibility contract.
+
+### Upload And Immutable Facts
+
+- [ ] Bind upload authorization to the verified current actor/application and
+      default-site compatibility context, access class, declared MIME, maximum
+      size, and permitted current-provider key prefix.
+- [ ] Sniff actual MIME/content type and reject mismatch with declared type,
+      extension, access lane, or feature policy.
+- [ ] Define checksum creation/verification and preserve immutable upload facts:
+      original name, detected type, size, checksum, source, owner, and time.
+- [ ] Retain current object-size/storage-metadata/path checks and add bounded
+      abandoned-presign cleanup.
+- [ ] Define archive/container expansion and parser resource limits before later
+      accepting bundled or 3D assets.
+
+### Lifecycle Worker
+
+- [ ] Choose a bounded queue or reliable polling mechanism from demonstrated
+      requirements; do not introduce a general event platform in F5.
+- [ ] Implement idempotent `PENDING/QUEUED` claims with leases, retry limits,
+      backoff, terminal failure, and dead-letter visibility.
+- [ ] Verify stored objects and extract safe metadata such as detected MIME,
+      dimensions, duration where supported, size, and checksum.
+- [ ] Add a replaceable malware-scanner interface and explicit unavailable,
+      timed-out, infected, clean, and manually reviewed states.
+- [ ] Promote only validated media to `READY/CLEAN`; keep failed, infected,
+      missing, or ambiguous objects non-renderable.
+- [ ] Make reprocessing versioned and safe to retry without replacing immutable
+      originals or duplicating derived records.
+
+### Originals, Variants, And Provenance
+
+- [ ] Model immutable originals and derived variants separately.
+- [ ] Generate selected web, thumbnail, and mobile variants automatically.
+- [ ] Record source media, processor/version, parameters, checksum, status,
+      default-site compatibility reference, access class, and creation time for
+      every derivative.
+- [ ] Use immutable variant/version identity in cacheable URLs.
+- [ ] Prevent public delivery of raw originals unless an explicit policy permits
+      that exact media/access class/operation.
+- [ ] Support regeneration and rollback without mutating the original.
+
+### Content And CDN Integration
+
+- [ ] Replace product thumbnail/gallery and blog cover URLs with media IDs.
+- [ ] Define page/settings media references and semantic roles, ordering, alt
+      text, captions, locale, and channel overrides in the owning content domain.
+- [ ] Validate content/media ownership inside the current default-site boundary.
+- [ ] Freeze compatibility-safe media/CDN routes, cache-control, ETag,
+      replacement, invalidation, deletion, and revocation behavior.
+- [ ] Add a narrow default-site public-media rename endpoint. Rename changes
+      only `displayName` and its descriptive storage key, preserves the Media
+      ID, original bytes, checksum, and existing content references, rejects
+      destination collisions, and records recoverable/audited move state. Do
+      not overload rename with image editing or mutate an immutable original.
+- [ ] Keep media-service as CDN origin policy authority and ensure storage/CDN
+      configuration cannot bypass status, scan, site, channel, or access class.
+- [ ] Implement final CORS/preflight behavior for verified storefront/admin
+      origins and preserve the rule that CORS is not mobile/server authorization.
+
+### Consistency, Strict Media, And Providers
+
+- [ ] Add orphan-object, missing-object, and database/storage drift detection.
+- [ ] Add reconciliation for destructive operations and worker-backed execution
+      for plans above the synchronous deletion cap.
+- [ ] Define explicit folder ownership if empty folders remain a requirement.
+- [ ] Separate strict preview from original download and default-deny strict
+      original access.
+- [ ] Add durable strict-media audits without storing signed URLs or secrets.
+- [ ] Define provider-level versus application-level encryption, retention, and
+      secure deletion responsibilities.
+- [ ] Freeze only the S3-compatible operations required by current workflows;
+      retain MinIO locally and prove that media policy does not depend on MinIO
+      console/API extensions.
+- [ ] Record Supabase Storage S3, AWS S3, and Azure Blob as candidates without
+      implementing provider topology or parity before F9 selects the primary
+      cloud.
+- [ ] Keep provider configuration behind the media-service boundary and add a
+      narrow contract test double or compatibility fixture. Do not add bucket
+      fleets, replication, provider migration, KMS layout, or cross-cloud sync.
+
+### F5 Exit Gate
+
+- [ ] An authorized upload becomes `READY/CLEAN` and renderable without manual
+      database edits.
+- [ ] Web, thumbnail, and mobile variants are generated with traceable
+      provenance while originals remain immutable.
+- [ ] Products/blogs/pages use validated Media IDs rather than provider URLs;
+      resumed F4 later proves same-site enforcement.
+- [ ] Public/protected/strict delivery and denial tests pass after worker/CDN
+      changes.
+- [ ] Orphans, drift, failed processing, and oversized deletion are detectable
+      and recoverable.
+- [ ] The F5 worker pattern is sufficient for media but has not become an
+      ungoverned general event system.
+
+## M5 - 3D Showroom
+
+Purpose: deliver a bounded web-first 3D showroom from the proven commerce and
+F5 media paths. M5 owns only the scene and processing behavior its demonstration
+requires; M3S, F8, F6, F9, and any future M6 generalize from that evidence later.
+
+### Product And Module Boundary
+
+- [ ] Keep product core limited to a versioned showroom reference. Use a
+      separate package/service/worker only where ownership, dependency, or
+      failure isolation requires it; do not pre-build the F6 module platform.
+- [ ] Define default-site enablement, actor/admin permissions, component health,
+      data retention, upgrade/rollback, and absent/disabled fallback.
+- [ ] Validate product and scene ownership through versioned service contracts;
+      never read product/media databases directly.
+- [ ] Audit scene publication, product binding, destructive changes, privileged
+      processing, and server enablement/permission decisions.
+
+### 3D Asset And Processing Contract
+
+- [ ] Run a web compatibility spike and freeze the smallest canonical runtime
+      asset format plus accepted ingest formats before implementing converters.
+- [ ] Support GLB/GLTF ingestion as selected; require USDZ only if an explicit
+      iOS/AR acceptance case needs it.
+- [ ] Validate container/archive structure, external references, paths, MIME,
+      checksums, texture dimensions/formats, geometry/material counts, animation,
+      decompression/resource limits, and prohibited content.
+- [ ] Store 3D sources and derivatives as F5-governed default-site media with a
+      minimal M5 manifest and immutable provenance; let M3S generalize bundles
+      only from this implemented need.
+- [ ] Build deterministic texture/geometry optimization, compression, preview/
+      poster, and level-of-detail recipes with processor versions.
+- [ ] Start with measured CPU workers; introduce GPU workers only for a proven
+      workload and retain the same job/policy/provenance contracts.
+- [ ] Add retry, cancellation, supersession, partial-output cleanup,
+      reconciliation, and safe regeneration in one bounded M5/F5 job path.
+
+### Scene Manifest And Authoring
+
+- [ ] Define a versioned, JSON-compatible scene manifest containing bundle/
+      asset versions, transforms, camera, lighting, environment, hotspots,
+      product bindings, interaction intent, required renderer capabilities, and
+      poster/fallback media.
+- [ ] Keep manifest semantics platform-neutral; web/mobile renderer settings may
+      specialize without leaking DOM/CSS or native implementation details into
+      shared intent.
+- [ ] Add schema validation, migrations, draft/preview/publish/restore,
+      concurrency, immutable published revisions, and last-valid fallback.
+- [ ] Build a bounded admin authoring flow for asset selection, product binding,
+      camera/lighting presets, hotspots, preview, and publish; defer a general 3D
+      modeling application.
+- [ ] Prevent arbitrary scripts, external model/texture URLs, unsafe embeds, or
+      client-defined executable behavior in scene manifests.
+
+### Web Renderer And Future Mobile Contract
+
+- [ ] Build a lazy-loaded web renderer with explicit client-only boundary,
+      poster fallback, loading/progress/error states, keyboard/touch controls,
+      reduced-motion behavior, and accessibility description/fallback content.
+- [ ] Keep the manifest platform-neutral and record a renderer capability and
+      poster fallback contract for F8; M5 does not implement the mobile renderer.
+- [ ] Test representative low/mid/high browser/device profiles and define
+      measured load, memory, frame, network, texture, and geometry budgets.
+- [ ] Select LOD/quality from trusted capability/performance rules and preserve
+      a functional product/media fallback when 3D is absent or too expensive.
+- [ ] Deliver assets through approved CDN/media routes with versioned immutable
+      cache identity; no renderer receives storage credentials.
+- [ ] Record only the bounded web metrics needed for M7 evaluation without
+      inventing a general event platform or logging raw sensitive scene/user data.
+
+### Security, Operations, And Evidence
+
+- [ ] Repeat current actor/application, default-site compatibility, product
+      binding, scene lifecycle, and media access checks at component boundaries.
+- [ ] Add processing and delivery quotas, timeouts, cancellation, cost labels,
+      and denial behavior for malicious or oversized assets.
+- [ ] Add bounded job, asset-processing, delivery, renderer-failure, and
+      client-performance diagnostics appropriate to the demo.
+- [ ] Test malformed/bomb assets, wrong product/media binding, disabled
+      component, missing variants, stale manifest, worker outage, delivery
+      failure, old manifest capability, and rollback.
+- [ ] Run an actual storefront demonstration using the published scene and
+      documented fallback. Mobile proof belongs to F8.
+
+### M5 Exit Gate
+
+- [ ] Admin can upload/process a governed 3D bundle, bind products, preview, and
+      publish a versioned scene.
+- [ ] Storefront renders the scene contract with measured behavior and a safe
+      product/media fallback; the F8 handoff is explicit.
+- [ ] Disabled or unauthorized users cannot obtain protected scene/assets
+      through API, bounded worker, delivery, or renderer paths.
+- [ ] Asset processing is deterministic, observable, recoverable, and bounded by
+      measured device/infrastructure budgets.
+- [ ] Product core remains usable and uncorrupted when the showroom module is
+      disabled, absent, rolled back, or removed.
+
+## M3S - Advanced Media And Storage Compatibility
+
+Purpose: close only the advanced-media gaps demonstrated by F5 and the web
+showroom, while keeping storage replaceable through a narrow compatibility
+boundary. M3S does not design the final cloud storage structure, become a
+general-purpose editor, or build a video platform.
+
+### Retained Scope
+
+- [ ] Extend deterministic derived-asset recipes beyond F5 only where M2 or M5
+      has a concrete missing variant, preserving immutable originals and exact
+      processor/source provenance.
+- [ ] Add downscaled and/or watermarked protected/strict preview variants where
+      the frozen media policy requires them; never describe them as DRM.
+- [ ] Define the smallest versioned asset bundle needed by the implemented
+      showroom, with manifest, members, checksums, media types, relationships,
+      access class, default-site compatibility reference, and lifecycle.
+- [ ] Support bundle validation, atomic publication, partial-failure cleanup,
+      regeneration, replacement, retention, and deletion.
+- [ ] Add strict-media encryption/audit behavior only for a demonstrated
+      sensitive-asset use case, with media-service policy ownership preserved.
+- [ ] Add automated, dependency-aware CDN invalidation and reconciliation for
+      replaced/revoked derivatives and bundles.
+- [ ] Prove the narrow required S3 operations against MinIO and a provider-neutral
+      contract fixture. Do not select or structure the primary cloud in M3S.
+- [ ] Produce an F9 handoff inventory covering required object operations,
+      observed sizes/rates, URL behavior, lifecycle needs, failure modes, and
+      portability assumptions. Treat provider-specific gaps as input to F9.
+- [ ] Expose safe, versioned metadata hooks for later AI tagging/search while
+      preventing model output from becoming authoritative MIME, scan, owner,
+      access-class, or lifecycle data.
+
+### Explicitly Deferred From Original M3
+
+- General-purpose Photoshop-style or arbitrary non-destructive editing UI.
+- Video-specific metadata, thumbnails, transcoding, and playback work that has
+  no selected product consumer; streaming remains deferred with M4.
+- Every possible storage/CDN/provider adapter.
+- Provider-specific bucket/account/region topology, replication, lifecycle/KMS
+  design, migration orchestration, or multi-cloud synchronization before F9.
+- Unmeasured GPU acceleration or client-side processing that weakens the media
+  policy boundary.
+
+### M3S Exit Gate
+
+- [ ] The selected previews/bundles and any demonstrated encryption/audit or CDN
+      invalidation behavior pass their policy and recovery tests.
+- [ ] The required object operations pass MinIO plus provider-neutral
+      compatibility tests without bypassing media-service policy.
+- [ ] Derived outputs can be regenerated from immutable originals with exact
+      processor/recipe provenance.
+- [ ] Bundle lifecycle cannot publish partial, wrong-reference, infected,
+      missing, or unauthorized members; cross-site proof remains an F4 gate.
+- [ ] The retained M3 scope is documented separately from deferred editing/video
+      breadth.
+- [ ] The report states that final cloud storage structure remains open until
+      F9 and includes the exact evidence F9 must use for its provider decision.
+
+## F8 - React Native Foundation
+
+Purpose: create the secure default-site mobile core needed for D5 and the
+already proven web showroom contract without expanding into deferred M8 or
+claiming general site binding before F4.
+
+### Project, Identity, And Builds
+
+- [ ] Create the private React Native/Expo workspace and record the supported
+      architecture/build strategy.
+- [ ] Define Android/iOS application identities, signing boundaries, development
+      profiles, release profiles, and runtime-version compatibility.
+- [ ] Keep signing credentials, S2S keys, gateway keys, storage credentials, and
+      registry/cluster access out of source and application bundles.
+- [ ] Add reproducible Android verification and controlled macOS/iOS
+      verification with retained, sanitized evidence.
+
+### Site And Runtime Contract
+
+- [ ] Bind each build profile to one configured F3 public application/client and
+      prevent runtime tenant/site selection.
+- [ ] Load default-site branding, locale, theme, navigation, and the F6-ready
+      capability presentation contract from gateway APIs.
+- [ ] Implement authentication, refresh, secure token storage, typed gateway
+      client, request IDs, route protection, and public/authenticated sessions.
+- [ ] Define bounded cache/offline behavior and version/update compatibility
+      required for D5, without promising the broader M8 offline system.
+- [ ] Implement push-registration foundations with site/app/user ownership,
+      token lifecycle, logout/revocation cleanup, provider boundary, and no
+      client authority over notification permissions or target tenant/site.
+- [ ] Implement allowlisted deep-link parsing/routing foundations with
+      authentication/capability checks and safe fallback for unknown, stale, or
+      unauthorized targets.
+- [ ] Defer broad push campaigns, background synchronization, app-specific
+      overrides, and store-release automation to M8.
+
+### Modules And Media
+
+- [ ] Define mobile core versus optional feature packages and distinguish
+      entitlement-locked included code from physically absent native modules.
+- [ ] Require backend authorization for every protected operation regardless of
+      client capability state.
+- [ ] Use site-aware mobile variants and preserve public/protected/strict media
+      behavior and cache expiry.
+- [ ] Implement the mobile side of the versioned M5 scene/asset contract with a
+      safe poster/product fallback; do not redesign the web-first showroom.
+
+### F8 Exit Gate
+
+- [ ] A signed Android/iOS build uses only its configured default-site public
+      client and exposes no arbitrary scope selection.
+- [ ] Login/refresh, configuration, capabilities, gateway calls, and public
+      mobile media work on representative builds/devices.
+- [ ] Disabled or absent capabilities remain unusable and render a defined
+      fallback.
+- [ ] Android/iOS builds are reproducible without exposing operational secrets.
+
+## F6 - Modular Feature Compatibility Foundation
+
+Purpose: use the implemented showroom and mobile needs to prove a small module
+boundary without inventing the final tenant licensing system before resumed F4.
+
+### Core And Capability Boundary
+
+- [ ] Define the minimum core installed for every environment.
+- [ ] Define optional module responsibilities and move existing showroom/3D
+      fields out of product core through a compatible migration/contract plan.
+- [ ] Limit shared packages to contracts, clients, verified context,
+      configuration, errors, observability, tests, and a bounded module SDK.
+- [ ] Define only the versioned feature keys and capability shapes required by
+      implemented consumers. Record metering/allocation/delegation as later F4
+      and commercial work unless a current feature proves the need.
+- [ ] Make current capability server-authoritative from deployed module,
+      configured default-site availability, channel/build support, and actor
+      permission. Add licensed-target entitlement only when F4 resumes.
+- [ ] Define a signed client capability manifest for presentation while keeping
+      backend enforcement authoritative.
+
+### Module Compatibility Contract
+
+- [ ] Extract only the runtime/version/health/migration/resource/rollback fields
+      that the implemented M5 component actually needs.
+- [ ] Keep the contract compatible with a separate image/service/worker where
+      M5 proved that boundary, without defining unused shared/dedicated/edge
+      deployment modes.
+- [ ] Make enable/disable state server-owned and fail closed; client-visible
+      presentation flags and model responses cannot enable a backend operation.
+- [ ] Record signed licensed entitlement manifests, allocation/delegation,
+      grace/expiry/termination, metering, and fleet operation as deferred F4 and
+      commercial work.
+
+### Implemented Consumer Proof
+
+- [ ] Use the already implemented M5 showroom boundary as the first real proof;
+      do not build a contrived second proof module.
+- [ ] Preserve its separate image/database/service identity only where M5
+      evidence justified them.
+- [ ] Register its exact capability and protect gateway/domain operations with
+      server enablement plus actor/resource checks.
+- [ ] Add a matching optional web/mobile capability and fallback behavior.
+- [ ] Test installation, migration, upgrade, rollback, disablement, data
+      retention/export, and removal without editing unrelated core code.
+
+### F6 Exit Gate
+
+- [ ] One module operates outside core with separate deployment and a
+      default-site server capability boundary.
+- [ ] Disabling or removing it cannot corrupt core data or break clients that
+      follow the capability/fallback contract.
+- [ ] Client flags cannot bypass server enforcement.
+- [ ] The existing showroom and later AI work can use the proven pattern without
+      turning it into a speculative module platform.
+- [ ] Final tenant/site entitlement, allocation, delegation, and licensed-module
+      isolation remain explicitly open for resumed F4 and commercial phases.
+
+## D5 - Mobile Product Flow
+
+Purpose: prove the same product and commerce contracts in the one configured
+default-site mobile application without implementing deferred M8 breadth or
+claiming general application/tenant isolation before F4.
+
+- [ ] Bind the build to one configured public client/application and reject
+      runtime tenant/site selection.
+- [ ] Load the default-site theme, locale, navigation, and F6 capability
+      presentation contract.
+- [ ] Implement registration/login/refresh/logout with secure token storage.
+- [ ] Render product list/detail and site-aware mobile media variants.
+- [ ] Implement cart, demo checkout, order confirmation, and order history.
+- [ ] Enforce route and feature denial in the UI while relying on backend policy
+      as the actual security boundary.
+- [ ] Handle expired sessions, absent capabilities, offline/degraded reads,
+      version incompatibility, and missing media using the F8 contract.
+- [ ] Run representative Android and controlled iOS device/build tests.
+
+### D5 Exit Gate
+
+- [ ] The signed app consumes only the configured default-site product through
+      the external typed client.
+- [ ] Login, refresh, catalog, media, cart, checkout, and orders work on the
+      supported mobile builds.
+- [ ] Capability tampering fails at client presentation and backend enforcement;
+      multi-site tampering remains an explicit F4 exit case.
+- [ ] No M8 offline catalog, push, background sync, or store automation is
+      implied by completing D5.
+
+## Commerce Portfolio Exit Gate - Release P1
+
+```text
+admin uploads media
+-> media becomes READY/CLEAN with web/mobile variants
+-> admin creates and publishes a default-site product
+-> storefront and mobile display the same authoritative product
+-> user adds it to a cart and completes idempotent demo checkout
+-> admin sees and updates the resulting order
+```
+
+- [ ] The entire flow is explicitly default-site/single-realm, enforces current
+      actor/application policy, and accepts no caller-selected scope override.
+- [ ] Every client uses gateway APIs and approved CDN/storage data-plane URLs.
+- [ ] Media uses IDs and verified variants; no client persists private provider
+      URLs as content identity.
+- [ ] Web and mobile use the same versioned external contracts while rendering
+      platform-appropriate interfaces.
+- [ ] CI and a reproducible local/release smoke environment cover the flow;
+      primary-cloud staging remains F9.
+- [ ] Demo reset/reseed is deterministic and cannot target production.
+- [ ] Existing backup/restore and deployment rollback commands preserve or
+      safely recover the demonstration state in their currently supported
+      environment.
+- [ ] A portfolio runbook records architecture, supported scenarios, deliberate
+      exclusions, setup, demo accounts/data, verification commands, and known
+      limitations.
+
+---
+
+# AI AND ANALYTICS
+
+Execution order: `AI0 -> M7`.
+
+## AI0 - Agentic AI And RAG Foundation
+
+Purpose: add an evaluated AI boundary to the proven default-site P1 product.
+AI0 provides bounded ingestion, retrieval, model, tool, evaluation, and privacy
+contracts. Broad recommendations and analytics remain M7; tenant-isolated AI
+remains part of the resumed F4 exit.
+
+AI0 must reuse F3 gateway trust, current actor/application authorization, F5
+governed media, F6 server capabilities, and the P1 domain contracts. It may use
+the bounded F5 worker pattern for ingestion but must not pre-implement general
+M6 or F9 infrastructure.
+
+### Ownership And Architecture
+
+- [ ] Create an ADR for AI orchestration, ingestion/index metadata, evaluation,
+      and model-provider ownership before adding a new service/database.
+- [ ] Keep Auth/User/Tenant/Product/Media/Blog/Order services authoritative for
+      their existing domains; AI owns neither transactional truth nor access
+      decisions.
+- [ ] Access domain data through versioned clients/events and never by importing
+      another service's Prisma client or querying its database.
+- [ ] Keep the public AI surface behind the gateway and put premium AI behavior
+      behind F6 capability/entitlement checks.
+- [ ] Use Python only for concrete retrieval, ML/data, evaluation, or worker
+      workflows where its ecosystem is justified; retain NestJS/TypeScript for
+      existing request-path and domain ownership.
+- [ ] Define a narrow internal provider/model interface without forcing every
+      provider into a lowest-common-denominator abstraction.
+
+### Knowledge Source And Ingestion Contract
+
+- [ ] Define a source registry containing the default-site compatibility
+      reference, source owner, classification, allowed audiences/roles,
+      retention, legal/privacy status, lifecycle, and source contract/version.
+- [ ] Admit only supported, scanned, authorized source media/content; do not
+      index arbitrary storage objects because a key is discoverable.
+- [ ] Apply current application/actor and document authorization before
+      chunking/index writes.
+- [ ] Define parser, normalization, chunking, embedding, metadata, and index
+      versions with immutable source/content hashes and provenance.
+- [ ] Give chunks stable source/revision relationships while allowing a new
+      strategy/model to create a separate index version.
+- [ ] Implement idempotent ingestion, retry, terminal failure, re-index, delete,
+      tombstone, retention expiry, and reconciliation behavior.
+- [ ] Remove or make expired/deauthorized content non-retrievable within a
+      tested bound across source, chunks, vectors, caches, and derived summaries.
+- [ ] Treat source text and metadata as untrusted content capable of indirect
+      prompt injection.
+
+### Retrieval And Grounded Response
+
+- [ ] Enforce current application, actor/role, server capability, source
+      lifecycle, and document ACL in the query/retrieval boundary before
+      results can mix.
+- [ ] Establish a vector-only baseline, then benchmark lexical/hybrid retrieval
+      and reranking using the evaluation set before selecting added complexity.
+- [ ] Preserve source ID, revision, chunk, score/rank, and index/model versions
+      for every retrieved context item.
+- [ ] Return inspectable citations that resolve only through authorized gateway
+      or content/media routes.
+- [ ] Define insufficient-context, conflicting-source, unavailable-model,
+      retrieval-timeout, and partial-result behavior.
+- [ ] Prevent model output from inventing internal identifiers, signed URLs,
+      permissions, or unsupported citations.
+- [ ] Validate and encode model output before using it in HTML, queries, tool
+      parameters, files, or other interpreters.
+
+### Agent And Tool Contract
+
+- [ ] Begin with a bounded read-only product assistant over selected product,
+      content, media-metadata, and help/knowledge operations.
+- [ ] Register every tool with a versioned schema, owning service/client,
+      allowed application/actor roles, required capability, side-effect class,
+      timeout, retry/idempotency policy, and output/redaction limit.
+- [ ] Derive tool authorization from verified gateway context; never accept an
+      agent/model-generated application, actor, role, capability, or document
+      scope as truth.
+- [ ] Re-authorize every tool invocation at its owning boundary.
+- [ ] Deny arbitrary shell, SQL, filesystem, URL fetch, cloud-control,
+      Kubernetes, secret-store, and unrestricted internal-service tools.
+- [ ] Bound iterations, parallel calls, tokens, wall time, provider cost, and
+      output size per request.
+- [ ] Treat retrieved content and previous tool output as data, never as policy
+      or permission to select another tool.
+- [ ] Require explicit user confirmation, idempotency, preview/diff, and audit
+      before introducing any consequential write tool.
+- [ ] Provide an operator kill switch that disables model/tool execution without
+      disabling normal commerce operations.
+
+### Evaluation And Release Policy
+
+- [ ] Create versioned, default-site-safe evaluation datasets from synthetic,
+      consented, or appropriately sanitized examples; production logs are not
+      automatically evaluation/training data.
+- [ ] Measure retrieval relevance/coverage, citation correctness, groundedness,
+      task correctness, abstention, tool choice/arguments/result handling,
+      latency, token use, and cost.
+- [ ] Add deterministic actor/application/document ACL tests independent of
+      model quality.
+- [ ] Add direct/indirect prompt injection, poisoned source, malicious tool
+      output, sensitive disclosure, excessive agency, unbounded consumption,
+      citation forgery, and unauthorized-document retrieval cases.
+- [ ] Establish baselines and explicit regression tolerances before comparing
+      prompt, model, embedding, chunking, ranking, or tool changes.
+- [ ] Keep model-judged evaluation distinguishable from deterministic checks and
+      periodically calibrate it with human review.
+- [ ] Run shadow/offline evaluation before enabling a new model/index/prompt;
+      use capability-scoped rollout and rollback for online changes.
+
+### Privacy, Observability, And Operations
+
+- [ ] Record model/provider/version, prompt-template version, retrieval/index
+      version, tool-contract version, request ID, safe scope labels, timing,
+      token/cost totals, outcome, and policy decisions.
+- [ ] Define whether prompts, retrieved passages, outputs, and tool payloads may
+      be logged; default to redacted metadata where full content is unnecessary.
+- [ ] Define data residency, provider retention/training, encryption, deletion,
+      export, and incident response before sending product/user data to an
+      external model/embedding provider.
+- [ ] Restrict network egress to approved model/embedding endpoints and keep
+      provider credentials in the F9 secret boundary.
+- [ ] Add model/retrieval/tool latency, failure, rate, cost, denial, and quality-
+      regression dashboards/alerts.
+- [ ] Test provider outage, quota exhaustion, slow response, malformed output,
+      index outage, partial ingestion, rollback, and cost-limit behavior.
+
+### AI0 Exit Gate
+
+- [ ] One user-facing, read-only, citation-bearing RAG/agent use case works
+      through the gateway on authorized product/content knowledge.
+- [ ] Wrong-application, wrong-actor, unauthorized-document, and forged-context
+      retrieval/tool calls fail deterministically without relying on the model.
+- [ ] Source update/delete/re-index behavior is traceable and reconciled.
+- [ ] Every answer/tool run can identify its model, prompt, index, retrieved
+      sources, tool contracts, scope, and evaluation baseline without leaking
+      secrets.
+- [ ] Prompt injection, excessive agency, disclosure, and unbounded-consumption
+      denial suites pass at the approved threshold.
+- [ ] A model/provider can be disabled or rolled back without disabling P1
+      commerce or corrupting transactional data.
+- [ ] The exit report labels the capability default-site/single-realm and leaves
+      cross-tenant retrieval/index isolation to resumed F4.
+
+## M7 - AI And Analytics
+
+Purpose: build evaluated default-site intelligence on top of AI0, M2 content,
+M3S assets, bounded owning-phase jobs/indexes, and the M5 showroom without
+transferring transactional authority to models. Multi-tenant analytics and
+learning isolation remain a resumed F4 gate.
+
+### Analytics Event And Data Contract
+
+- [ ] Define a versioned analytics catalog with event purpose, producer,
+      default-site/application compatibility scope, actor/session pseudonym
+      policy, consent/legal basis where applicable, payload schema, retention,
+      and owner.
+- [ ] Distinguish operational telemetry, security audit, product analytics,
+      model/agent traces, and training/evaluation data; do not copy all logs into
+      one analytics lake.
+- [ ] Validate, minimize, and classify event fields; exclude secrets, tokens,
+      signed URLs, unnecessary prompt/document content, and uncontrolled PII.
+- [ ] Define late/duplicate/out-of-order event handling and deletion/export
+      propagation through analytical stores and derived features.
+- [ ] Add data-quality, freshness, lineage, schema-drift, and tenant-isolation
+      checks before analytics becomes an AI input.
+
+### Selected AI Capabilities
+
+- [ ] Implement default-site semantic/catalog/content search enrichment using
+      AI0's bounded index and measured relevance improvements.
+- [ ] Implement media/content/product tag suggestions as non-authoritative
+      reviewed proposals with provenance and confidence/quality evidence.
+- [ ] Implement recommendations only after defining a useful baseline,
+      eligibility/privacy policy, cold-start/fallback behavior, and offline/
+      online success metrics.
+- [ ] Implement bounded admin/site insights that cite or link their supporting
+      data and state uncertainty/coverage limitations.
+- [ ] Allow the agent to use new read tools only through AI0 tool policy; add
+      write tools individually with confirmation, idempotency, authorization,
+      audit, and rollback.
+- [ ] Keep pricing, inventory, order status, media policy, entitlement, tenant
+      authority, and publication decisions deterministic and service-owned.
+
+### Model, Experiment, And Governance Lifecycle
+
+- [ ] Maintain a registry for model/provider/version, prompt, feature pipeline,
+      index, training/evaluation data version, parameters, owner, approval,
+      deployment, rollback, and retirement.
+- [ ] Define reproducible offline baselines and online rollout/experiment policy
+      with explicit dataset/source boundaries. Cross-tenant learning isolation
+      is added and proven when F4 resumes.
+- [ ] Add model/retrieval/recommendation quality, drift, bias/coverage where
+      relevant, latency, availability, and cost monitoring.
+- [ ] Define user/admin feedback capture without treating feedback as trusted
+      labels or automatic training consent.
+- [ ] Define privacy notice, consent where required, retention, export, deletion,
+      provider-training, residency, and incident procedures.
+- [ ] Add human review/escalation for uncertain, sensitive, or consequential
+      outputs and a capability-scoped shutdown/rollback path.
+- [ ] Use Python only for concrete ML/data workflows and keep deployment,
+      contracts, tests, observability, and ownership standards language-neutral.
+
+### Evaluation And Failure Proofs
+
+- [ ] Extend AI0 evaluations per capability: retrieval, tagging, search,
+      recommendation, insight, and tool behavior each get task-appropriate
+      deterministic and human-reviewed measures.
+- [ ] Compare every learned/LLM capability against a simple non-AI baseline and
+      retain AI only where measured value justifies complexity/cost.
+- [ ] Test prompt/data poisoning, popularity/feedback manipulation, sparse/cold
+      data, stale indexes, model/provider outage, quota/cost exhaustion, drift,
+      deletion, rollback, and unauthorized-source scenarios.
+- [ ] Test that AI failure degrades to normal product/search/media/showroom
+      behavior rather than blocking commerce or weakening authorization.
+- [ ] Publish model cards or equivalent internal capability records describing
+      purpose, data, metrics, limits, risks, and rollback owner.
+
+### M7 Exit Gate
+
+- [ ] Default-site analytics is versioned, minimized, traceable, and covered by
+      retention/export/deletion policy.
+- [ ] Each shipped AI capability beats its declared non-AI baseline at the
+      approved quality/cost/latency threshold.
+- [ ] Model, prompt, index, data, tool, and experiment versions are auditable and
+      reversible.
+- [ ] Unauthorized-source disclosure, prompt injection, excessive agency,
+      poisoned data, and model/provider outage tests pass at the approved
+      release threshold; cross-tenant cases remain part of resumed F4.
+- [ ] Disabling every AI capability leaves P1 commerce, M2 content, M3S media,
+      and M5 showroom operational under defined non-AI fallbacks.
+- [ ] The exit report makes no tenant-isolation claim and lists the analytics,
+      indexes, pseudonyms, and traces that resumed F4 must scope and test.
+
+---
+
+# AI And Showroom Product Checkpoint
+
+## End-To-End Product Proof
+
+```text
+site admin publishes governed media, products, and composed content
+-> storefront and mobile render the same site contracts
+-> user completes the P1 commerce flow
+-> authorized RAG answers cite current default-site sources
+-> bounded owning-phase jobs update AI indexes and derived state reliably
+-> admin publishes an enabled 3D scene
+-> web and mobile render it or use the declared fallback
+-> analytics and selected AI insights remain default-site and reversible
+```
+
+- [ ] P0 Web Commerce and P1 Commerce Portfolio gates remain green.
+- [ ] AI0, M2, F5, M5, M3S, F8, F6, D5, and M7 exit gates pass.
+- [ ] The complete external path uses gateway plus approved CDN/storage URLs.
+- [ ] Wrong-actor/application and unauthorized data, media, content, vector,
+      agent/tool, analytics, and 3D access is denied in the default-site product.
+- [ ] Web and mobile demonstrate commerce, content, governed media, AI/RAG, and
+      the same server-enabled 3D showroom contract.
+- [ ] The checkpoint produces the workload/storage/traffic evidence F9 needs and
+      the complete data-owner inventory resumed F4 must scope.
+- [ ] CI/staging includes deterministic contract/security gates and explicitly
+      versioned AI/3D evaluation evidence.
+- [ ] A portfolio demonstration explains current capabilities, architecture,
+      failure handling, measurements, security boundaries, and deliberate
+      exclusions without presenting planned features as complete.
+
+---
+
+# CLOUD AND MULTI-TENANT COMPLETION
+
+Execution order: `F9 -> F4`. F4 resumes at R6.1 only after F9 exits.
+
+## F9 - Cloud, Kubernetes, Delivery, And Operations Foundation
+
+Purpose: prove one production-shaped deployment and a bounded portability path,
+using the implemented product's actual traffic, storage, worker, AI, and
+showroom needs. F9 does not maintain two complete production clouds or silently
+finish tenant isolation.
+
+### Cloud And Infrastructure Decision
+
+- [ ] At F9 entry, select AWS or Azure as the primary deployment using explicit
+      cost, regional availability, managed-service, learning, and portfolio
+      criteria; record the decision and exit strategy in an ADR.
+- [ ] Re-evaluate Supabase Storage S3, AWS S3, and Azure Blob from the measured
+      F5/M5/M3S operation inventory. Select the primary object-store structure
+      here rather than retroactively treating the pre-cloud compatibility layer
+      as a permanent design.
+- [ ] Define cloud-neutral application contracts for Kubernetes, PostgreSQL,
+      Redis-compatible state, object storage, DNS/TLS, registry, secrets,
+      telemetry, backups, and model-provider egress.
+- [ ] Implement infrastructure as code for the primary environment and prohibit
+      undocumented console-only production resources.
+- [ ] Produce a service-by-service AWS/Azure mapping and complete a bounded
+      second-cloud compatibility proof only after the primary exit gate passes.
+- [ ] Do not claim active-active multi-cloud, automatic failover, or full parity
+      without separate evidence and operational ownership.
+
+### Kubernetes, Images, And Secrets
+
+- [ ] Create core and optional-module Helm patterns with namespaces, service
+      accounts, default-deny network policies, DNS exceptions, explicit service
+      allowlists, resources, quotas, probes, migration jobs, and storage.
+- [ ] Define node selection and optional GPU scheduling without allocating GPU
+      infrastructure before a measured workload requires it.
+- [ ] Use a private registry, digest-pinned images, restricted pull identity,
+      SBOMs, scanning, and image-signing/verification policy.
+- [ ] Rebuild from current stable base images at production freeze and resolve
+      or formally classify every remaining runtime finding under the approved
+      release policy.
+- [ ] Keep secrets outside images; define managed secret/KMS encryption,
+      workload access, audit, rotation, and revocation.
+- [ ] Prevent core/module/worker workloads from receiving unrelated secrets.
+
+### Networking And Delivery
+
+- [ ] Expose only the gateway and approved storage/CDN origins.
+- [ ] Keep internal gRPC, databases, Redis, admin storage console, metrics, and
+      management endpoints private.
+- [ ] Define ingress, TLS, DNS, the configured default storefront domain,
+      CDN origin/cache, and internal/external storage endpoints. General
+      site-domain verification remains resumed F4 work.
+- [ ] Decide and document whether admin/storefront run in Kubernetes or an
+      approved managed/static hosting boundary; in either case preserve gateway-
+      only APIs, environment separation, CSP/security headers, rollback, and
+      deployment evidence.
+- [ ] Keep signed mobile build/distribution outside the cluster while using the
+      same versioned gateway, configured public application/client, and
+      release-compatibility contracts.
+- [ ] Add egress restrictions for sensitive workloads and reserve explicit
+      destinations for later model/embedding providers.
+- [ ] Verify network policy with positive and negative reachability tests, not
+      only rendered YAML.
+
+### Observability, Reliability, And Cost
+
+- [ ] Add structured logs, request/trace propagation, metrics, dashboards, and
+      alerts with safe service/application/actor/module labels. Record where F4
+      must later add authoritative tenant/site labels.
+- [ ] Define log/trace/audit retention and prevent secrets, raw tokens, signed
+      URLs, or unapproved prompt/document content from telemetry.
+- [ ] Test database/media backup and restore, deployment rollback, failed
+      migration recovery, graceful drain/shutdown, and dependency degradation.
+- [ ] Add worker retry/dead-letter visibility before F5 workers are considered
+      production-ready in Kubernetes.
+- [ ] Run baseline load, rate-limit, noisy-neighbor, and resource-limit tests.
+- [ ] Establish environment/resource cost attribution and budget alerts before
+      later GPU or model-provider costs arrive.
+- [ ] Create staging, deployment, rollback, incident, and disaster-recovery
+      runbooks and exercise their critical paths.
+
+### F9 Exit Gate
+
+- [ ] Core and the F6 proof module run reproducibly in the primary Kubernetes
+      environment from infrastructure/configuration source.
+- [ ] Only gateway and approved media/storage data-plane routes are externally
+      reachable; negative network tests pass.
+- [ ] Images, secrets, migrations, probes, backups, rollback, monitoring, alerts,
+      and cost controls are verified.
+- [ ] Clients have no cluster, node, registry, database, S2S, or internal-service
+      access.
+- [ ] A documented second-cloud mapping/compatibility proof exists without a
+      false full-parity claim.
+- [ ] The chosen object-store topology, credentials/KMS, lifecycle, backup,
+      delivery, and migration behavior pass primary-cloud evidence; M3S
+      compatibility tests remain green or are revised through an explicit ADR.
+
 ## F4 - Tenant, Site, Application, And Identity-Realm Authority
 
-Purpose: establish the authoritative tenant/site/application and customer-root
-identity isolation required by every later domain, frontend, worker, search,
-3D, analytics, and AI feature. Unrelated licensed customers must not share one
+Purpose: use the completed product and cloud evidence to finish the authoritative
+tenant/site/application and customer-root identity isolation required before
+NebulaNV can activate or claim multi-tenant behavior. Unrelated licensed customers must not share one
 credential/session population, while explicitly selected subordinate
 applications may provide prompt-free SSO through their licensed root realm.
 
 The original Batch 1 and completed Batch 2/3 evidence remains historical.
 [ADR-0014](docs/architecture/decisions/0014-f4-customer-identity-realms-and-federation.md)
 supersedes only the platform-global identity/session clauses and requires a
-corrective architecture/schema/contract gate before later F4 work continues.
+corrective architecture/schema/contract gate before remaining F4 work continues.
 [ADR-0015](docs/architecture/decisions/0015-f4-identity-realm-record-and-migration-freeze.md)
 closed that Batch 1R design gate on 2026-08-31 with exact record owners,
 administrator/session choices, identifiers, R0-R11 migration/rollback order,
@@ -581,346 +1648,10 @@ that documentation completion.
       have mandatory tenant/site/application/identity-realm/subject/request
       scope before they are implemented.
 
-## F5 - Media Processing And CDN Foundation
-
-Purpose: turn the existing upload/finalize policy into an automatic, auditable
-media lifecycle suitable for web, mobile, content, later AI, and 3D assets.
-
-### Upload And Immutable Facts
-
-- [ ] Bind upload authorization to verified tenant, site, actor, feature scope,
-      access class, declared MIME, maximum size, and permitted storage prefix.
-- [ ] Sniff actual MIME/content type and reject mismatch with declared type,
-      extension, access lane, or feature policy.
-- [ ] Define checksum creation/verification and preserve immutable upload facts:
-      original name, detected type, size, checksum, source, owner, and time.
-- [ ] Retain current object-size/storage-metadata/path checks and add bounded
-      abandoned-presign cleanup.
-- [ ] Define archive/container expansion and parser resource limits before later
-      accepting bundled or 3D assets.
-
-### Lifecycle Worker
-
-- [ ] Choose a bounded queue or reliable polling mechanism from demonstrated
-      requirements; do not introduce a general event platform in F5.
-- [ ] Implement idempotent `PENDING/QUEUED` claims with leases, retry limits,
-      backoff, terminal failure, and dead-letter visibility.
-- [ ] Verify stored objects and extract safe metadata such as detected MIME,
-      dimensions, duration where supported, size, and checksum.
-- [ ] Add a replaceable malware-scanner interface and explicit unavailable,
-      timed-out, infected, clean, and manually reviewed states.
-- [ ] Promote only validated media to `READY/CLEAN`; keep failed, infected,
-      missing, or ambiguous objects non-renderable.
-- [ ] Make reprocessing versioned and safe to retry without replacing immutable
-      originals or duplicating derived records.
-
-### Originals, Variants, And Provenance
-
-- [ ] Model immutable originals and derived variants separately.
-- [ ] Generate selected web, thumbnail, and mobile variants automatically.
-- [ ] Record source media, processor/version, parameters, checksum, status,
-      tenant/site, access class, and creation time for every derivative.
-- [ ] Use immutable variant/version identity in cacheable URLs.
-- [ ] Prevent public delivery of raw originals unless an explicit policy permits
-      that exact media/access class/operation.
-- [ ] Support regeneration and rollback without mutating the original.
-
-### Content And CDN Integration
-
-- [ ] Replace product thumbnail/gallery and blog cover URLs with media IDs.
-- [ ] Define page/settings media references and semantic roles, ordering, alt
-      text, captions, locale, and channel overrides in the owning content domain.
-- [ ] Validate content/media tenant/site ownership at the owning boundaries.
-- [ ] Freeze site-aware canonical media/CDN routes, cache-control, ETag,
-      replacement, invalidation, deletion, and revocation behavior.
-- [ ] Add a narrow, site-scoped public-media rename endpoint. Rename changes
-      only `displayName` and its descriptive storage key, preserves the Media
-      ID, original bytes, checksum, and existing content references, rejects
-      destination collisions, and records recoverable/audited move state. Do
-      not overload rename with image editing or mutate an immutable original.
-- [ ] Keep media-service as CDN origin policy authority and ensure storage/CDN
-      configuration cannot bypass status, scan, site, channel, or access class.
-- [ ] Implement final CORS/preflight behavior for verified storefront/admin
-      origins and preserve the rule that CORS is not mobile/server authorization.
-
-### Consistency, Strict Media, And Providers
-
-- [ ] Add orphan-object, missing-object, and database/storage drift detection.
-- [ ] Add reconciliation for destructive operations and worker-backed execution
-      for plans above the synchronous deletion cap.
-- [ ] Define explicit folder ownership if empty folders remain a requirement.
-- [ ] Separate strict preview from original download and default-deny strict
-      original access.
-- [ ] Add durable strict-media audits without storing signed URLs or secrets.
-- [ ] Define provider-level versus application-level encryption, retention, and
-      secure deletion responsibilities.
-- [ ] Freeze a storage-adapter contract and provider-test suite; retain MinIO
-      locally, verify Supabase Storage S3 compatibility while it remains a
-      supported provider, and implement the selected primary cloud object store.
-- [ ] Reserve the non-primary AWS S3 or Azure Blob implementation behind the
-      same policy boundary and prove only the bounded compatibility promised by
-      F9 rather than claiming every provider is operationally equivalent.
-
-### F5 Exit Gate
-
-- [ ] An authorized upload becomes `READY/CLEAN` and renderable without manual
-      database edits.
-- [ ] Web, thumbnail, and mobile variants are generated with traceable
-      provenance while originals remain immutable.
-- [ ] Products/blogs/pages use same-site media IDs rather than provider URLs.
-- [ ] Public/protected/strict delivery and denial tests pass after worker/CDN
-      changes.
-- [ ] Orphans, drift, failed processing, and oversized deletion are detectable
-      and recoverable.
-- [ ] The F5 worker pattern is sufficient for media but has not become an
-      ungoverned general event system.
-
-## F6 - Modular Feature And Entitlement Foundation
-
-Purpose: prove that later AI and showroom capabilities can remain independent
-from core schemas, deployments, and client-controlled feature flags.
-
-### Core And Capability Boundary
-
-- [ ] Define the minimum core installed for every environment.
-- [ ] Define optional module responsibilities and move existing showroom/3D
-      fields out of product core through a compatible migration/contract plan.
-- [ ] Limit shared packages to contracts, clients, verified context,
-      configuration, errors, observability, tests, and a bounded module SDK.
-- [ ] Define versioned feature keys, boolean/metered/allocated/non-delegable
-      capabilities, site/channel allocations, and user-permission intersection.
-- [ ] Make effective capability server-authoritative: entitlement, allocation,
-      deployed module, channel/build support, actor permission, and license
-      state must all permit the operation.
-- [ ] Define a signed client capability manifest for presentation while keeping
-      backend enforcement authoritative.
-
-### Module And License Contract
-
-- [ ] Define module image digest, core-version compatibility, API contracts,
-      migrations, health/readiness, service account, network, CPU/memory/storage,
-      optional GPU, feature limits, retention, rollback, and uninstall fields.
-- [ ] Define shared, dedicated, and restricted edge-worker deployment modes
-      without implementing an operator.
-- [ ] Define signed deployment-bound entitlement manifests and server-
-      authoritative time.
-- [ ] Define `ACTIVE -> EXPIRING -> GRACE -> SUSPENDED -> TERMINATED`, the
-      one-month grace rule, warnings, emergency revocation, and read/export
-      behavior.
-- [ ] Ensure client-visible flags and model responses can never extend or create
-      entitlement.
-
-### Proof Module
-
-- [ ] Build a deliberately small independent proof module rather than using the
-      future AI or showroom module as the first test of the platform pattern.
-- [ ] Give it a separate image, database only if justified, health/readiness,
-      versioned contract, service identity, and narrow network policy.
-- [ ] Register it in the feature catalog and protect gateway/domain operations
-      with entitlement plus actor/resource checks.
-- [ ] Add a matching optional web/mobile capability and fallback behavior.
-- [ ] Test installation, migration, upgrade, rollback, disablement, data
-      retention/export, and removal without editing unrelated core code.
-
-### F6 Exit Gate
-
-- [ ] One module operates outside core with separate deployment and tenant/site
-      entitlement.
-- [ ] Disabling or removing it cannot corrupt core data or break clients that
-      follow the capability/fallback contract.
-- [ ] Client flags cannot bypass server enforcement.
-- [ ] AI and showroom have a proven module pattern but remain unimplemented.
-
-## F7 - Web And Admin Foundation
-
-Purpose: establish separate, tested storefront and admin applications that
-consume gateway contracts and can later host CMS, AI, and 3D capabilities.
-
-### Application Split And Shared Frontend
-
-- [ ] Freeze `apps/storefront` as the public Next.js application and
-      `apps/admin` as the Vite React administration application.
-- [ ] Decide through a migration inventory how current `apps/web` code is
-      reused, moved, or retired; do not maintain three accidental authorities.
-- [ ] Share only UI primitives, intent-oriented schemas, theme tokens, and the
-      external gateway client; never Prisma, internal gRPC, or service URLs.
-- [ ] Standardize authentication/refresh, tenant/site/channel context,
-      capability manifests, request IDs, and error envelopes.
-- [ ] Define loading, empty, denied, expired, degraded, offline, and unexpected
-      failure states.
-- [ ] Establish localization, RTL, accessibility, theme-token, unit,
-      integration, and browser-e2e foundations.
-
-### Admin Shell
-
-- [ ] Implement login/logout/refresh, protected routes, and safe error
-      boundaries.
-- [ ] Add role/capability-aware navigation, verified site context, and an
-      explicit parent-target banner where applicable.
-- [ ] Build reusable list, form, filter, pagination, validation-error, and
-      optimistic-concurrency patterns.
-- [ ] Add the F5 site-owned media picker shell without exposing provider URLs or
-      internal media operations.
-
-### Storefront Shell
-
-- [ ] Resolve verified site/domain identity and load site theme/configuration.
-- [ ] Use the public external client for product/content data.
-- [ ] Establish SEO, canonical, robots, sitemap-input, error, and not-found
-      behavior.
-- [ ] Build the CDN media component and product list/detail skeleton.
-- [ ] Define capability-based placeholders for later CMS/AI/3D features; do not
-      ship fake implementations.
-
-### F7 Exit Gate
-
-- [ ] Admin and storefront build, test, and deploy independently.
-- [ ] Both use only gateway and approved CDN/storage data-plane URLs.
-- [ ] Neither owns backend contracts, tenant policy, Prisma, or internal service
-      addresses.
-- [ ] Authentication, site context, capability denial, accessibility, RTL, and
-      core failure states have CI coverage.
-
-## F8 - React Native Foundation
-
-Purpose: create the secure, site-bound mobile core needed for D5 and the later
-3D module without expanding into all of deferred M8.
-
-### Project, Identity, And Builds
-
-- [ ] Create the private React Native/Expo workspace and record the supported
-      architecture/build strategy.
-- [ ] Define Android/iOS application identities, signing boundaries, development
-      profiles, release profiles, and runtime-version compatibility.
-- [ ] Keep signing credentials, S2S keys, gateway keys, storage credentials, and
-      registry/cluster access out of source and application bundles.
-- [ ] Add reproducible Android verification and controlled macOS/iOS
-      verification with retained, sanitized evidence.
-
-### Site And Runtime Contract
-
-- [ ] Bind each signed app registration to one owning site and prevent arbitrary
-      tenant/site selection.
-- [ ] Resolve site/channel from registered application context and load branding,
-      locale, theme, navigation, and signed capability manifest.
-- [ ] Implement authentication, refresh, secure token storage, typed gateway
-      client, request IDs, route protection, and public/authenticated sessions.
-- [ ] Define bounded cache/offline behavior and version/update compatibility
-      required for D5, without promising the broader M8 offline system.
-- [ ] Implement push-registration foundations with site/app/user ownership,
-      token lifecycle, logout/revocation cleanup, provider boundary, and no
-      client authority over notification permissions or target tenant/site.
-- [ ] Implement allowlisted deep-link parsing/routing foundations with
-      authentication/capability checks and safe fallback for unknown, stale, or
-      unauthorized targets.
-- [ ] Defer broad push campaigns, background synchronization, app-specific
-      overrides, and store-release automation to M8.
-
-### Modules And Media
-
-- [ ] Define mobile core versus optional feature packages and distinguish
-      entitlement-locked included code from physically absent native modules.
-- [ ] Require backend authorization for every protected operation regardless of
-      client capability state.
-- [ ] Use site-aware mobile variants and preserve public/protected/strict media
-      behavior and cache expiry.
-- [ ] Reserve a versioned native renderer-capability and fallback contract for
-      the later showroom without implementing M5 in F8.
-
-### F8 Exit Gate
-
-- [ ] A signed Android/iOS application resolves only its owning site.
-- [ ] Login/refresh, configuration, capabilities, gateway calls, and public
-      mobile media work on representative builds/devices.
-- [ ] Disabled or absent capabilities remain unusable and render a defined
-      fallback.
-- [ ] Android/iOS builds are reproducible without exposing operational secrets.
-
-## F9 - Cloud, Kubernetes, Delivery, And Operations Foundation
-
-Purpose: prove one production-shaped deployment and a bounded portability path,
-not maintain two complete production clouds before product evidence exists.
-
-### Cloud And Infrastructure Decision
-
-- [ ] At F9 entry, select AWS or Azure as the primary deployment using explicit
-      cost, regional availability, managed-service, learning, and portfolio
-      criteria; record the decision and exit strategy in an ADR.
-- [ ] Define cloud-neutral application contracts for Kubernetes, PostgreSQL,
-      Redis-compatible state, object storage, DNS/TLS, registry, secrets,
-      telemetry, backups, and model-provider egress.
-- [ ] Implement infrastructure as code for the primary environment and prohibit
-      undocumented console-only production resources.
-- [ ] Produce a service-by-service AWS/Azure mapping and complete a bounded
-      second-cloud compatibility proof only after the primary exit gate passes.
-- [ ] Do not claim active-active multi-cloud, automatic failover, or full parity
-      without separate evidence and operational ownership.
-
-### Kubernetes, Images, And Secrets
-
-- [ ] Create core and optional-module Helm patterns with namespaces, service
-      accounts, default-deny network policies, DNS exceptions, explicit service
-      allowlists, resources, quotas, probes, migration jobs, and storage.
-- [ ] Define node selection and optional GPU scheduling without allocating GPU
-      infrastructure before a measured workload requires it.
-- [ ] Use a private registry, digest-pinned images, restricted pull identity,
-      SBOMs, scanning, and image-signing/verification policy.
-- [ ] Rebuild from current stable base images at production freeze and resolve
-      or formally classify every remaining runtime finding under the approved
-      release policy.
-- [ ] Keep secrets outside images; define managed secret/KMS encryption,
-      workload access, audit, rotation, and revocation.
-- [ ] Prevent core/module/worker workloads from receiving unrelated secrets.
-
-### Networking And Delivery
-
-- [ ] Expose only the gateway and approved storage/CDN origins.
-- [ ] Keep internal gRPC, databases, Redis, admin storage console, metrics, and
-      management endpoints private.
-- [ ] Define ingress, TLS, DNS, site-domain verification, CDN origin/cache, and
-      internal/external storage endpoints.
-- [ ] Decide and document whether admin/storefront run in Kubernetes or an
-      approved managed/static hosting boundary; in either case preserve gateway-
-      only APIs, environment separation, CSP/security headers, rollback, and
-      deployment evidence.
-- [ ] Keep signed mobile build/distribution outside the cluster while using the
-      same versioned gateway, site/app registration, and release-compatibility
-      contracts.
-- [ ] Add egress restrictions for sensitive workloads and reserve explicit
-      destinations for later model/embedding providers.
-- [ ] Verify network policy with positive and negative reachability tests, not
-      only rendered YAML.
-
-### Observability, Reliability, And Cost
-
-- [ ] Add structured logs, request/trace propagation, metrics, dashboards, and
-      alerts with safe service/tenant/site/actor/module labels.
-- [ ] Define log/trace/audit retention and prevent secrets, raw tokens, signed
-      URLs, or unapproved prompt/document content from telemetry.
-- [ ] Test database/media backup and restore, deployment rollback, failed
-      migration recovery, graceful drain/shutdown, and dependency degradation.
-- [ ] Add worker retry/dead-letter visibility before F5 workers are considered
-      production-ready in Kubernetes.
-- [ ] Run baseline load, rate-limit, noisy-neighbor, and resource-limit tests.
-- [ ] Establish environment/resource cost attribution and budget alerts before
-      later GPU or model-provider costs arrive.
-- [ ] Create staging, deployment, rollback, incident, and disaster-recovery
-      runbooks and exercise their critical paths.
-
-### F9 Exit Gate
-
-- [ ] Core and the F6 proof module run reproducibly in the primary Kubernetes
-      environment from infrastructure/configuration source.
-- [ ] Only gateway and approved media/storage data-plane routes are externally
-      reachable; negative network tests pass.
-- [ ] Images, secrets, migrations, probes, backups, rollback, monitoring, alerts,
-      and cost controls are verified.
-- [ ] Clients have no cluster, node, registry, database, S2S, or internal-service
-      access.
-- [ ] A documented second-cloud mapping/compatibility proof exists without a
-      false full-parity claim.
-
 ## Foundation Definition Of Done
+
+Status: final foundation gate, evaluated only after F9 and resumed F4 complete.
+It is no longer an entry prerequisite for the commerce demo.
 
 ```text
 seed tenant/site/channels/apps
@@ -942,451 +1673,103 @@ seed tenant/site/channels/apps
 
 ---
 
-# COMMERCE PORTFOLIO PRODUCT
+# PARALLEL ENGINEERING AI TRACK
 
-## D1 - Site-Scoped Commerce Domain
+## EA0 - Repository Agent And Evaluation Lab
 
-Purpose: provide the product/catalog authority used consistently by admin,
-storefront, mobile, search, content, and later AI/3D modules.
+Purpose: gain practical RAG, agent, tool-calling, and evaluation experience
+while improving navigation of NebulaNV's existing evidence. EA0 is an internal
+engineering tool, not a customer feature and not a release authority.
 
-### Product Model And Lifecycle
+EA0 may run in a separate timebox during later foundation work. It must not
+delay an active foundation exit gate or silently modify production behavior.
 
-- [ ] Finalize the site-scoped product model without premium AI/showroom fields.
-- [ ] Support draft, active, and archived lifecycle with explicit public/admin
-      visibility rules.
-- [ ] Support title, slug, excerpt, description, SKU, price, currency, basic
-      stock, and availability with validated invariants.
-- [ ] Define site-scoped slug/SKU uniqueness and migration behavior.
-- [ ] Support category, tag, and brand through authoritative taxonomy contracts.
-- [ ] Use same-site media IDs for thumbnail/gallery roles, ordering, alt text,
-      and channel overrides.
-- [ ] Preserve authoritative public reads that cannot expose drafts, archived,
-      deleted, or cross-site records through query flags.
+### Corpus Governance
 
-### Contracts And Evidence
+- [ ] Inventory candidate sources and classify each as authoritative,
+      operational, generated, historical, superseded, or excluded.
+- [ ] Define metadata for path, heading, owner, status, effective/review date,
+      source commit/hash, domain, and supersession relationships.
+- [ ] Keep `TODO.md`, `docs/current-focus.md`, architecture documents, audits,
+      reports, generated contracts, and runtime evidence distinguishable.
+- [ ] Exclude `.env` secrets, credentials, backups, database dumps, image
+      archives, dependency caches, and unbounded raw logs.
+- [ ] Preserve source path and heading boundaries in chunks so every retrieval
+      result can be inspected in its original context.
+- [ ] Invalidate or re-index changed/deleted sources deterministically; do not
+      let an obsolete chunk survive because its filename still exists.
+- [ ] Define retention for indexed logs/test evidence separately from durable
+      architecture and contract documents.
 
-- [ ] Complete gateway/HTTP/gRPC parity for the selected product operations.
-- [ ] Keep external DTOs separate from service inputs, proto types, and Prisma.
-- [ ] Add tenant/site, lifecycle, taxonomy, media-reference, concurrency, and
-      denial tests.
-- [ ] Add deterministic seed products that exercise active/draft/archived and
-      media/taxonomy relationships.
+### Retrieval And Answers
 
-### D1 Exit Gate
+- [ ] Build a reproducible ingestion command that never mutates source files.
+- [ ] Store chunk/content hashes and ingestion/index versions.
+- [ ] Apply repository/workspace scope before retrieval.
+- [ ] Return file/heading citations for repository claims.
+- [ ] Prefer an explicit insufficient-evidence result over an invented answer.
+- [ ] Distinguish implementation evidence from plans and historical reports in
+      ranking and response policy.
+- [ ] Test stale/superseded-document conflicts and require the current source
+      of truth to win.
 
-- [ ] Admin can manage site-owned products while anonymous clients see only
-      active public records.
-- [ ] Product references cannot cross tenant/site boundaries.
-- [ ] Product core contains no showroom, recommendation, or premium-module
-      implementation fields.
+### Tools And Agency
 
-## D2 - Cart, Checkout, And Order
+- [ ] Start with read-only tools for search, file inspection, test ownership,
+      dependency maps, and bounded test-result summaries.
+- [ ] Give each tool a typed schema, exact filesystem/repository scope, timeout,
+      output limit, and redaction policy.
+- [ ] Do not expose unrestricted shell, database, cloud, GitHub, or secret-store
+      access to the model.
+- [ ] Treat retrieved documents, code comments, issues, logs, and tool output as
+      untrusted data that cannot override agent policy.
+- [ ] Require explicit human approval and a visible diff before any later
+      source-writing experiment.
+- [ ] Record model, prompt, retrieval/index, tool-contract, input-corpus, and
+      evaluation versions for every assessed run.
 
-Purpose: demonstrate a coherent commerce transaction without pretending to
-collect or reconcile production payment.
+### Evaluation And Safety
 
-### Cart And Checkout
+- [ ] Create a versioned evaluation set covering architecture ownership,
+      current-focus status, commands, security boundaries, stale documents,
+      insufficient evidence, and conflicting sources.
+- [ ] Add retrieval relevance, citation correctness, answer correctness,
+      refusal/abstention, tool-selection, tool-argument, latency, token, and
+      cost measurements.
+- [ ] Add malicious-document and indirect-prompt-injection cases.
+- [ ] Add secret-seeking, path-escape, oversized-output, unauthorized-write,
+      and destructive-tool cases.
+- [ ] Separate deterministic assertions from model-judged scores and retain
+      human-reviewed examples for subjective quality.
+- [ ] Pin an evaluation baseline before changing prompts, chunking, embedding,
+      ranking, models, or tools.
 
-- [ ] Implement site-scoped cart and items with verified user ownership.
-- [ ] Validate product site, lifecycle, availability, currency, price, and basic
-      stock at the authoritative boundaries.
-- [ ] Define quantity/update/remove behavior and deterministic totals.
-- [ ] Implement idempotent checkout using the gateway contract and bounded
-      replay behavior.
-- [ ] Snapshot product identity, SKU, title, unit price, currency, and quantity
-      into order items so later catalog edits do not rewrite orders.
-- [ ] Clearly label checkout as demo/no-production-payment and never collect real
-      payment credentials or fabricate a settled provider transaction.
+### EA0 Exit Gate
 
-### Orders
-
-- [ ] Add user order list/detail restricted to the verified owner/site.
-- [ ] Add admin order list/detail and retain admin-authorized status changes.
-- [ ] Define permitted status transitions, concurrency behavior, and audit.
-- [ ] Prevent client-supplied user/site/price/status authority.
-- [ ] Add integration tests for repeat checkout, stale product state, mixed-site
-      carts, ownership denial, admin policy, and failure rollback.
-
-### D2 Exit Gate
-
-- [ ] A user can create a cart and produce one durable idempotent demo order.
-- [ ] Orders retain immutable commercial snapshots and correct site/user scope.
-- [ ] User/admin reads and status transitions enforce their distinct policies.
-- [ ] The UI and documentation never imply production payment capability.
-
-## D3 - Admin Product Flow
-
-Purpose: provide the operator side of the complete demonstration through the
-real gateway, tenant, entitlement, media, taxonomy, product, and order contracts.
-
-- [ ] Authenticate/refresh/logout an admin through the gateway.
-- [ ] Display verified tenant/site/channel and active capability context.
-- [ ] List, filter, create, edit, publish/archive, and inspect products.
-- [ ] Select only allowed site taxonomy records.
-- [ ] Upload/select F5-governed site media and assign semantic product roles.
-- [ ] Set validated price, currency, stock, and availability.
-- [ ] View orders and perform permitted status transitions.
-- [ ] Handle validation, conflict, denied, expired-session, degraded dependency,
-      empty, and unexpected-error states.
-- [ ] Add frontend unit/integration/e2e coverage against the external client;
-      do not mock away gateway envelope and policy behavior in all tests.
-
-### D3 Exit Gate
-
-- [ ] An authorized site admin can publish a complete product with taxonomy and
-      clean media without direct service/database/storage access.
-- [ ] A wrong-site or insufficient-role admin is denied.
-- [ ] Admin behavior survives refresh, conflict, and degraded-service cases.
-
-## D4 - Storefront Product Flow
-
-Purpose: prove anonymous discovery and authenticated commerce on the owning
-site without internal-service knowledge.
-
-- [ ] Resolve the active site from verified domain/application context.
-- [ ] Render product listing/detail with taxonomy, price/availability, and CDN
-      media from public gateway contracts.
-- [ ] Add basic SEO title/description, canonical, robots, structured-data, and
-      media-sitemap inputs without leaking provider/private media URLs.
-- [ ] Implement register/login/refresh/logout through the gateway/BFF contract.
-- [ ] Implement cart, demo checkout, order confirmation, and authenticated order
-      history/detail.
-- [ ] Define not-found versus unavailable/archived behavior without exposing
-      hidden product existence.
-- [ ] Cover anonymous/authenticated, wrong-domain/site, capability-denied,
-      missing-media, degraded-service, and checkout-replay scenarios.
-
-### D4 Exit Gate
-
-- [ ] A storefront visitor can discover an active product, authenticate, check
-      out, and inspect the resulting order through gateway APIs.
-- [ ] Draft/archived/cross-site products and non-public media remain hidden.
-- [ ] Storefront has no internal service URL, Prisma, storage credential, or
-      trusted-context construction.
-
-## D5 - Mobile Product Flow
-
-Purpose: prove the same product and commerce contracts in a signed, site-bound
-mobile application without implementing deferred M8 breadth.
-
-- [ ] Resolve the owning site/channel from registered app identity and reject
-      arbitrary site selection.
-- [ ] Load site theme, locale, navigation, and signed capability manifest.
-- [ ] Implement registration/login/refresh/logout with secure token storage.
-- [ ] Render product list/detail and site-aware mobile media variants.
-- [ ] Implement cart, demo checkout, order confirmation, and order history.
-- [ ] Enforce route and feature denial in the UI while relying on backend policy
-      as the actual security boundary.
-- [ ] Handle expired sessions, absent capabilities, offline/degraded reads,
-      version incompatibility, and missing media using the F8 contract.
-- [ ] Run representative Android and controlled iOS device/build tests.
-
-### D5 Exit Gate
-
-- [ ] The signed app consumes only its owning site's data through the external
-      typed client.
-- [ ] Login, refresh, catalog, media, cart, checkout, and orders work on the
-      supported mobile builds.
-- [ ] Capability or site tampering fails at both client presentation and backend
-      enforcement.
-- [ ] No M8 offline catalog, push, background sync, or store automation is
-      implied by completing D5.
-
-## Commerce Demo Exit Gate - Release P1
-
-```text
-admin uploads media
--> media becomes READY/CLEAN with web/mobile variants
--> admin creates and publishes a site-owned product
--> storefront and mobile display the same authoritative product
--> user adds it to a cart and completes idempotent demo checkout
--> admin sees and updates the resulting order
-```
-
-- [ ] The entire flow is tenant/site scoped and forged/cross-site access fails.
-- [ ] Every client uses gateway APIs and approved CDN/storage data-plane URLs.
-- [ ] Media uses IDs and verified variants; no client persists private provider
-      URLs as content identity.
-- [ ] Web and mobile use the same versioned external contracts while rendering
-      platform-appropriate interfaces.
-- [ ] CI and primary-cloud staging smoke tests cover the flow.
-- [ ] Demo reset/reseed is deterministic and cannot target production.
-- [ ] Backup/restore and deployment rollback preserve or safely recover the
-      demonstration state.
-- [ ] A portfolio runbook records architecture, supported scenarios, deliberate
-      exclusions, setup, demo accounts/data, verification commands, and known
-      limitations.
+- [ ] Repository answers cite inspectable sources and distinguish plans from
+      implementation.
+- [ ] Stale or superseded documents cannot silently outrank active authority.
+- [ ] The agent cannot read excluded secrets or write repository files through
+      its normal tool set.
+- [ ] Evaluation runs are reproducible enough to compare two configurations.
+- [ ] Security-denial and insufficient-evidence cases pass.
+- [ ] The lab has a concise runbook and bounded local/cloud cost report.
 
 ---
 
-# PRODUCT AI FOUNDATION
+# DEFERRED GROWTH PARKING LOT
 
-## AI0 - Agentic AI And RAG Foundation
+These items are intentionally outside the active path. They receive no partial
+implementation merely because a shared field or UI placeholder is convenient.
+Re-entry requires a concrete user/business need, dependencies, acceptance
+criteria, cost estimate, and updated exit gate.
 
-Purpose: add a tenant-isolated, evaluated AI boundary to the proven P1 product.
-AI0 provides ingestion, retrieval, model, tool, evaluation, privacy, and
-operational contracts. Broad recommendations and analytics remain M7.
+## Deferred M6 - State, Search, Events, And Workers
 
-AI0 must reuse F3 gateway trust, F4 scope, F5 governed media, F6 capability
-enforcement, F9 operations, and the P1 domain contracts. It may reuse the
-bounded F5 worker pattern for ingestion but must not pre-implement the general
-M6 event platform.
-
-### Ownership And Architecture
-
-- [ ] Create an ADR for AI orchestration, ingestion/index metadata, evaluation,
-      and model-provider ownership before adding a new service/database.
-- [ ] Keep Auth/User/Tenant/Product/Media/Blog/Order services authoritative for
-      their existing domains; AI owns neither transactional truth nor access
-      decisions.
-- [ ] Access domain data through versioned clients/events and never by importing
-      another service's Prisma client or querying its database.
-- [ ] Keep the public AI surface behind the gateway and put premium AI behavior
-      behind F6 capability/entitlement checks.
-- [ ] Use Python only for concrete retrieval, ML/data, evaluation, or worker
-      workflows where its ecosystem is justified; retain NestJS/TypeScript for
-      existing request-path and domain ownership.
-- [ ] Define a narrow internal provider/model interface without forcing every
-      provider into a lowest-common-denominator abstraction.
-
-### Knowledge Source And Ingestion Contract
-
-- [ ] Define a source registry containing authoritative tenant/site, source
-      owner, classification, allowed audiences/roles, retention, legal/privacy
-      status, lifecycle, and source contract/version.
-- [ ] Admit only supported, scanned, authorized source media/content; do not
-      index arbitrary storage objects because a key is discoverable.
-- [ ] Apply tenant/site and document authorization before chunking/index writes.
-- [ ] Define parser, normalization, chunking, embedding, metadata, and index
-      versions with immutable source/content hashes and provenance.
-- [ ] Give chunks stable source/revision relationships while allowing a new
-      strategy/model to create a separate index version.
-- [ ] Implement idempotent ingestion, retry, terminal failure, re-index, delete,
-      tombstone, retention expiry, and reconciliation behavior.
-- [ ] Remove or make expired/deauthorized content non-retrievable within a
-      tested bound across source, chunks, vectors, caches, and derived summaries.
-- [ ] Treat source text and metadata as untrusted content capable of indirect
-      prompt injection.
-
-### Retrieval And Grounded Response
-
-- [ ] Enforce tenant/site, actor/role, channel, entitlement, source lifecycle,
-      and document ACL in the query/retrieval boundary before results can mix.
-- [ ] Establish a vector-only baseline, then benchmark lexical/hybrid retrieval
-      and reranking using the evaluation set before selecting added complexity.
-- [ ] Preserve source ID, revision, chunk, score/rank, and index/model versions
-      for every retrieved context item.
-- [ ] Return inspectable citations that resolve only through authorized gateway
-      or content/media routes.
-- [ ] Define insufficient-context, conflicting-source, unavailable-model,
-      retrieval-timeout, and partial-result behavior.
-- [ ] Prevent model output from inventing internal identifiers, signed URLs,
-      permissions, or unsupported citations.
-- [ ] Validate and encode model output before using it in HTML, queries, tool
-      parameters, files, or other interpreters.
-
-### Agent And Tool Contract
-
-- [ ] Begin with a bounded read-only product assistant over selected product,
-      content, media-metadata, and help/knowledge operations.
-- [ ] Register every tool with a versioned schema, owning service/client,
-      allowed application/actor roles, required capability, side-effect class,
-      timeout, retry/idempotency policy, and output/redaction limit.
-- [ ] Derive tool authorization from verified gateway context; never accept an
-      agent/model-generated tenant, site, actor, role, or entitlement as truth.
-- [ ] Re-authorize every tool invocation at its owning boundary.
-- [ ] Deny arbitrary shell, SQL, filesystem, URL fetch, cloud-control,
-      Kubernetes, secret-store, and unrestricted internal-service tools.
-- [ ] Bound iterations, parallel calls, tokens, wall time, provider cost, and
-      output size per request.
-- [ ] Treat retrieved content and previous tool output as data, never as policy
-      or permission to select another tool.
-- [ ] Require explicit user confirmation, idempotency, preview/diff, and audit
-      before introducing any consequential write tool.
-- [ ] Provide an operator kill switch that disables model/tool execution without
-      disabling normal commerce operations.
-
-### Evaluation And Release Policy
-
-- [ ] Create versioned, tenant-safe evaluation datasets from synthetic,
-      consented, or appropriately sanitized examples; production logs are not
-      automatically evaluation/training data.
-- [ ] Measure retrieval relevance/coverage, citation correctness, groundedness,
-      task correctness, abstention, tool choice/arguments/result handling,
-      latency, token use, and cost.
-- [ ] Add deterministic tenant/document ACL tests independent of model quality.
-- [ ] Add direct/indirect prompt injection, poisoned source, malicious tool
-      output, sensitive disclosure, excessive agency, unbounded consumption,
-      citation forgery, and cross-tenant retrieval cases.
-- [ ] Establish baselines and explicit regression tolerances before comparing
-      prompt, model, embedding, chunking, ranking, or tool changes.
-- [ ] Keep model-judged evaluation distinguishable from deterministic checks and
-      periodically calibrate it with human review.
-- [ ] Run shadow/offline evaluation before enabling a new model/index/prompt;
-      use capability-scoped rollout and rollback for online changes.
-
-### Privacy, Observability, And Operations
-
-- [ ] Record model/provider/version, prompt-template version, retrieval/index
-      version, tool-contract version, request ID, safe scope labels, timing,
-      token/cost totals, outcome, and policy decisions.
-- [ ] Define whether prompts, retrieved passages, outputs, and tool payloads may
-      be logged; default to redacted metadata where full content is unnecessary.
-- [ ] Define data residency, provider retention/training, encryption, deletion,
-      export, and incident response before sending tenant data to an external
-      model/embedding provider.
-- [ ] Restrict network egress to approved model/embedding endpoints and keep
-      provider credentials in the F9 secret boundary.
-- [ ] Add model/retrieval/tool latency, failure, rate, cost, denial, and quality-
-      regression dashboards/alerts.
-- [ ] Test provider outage, quota exhaustion, slow response, malformed output,
-      index outage, partial ingestion, rollback, and cost-limit behavior.
-
-### AI0 Exit Gate
-
-- [ ] One tenant-facing, read-only, citation-bearing RAG/agent use case works
-      through the gateway on authorized product/content knowledge.
-- [ ] Cross-tenant, cross-site, unauthorized-document, and forged-context
-      retrieval/tool calls fail deterministically without relying on the model.
-- [ ] Source update/delete/re-index behavior is traceable and reconciled.
-- [ ] Every answer/tool run can identify its model, prompt, index, retrieved
-      sources, tool contracts, scope, and evaluation baseline without leaking
-      secrets.
-- [ ] Prompt injection, excessive agency, disclosure, and unbounded-consumption
-      denial suites pass at the approved threshold.
-- [ ] A model/provider can be disabled or rolled back without disabling P1
-      commerce or corrupting transactional data.
-
----
-
-# SELECTED GROWTH MODULES
-
-## M2 - Blog, CMS, And Composition
-
-Purpose: add a governed content/composition system that produces useful
-storefront/mobile experiences and an authoritative corpus for later search and
-AI without turning the editor into arbitrary executable code.
-
-### Blog And Content Ownership
-
-- [ ] Complete site-scoped blog authoring/publishing and resolve taxonomy
-      duplication through the authoritative taxonomy contracts.
-- [ ] Replace blog cover/content URLs with same-site media IDs and add SEO,
-      locale, author/editor, lifecycle, and revision ownership.
-- [ ] Add custom pages, navigation/menu ownership, and site/channel placement.
-- [ ] Define draft, preview, scheduled publish where required, publish, archive,
-      restore, and immutable published revision behavior.
-- [ ] Protect editor concurrency with optimistic versioning or an equally
-      explicit conflict contract.
-- [ ] Use short-lived/noindex preview access and prevent previews from exposing
-      protected/strict content.
-
-### Composition Schema And Registry
-
-- [ ] Select one canonical JSON-compatible schema source for runtime validation,
-      generated types, editor forms, renderer inputs, and migration tests.
-- [ ] Define versioned pages, revisions, sections, slots, block instances,
-      themes, layout presets, data bindings, and renderer-capability manifests.
-- [ ] Build a curated block registry with schema version, migration, allowed
-      slots, platform support, fallback, cost profile, and data dependencies.
-- [ ] Store declarative allowlisted data bindings, not copied product/blog/media
-      records or arbitrary queries.
-- [ ] Keep checkout, auth, profile, order, payment, and other sensitive screens
-      outside free-form composition.
-- [ ] Prohibit arbitrary CSS/HTML/JavaScript and sanitize structured rich text,
-      URLs, links, embeds, and external resources under explicit CSP rules.
-
-### Web, Mobile, Cache, And Failure Behavior
-
-- [ ] Build the first high-quality web block set around real product, taxonomy,
-      blog, media, settings, and menu contracts.
-- [ ] Add a minimal admin editor for approved blocks and safe properties.
-- [ ] Render through the storefront with SSR where appropriate, intent-oriented
-      layout, responsive media, and precise dependency tags.
-- [ ] Implement native renderers only for selected supported blocks; use the
-      capability manifest and explicit fallback for unsupported blocks.
-- [ ] Invalidate affected pages/blocks when product, media, settings, taxonomy,
-      menu, theme, or content revisions change without flushing the entire site.
-- [ ] Preserve last valid published content or block-level fallback when a
-      migration, service, media reference, or renderer fails.
-
-### Accessibility, RTL, Performance, And AI Hooks
-
-- [ ] Enforce alt/decorative semantics, heading structure, link labels, carousel
-      controls, contrast, reduced motion, and other selected accessibility rules
-      before publishing.
-- [ ] Test localization/RTL in schemas, themes, editor, web, and supported native
-      renderers rather than applying direction only at the final DOM layer.
-- [ ] Define publish-time and measured runtime budgets for client JavaScript,
-      media weight, fonts, third-party scripts, and heavy blocks.
-- [ ] Expose versioned, permission-aware published/draft content contracts for
-      AI0 ingestion; AI indexing must not read the CMS database directly.
-- [ ] Index only lifecycle/role-authorized revisions, remove superseded/deleted
-      revisions, and preserve source citations.
-- [ ] Keep AI suggestions as reviewed drafts; models cannot publish content.
-
-### M2 Exit Gate
-
-- [ ] Admin can author, preview, publish, restore, and audit a site-owned page and
-      blog content through curated schemas.
-- [ ] Storefront and selected mobile blocks render the same semantic content
-      with declared platform fallbacks.
-- [ ] Old published block versions migrate or continue rendering safely.
-- [ ] Sanitization, accessibility, RTL, cache invalidation, concurrency,
-      fallback, and performance-budget tests pass.
-- [ ] AI retrieval respects revision lifecycle and role/site permissions.
-
-## M3S - Selected Advanced Media
-
-Purpose: deliver the advanced media capabilities required by sensitive previews,
-cloud portability, content, AI metadata, and the upcoming showroom. M3S does not
-attempt to become a general-purpose media editor or video platform.
-
-### Retained Scope
-
-- [ ] Extend deterministic derived-asset recipes beyond F5 baseline variants
-      while preserving immutable originals and processor/source provenance.
-- [ ] Add downscaled and/or watermarked protected/strict preview variants where
-      the frozen media policy requires them; never describe them as DRM.
-- [ ] Define versioned asset bundles with manifest, members, checksums, media
-      types, relationships, access class, tenant/site ownership, and lifecycle.
-- [ ] Support bundle validation, atomic publication, partial-failure cleanup,
-      regeneration, replacement, retention, and deletion.
-- [ ] Complete advanced strict-media encryption/audit behavior required by the
-      selected sensitive-asset use cases, with documented provider/app ownership.
-- [ ] Add automated, dependency-aware CDN invalidation and reconciliation for
-      replaced/revoked derivatives and bundles.
-- [ ] Prove the storage/media adapter against the primary cloud and one bounded
-      second-provider compatibility target without duplicating media policy.
-- [ ] Expose safe, versioned metadata hooks for later AI tagging/search while
-      preventing model output from becoming authoritative MIME, scan, owner,
-      access-class, or lifecycle data.
-
-### Explicitly Deferred From Original M3
-
-- General-purpose Photoshop-style or arbitrary non-destructive editing UI.
-- Video-specific metadata, thumbnails, transcoding, and playback work that has
-  no selected product consumer; streaming remains deferred with M4.
-- Every possible storage/CDN/provider adapter.
-- Unmeasured GPU acceleration or client-side processing that weakens the media
-  policy boundary.
-
-### M3S Exit Gate
-
-- [ ] Protected/strict previews, bundles, encryption/audit, CDN invalidation,
-      and provider compatibility pass their policy and recovery tests.
-- [ ] Derived outputs can be regenerated from immutable originals with exact
-      processor/recipe provenance.
-- [ ] Bundle lifecycle cannot publish partial, cross-site, infected, missing, or
-      unauthorized members.
-- [ ] The retained M3 scope is documented separately from deferred editing/video
-      breadth.
-
-## M6 - State, Search, Events, And Workers
-
-Purpose: generalize reliable asynchronous and indexing infrastructure only now
-that media, commerce, AI, and CMS provide concrete consumers. M6 precedes M5 so
-the showroom does not invent a second worker/search/event architecture.
+Status: deferred from the active sequence. This section preserves the future
+scope and is not an implementation checklist until multiple measured consumers
+justify one shared platform over the bounded jobs/indexes owned by F5, M5, AI0,
+and M7.
 
 ### Event Contracts And Outbox
 
@@ -1460,226 +1843,6 @@ the showroom does not invent a second worker/search/event architecture.
 - [ ] The platform has no event-driven rewrite without a named consumer and
       evidence-backed benefit.
 
-## M5 - 3D Showroom
-
-Purpose: fulfill the promised web/mobile 3D capability as an entitled module
-using F5/M3S assets, F6 modules, F8 mobile, F9 operations, and M6 workers.
-
-### Product And Module Boundary
-
-- [ ] Implement showroom as a separate F6 module/service/worker set; keep
-      product core limited to versioned showroom capability/reference contracts.
-- [ ] Define site/channel entitlement, actor/admin permissions, module health,
-      data retention, upgrade/rollback, and absent/disabled fallback.
-- [ ] Validate product and scene ownership through versioned service contracts;
-      never read product/media databases directly.
-- [ ] Audit scene publication, product binding, destructive changes, privileged
-      processing, and entitlement decisions.
-
-### 3D Asset And Processing Contract
-
-- [ ] Run a web/Android/iOS compatibility spike and freeze the canonical runtime
-      asset format plus accepted ingest formats before implementing converters.
-- [ ] Support GLB/GLTF ingestion as selected; require USDZ only if an explicit
-      iOS/AR acceptance case needs it.
-- [ ] Validate container/archive structure, external references, paths, MIME,
-      checksums, texture dimensions/formats, geometry/material counts, animation,
-      decompression/resource limits, and prohibited content.
-- [ ] Store 3D sources and derivatives as F5/M3S governed, site-owned asset
-      bundles with immutable provenance.
-- [ ] Build deterministic texture/geometry optimization, compression, preview/
-      poster, and level-of-detail recipes with processor versions.
-- [ ] Start with measured CPU workers; introduce GPU workers only for a proven
-      workload and retain the same job/policy/provenance contracts.
-- [ ] Add retry, cancellation, supersession, partial-output cleanup,
-      reconciliation, and safe regeneration through M6.
-
-### Scene Manifest And Authoring
-
-- [ ] Define a versioned, JSON-compatible scene manifest containing bundle/
-      asset versions, transforms, camera, lighting, environment, hotspots,
-      product bindings, interaction intent, required renderer capabilities, and
-      poster/fallback media.
-- [ ] Keep manifest semantics platform-neutral; web/mobile renderer settings may
-      specialize without leaking DOM/CSS or native implementation details into
-      shared intent.
-- [ ] Add schema validation, migrations, draft/preview/publish/restore,
-      concurrency, immutable published revisions, and last-valid fallback.
-- [ ] Build a bounded admin authoring flow for asset selection, product binding,
-      camera/lighting presets, hotspots, preview, and publish; defer a general 3D
-      modeling application.
-- [ ] Prevent arbitrary scripts, external model/texture URLs, unsafe embeds, or
-      client-defined executable behavior in scene manifests.
-
-### Web And Mobile Renderers
-
-- [ ] Build a lazy-loaded web renderer with explicit client-only boundary,
-      poster fallback, loading/progress/error states, keyboard/touch controls,
-      reduced-motion behavior, and accessibility description/fallback content.
-- [ ] Build the mobile renderer against the same semantic manifest and selected
-      asset bundle contract, using native/device capability detection rather
-      than user-controlled entitlement.
-- [ ] Test representative low/mid/high device classes and define measured load,
-      memory, frame, network, texture, geometry, and battery/thermal budgets.
-- [ ] Select LOD/quality from trusted capability/performance rules and preserve
-      a functional product/media fallback when 3D is absent or too expensive.
-- [ ] Deliver assets through approved CDN/media routes with versioned immutable
-      cache identity; no renderer receives storage credentials.
-- [ ] Ensure web/mobile analytics uses governed M7-ready event contracts without
-      placing raw sensitive scene/user data into general telemetry.
-
-### Security, Operations, And Evidence
-
-- [ ] Repeat tenant/site, entitlement, product binding, scene lifecycle, and
-      media access checks at module/asset boundaries.
-- [ ] Add processing and delivery quotas, timeouts, cancellation, cost labels,
-      and denial behavior for malicious or oversized assets.
-- [ ] Add module, queue, worker, optional GPU, asset-processing, CDN, renderer-
-      failure, and client-performance dashboards/alerts.
-- [ ] Test malformed/bomb assets, cross-site binding, disabled entitlement,
-      missing variants, stale manifest, worker/GPU outage, CDN failure, old app
-      capability, and rollback.
-- [ ] Run an actual web plus Android/iOS demonstration using the same published
-      scene and documented fallbacks.
-
-### M5 Exit Gate
-
-- [ ] Admin can upload/process a governed 3D bundle, bind products, preview, and
-      publish a versioned scene.
-- [ ] Storefront and supported mobile builds render the same scene contract with
-      platform-appropriate behavior and safe fallback.
-- [ ] Disabled/unauthorized/cross-site users cannot obtain scene/assets through
-      API, worker, CDN, or renderer paths.
-- [ ] Asset processing is deterministic, observable, recoverable, and bounded by
-      measured device/infrastructure budgets.
-- [ ] Product core remains usable and uncorrupted when the showroom module is
-      disabled, absent, rolled back, or removed.
-
-## M7 - AI And Analytics
-
-Purpose: build evaluated tenant-scoped intelligence on top of AI0, M2 content,
-M3S assets, M6 events/search/workers, and the M5 showroom without transferring
-transactional authority to models.
-
-### Analytics Event And Data Contract
-
-- [ ] Define a versioned analytics catalog with event purpose, producer,
-      tenant/site/channel/application scope, actor/session pseudonym policy,
-      consent/legal basis where applicable, payload schema, retention, and owner.
-- [ ] Distinguish operational telemetry, security audit, product analytics,
-      model/agent traces, and training/evaluation data; do not copy all logs into
-      one analytics lake.
-- [ ] Validate, minimize, and classify event fields; exclude secrets, tokens,
-      signed URLs, unnecessary prompt/document content, and uncontrolled PII.
-- [ ] Define late/duplicate/out-of-order event handling and deletion/export
-      propagation through analytical stores and derived features.
-- [ ] Add data-quality, freshness, lineage, schema-drift, and tenant-isolation
-      checks before analytics becomes an AI input.
-
-### Selected AI Capabilities
-
-- [ ] Implement tenant-scoped semantic/catalog/content search enrichment using
-      AI0/M6 indexes and measured relevance improvements.
-- [ ] Implement media/content/product tag suggestions as non-authoritative
-      reviewed proposals with provenance and confidence/quality evidence.
-- [ ] Implement recommendations only after defining a useful baseline,
-      eligibility/privacy policy, cold-start/fallback behavior, and offline/
-      online success metrics.
-- [ ] Implement bounded admin/site insights that cite or link their supporting
-      data and state uncertainty/coverage limitations.
-- [ ] Allow the agent to use new read tools only through AI0 tool policy; add
-      write tools individually with confirmation, idempotency, authorization,
-      audit, and rollback.
-- [ ] Keep pricing, inventory, order status, media policy, entitlement, tenant
-      authority, and publication decisions deterministic and service-owned.
-
-### Model, Experiment, And Governance Lifecycle
-
-- [ ] Maintain a registry for model/provider/version, prompt, feature pipeline,
-      index, training/evaluation data version, parameters, owner, approval,
-      deployment, rollback, and retirement.
-- [ ] Define reproducible offline baselines and online rollout/experiment policy
-      with tenant/site isolation and no cross-tenant learning leakage.
-- [ ] Add model/retrieval/recommendation quality, drift, bias/coverage where
-      relevant, latency, availability, and cost monitoring.
-- [ ] Define user/admin feedback capture without treating feedback as trusted
-      labels or automatic training consent.
-- [ ] Define privacy notice, consent where required, retention, export, deletion,
-      provider-training, residency, and incident procedures.
-- [ ] Add human review/escalation for uncertain, sensitive, or consequential
-      outputs and a capability-scoped shutdown/rollback path.
-- [ ] Use Python only for concrete ML/data workflows and keep deployment,
-      contracts, tests, observability, and ownership standards language-neutral.
-
-### Evaluation And Failure Proofs
-
-- [ ] Extend AI0 evaluations per capability: retrieval, tagging, search,
-      recommendation, insight, and tool behavior each get task-appropriate
-      deterministic and human-reviewed measures.
-- [ ] Compare every learned/LLM capability against a simple non-AI baseline and
-      retain AI only where measured value justifies complexity/cost.
-- [ ] Test prompt/data poisoning, popularity/feedback manipulation, sparse/cold
-      data, stale indexes, model/provider outage, quota/cost exhaustion, drift,
-      deletion, rollback, and cross-tenant attack scenarios.
-- [ ] Test that AI failure degrades to normal product/search/media/showroom
-      behavior rather than blocking commerce or weakening authorization.
-- [ ] Publish model cards or equivalent internal capability records describing
-      purpose, data, metrics, limits, risks, and rollback owner.
-
-### M7 Exit Gate
-
-- [ ] Tenant-scoped analytics is versioned, minimized, traceable, and covered by
-      retention/export/deletion policy.
-- [ ] Each shipped AI capability beats its declared non-AI baseline at the
-      approved quality/cost/latency threshold.
-- [ ] Model, prompt, index, data, tool, and experiment versions are auditable and
-      reversible.
-- [ ] Cross-tenant leakage, prompt injection, excessive agency, poisoned data,
-      and model/provider outage tests pass at the approved release threshold.
-- [ ] Disabling every AI capability leaves P1 commerce, M2 content, M3S media,
-      and M5 showroom operational under defined non-AI fallbacks.
-
----
-
-# REPRESENTATION RELEASE P2
-
-## End-To-End Product Proof
-
-```text
-site admin publishes governed media, products, and composed content
--> storefront and mobile render the same site contracts
--> user completes the P1 commerce flow
--> authorized RAG answers cite current site-owned sources
--> events update search, AI indexes, caches, and derived state reliably
--> admin publishes an entitled 3D scene
--> web and mobile render it or use the declared fallback
--> analytics and selected AI insights remain tenant-scoped and reversible
-```
-
-- [ ] P0 Foundation and P1 Commerce gates remain green.
-- [ ] AI0, M2, M3S, M6, M5, and M7 exit gates pass.
-- [ ] The complete external path uses gateway plus approved CDN/storage URLs.
-- [ ] Cross-tenant denial is proven for data, media, content, search, vectors,
-      agents/tools, events/jobs, analytics, and 3D scenes/assets.
-- [ ] Web and mobile demonstrate commerce, content, governed media, AI/RAG, and
-      the same entitled 3D showroom contract.
-- [ ] Primary-cloud Kubernetes deploy, rollback, backup/restore, observability,
-      cost, and incident controls are exercised.
-- [ ] CI/staging includes deterministic contract/security gates and explicitly
-      versioned AI/3D evaluation evidence.
-- [ ] A portfolio demonstration explains current capabilities, architecture,
-      failure handling, measurements, security boundaries, and deliberate
-      exclusions without presenting planned features as complete.
-
----
-
-# DEFERRED GROWTH PARKING LOT
-
-These items are intentionally outside the active path. They receive no partial
-implementation merely because a shared field or UI placeholder is convenient.
-Re-entry requires a concrete user/business need, dependencies, acceptance
-criteria, cost estimate, and updated exit gate.
-
 ## Deferred M1 - Commerce Expansion
 
 - Payment-provider abstraction, confirmation, reconciliation, refunds, and
@@ -1749,40 +1912,29 @@ not a claim that commercial SaaS productization exists.
       M7 start; do not freeze vendor-specific 2026 implementation details as
       timeless architecture.
 
+---
+
 # CURRENT NEXT ACTION
 
-1. Preserve the completed F3 gateway, client, trust, release, and evidence
-   contracts; do not restart or redesign them as part of F4.
-2. Batch 1R and Batch 3R R0-R4 are complete. Execute F4 from
-   `docs/current-focus.md`; the `R3_REALM_AUTH_SHADOW` entry ledger is recorded.
-   The family-version prerequisite and isolated Realm Auth schema/deployment
-   foundation, clean dual-store verifier, and operator maintenance-backup
-   coverage are implemented, and the foundation verifier passed on 2026-09-09.
-   Bounded encrypted owner exports, atomic import, and login comparison are now
-   implemented, and their first populated verifier passed on 2026-09-09. The
-   first completion review corrected exact-rerun and controlled shadow-rollback
-   gaps, and the expanded adversarial/rollback proof passed. The second review
-   corrected the concurrent serializable-import retry gap, and its two-client
-   stateful proof passed. The updated foundation, Authority, role-seed, R2,
-   all-service migration, and zero-residue regressions passed on 2026-09-09,
-   closing R3. R4 then added the fixed provisioning operator subject and
-   offline recovery credential, exact rerun/no-use rollback checks, and the
-   per-epoch/per-role active tenant-grant constraint. Its clean disposable
-   proof passed on 2026-09-12 with zero sessions, tokens, operator grants,
-   customer-authority changes, or database residue. R5 then added the exact
-   context-v3 contract, strict receiver routing, and 56 separately declared
-   protobuf/controller/typed-client receiver paths. Its frozen legacy-proto,
-   exact-version, no-propagation, parity, and no-writer proofs passed on
-   2026-09-12. Begin R6.1_DEFAULT_AUTH_SESSION without activating the R1
-   records or the gateway v3 cohort.
-   R2's populated upgrades, reruns, atomic rollback, earlier-seed regressions,
-   and cleanup passed; legacy readers and v1 history remain preserved. R1's
-   realm/provider/policy/trust records remain inactive. R3 shadow migration
-   leaves current User/Auth authoritative and issues no realm session.
-3. Do not skip ADR-0015's receiver-before-session, durable generation/legacy-
-   bridge, traffic-cohort, clean-rerun, or rollback gates when adding realm
-   schema/protos, context v3, or domain actor columns.
-4. Optionally timebox EA0 corpus inventory and read-only evaluation design in a
-   separate track, but do not let it delay F4 or grant source-writing tools.
-5. Do not begin product AI0, CMS M2, advanced media M3S, general M6, showroom
-   M5, or analytics M7 before their declared dependency gates.
+1. Preserve F0-F3 and the audited F4 R0-R5 checkpoint. Do not continue R6.1,
+   activate dormant Realm Auth/context v3/Tenant Authority consumers, or alter
+   the completed F4 evidence during the demo-first phases.
+2. Execute F7 from `docs/current-focus.md`. Start with the read-only
+   `apps/web` route/import/asset/configuration/build inventory and write the
+   file-level admin/storefront disposition matrix before moving code.
+3. Complete `F7 -> D1 -> D2 -> D3 -> D4` and close the explicitly
+   default-site/single-realm P0 working web commerce demo.
+4. Continue in the adopted order:
+   `M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`.
+   General M6 remains deferred; each owning phase may implement only its bounded
+   proven jobs, indexes, or cache behavior.
+5. Treat M3S storage as compatibility work. Retain media-service policy and
+   MinIO local storage, implement only required S3-compatible operations and
+   provider-neutral tests, and send measured requirements to F9. F9 selects and
+   proves the primary provider topology before any full storage structure,
+   migration, replication, lifecycle/KMS, or multi-cloud work.
+6. Label every pre-F4 release as default-site/single-realm. Do not claim
+   cross-tenant, cross-license, realm-isolated session, or tenant-scoped
+   AI/analytics behavior until resumed F4 exits.
+7. The assistant runs small inspections and focused checks directly. Salar runs
+   commands likely to exceed the session timeout and returns bounded results.
