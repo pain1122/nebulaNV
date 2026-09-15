@@ -108,11 +108,25 @@ File:
 Purpose:
 
 - Builds all backend services from one shared Dockerfile.
-- Uses `node:22-bookworm` for build stages.
+- Uses immutable official `node:22-bookworm` and
+  `node:22-bookworm-slim` image-index digests for build and runtime stages.
+  This prevents sequential service targets from resolving different base bytes
+  during one build. Updating either digest is an explicit dependency/security
+  maintenance change followed by backend image and scan evidence.
 - Enables pnpm through corepack.
+- Caches Corepack's pinned pnpm download across sequential targets and retries
+  preparation at most three times, so a transient registry reset does not
+  immediately discard an otherwise reusable build graph.
+- Verified on 2026-09-15 by all 55 backend-tooling tests, Dockerfile build
+  validation, a complete sequential image build, and healthy startup of all
+  eleven backend/ingress services.
 - Uses `pnpm fetch` for dependency cache.
 - Copies package manifests first for better Docker layer caching.
 - Copies Prisma schemas before install because workspace postinstall runs Prisma generation.
+- Serializes build-stage dependency lifecycle scripts so the Prisma services do
+  not open concurrent engine-download connections through Docker Desktop. This
+  can make a cold install slower, while the dependency layer remains cached by
+  the lockfile and manifests.
 - Excludes host-generated proto TypeScript from the Docker context and regenerates it through the package-owned pinned toolchain before compiling `@nebula/protos`.
 - Runs one shared backend build through Turbo.
 - Builds the four small shared runtime packages before the cached Turbo service build. This refreshes pnpm's injected workspace copies even when Turbo would otherwise restore a shared-package build and skip its post-build synchronization hook.

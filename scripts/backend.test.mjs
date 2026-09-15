@@ -324,6 +324,27 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
   const rootExample = envValues(source(".env.example"));
   const releaseExample = envValues(source("deploy/.env.production.example"));
 
+  assert.match(
+    dockerfile,
+    /FROM node:22-bookworm@sha256:[a-f0-9]{64} AS build-base/,
+    "the build base must use an immutable official-image index",
+  );
+  assert.match(
+    dockerfile,
+    /FROM node:22-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base/,
+    "the runtime base must use an immutable official-image index",
+  );
+  assert.match(
+    dockerfile,
+    /id=nebula-corepack,target=\/root\/\.cache\/node\/corepack,sharing=locked/,
+    "Corepack downloads must survive sequential target builds",
+  );
+  assert.match(
+    dockerfile,
+    /until corepack prepare pnpm@10\.17\.1 --activate; do[\s\S]*?"\$attempt" -ge 3/,
+    "Corepack preparation must use a bounded retry",
+  );
+
   const backendGroup =
     bake.match(/group "backend"\s*\{([\s\S]*?)\}/)?.[1] ?? "";
   const bakeTargets = [...backendGroup.matchAll(/"([a-z]+(?:-[a-z]+)*)"/g)].map(
@@ -356,6 +377,11 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
   assert.match(
     dockerfile,
     /--mount=from=prod-deps,source=\/app\/packages,target=\/production-packages,ro/,
+  );
+  assert.match(
+    dockerfile,
+    /pnpm install --frozen-lockfile[\s\S]*?--child-concurrency=1[\s\S]*?--filter=@nebula\/protos\.\.\./,
+    "build dependency lifecycle scripts must run serially",
   );
   assert.match(
     dockerfile,

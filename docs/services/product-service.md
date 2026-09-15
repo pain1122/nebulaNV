@@ -1,6 +1,6 @@
 # Product Service
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-09-15
 
 ## Purpose
 
@@ -53,7 +53,23 @@ Access:
 
 Important note:
 
-HTTP currently does not expose product delete/restore/hard-delete, bulk discount, or gallery actions. Those exist in gRPC.
+The service's direct HTTP listener does not expose product
+delete/restore/hard-delete, bulk discount, or gallery actions. Those operations
+exist in gRPC and are already exposed externally through the gateway.
+
+## External Gateway Contract
+
+The public gateway exposes public Product list/get/gallery reads and admin
+list/get/create/update/delete/restore/hard-delete, bulk-discount, and gallery
+management. Generated `@nebula/api-client` methods cover the same routes.
+External callers must use this gateway contract; the direct Product HTTP
+listener remains an internal compatibility surface.
+
+The gateway preserves the service's public/admin visibility split and uses the
+shared request envelope, actor policy, error mapping, and idempotency handling.
+The current route inventory and the contract defects found behind those routes
+are recorded in the
+[D1 Batch 0 Product Contract And Data Audit](../reports/2026-09-15-d1-batch0-product-contract-data-audit.md).
 
 ## Current gRPC Contract
 
@@ -344,12 +360,29 @@ Tests:
 
 ## Known Gaps
 
-- Product variants are not modeled yet.
-- Need WooCommerce-style variant support with per-variant SKU, price, stock, media, attributes/options, and active/deleted state.
+- Product stock, availability, variants, selected options, and lost-update
+  protection are not modeled yet.
+- The proto/gateway declare `effectivePrice`, but Product does not calculate or
+  return it, so the current external value can default to zero.
+- Discount clearing, date validation, percentage bounds, and the wire value for
+  no discount are inconsistent between mutation paths.
+- Price requiredness differs between direct HTTP and gateway create paths.
+- Product variants need a bounded ecommerce contract with per-variant SKU,
+  price/stock overrides, options, active/deleted state, and deterministic order.
 - Order/cart items should eventually snapshot selected `variantId` and selected options, not only `productId`.
-- Currency policy is not fully standardized with order-service yet.
-- Default currency fallback and DB currency default differ: `USD` fallback vs `EUR` DB default.
+- Currency policy is not standardized with order-service. Settings seeds `USD`,
+  Product's database/response fallback is `EUR`, and a failed Settings lookup
+  can cache `USD` for the process lifetime.
+- Category ownership correctly stays in taxonomy-service. Product tags remain
+  free strings and Product has no authoritative brand relationship.
 - Product media fields are URL strings only; no media-service validation or media ID contract yet.
-- HTTP does not expose delete/restore/hard-delete, bulk discount, or gallery actions.
+- Omitted gallery sort order becomes zero through the gateway instead of
+  appending as the Product service intends.
+- Slug/SKU generation and conflict handling are nondeterministic under
+  concurrent writes; hard-delete dependency errors lack a stable mapped result.
 - Product comments, attributes, product sets, and VR hotspots exist in DB shape but do not have full visible service contracts yet.
 - gRPC admin enforcement should stay under review for every write method.
+
+These are classified and ordered in the dated D1 audit. Advanced presentation,
+comments, sets, and hotspot breadth remains compatibility data outside the
+basic ecommerce contract unless a concrete consumer requires it.

@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 
 Status: active backend execution checklist.
 
@@ -54,15 +54,15 @@ but they are not permanent production topology decisions.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Gateway            | F3 exposes generated, gateway-only external Auth, User, Settings, Media, Taxonomy, Product, Blog, and Order APIs              | Preserve this boundary and close only proven Product contract gaps                                           |
 | Product lifecycle  | `DRAFT`, `ACTIVE`, and `ARCHIVED` exist; public reads force active/non-deleted visibility and admin reads are separate        | Keep the mechanism and extend it without weakening visibility                                                |
-| Product model      | Product, gallery, attributes, comments, sets, hotspots, price, stock, slug, and SKU fields exist                              | Audit which fields have complete invariants and public contracts before adding schema                        |
+| Product model      | Product, gallery, attributes, comments, sets, hotspots, price, slug, and SKU fields exist; stock and availability do not      | Repair inconsistent facts, then add the minimum commercial state required for ecommerce                      |
 | Variants           | No authoritative variant model or selected-option contract exists                                                             | Confirmed ecommerce implementation gap                                                                       |
 | Taxonomy           | Product-scoped taxonomy facade and default-category initialization exist                                                      | Preserve ownership; prove category/tag/brand needs against current taxonomy contracts                        |
 | Media              | Media-service owns media policy, while Product currently stores URL strings and does not validate Media records               | Replace product-facing URL authority with the minimum validated Media-reference contract; no file-manager UI |
 | Currency           | Product fallback, Product database default, and Order behavior are not standardized                                           | Confirmed cross-service invariant gap shared with D2                                                         |
-| Product operations | Internal gRPC supports more management operations than the external HTTP/gateway surface                                      | Decide the minimum admin operations needed for ecommerce and complete parity                                 |
+| Product operations | Internal HTTP is limited, but the gateway already exposes all current gRPC management operations and generates client methods | Preserve the route boundary and repair its commercial data and response contracts                            |
 | Orders             | Cart, checkout, order snapshots, ownership checks, and admin status mutation already exist                                    | D2 will harden idempotency, stock, currency, transitions, rollback, and response mapping                     |
 | Frontends          | `apps/web` remains the compatibility client; the intended admin is an external Vite project and no storefront is required now | Do not change frontend source during D1/D2                                                                   |
-| Tenant work        | F4 R0-R5 is dormant and an untracked R6.1 experiment exists                                                                   | Preserve it untouched and make no tenant-isolation claim                                                     |
+| Tenant work        | F4 R0-R5 is dormant and the paused R6.1 experiment is preserved in a named path-scoped stash                                  | Preserve that stash untouched and make no tenant-isolation claim                                             |
 
 ## Finding Classification
 
@@ -98,25 +98,33 @@ Each D1 batch must:
 
 ## Batch 0 - Product Contract And Data Audit
 
-- [ ] Build a field-by-field matrix across Prisma, HTTP DTOs, gRPC proto,
+- [x] Build a field-by-field matrix across Prisma, HTTP DTOs, gRPC proto,
       gateway DTOs, OpenAPI, generated client types, seeds, and documentation.
-- [ ] Trace create, update, public read, admin read, archive/delete/restore,
+- [x] Trace create, update, public read, admin read, archive/delete/restore,
       taxonomy, gallery, pricing, stock, and availability behavior end to end.
-- [ ] Record current uniqueness, concurrency, transaction, error translation,
+- [x] Record current uniqueness, concurrency, transaction, error translation,
       and authorization behavior with exact source/test evidence.
-- [ ] Confirm which existing advanced fields are dormant compatibility data and
+- [x] Confirm which existing advanced fields are dormant compatibility data and
       keep them outside the basic ecommerce contract.
-- [ ] Run focused Product, Taxonomy, Media, Settings, gateway, external-client,
+- [x] Run focused Product, Taxonomy, Media, Settings, gateway, external-client,
       migration-status, and relevant live baselines.
-- [ ] Produce a dated D1 implementation matrix with confirmed defects separated
+      Product (24), Taxonomy (8), Media (30), Settings (12), and focused gateway
+      Product (8) tests plus `pnpm api:check` pass. Product e2e passed 9 suites
+      and 52 tests; F3 live passed all six flows; all nine Prisma services passed
+      clean migration verification with zero disposable databases remaining;
+      the final backend boot and all eleven readiness checks passed. Four
+      baseline incidents and their narrow corrections are recorded in the D1
+      audit.
+- [x] Produce a dated D1 implementation matrix with confirmed defects separated
       from stale documentation, optional hardening, and future scaling work.
+      See [D1 Batch 0 Product Contract And Data Audit](reports/2026-09-15-d1-batch0-product-contract-data-audit.md).
 
 ### Batch 0 Exit
 
-- [ ] Every D1 field and operation has one authoritative owner and an explicit
+- [x] Every D1 field and operation has one authoritative owner and an explicit
       external/internal exposure decision.
-- [ ] No schema or transport change is based only on a future frontend guess.
-- [ ] Existing passing behavior and rollback points are recorded.
+- [x] No schema or transport change is based only on a future frontend guess.
+- [x] Existing passing behavior and rollback points are recorded.
 
 ## Batch 1 - Product Core, Lifecycle, And Variants
 
@@ -226,10 +234,12 @@ Each D1 batch must:
 - Do not implement a file-manager UI or broad S3/provider abstraction.
 - Do not activate Realm Auth, context v3, Tenant Authority, or general
   tenant/site scoping.
-- Do not touch the untracked R6.1 Realm Auth experiment.
+- Do not apply, edit, or drop the named R6.1 Realm Auth experiment stash.
 - Preserve unrelated dirty work.
 
 ## Next Action
 
-Begin D1 Batch 0 by producing the Product contract/data matrix and running the
-fast focused baselines. No frontend source change is part of this action.
+Begin D1 Batch 1 with the narrow existing-contract repairs in audit order:
+effective price, discount state/wire invariants, price requiredness, currency
+normalization, gallery append semantics, identifier conflicts, and stable
+destructive-operation errors. No frontend source change is part of this action.

@@ -1,6 +1,6 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
 ## 1. Collaboration Contract
@@ -119,6 +119,8 @@ operation, remains disabled until its isolation work is complete.
 - Current focus file: `docs/current-focus.md`.
 - Current backend-ecommerce roadmap correction:
   `docs/reports/2026-09-14-backend-ecommerce-roadmap-correction.md`.
+- Current D1 Product contract/data audit:
+  `docs/reports/2026-09-15-d1-batch0-product-contract-data-audit.md`.
 - Partially superseded demo-first rebaseline:
   `docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md`.
 - Historical F7 source/migration inventory:
@@ -159,6 +161,38 @@ operation, remains disabled until its isolation work is complete.
   the Product/catalog backend, variants, governed Media references, Taxonomy,
   shop currency, gateway parity, deterministic data, migrations, and live
   evidence without frontend source changes.
+- D1 Batch 0 is complete. Product (24), Taxonomy (8), Media (30), Settings (12),
+  and focused gateway Product (8) tests plus `pnpm api:check` pass. Product e2e
+  passed 9 suites/52 tests; all six F3 live flows passed; all nine Prisma
+  services passed clean migration verification with zero verifier databases;
+  and the final boot plus all eleven health checks passed. Use the dated audit
+  as the defect ledger and begin Batch 1 with its narrow existing-contract
+  repairs before commercial schema.
+- The first D1 baseline boot exposed a populated-upgrade ordering gap in paused
+  F4: Tenant Authority R2 requires the inactive R1 control-plane seed, while
+  generic boot migrates before seeding. The local database was recovered
+  without losing actor data; all eight migrations are current and the seed is
+  idempotent. The general pre-R2 upgrade path still needs a narrow tooling or
+  runbook correction before a comparable deployment.
+- A second boot reached the shared image build and failed because the preserved
+  untracked R6.1 session experiment calls four missing Realm Auth Redis methods
+  across seven sites. This is deferred F4 user work, not committed backend or
+  D1 behavior. The dated D1 audit records the exact paths/errors and the
+  authorized path-scoped stash used to keep that experiment recoverable during
+  the backend baseline. The stash inventory contains only those paths, and the
+  committed Realm Auth build passes without them.
+- The next boot reached Docker dependency installation, where five concurrent
+  Prisma postinstall generators all failed with `ECONNRESET`. The build-stage
+  install now uses pnpm `--child-concurrency=1`, preserving required generation
+  while serializing its external engine-download path. The final build proved
+  this corrected layer.
+- That retry cached the corrected Prisma layer and exported media image 6/11,
+  then mutable Node tags resolved to different digests for taxonomy and forced
+  a Corepack network request that failed. The existing official Node 22
+  Bookworm build/runtime bases are now pinned by index digest, and Corepack has
+  a shared locked cache plus three bounded attempts. Base updates now require
+  explicit image/scan evidence. All 55 backend-tooling tests, Dockerfile build
+  validation, the sequential image build, and runtime startup passed.
 - D2 then completes cart, idempotent demo checkout, immutable Order snapshots,
   stock/currency behavior, status transitions, concurrency, and rollback. D1
   and D2 close the frontend-independent B0 Backend Ecommerce Release.
@@ -178,9 +212,9 @@ operation, remains disabled until its isolation work is complete.
   S3-compatible operations/provider-neutral tests may be added. F9 selects and
   proves primary-cloud bucket/KMS/lifecycle/migration structure from measured
   product evidence.
-- Untracked R6.1 Realm Auth experiment files remain outside the committed
-  baseline. Do not edit, import, test, delete, or move them during D1/D2 without
-  a separate user decision.
+- The paused R6.1 Realm Auth experiment is preserved in the named path-scoped
+  stash `paused-f4-r6.1-before-d1-baseline-2026-09-15`. Do not apply, edit, or
+  drop that stash during D1/D2 without a separate user decision.
 
 ## 5. How To Load Context For A Task
 

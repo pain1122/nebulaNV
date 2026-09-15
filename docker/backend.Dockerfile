@@ -1,12 +1,21 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm AS build-base
+FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS build-base
 WORKDIR /app
 
 ENV PNPM_HOME=/root/.local/share/pnpm
+ENV COREPACK_HOME=/root/.cache/node/corepack
 ENV PATH=$PNPM_HOME:$PATH
 
-RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
+RUN --mount=type=cache,id=nebula-corepack,target=/root/.cache/node/corepack,sharing=locked \
+    set -eu; \
+    corepack enable; \
+    attempt=1; \
+    until corepack prepare pnpm@10.17.1 --activate; do \
+      if [ "$attempt" -ge 3 ]; then exit 1; fi; \
+      attempt=$((attempt + 1)); \
+      sleep 5; \
+    done
 
 # Keep dependency resolution independent from application source changes.
 FROM build-base AS deps
@@ -45,7 +54,9 @@ COPY --from=deps /app/apps ./apps
 COPY --from=deps /app/packages ./packages
 
 # Workspace postinstall scripts generate Prisma clients, so schemas must exist
-# before the full development install. Later source copies merge with this tree.
+# before the full development install. Run lifecycle scripts serially because
+# concurrent Prisma engine downloads can exhaust/reset the Docker TLS path.
+# Later source copies merge with this tree.
 COPY apps/blog-service/prisma/schema.prisma apps/blog-service/prisma/schema.prisma
 COPY apps/tenant-authority-service/prisma/schema.prisma apps/tenant-authority-service/prisma/schema.prisma
 COPY apps/media-service/prisma/schema.prisma apps/media-service/prisma/schema.prisma
@@ -58,6 +69,7 @@ COPY apps/realm-auth-service/prisma/schema.prisma apps/realm-auth-service/prisma
 
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile \
+    --child-concurrency=1 \
     --filter=@nebula/protos... \
     --filter=@nebula/grpc-auth... \
     --filter=@nebula/gateway... \
@@ -199,7 +211,7 @@ COPY --from=build /app/packages/protos/user.proto /packages/protos/user.proto
 # This layer is referenced by every final service image. The layer is shared in
 # a registry/local store, but is still part of each image manifest, so every
 # image remains independently pushable, pullable, savable, and runnable.
-FROM node:22-bookworm-slim AS runtime-base
+FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS runtime-base
 WORKDIR /workspace
 
 ENV NODE_ENV=production
