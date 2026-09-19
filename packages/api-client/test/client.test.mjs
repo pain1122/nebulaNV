@@ -21,8 +21,14 @@ function jsonResponse(status, body, responseHeaders = {}) {
 
 test("generated inventory contains the complete gateway operation surface", () => {
   assert.equal(Object.keys(gatewayOperations).length, 70);
-  assert.equal(gatewayOperations.products_list.pathTemplate, "/api/v1/products");
-  assert.equal(gatewayOperations.admin_products_create.requiresAccessToken, true);
+  assert.equal(
+    gatewayOperations.products_list.pathTemplate,
+    "/api/v1/products",
+  );
+  assert.equal(
+    gatewayOperations.admin_products_create.requiresAccessToken,
+    true,
+  );
 });
 
 test("public calls use only the gateway base, client ID, and typed query", async () => {
@@ -32,7 +38,11 @@ test("public calls use only the gateway base, client ID, and typed query", async
     publicClientId: "storefront-web",
     fetch: async (url, init) => {
       calls.push({ url, init });
-      return jsonResponse(200, { data: [], meta: { pagination: { profile: "page-limit-total" } } }, { "x-request-id": "request-1" });
+      return jsonResponse(
+        200,
+        { data: [], meta: { pagination: { profile: "page-limit-total" } } },
+        { "x-request-id": "request-1" },
+      );
     },
   });
 
@@ -65,7 +75,7 @@ test("protected mutations attach bearer, idempotency, origin, and JSON body", as
 
   const result = await client.request("admin_products_create", {
     idempotencyKey: "0123456789abcdef",
-    body: { title: "Desk", content: "Description" },
+    body: { title: "Desk", price: 100, content: "Description" },
   });
 
   assert.equal(result.ok, true);
@@ -75,6 +85,7 @@ test("protected mutations attach bearer, idempotency, origin, and JSON body", as
   assert.equal(calls[0].init.headers["Sec-Fetch-Site"], "same-origin");
   assert.deepEqual(JSON.parse(calls[0].init.body), {
     title: "Desk",
+    price: 100,
     content: "Description",
   });
 });
@@ -90,7 +101,8 @@ test("HTTP failures retain status, gateway envelope, headers, and request ID", a
   const client = createGatewayClient({
     baseUrl: "https://gateway.example.test",
     publicClientId: "mobile",
-    fetch: async () => jsonResponse(400, failure, { "x-request-id": "request-2" }),
+    fetch: async () =>
+      jsonResponse(400, failure, { "x-request-id": "request-2" }),
   });
 
   const result = await client.request("auth_login", {

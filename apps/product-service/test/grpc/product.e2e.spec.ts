@@ -67,6 +67,13 @@ describe("ProductService gRPC (admin required on writes)", () => {
     id = res.data.id;
     expect(res.data.title).toBe(input.title);
     expect(res.data.categoryId).toBe(categoryId);
+    expect(res.data).toMatchObject({
+      price: 149.5,
+      discountType: "NONE",
+      discountValue: 0,
+      discountActive: false,
+      effectivePrice: 149.5,
+    });
   });
 
   it("GetProduct returns the created item (public)", async () => {
@@ -170,14 +177,28 @@ describe("ProductService gRPC (admin required on writes)", () => {
     );
   });
 
-  it("UpdateProduct (admin) changes title", async () => {
+  it("UpdateProduct (admin) changes title and calculates its discount", async () => {
     const res = await call<any>(
       client,
       "UpdateProduct",
-      { id, data: { title: "E2E Widget gRPC Pro" } },
+      {
+        id,
+        data: {
+          title: "E2E Widget gRPC Pro",
+          discountType: "PERCENTAGE",
+          discountValue: 10,
+          discountActive: true,
+        },
+      },
       mdS2S({ role: "admin" }),
     );
     expect(res.data.title).toBe("E2E Widget gRPC Pro");
+    expect(res.data).toMatchObject({
+      discountType: "PERCENTAGE",
+      discountValue: 10,
+      discountActive: true,
+      effectivePrice: 134.55,
+    });
   });
 
   it("UpdateProduct returns NOT_FOUND for a missing product", async () => {

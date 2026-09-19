@@ -128,6 +128,10 @@ Each D1 batch must:
 
 ## Batch 1 - Product Core, Lifecycle, And Variants
 
+- [x] Repair the audited `effectivePrice`, discount-state/wire, create-price,
+      and create/bulk omission defects across Product, gRPC, gateway, OpenAPI,
+      generated client, focused tests, container-backed Product tests, and
+      preserved F3 live flows.
 - [ ] Finalize required product fields: title, slug, excerpt, description, base
       SKU, lifecycle, availability, price, currency, and basic stock.
 - [ ] Preserve deterministic global slug/SKU uniqueness for the current
@@ -239,7 +243,6 @@ Each D1 batch must:
 
 ## Next Action
 
-Begin D1 Batch 1 with the narrow existing-contract repairs in audit order:
-effective price, discount state/wire invariants, price requiredness, currency
-normalization, gallery append semantics, identifier conflicts, and stable
+Continue the narrow existing-contract repair order with currency normalization,
+gallery append semantics, identifier conflicts, and stable
 destructive-operation errors. No frontend source change is part of this action.

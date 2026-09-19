@@ -113,7 +113,10 @@ describe("gateway Product HTTP routes", () => {
       .query({ page: 1, limit: 20 })
       .set({ "X-Nebula-Client-ID": "mobile-local" })
       .expect(200);
-    expect(accepted.body.meta.pagination).toEqual({ profile: "total-only", total: 1 });
+    expect(accepted.body.meta.pagination).toEqual({
+      profile: "total-only",
+      total: 1,
+    });
     expect(products.listPublic).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ page: 1, limit: 20 }),
@@ -155,17 +158,30 @@ describe("gateway Product HTTP routes", () => {
     expect(products.listAdmin).toHaveBeenCalledTimes(1);
   });
 
-  it("accepts external content on create and rejects an empty patch before dispatch", async () => {
+  it("requires price, accepts external content, and rejects an empty patch", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/admin/products")
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-missing-price`)
+      .send({ title: "Desk" })
+      .expect(400);
+    expect(products.create).not.toHaveBeenCalled();
+
     await request(app.getHttpServer())
       .post("/api/v1/admin/products")
       .set(TEST_ADMIN_IDENTITY_HEADERS)
       .set("Authorization", "Bearer admin-token")
       .set("Idempotency-Key", IDEMPOTENCY_KEY)
-      .send({ title: "Desk", content: "Solid oak" })
+      .send({ title: "Desk", price: 100, content: "Solid oak" })
       .expect(201);
     expect(products.create).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ title: "Desk", content: "Solid oak" }),
+      expect.objectContaining({
+        title: "Desk",
+        price: 100,
+        content: "Solid oak",
+      }),
     );
 
     await request(app.getHttpServer())

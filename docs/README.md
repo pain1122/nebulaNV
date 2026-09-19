@@ -70,6 +70,7 @@ For most backend tasks, read in this order:
 
 ## Reports
 
+- [2026-09-15 D1 Batch 1 Existing-Contract Repair Checkpoint](reports/2026-09-15-d1-batch1-contract-repair-checkpoint.md)
 - [2026-09-15 D1 Batch 0 Product Contract And Data Audit](reports/2026-09-15-d1-batch0-product-contract-data-audit.md)
 - [2026-09-14 Backend Ecommerce Roadmap Correction](reports/2026-09-14-backend-ecommerce-roadmap-correction.md)
 - [2026-09-14 F7 Batch 0 Web Source And Migration Inventory](reports/2026-09-14-f7-batch0-web-source-migration-inventory.md)

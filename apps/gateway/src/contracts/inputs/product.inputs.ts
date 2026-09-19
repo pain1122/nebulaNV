@@ -43,7 +43,10 @@ export const PRODUCT_INPUT_PROFILES = Object.freeze({
   "product-admin-list": profile({
     query: ["q", "categoryId", "page", "limit", "status", "includeDeleted"],
   }),
-  "product-write": profile({ body: PRODUCT_WRITE_FIELDS }),
+  "product-write": profile({
+    body: PRODUCT_WRITE_FIELDS,
+    requiredBody: ["title", "price"],
+  }),
   "product-patch": profile({
     params: ["id"],
     body: PRODUCT_WRITE_FIELDS,
@@ -73,6 +76,17 @@ export const PRODUCT_INPUT_PROFILES = Object.freeze({
         kind: "at-least-one",
         location: "body",
         fields: ["ids", "categoryId", "status", "q"],
+      },
+      {
+        kind: "at-least-one",
+        location: "body",
+        fields: [
+          "discountType",
+          "discountValue",
+          "discountActive",
+          "discountStart",
+          "discountEnd",
+        ],
       },
     ],
   }),

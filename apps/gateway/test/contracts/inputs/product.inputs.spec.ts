@@ -20,12 +20,16 @@ describe("product input profiles", () => {
   it("uses external content and rejects internal description", () => {
     expect(
       validateGatewayInput("product-write", {
-        body: { title: "Desk", content: "External description" },
+        body: {
+          title: "Desk",
+          price: 100,
+          content: "External description",
+        },
       }),
     ).toEqual([]);
     expect(
       validateGatewayInput("product-write", {
-        body: { title: "Desk", description: "Internal field" },
+        body: { title: "Desk", price: 100, description: "Internal field" },
       }),
     ).toEqual([{ field: "body.description", code: "unknown_field" }]);
   });
@@ -49,6 +53,11 @@ describe("product input profiles", () => {
   it("requires a bulk selector and bounds gallery collections", () => {
     expect(validateGatewayInput("product-bulk-discount", { body: {} })).toEqual(
       [
+        {
+          field:
+            "body.discountType|discountValue|discountActive|discountStart|discountEnd",
+          code: "required_field",
+        },
         {
           field: "body.ids|categoryId|status|q",
           code: "required_field",

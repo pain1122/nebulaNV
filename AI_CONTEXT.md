@@ -168,6 +168,13 @@ operation, remains disabled until its isolation work is complete.
   and the final boot plus all eleven health checks passed. Use the dated audit
   as the defect ledger and begin Batch 1 with its narrow existing-contract
   repairs before commercial schema.
+- D1 Batch 1's first repair is complete. Product calculates numeric effective
+  prices, normalizes and validates the complete discount state, and emits
+  `NONE`. Gateway create requires an explicit price, while create and bulk
+  mappers preserve omission. Focused Product, gateway, OpenAPI/proto, and
+  API-client checks pass; rebuilt Product passed 10 suites/65 tests, all eleven
+  services are ready, and all six preserved F3 live flows pass. See
+  `docs/reports/2026-09-15-d1-batch1-contract-repair-checkpoint.md`.
 - The first D1 baseline boot exposed a populated-upgrade ordering gap in paused
   F4: Tenant Authority R2 requires the inactive R1 control-plane seed, while
   generic boot migrates before seeding. The local database was recovered

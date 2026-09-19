@@ -551,7 +551,7 @@ export type GatewayProductWriteDto = Readonly<{
   readonly "model3dPosterUrl"?: string;
   readonly "model3dUrl"?: string;
   readonly "noindex"?: boolean;
-  readonly "price"?: number;
+  readonly "price": number;
   readonly "promoActive"?: boolean;
   readonly "promoBadge"?: string;
   readonly "promoTitle"?: string;

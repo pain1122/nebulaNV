@@ -16,6 +16,7 @@ import { firstValueFrom } from "rxjs";
 import { createGatewayDownstreamContext } from "../downstream/gateway-downstream-context";
 import type { GatewayHttpRequest } from "../http/public-client-boundary";
 import {
+  GatewayDiscountType,
   GatewayProductStatus,
   type GatewayAdminProductListQueryDto,
   type GatewayBulkResultDto,
@@ -38,6 +39,17 @@ function knownStatus(value: string): GatewayProductStatus {
     throw new BadGatewayException("product_response_status_invalid");
   }
   return value as GatewayProductStatus;
+}
+
+function knownDiscountType(value: string): GatewayDiscountType {
+  // Accept the former empty-string representation during rolling upgrades.
+  if (value === "") return GatewayDiscountType.NONE;
+  if (
+    !Object.values(GatewayDiscountType).includes(value as GatewayDiscountType)
+  ) {
+    throw new BadGatewayException("product_response_discount_type_invalid");
+  }
+  return value as GatewayDiscountType;
 }
 
 function finiteNumber(value: number, name: string): number {
@@ -84,7 +96,7 @@ function product(value: productv1.Product | undefined): GatewayProductDto {
     promoTitle: value.promoTitle,
     promoBadge: value.promoBadge,
     promoActive: value.promoActive,
-    discountType: value.discountType,
+    discountType: knownDiscountType(value.discountType),
     discountValue: finiteNumber(value.discountValue, "discount_value"),
     discountActive: value.discountActive,
     discountStart: value.discountStart,
@@ -154,41 +166,17 @@ function gallery(
 function createInput(
   input: GatewayProductWriteDto,
 ): GrpcRequestInput<productv1.ProductInput> {
-  return {
+  const data: Partial<GrpcRequestInput<productv1.ProductInput>> = {
     title: input.title,
-    slug: input.slug ?? "",
-    sku: input.sku ?? "",
-    price: input.price ?? 0,
-    categoryId: input.categoryId ?? "",
-    description: input.content ?? "",
-    excerpt: input.excerpt ?? "",
-    currency: input.currency ?? "",
-    status: input.status ?? "",
-    thumbnailUrl: input.thumbnailUrl ?? "",
-    model3dUrl: input.model3dUrl ?? "",
-    model3dFormat: input.model3dFormat ?? "",
-    model3dLiveView: input.model3dLiveView ?? false,
-    model3dPosterUrl: input.model3dPosterUrl ?? "",
-    vrEnabled: input.vrEnabled ?? false,
-    vrPlanImageUrl: input.vrPlanImageUrl ?? "",
-    metaTitle: input.metaTitle ?? "",
-    metaDescription: input.metaDescription ?? "",
-    metaKeywords: input.metaKeywords ?? "",
-    customSchema: input.customSchema ?? "",
-    noindex: input.noindex ?? false,
-    isFeatured: input.isFeatured ?? false,
-    featureSort: input.featureSort ?? 0,
-    promoTitle: input.promoTitle ?? "",
-    promoBadge: input.promoBadge ?? "",
-    promoActive: input.promoActive ?? false,
-    discountType: input.discountType ?? "",
-    discountValue: input.discountValue ?? 0,
-    discountActive: input.discountActive ?? false,
-    discountStart: input.discountStart ?? "",
-    discountEnd: input.discountEnd ?? "",
-    tags: input.tags ?? [],
-    complementaryIds: input.complementaryIds ?? [],
+    price: input.price,
   };
+  for (const field of PATCH_FIELDS) {
+    if (field === "title" || field === "price") continue;
+    const value = input[field];
+    if (value !== undefined) Object.assign(data, { [field]: value });
+  }
+  if (input.content !== undefined) data.description = input.content;
+  return data as GrpcRequestInput<productv1.ProductInput>;
 }
 
 const PATCH_FIELDS = Object.freeze([
@@ -388,20 +376,26 @@ export class GatewayProductApiService {
     input: GatewayProductBulkDiscountDto,
   ): Promise<GatewayBulkResultDto> {
     const products = this.products(request);
+    const data: Partial<GrpcRequestInput<productv1.ApplyDiscountBulkRequest>> =
+      {};
+    for (const field of [
+      "ids",
+      "categoryId",
+      "status",
+      "q",
+      "discountType",
+      "discountValue",
+      "discountActive",
+      "discountStart",
+      "discountEnd",
+    ] as const) {
+      const value = input[field];
+      if (value !== undefined) Object.assign(data, { [field]: value });
+    }
     const result = await wrapGrpc(
       firstValueFrom(
         products.proxy.ApplyDiscountBulk(
-          {
-            ids: input.ids ?? [],
-            categoryId: input.categoryId ?? "",
-            status: input.status ?? "",
-            q: input.q ?? "",
-            discountType: input.discountType ?? "",
-            discountValue: input.discountValue ?? 0,
-            discountActive: input.discountActive ?? false,
-            discountStart: input.discountStart ?? "",
-            discountEnd: input.discountEnd ?? "",
-          },
+          data as GrpcRequestInput<productv1.ApplyDiscountBulkRequest>,
           products.metadata,
         ),
       ),

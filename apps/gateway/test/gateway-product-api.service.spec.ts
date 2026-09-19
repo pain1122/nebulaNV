@@ -6,7 +6,10 @@ import { of } from "rxjs";
 import type { GatewayRequestContext } from "../src/application/application.contracts";
 import type { GatewayHttpRequest } from "../src/http/public-client-boundary";
 import { GatewayProductApiService } from "../src/product/gateway-product-api.service";
-import { GatewayProductStatus } from "../src/product/product-api.dto";
+import {
+  GatewayDiscountType,
+  GatewayProductStatus,
+} from "../src/product/product-api.dto";
 
 const PRODUCT_KEY = {
   id: "gateway-product-v1",
@@ -159,10 +162,11 @@ describe("GatewayProductApiService", () => {
 
     await service.create(gatewayRequest(true), {
       title: "Desk",
+      price: 100,
       content: "Solid oak",
     });
-    expect(createProduct.mock.calls[0]?.[0]).toMatchObject({
-      data: { title: "Desk", description: "Solid oak" },
+    expect(createProduct.mock.calls[0]?.[0]).toEqual({
+      data: { title: "Desk", price: 100, description: "Solid oak" },
     });
 
     await service.update(gatewayRequest(true), PRODUCT_ID, {
@@ -183,6 +187,38 @@ describe("GatewayProductApiService", () => {
     expect(metadata.get(X_REQUEST_ID_HEADER)).toEqual([
       requestContext.requestId,
     ]);
+  });
+
+  it("normalizes the legacy empty discount response and rejects unknown values", async () => {
+    const compatible = createHarness({
+      GetProduct: jest.fn(() => of({ data: product({ discountType: "" }) })),
+    });
+    await expect(
+      compatible.service.getPublic(gatewayRequest(false), PRODUCT_ID),
+    ).resolves.toMatchObject({ discountType: GatewayDiscountType.NONE });
+
+    const invalid = createHarness({
+      GetProduct: jest.fn(() =>
+        of({ data: product({ discountType: "SURPRISE" }) }),
+      ),
+    });
+    await expect(
+      invalid.service.getPublic(gatewayRequest(false), PRODUCT_ID),
+    ).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("preserves omission in a partial bulk discount request", async () => {
+    const applyDiscountBulk = jest.fn(() => of({ updated: 2 }));
+    const { service } = createHarness({ ApplyDiscountBulk: applyDiscountBulk });
+
+    await expect(
+      service.applyDiscount(gatewayRequest(true), {
+        discountActive: false,
+      }),
+    ).resolves.toEqual({ updated: 2 });
+    expect(applyDiscountBulk.mock.calls[0]?.[0]).toEqual({
+      discountActive: false,
+    });
   });
 
   it("rejects deleted public gallery rows and mismatched product IDs", async () => {

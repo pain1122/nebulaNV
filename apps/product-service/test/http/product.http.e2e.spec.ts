@@ -64,6 +64,13 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     );
     id = res.data.id;
     expect(res.data.title).toBe("E2E Widget");
+    expect(res.data).toMatchObject({
+      price: 199.99,
+      discountType: "NONE",
+      discountValue: 0,
+      discountActive: false,
+      effectivePrice: 199.99,
+    });
     // categoryId should be auto-filled with default_product_category
     expect(typeof res.data.categoryId).toBe("string");
     expect(res.data.categoryId.length).toBeGreaterThan(0);

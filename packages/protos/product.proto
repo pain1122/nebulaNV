@@ -47,7 +47,7 @@ message Product {
   bool   promoActive = 27;
 
   // discount
-  string discountType = 28; // "PERCENTAGE" | "FIXED" | ""
+  string discountType = 28; // "PERCENTAGE" | "FIXED" | "NONE"
   double discountValue = 29;
   bool   discountActive = 30;
   string discountStart = 31; // ISO8601 or ""

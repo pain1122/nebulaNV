@@ -163,7 +163,7 @@ DDL rollback on a malformed old-schema comment.
 
 ## Product Rules
 
-- Create requires `title`.
+- Create requires `title` and an explicit non-negative `price`.
 - Price must be non-negative.
 - Slug is generated from title/input slug and made unique.
 - SKU is generated if absent and made unique.
@@ -206,6 +206,13 @@ Mapping rule:
 - `DiscountTypeDto.NONE` maps to `null` in the database.
 - Clearing discount also clears value, active flag, and date window.
 - Discount end must be greater than or equal to discount start.
+- A stored percentage/fixed type requires a non-negative value; percentage is
+  capped at 100.
+- Partial single and bulk changes are checked against the complete stored
+  discount state before mutation.
+- Responses use `NONE` for no discount and include a numeric `effectivePrice`.
+  Active in-window percentage/fixed discounts are rounded to two decimals, and
+  fixed discounts clamp at zero.
 
 ## Media And Presentation Fields
 
@@ -355,6 +362,7 @@ Tests:
 - `apps/product-service/test/default-product-taxonomy.initializer.unit.spec.ts`
 - `apps/product-service/test/product.error-translation.unit.spec.ts`
 - `apps/product-service/test/product-read-visibility.unit.spec.ts`
+- `apps/product-service/test/product-discount.unit.spec.ts`
 - `apps/product-service/test/setup/wait-for-services.ts`
 - `apps/product-service/test/jest.env.ts`
 
@@ -362,11 +370,6 @@ Tests:
 
 - Product stock, availability, variants, selected options, and lost-update
   protection are not modeled yet.
-- The proto/gateway declare `effectivePrice`, but Product does not calculate or
-  return it, so the current external value can default to zero.
-- Discount clearing, date validation, percentage bounds, and the wire value for
-  no discount are inconsistent between mutation paths.
-- Price requiredness differs between direct HTTP and gateway create paths.
 - Product variants need a bounded ecommerce contract with per-variant SKU,
   price/stock overrides, options, active/deleted state, and deterministic order.
 - Order/cart items should eventually snapshot selected `variantId` and selected options, not only `productId`.

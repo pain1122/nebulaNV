@@ -1654,6 +1654,7 @@
             "type": "string"
           },
           "discountValue": {
+            "description": "Percentage discounts are additionally limited to 100.",
             "maximum": 1000000,
             "minimum": 0,
             "type": "number"
@@ -1923,6 +1924,7 @@
             "type": "string"
           },
           "discountValue": {
+            "description": "Percentage discounts are additionally limited to 100.",
             "maximum": 1000000,
             "minimum": 0,
             "type": "number"
@@ -2067,6 +2069,7 @@
             "type": "string"
           },
           "discountValue": {
+            "description": "Percentage discounts are additionally limited to 100.",
             "maximum": 1000000,
             "minimum": 0,
             "type": "number"
@@ -2166,7 +2169,8 @@
           }
         },
         "required": [
-          "title"
+          "title",
+          "price"
         ],
         "type": "object"
       },

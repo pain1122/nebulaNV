@@ -94,12 +94,11 @@ export class GatewayProductWriteDto {
   @MaxLength(120)
   sku?: string;
 
-  @ApiPropertyOptional({ minimum: 0 })
-  @IsOptional()
+  @ApiProperty({ minimum: 0 })
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  price?: number;
+  price!: number;
 
   @ApiPropertyOptional({ maxLength: 8 })
   @IsOptional()
@@ -112,7 +111,9 @@ export class GatewayProductWriteDto {
   @IsEnum(GatewayProductStatus)
   status?: GatewayProductStatus;
 
-  @ApiPropertyOptional({ description: "Maps to the internal description field." })
+  @ApiPropertyOptional({
+    description: "Maps to the internal description field.",
+  })
   @IsOptional()
   @IsString()
   content?: string;
@@ -228,10 +229,15 @@ export class GatewayProductWriteDto {
   @IsEnum(GatewayDiscountType)
   discountType?: GatewayDiscountType;
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 1_000_000 })
-  @ValidateIf((value: GatewayProductWriteDto) =>
-    value.discountType !== undefined &&
-    value.discountType !== GatewayDiscountType.NONE,
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 1_000_000,
+    description: "Percentage discounts are additionally limited to 100.",
+  })
+  @ValidateIf(
+    (value: GatewayProductWriteDto) =>
+      value.discountType !== undefined &&
+      value.discountType !== GatewayDiscountType.NONE,
   )
   @Type(() => Number)
   @IsNumber()
@@ -269,7 +275,9 @@ export class GatewayProductWriteDto {
   complementaryIds?: string[];
 }
 
-export class GatewayProductPatchDto extends PartialType(GatewayProductWriteDto) {}
+export class GatewayProductPatchDto extends PartialType(
+  GatewayProductWriteDto,
+) {}
 
 export class GatewayProductBulkDiscountDto {
   @ApiPropertyOptional({ type: [String], maxItems: 1000 })
@@ -299,7 +307,11 @@ export class GatewayProductBulkDiscountDto {
   @IsEnum(GatewayDiscountType)
   discountType?: GatewayDiscountType;
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 1_000_000 })
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 1_000_000,
+    description: "Percentage discounts are additionally limited to 100.",
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -426,7 +438,8 @@ export class GatewayProductDto {
   @ApiProperty() promoTitle!: string;
   @ApiProperty() promoBadge!: string;
   @ApiProperty() promoActive!: boolean;
-  @ApiProperty({ enum: GatewayDiscountType }) discountType!: string;
+  @ApiProperty({ enum: GatewayDiscountType })
+  discountType!: GatewayDiscountType;
   @ApiProperty() discountValue!: number;
   @ApiProperty() discountActive!: boolean;
   @ApiProperty() discountStart!: string;

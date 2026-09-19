@@ -60,6 +60,31 @@ type PrismaMappingOptions = {
   missingTarget?: string;
 };
 
+type DiscountState = Pick<
+  Product,
+  | "discountType"
+  | "discountValue"
+  | "discountActive"
+  | "discountStart"
+  | "discountEnd"
+>;
+
+const DISCOUNT_FIELDS = [
+  "discountType",
+  "discountValue",
+  "discountActive",
+  "discountStart",
+  "discountEnd",
+] as const;
+
+const hasOwn = (value: object, key: PropertyKey): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
+const isProvided = <T extends object, K extends keyof T>(
+  value: T,
+  key: K,
+): boolean => hasOwn(value, key) && value[key] !== undefined;
+
 function mapPrisma(e: unknown, options?: PrismaMappingOptions): Error {
   if (isRecord(e) && e.code === "P2002") {
     const meta = isRecord(e.meta) ? e.meta : undefined;
@@ -172,7 +197,37 @@ export class ProductServiceImpl {
     }
   }
 
+  private effectivePrice(p: Product, now = new Date()): number {
+    const price = new Prisma.Decimal(p.price);
+    const value = p.discountValue ? new Prisma.Decimal(p.discountValue) : null;
+    const outsideWindow =
+      (p.discountStart !== null && now < p.discountStart) ||
+      (p.discountEnd !== null && now > p.discountEnd);
+
+    if (
+      !p.discountActive ||
+      !p.discountType ||
+      value === null ||
+      value.isNegative() ||
+      outsideWindow
+    ) {
+      return price.toNumber();
+    }
+
+    const discounted =
+      p.discountType === DiscountType.PERCENTAGE
+        ? price.mul(new Prisma.Decimal(100).minus(value)).div(100)
+        : price.minus(value);
+    const nonNegative = discounted.isNegative()
+      ? new Prisma.Decimal(0)
+      : discounted;
+    return nonNegative
+      .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+      .toNumber();
+  }
+
   private toDto = (p: Product) => {
+    const hasDiscount = p.discountType !== null;
     return {
       id: p.id,
       slug: p.slug,
@@ -181,7 +236,7 @@ export class ProductServiceImpl {
       excerpt: p.excerpt ?? "",
       sku: p.sku,
       status: p.status ?? "ACTIVE",
-      price: p.price,
+      price: new Prisma.Decimal(p.price).toNumber(),
       currency: p.currency ?? "EUR",
 
       categoryId: p.categoryId,
@@ -203,11 +258,17 @@ export class ProductServiceImpl {
       promoTitle: p.promoTitle ?? "",
       promoBadge: p.promoBadge ?? "",
       promoActive: !!p.promoActive,
-      discountType: p.discountType ?? "",
-      discountValue: p.discountValue ?? 0,
-      discountActive: !!p.discountActive,
-      discountStart: p.discountStart ? p.discountStart.toISOString() : "",
-      discountEnd: p.discountEnd ? p.discountEnd.toISOString() : "",
+      discountType: p.discountType ?? DiscountTypeDto.NONE,
+      discountValue:
+        hasDiscount && p.discountValue
+          ? new Prisma.Decimal(p.discountValue).toNumber()
+          : 0,
+      discountActive: hasDiscount && !!p.discountActive,
+      discountStart:
+        hasDiscount && p.discountStart ? p.discountStart.toISOString() : "",
+      discountEnd:
+        hasDiscount && p.discountEnd ? p.discountEnd.toISOString() : "",
+      effectivePrice: this.effectivePrice(p),
       tags: p.tags ?? [],
       complementaryIds: p.complementaryIds ?? [],
       createdAt: p.createdAt ? p.createdAt.toISOString() : "",
@@ -320,6 +381,137 @@ export class ProductServiceImpl {
     }
   }
 
+  private parseDiscountDate(
+    value: string | null | undefined,
+  ): Date | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null || value === "") return null;
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException("discount date must be a valid ISO date");
+    }
+    return parsed;
+  }
+
+  private assertDiscountState(state: DiscountState): void {
+    this.assertDiscountWindow(state.discountStart, state.discountEnd);
+
+    if (state.discountType === null) {
+      if (
+        state.discountValue !== null ||
+        state.discountActive ||
+        state.discountStart !== null ||
+        state.discountEnd !== null
+      ) {
+        throw new BadRequestException(
+          "discountType is required when discount fields are set",
+        );
+      }
+      return;
+    }
+
+    if (state.discountValue === null) {
+      throw new BadRequestException(
+        "discountValue is required when discountType is set",
+      );
+    }
+    if (state.discountValue.isNegative()) {
+      throw new BadRequestException("discountValue must be non-negative");
+    }
+    if (
+      state.discountType === DiscountType.PERCENTAGE &&
+      state.discountValue.greaterThan(100)
+    ) {
+      throw new BadRequestException(
+        "percentage discountValue must be at most 100",
+      );
+    }
+  }
+
+  private clearedDiscountState(): DiscountState {
+    return {
+      discountType: null,
+      discountValue: null,
+      discountActive: false,
+      discountStart: null,
+      discountEnd: null,
+    };
+  }
+
+  private createDiscountState(input: ProductInputDto): DiscountState {
+    if (
+      input.discountType === DiscountTypeDto.NONE ||
+      (input.discountType === undefined &&
+        input.discountValue === undefined &&
+        input.discountActive !== true &&
+        input.discountStart === undefined &&
+        input.discountEnd === undefined)
+    ) {
+      return this.clearedDiscountState();
+    }
+
+    const discountType = asDiscountType(input.discountType);
+    if (!discountType) {
+      throw new BadRequestException(
+        "discountType is required when discount fields are set",
+      );
+    }
+
+    const state: DiscountState = {
+      discountType,
+      discountValue:
+        input.discountValue === undefined
+          ? null
+          : new Prisma.Decimal(input.discountValue),
+      discountActive: input.discountActive ?? false,
+      discountStart: this.parseDiscountDate(input.discountStart) ?? null,
+      discountEnd: this.parseDiscountDate(input.discountEnd) ?? null,
+    };
+    this.assertDiscountState(state);
+    return state;
+  }
+
+  private patchDiscountState(
+    current: DiscountState,
+    patch: ProductPatchInput,
+  ): DiscountState {
+    if (
+      isProvided(patch, "discountType") &&
+      (patch.discountType === DiscountTypeDto.NONE ||
+        patch.discountType === null)
+    ) {
+      return this.clearedDiscountState();
+    }
+
+    const discountType = isProvided(patch, "discountType")
+      ? asDiscountType(patch.discountType)
+      : current.discountType;
+    if (discountType === undefined) {
+      throw new BadRequestException("discountType is invalid");
+    }
+
+    const state: DiscountState = {
+      discountType,
+      discountValue: isProvided(patch, "discountValue")
+        ? patch.discountValue === null
+          ? null
+          : new Prisma.Decimal(patch.discountValue as number)
+        : current.discountValue,
+      discountActive: isProvided(patch, "discountActive")
+        ? (patch.discountActive ?? false)
+        : current.discountActive,
+      discountStart: isProvided(patch, "discountStart")
+        ? (this.parseDiscountDate(patch.discountStart) ?? null)
+        : current.discountStart,
+      discountEnd: isProvided(patch, "discountEnd")
+        ? (this.parseDiscountDate(patch.discountEnd) ?? null)
+        : current.discountEnd,
+    };
+    this.assertDiscountState(state);
+    return state;
+  }
+
   private assertPrice(value: unknown): void {
     const n = Number(value);
     if (!Number.isFinite(n) || n < 0) {
@@ -345,16 +537,8 @@ export class ProductServiceImpl {
       input.categoryId ?? (await this.getDefaultCategoryId(downstream));
     await this.assertCategoryExists(categoryId, downstream);
 
-    // normalize window to Date|null for DB
     const defaultCurrency = await this.getDefaultCurrency(downstream);
-    const discountStart: Date | null = input.discountStart
-      ? new Date(input.discountStart)
-      : null;
-    const discountEnd: Date | null = input.discountEnd
-      ? new Date(input.discountEnd)
-      : null;
-    this.assertDiscountWindow(discountStart, discountEnd);
-    const discountType = asDiscountType(input.discountType);
+    const discount = this.createDiscountState(input);
 
     try {
       const data = await this.prisma.product.create({
@@ -394,15 +578,7 @@ export class ProductServiceImpl {
           promoBadge: input.promoBadge,
           promoActive: !!input.promoActive,
 
-          discountType,
-          discountValue:
-            input.discountValue != null
-              ? new Prisma.Decimal(input.discountValue)
-              : null,
-          discountActive:
-            discountType === null ? false : !!input.discountActive,
-          discountStart,
-          discountEnd,
+          ...discount,
 
           tags: input.tags ?? [],
           complementaryIds: input.complementaryIds ?? [],
@@ -436,30 +612,27 @@ export class ProductServiceImpl {
       }
     }
 
-    const discountStart =
-      patch.discountStart === null
-        ? null
-        : patch.discountStart
-          ? new Date(patch.discountStart)
-          : undefined;
-    const discountEnd =
-      patch.discountEnd === null
-        ? null
-        : patch.discountEnd
-          ? new Date(patch.discountEnd)
-          : undefined;
-    this.assertDiscountWindow(
-      discountStart instanceof Date ? discountStart : undefined,
-      discountEnd instanceof Date ? discountEnd : undefined,
+    const changesDiscount = DISCOUNT_FIELDS.some((field) =>
+      isProvided(patch, field),
     );
-    const patchDiscountType = Object.prototype.hasOwnProperty.call(
-      patch,
-      "discountType",
-    )
-      ? asDiscountType(patch.discountType)
-      : undefined;
 
     try {
+      let discountData: DiscountState | undefined;
+      if (changesDiscount) {
+        const current = await this.prisma.product.findUnique({
+          where: { id },
+          select: {
+            discountType: true,
+            discountValue: true,
+            discountActive: true,
+            discountStart: true,
+            discountEnd: true,
+          },
+        });
+        if (!current) throw new NotFoundException("product_not_found");
+        discountData = this.patchDiscountState(current, patch);
+      }
+
       const data = await this.prisma.product.update({
         where: { id },
         data: {
@@ -493,14 +666,7 @@ export class ProductServiceImpl {
           promoTitle: patch.promoTitle ?? undefined,
           promoBadge: patch.promoBadge ?? undefined,
           promoActive: patch.promoActive ?? undefined,
-          discountType: patchDiscountType,
-          discountValue:
-            patch.discountValue != null
-              ? new Prisma.Decimal(patch.discountValue)
-              : undefined,
-          discountActive: patch.discountActive ?? undefined,
-          discountStart,
-          discountEnd,
+          ...(discountData ?? {}),
           tags: patch.tags ?? undefined,
           complementaryIds: patch.complementaryIds ?? undefined,
         },
@@ -614,36 +780,6 @@ export class ProductServiceImpl {
 
   // ---- Bulk discount ----
   async applyDiscountBulk(req: ApplyDiscountBulkDto) {
-    const data: Prisma.ProductUpdateManyMutationInput = {};
-    const clear = req.discountType === DiscountTypeDto.NONE;
-
-    if (clear) {
-      data.discountType = null;
-      data.discountValue = null;
-      data.discountActive = false;
-      data.discountStart = null;
-      data.discountEnd = null;
-    } else {
-      const nextDiscountType = asDiscountType(req.discountType);
-      if (nextDiscountType !== undefined) data.discountType = nextDiscountType;
-      if (req.discountValue != null)
-        data.discountValue = new Prisma.Decimal(req.discountValue);
-      if (typeof req.discountActive === "boolean")
-        data.discountActive = req.discountActive;
-      if (req.discountStart !== undefined)
-        data.discountStart = req.discountStart
-          ? new Date(req.discountStart)
-          : null;
-      if (req.discountEnd !== undefined)
-        data.discountEnd = req.discountEnd ? new Date(req.discountEnd) : null;
-      if (req.discountStart && req.discountEnd) {
-        this.assertDiscountWindow(
-          new Date(req.discountStart),
-          new Date(req.discountEnd),
-        );
-      }
-    }
-
     const where: Prisma.ProductWhereInput = { deletedAt: null };
     if (req.ids && req.ids.length) where.id = { in: req.ids };
     if (req.categoryId) where.categoryId = req.categoryId;
@@ -655,6 +791,70 @@ export class ProductServiceImpl {
         { sku: { contains: req.q, mode: "insensitive" } },
       ];
     }
+
+    const changesDiscount = DISCOUNT_FIELDS.some((field) =>
+      isProvided(req, field),
+    );
+    if (!changesDiscount) {
+      throw new BadRequestException("discount update is required");
+    }
+
+    const data: Prisma.ProductUpdateManyMutationInput = {};
+    const clear = req.discountType === DiscountTypeDto.NONE;
+    if (clear) {
+      Object.assign(data, this.clearedDiscountState());
+    } else {
+      const patch: ProductPatchInput = {};
+      if (isProvided(req, "discountType"))
+        patch.discountType = req.discountType;
+      if (isProvided(req, "discountValue"))
+        patch.discountValue = req.discountValue;
+      if (isProvided(req, "discountActive"))
+        patch.discountActive = req.discountActive;
+      if (isProvided(req, "discountStart"))
+        patch.discountStart = req.discountStart;
+      if (isProvided(req, "discountEnd")) patch.discountEnd = req.discountEnd;
+
+      let currentRows: DiscountState[];
+      try {
+        currentRows = await this.prisma.product.findMany({
+          where,
+          select: {
+            discountType: true,
+            discountValue: true,
+            discountActive: true,
+            discountStart: true,
+            discountEnd: true,
+          },
+        });
+      } catch (e) {
+        throw mapPrisma(e);
+      }
+      for (const current of currentRows) {
+        this.patchDiscountState(current, patch);
+      }
+
+      if (isProvided(patch, "discountType")) {
+        const nextDiscountType = asDiscountType(patch.discountType);
+        if (!nextDiscountType) {
+          throw new BadRequestException("discountType is invalid");
+        }
+        data.discountType = nextDiscountType;
+      }
+      if (isProvided(patch, "discountValue")) {
+        data.discountValue = new Prisma.Decimal(patch.discountValue as number);
+      }
+      if (isProvided(patch, "discountActive")) {
+        data.discountActive = patch.discountActive;
+      }
+      if (isProvided(patch, "discountStart")) {
+        data.discountStart = this.parseDiscountDate(patch.discountStart);
+      }
+      if (isProvided(patch, "discountEnd")) {
+        data.discountEnd = this.parseDiscountDate(patch.discountEnd);
+      }
+    }
+
     try {
       const res = await this.prisma.product.updateMany({ where, data });
       return { updated: res.count };
