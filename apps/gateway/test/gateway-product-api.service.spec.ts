@@ -221,6 +221,26 @@ describe("GatewayProductApiService", () => {
     });
   });
 
+  it("preserves omitted gallery sort while retaining explicit zero", async () => {
+    const addImages = jest.fn(() => of({ productId: PRODUCT_ID, images: [] }));
+    const { service } = createHarness({ AddImages: addImages });
+
+    await service.addImages(gatewayRequest(true), PRODUCT_ID, {
+      images: [
+        { url: "https://cdn.example/append.jpg" },
+        { url: "https://cdn.example/first.jpg", sort: 0 },
+      ],
+    });
+
+    expect(addImages.mock.calls[0]?.[0]).toEqual({
+      productId: PRODUCT_ID,
+      images: [
+        { url: "https://cdn.example/append.jpg", alt: "" },
+        { url: "https://cdn.example/first.jpg", alt: "", sort: 0 },
+      ],
+    });
+  });
+
   it("rejects deleted public gallery rows and mismatched product IDs", async () => {
     const deleted = createHarness({
       ListGallery: jest.fn(() =>

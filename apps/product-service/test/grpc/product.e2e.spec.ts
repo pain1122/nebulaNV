@@ -173,11 +173,23 @@ describe("ProductService gRPC (admin required on writes)", () => {
       "AddImages",
       {
         productId: draftId,
-        images: [{ url: "https://example.test/draft.jpg", alt: "draft" }],
+        images: [
+          { url: "https://example.test/draft.jpg", alt: "draft" },
+          { url: "https://example.test/draft-2.jpg", alt: "draft 2" },
+        ],
       },
       mdS2S({ role: "admin" }),
     );
-    expect(added.images).toHaveLength(1);
+    expect(added.images).toEqual([
+      expect.objectContaining({
+        url: "https://example.test/draft.jpg",
+        sort: 0,
+      }),
+      expect.objectContaining({
+        url: "https://example.test/draft-2.jpg",
+        sort: 1,
+      }),
+    ]);
 
     await expect(
       call(client, "ListGallery", { productId: draftId }, mdS2S()),
@@ -189,14 +201,18 @@ describe("ProductService gRPC (admin required on writes)", () => {
       { productId: draftId, includeDeleted: true },
       mdS2S({ role: "admin" }),
     );
-    expect(adminGallery.images).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: added.images[0].id,
-          deletedAt: "",
-        }),
-      ]),
-    );
+    expect(adminGallery.images).toEqual([
+      expect.objectContaining({
+        id: added.images[0].id,
+        sort: 0,
+        deletedAt: "",
+      }),
+      expect.objectContaining({
+        id: added.images[1].id,
+        sort: 1,
+        deletedAt: "",
+      }),
+    ]);
   });
 
   it("UpdateProduct (admin) changes title and calculates its discount", async () => {

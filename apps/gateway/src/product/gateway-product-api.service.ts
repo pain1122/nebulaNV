@@ -447,7 +447,7 @@ export class GatewayProductApiService {
             images: input.images.map((image) => ({
               url: image.url,
               alt: image.alt ?? "",
-              sort: image.sort ?? 0,
+              ...(image.sort === undefined ? {} : { sort: image.sort }),
             })),
           },
           products.metadata,

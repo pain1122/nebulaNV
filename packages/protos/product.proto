@@ -215,7 +215,7 @@ message GalleryImage {
 message NewImage {
   string url  = 1;
   string alt  = 2;
-  int32  sort = 3; // optional; if missing we append
+  optional int32 sort = 3; // if absent, Product appends after current active images
 }
 
 message AddImagesRequest {
