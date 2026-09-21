@@ -66,6 +66,7 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     expect(res.data.title).toBe("E2E Widget");
     expect(res.data).toMatchObject({
       price: 199.99,
+      currency: "USD",
       discountType: "NONE",
       discountValue: 0,
       discountActive: false,
@@ -74,6 +75,23 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     // categoryId should be auto-filled with default_product_category
     expect(typeof res.data.categoryId).toBe("string");
     expect(res.data.categoryId.length).toBeGreaterThan(0);
+  });
+
+  it("POST /products rejects a currency outside the configured shop currency", async () => {
+    const res = await fetch(`${PRODUCT_HTTP}/products`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${admin}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        data: { title: "Wrong Currency Widget", price: 10, currency: "EUR" },
+      }),
+    });
+    const body = (await res.json()) as { message?: string };
+
+    expect(res.status).toBe(400);
+    expect(body.message).toBe("product_currency_mismatch");
   });
 
   it("GET /products/:id returns the created product", async () => {

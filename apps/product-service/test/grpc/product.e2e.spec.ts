@@ -69,10 +69,32 @@ describe("ProductService gRPC (admin required on writes)", () => {
     expect(res.data.categoryId).toBe(categoryId);
     expect(res.data).toMatchObject({
       price: 149.5,
+      currency: "USD",
       discountType: "NONE",
       discountValue: 0,
       discountActive: false,
       effectivePrice: 149.5,
+    });
+  });
+
+  it("rejects a Product currency outside the configured shop currency", async () => {
+    await expect(
+      call<any>(
+        client,
+        "CreateProduct",
+        {
+          data: {
+            title: "Wrong Currency gRPC Widget",
+            price: 10,
+            categoryId,
+            currency: "EUR",
+          },
+        },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.INVALID_ARGUMENT,
+      details: "product_currency_mismatch",
     });
   });
 

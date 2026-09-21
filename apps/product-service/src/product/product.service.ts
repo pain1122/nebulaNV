@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
 import { ClientGrpc } from "@nestjs/microservices";
@@ -169,15 +170,16 @@ export class ProductServiceImpl {
     return getTaxonomy(this.taxonomyClient, downstream?.signingPolicy);
   }
 
-  private defaultCurrencyCache: string | null = null;
+  private normalizeCurrency(value: string): string | null {
+    const normalized = value.trim().toUpperCase();
+    return /^[A-Z]{3,8}$/.test(normalized) ? normalized : null;
+  }
 
-  private async getDefaultCurrency(
+  private async getShopCurrency(
     downstream?: VerifiedServiceDownstreamContext,
   ): Promise<string> {
-    if (this.defaultCurrencyCache) return this.defaultCurrencyCache;
-
-    try {
-      const res = await firstValueFrom(
+    const res = await wrapGrpc(
+      firstValueFrom(
         this.settings(downstream).GetString(
           {
             namespace: "pricing",
@@ -186,15 +188,37 @@ export class ProductServiceImpl {
           },
           downstream?.metadata,
         ),
-      );
+      ),
+    );
+    const currency = res?.found ? this.normalizeCurrency(res.value) : null;
 
-      const cur = res?.value || "USD";
-      this.defaultCurrencyCache = cur;
-      return cur;
-    } catch {
-      this.defaultCurrencyCache = "USD";
-      return this.defaultCurrencyCache;
+    if (!currency) {
+      throw new ServiceUnavailableException("shop_currency_not_configured");
     }
+
+    return currency;
+  }
+
+  private async resolveProductCurrency(
+    requested: string | undefined,
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<string> {
+    const normalized =
+      requested === undefined || requested.trim() === ""
+        ? null
+        : this.normalizeCurrency(requested);
+    if (requested !== undefined && requested.trim() !== "" && !normalized) {
+      throw new BadRequestException("currency_invalid");
+    }
+
+    const shopCurrency = await this.getShopCurrency(downstream);
+    if (!normalized) return shopCurrency;
+
+    if (normalized !== shopCurrency) {
+      throw new BadRequestException("product_currency_mismatch");
+    }
+
+    return shopCurrency;
   }
 
   private effectivePrice(p: Product, now = new Date()): number {
@@ -237,7 +261,7 @@ export class ProductServiceImpl {
       sku: p.sku,
       status: p.status ?? "ACTIVE",
       price: new Prisma.Decimal(p.price).toNumber(),
-      currency: p.currency ?? "EUR",
+      currency: p.currency,
 
       categoryId: p.categoryId,
 
@@ -537,7 +561,10 @@ export class ProductServiceImpl {
       input.categoryId ?? (await this.getDefaultCategoryId(downstream));
     await this.assertCategoryExists(categoryId, downstream);
 
-    const defaultCurrency = await this.getDefaultCurrency(downstream);
+    const currency = await this.resolveProductCurrency(
+      input.currency,
+      downstream,
+    );
     const discount = this.createDiscountState(input);
 
     try {
@@ -551,7 +578,7 @@ export class ProductServiceImpl {
           sku,
 
           price: new Prisma.Decimal(input.price ?? 0),
-          currency: input.currency ?? defaultCurrency,
+          currency,
           status: asStatus(input.status) ?? ProductStatus.DRAFT,
 
           categoryId,
@@ -600,6 +627,7 @@ export class ProductServiceImpl {
     if (patch.price != null) this.assertPrice(patch.price);
 
     let nextCategoryId: string | undefined;
+    let nextCurrency: string | undefined;
 
     // ✅ Only change category if the client actually sent categoryId
     if (patch.categoryId !== undefined) {
@@ -610,6 +638,13 @@ export class ProductServiceImpl {
         await this.assertCategoryExists(patch.categoryId, downstream);
         nextCategoryId = patch.categoryId;
       }
+    }
+
+    if (patch.currency !== undefined && patch.currency.trim() !== "") {
+      nextCurrency = await this.resolveProductCurrency(
+        patch.currency,
+        downstream,
+      );
     }
 
     const changesDiscount = DISCOUNT_FIELDS.some((field) =>
@@ -643,7 +678,7 @@ export class ProductServiceImpl {
           sku: patch.sku ?? undefined,
           price:
             patch.price != null ? new Prisma.Decimal(patch.price) : undefined,
-          currency: patch.currency ?? undefined,
+          currency: nextCurrency,
           status: asStatus(patch.status),
 
           // ✅ Only set when we actually decided a nextCategoryId

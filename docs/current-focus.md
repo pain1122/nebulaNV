@@ -164,6 +164,9 @@ Each D1 batch must:
       contracts; do not read the Media database or require a file-manager UI.
 - [ ] Define one settings-backed shop currency, normalize its representation,
       and align Product defaults/validation with the D2 Order contract.
+      Product write authority is complete in the
+      [shop-currency checkpoint](reports/2026-09-19-d1-shop-currency-authority-checkpoint.md);
+      Order alignment remains open for D2.
 - [ ] Define dependency failure behavior for Taxonomy, Media, and Settings so a
       degraded dependency cannot produce partially valid product state.
 - [ ] Add migration, compatibility, denial, ordering, missing-reference, and
@@ -243,6 +246,8 @@ Each D1 batch must:
 
 ## Next Action
 
-Continue the narrow existing-contract repair order with currency normalization,
-gallery append semantics, identifier conflicts, and stable
-destructive-operation errors. No frontend source change is part of this action.
+Continue the narrow existing-contract repair order with gallery append
+semantics, identifier conflicts, and stable destructive-operation errors. No
+frontend source change is part of this action. The Product-owned shop-currency
+repair is complete; Order-owned currency and in-flight cart transition policy
+remains a D2 handoff.

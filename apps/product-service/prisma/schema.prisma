@@ -19,7 +19,7 @@ model Product {
   sku              String                @unique
   status           ProductStatus         @default(ACTIVE)
   price            Decimal               @db.Decimal(18, 2)
-  currency         String                @default("EUR")
+  currency         String
   thumbnailUrl     String?
   categoryId       String                @map("category_id") @db.Uuid
   discountType     DiscountType?

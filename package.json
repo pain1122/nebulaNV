@@ -188,6 +188,7 @@
     "backend:seed": "node ./scripts/backend.mjs seed",
     "db:push": "node ./scripts/backend.mjs prisma push",
     "db:verify:migrations": "node ./scripts/backend.mjs database verify-migrations",
+    "db:verify:product": "node ./scripts/backend.mjs database verify-migrations product",
     "db:verify:tenant-authority": "node ./scripts/backend.mjs database verify-migrations tenant-authority",
     "db:verify:f4-batch3-role-seeds": "node ./scripts/backend.mjs database verify-f4-batch3-role-seeds",
     "db:verify:f4-r2-default-actors": "node ./scripts/backend.mjs database verify-f4-r2-default-actors",

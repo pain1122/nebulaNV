@@ -705,6 +705,7 @@ test("root command names point at the consolidated backend tool", () => {
       demoSeed: manifest.scripts["backend:seed"],
       push: manifest.scripts["db:push"],
       verifyMigrations: manifest.scripts["db:verify:migrations"],
+      verifyProduct: manifest.scripts["db:verify:product"],
       verifyTenantAuthority: manifest.scripts["db:verify:tenant-authority"],
       backup: manifest.scripts["db:backup"],
       restore: manifest.scripts["db:restore"],
@@ -740,6 +741,8 @@ test("root command names point at the consolidated backend tool", () => {
       demoSeed: "node ./scripts/backend.mjs seed",
       push: "node ./scripts/backend.mjs prisma push",
       verifyMigrations: "node ./scripts/backend.mjs database verify-migrations",
+      verifyProduct:
+        "node ./scripts/backend.mjs database verify-migrations product",
       verifyTenantAuthority:
         "node ./scripts/backend.mjs database verify-migrations tenant-authority",
       backup: "node ./scripts/backend.mjs database backup",
@@ -1759,8 +1762,14 @@ test("clean migration verification uses disposable databases and always cleans u
   assert.notEqual(seedEvidence, undefined);
 });
 
-test("migration verification can select only tenant authority", () => {
+test("migration verification can select one scoped service", () => {
   assert.deepEqual(migrationVerificationServices(), prismaServices);
+  assert.deepEqual(
+    migrationVerificationServices("product").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/product-service"],
+  );
   assert.deepEqual(
     migrationVerificationServices("tenant-authority").map(
       (service) => service.packageName,

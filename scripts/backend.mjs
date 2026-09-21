@@ -696,9 +696,14 @@ export function disposableMigrationServices(
 
 export function migrationVerificationServices(scope) {
   if (scope === undefined) return prismaServices;
-  if (scope === "tenant-authority") {
+  const scopedPackages = {
+    "tenant-authority": "@nebula/tenant-authority-service",
+    product: "@nebula/product-service",
+  };
+  const packageName = scopedPackages[scope];
+  if (packageName) {
     return prismaServices.filter(
-      (service) => service.packageName === "@nebula/tenant-authority-service",
+      (service) => service.packageName === packageName,
     );
   }
   throw new Error(`migration_verification_scope_invalid_${scope}`);
@@ -4682,7 +4687,7 @@ function usage() {
     "  node scripts/backend.mjs build-images [--pull|--clean]",
     "  node scripts/backend.mjs prisma <generate|migrate-dev|migrate-deploy|migrate-status|push|seed>",
     "  node scripts/backend.mjs seed",
-    "  node scripts/backend.mjs database verify-migrations [tenant-authority]",
+    "  node scripts/backend.mjs database verify-migrations [tenant-authority|product]",
     "  node scripts/backend.mjs database verify-f4-batch3-role-seeds",
     "  node scripts/backend.mjs database verify-f4-r2-default-actors",
     "  node scripts/backend.mjs database verify-f4-r3-realm-auth-foundation",
