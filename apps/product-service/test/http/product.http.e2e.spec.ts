@@ -11,6 +11,8 @@ describe("product-service HTTP (admin writes, public reads)", () => {
   let admin = "";
   let user = "";
   let id = "";
+  let slug = "";
+  let sku = "";
 
   beforeAll(async () => {
     // login normal user
@@ -63,6 +65,8 @@ describe("product-service HTTP (admin writes, public reads)", () => {
       { authorization: `Bearer ${admin}` },
     );
     id = res.data.id;
+    slug = res.data.slug;
+    sku = res.data.sku;
     expect(res.data.title).toBe("E2E Widget");
     expect(res.data).toMatchObject({
       price: 199.99,
@@ -76,6 +80,47 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     expect(typeof res.data.categoryId).toBe("string");
     expect(res.data.categoryId.length).toBeGreaterThan(0);
   });
+
+  it.each([
+    {
+      field: "slug",
+      expectedMessage: "product_slug_conflict",
+      duplicate: () => ({
+        slug,
+        sku: `UNIQUE-SLUG-CONFLICT-${Date.now()}`,
+      }),
+    },
+    {
+      field: "sku",
+      expectedMessage: "product_sku_conflict",
+      duplicate: () => ({
+        slug: `unique-sku-conflict-${Date.now()}`,
+        sku,
+      }),
+    },
+  ])(
+    "POST /products returns 409 for an explicit duplicate $field",
+    async ({ duplicate, expectedMessage }) => {
+      const res = await fetch(`${PRODUCT_HTTP}/products`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${admin}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          data: {
+            title: "Explicit identifier conflict",
+            price: 10,
+            ...duplicate(),
+          },
+        }),
+      });
+      const body = (await res.json()) as { message?: string };
+
+      expect(res.status).toBe(409);
+      expect(body.message).toBe(expectedMessage);
+    },
+  );
 
   it("POST /products rejects a currency outside the configured shop currency", async () => {
     const res = await fetch(`${PRODUCT_HTTP}/products`, {

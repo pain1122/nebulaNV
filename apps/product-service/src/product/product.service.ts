@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
@@ -88,18 +89,15 @@ const isProvided = <T extends object, K extends keyof T>(
 
 function mapPrisma(e: unknown, options?: PrismaMappingOptions): Error {
   if (isRecord(e) && e.code === "P2002") {
-    const meta = isRecord(e.meta) ? e.meta : undefined;
-    const rawTarget = meta?.target;
+    const target = uniqueConflictFields(e);
 
-    const target = Array.isArray(rawTarget)
-      ? rawTarget
-          .filter((item): item is string => typeof item === "string")
-          .join(", ")
-      : typeof rawTarget === "string"
-        ? rawTarget
-        : "unique constraint";
-
-    return new BadRequestException(`Duplicate value for ${target}`);
+    if (target.includes("slug")) {
+      return new ConflictException("product_slug_conflict");
+    }
+    if (target.includes("sku")) {
+      return new ConflictException("product_sku_conflict");
+    }
+    return new ConflictException("product_unique_conflict");
   }
 
   if (isRecord(e) && e.code === "P2025") {
@@ -129,10 +127,23 @@ function basicSlugify(s: string) {
   );
 }
 
-function randToken(len = 6) {
-  return Math.random()
-    .toString(36)
-    .slice(2, 2 + len);
+const identifierCandidate = (base: string, attempt: number): string =>
+  attempt === 1 ? base : `${base}-${attempt}`;
+
+function uniqueConflictFields(e: unknown): string[] {
+  if (!isRecord(e) || e.code !== "P2002") return [];
+  const meta = isRecord(e.meta) ? e.meta : undefined;
+  const target = meta?.target;
+  if (Array.isArray(target)) {
+    return target.filter((item): item is string => typeof item === "string");
+  }
+  return typeof target === "string"
+    ? target.split(",").map((field) => field.trim())
+    : [];
+}
+
+function isUniqueConflictFor(e: unknown, field: "slug" | "sku"): boolean {
+  return uniqueConflictFields(e).includes(field);
 }
 
 const asStatus = (value: unknown): ProductStatus | undefined =>
@@ -325,39 +336,6 @@ export class ProductServiceImpl {
     await this.assertCategoryExists(res.value, downstream);
 
     return res.value;
-  }
-
-  private async ensureUniqueSlug(base: string) {
-    let slug = basicSlugify(base);
-    let n = 1;
-    while (true) {
-      const exists = await this.prisma.product.findUnique({ where: { slug } });
-      if (!exists) return slug;
-      n += 1;
-      slug = `${basicSlugify(base)}-${n}`;
-    }
-  }
-
-  private async ensureUniqueSku(sku?: string | null) {
-    if (!sku) {
-      // generate until unique
-      while (true) {
-        const candidate = `SKU-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randToken(5).toUpperCase()}`;
-        const exists = await this.prisma.product.findUnique({
-          where: { sku: candidate },
-        });
-        if (!exists) return candidate;
-      }
-    }
-    // validate/ensure provided sku is unique; if collision, append token
-    let candidate = sku;
-    while (true) {
-      const exists = await this.prisma.product.findUnique({
-        where: { sku: candidate },
-      });
-      if (!exists) return candidate;
-      candidate = `${sku}-${randToken(3).toUpperCase()}`;
-    }
   }
 
   // ---- Validation helpers (create) ----
@@ -553,10 +531,9 @@ export class ProductServiceImpl {
     this.assertPrice(input.price);
 
     const title = input.title;
-    const slug = input.slug
-      ? basicSlugify(input.slug)
-      : await this.ensureUniqueSlug(title);
-    const sku = await this.ensureUniqueSku(input.sku ?? null);
+    const explicitSlug = !!input.slug?.trim();
+    const slugBase = basicSlugify(explicitSlug ? input.slug! : title);
+    const explicitSku = input.sku?.trim() || null;
     const categoryId =
       input.categoryId ?? (await this.getDefaultCategoryId(downstream));
     await this.assertCategoryExists(categoryId, downstream);
@@ -567,54 +544,74 @@ export class ProductServiceImpl {
     );
     const discount = this.createDiscountState(input);
 
-    try {
-      const data = await this.prisma.product.create({
-        data: {
-          title,
-          description: input.description ?? "",
-          excerpt: input.excerpt ?? null,
+    let slugAttempt = 1;
+    let skuAttempt = 1;
+    while (slugAttempt <= 1_000 && skuAttempt <= 1_000) {
+      const slug = identifierCandidate(slugBase, slugAttempt);
+      const generatedSkuBase = `SKU-${slug.toUpperCase()}`;
+      const sku =
+        explicitSku ?? identifierCandidate(generatedSkuBase, skuAttempt);
 
-          slug,
-          sku,
+      try {
+        const data = await this.prisma.product.create({
+          data: {
+            title,
+            description: input.description ?? "",
+            excerpt: input.excerpt ?? null,
 
-          price: new Prisma.Decimal(input.price ?? 0),
-          currency,
-          status: asStatus(input.status) ?? ProductStatus.DRAFT,
+            slug,
+            sku,
 
-          categoryId,
+            price: new Prisma.Decimal(input.price ?? 0),
+            currency,
+            status: asStatus(input.status) ?? ProductStatus.DRAFT,
 
-          // ✅ use normalized camelCase
-          thumbnailUrl: input.thumbnailUrl,
-          model3dUrl: input.model3dUrl,
-          model3dFormat: input.model3dFormat,
-          model3dLiveView: !!input.model3dLiveView,
-          model3dPosterUrl: input.model3dPosterUrl,
+            categoryId,
 
-          vrEnabled: !!input.vrEnabled,
-          vrPlanImageUrl: input.vrPlanImageUrl,
+            // ✅ use normalized camelCase
+            thumbnailUrl: input.thumbnailUrl,
+            model3dUrl: input.model3dUrl,
+            model3dFormat: input.model3dFormat,
+            model3dLiveView: !!input.model3dLiveView,
+            model3dPosterUrl: input.model3dPosterUrl,
 
-          metaTitle: input.metaTitle,
-          metaDescription: input.metaDescription,
-          metaKeywords: input.metaKeywords,
-          customSchema: input.customSchema,
-          noindex: !!input.noindex,
+            vrEnabled: !!input.vrEnabled,
+            vrPlanImageUrl: input.vrPlanImageUrl,
 
-          isFeatured: !!input.isFeatured,
-          featureSort: input.featureSort ?? 0,
-          promoTitle: input.promoTitle,
-          promoBadge: input.promoBadge,
-          promoActive: !!input.promoActive,
+            metaTitle: input.metaTitle,
+            metaDescription: input.metaDescription,
+            metaKeywords: input.metaKeywords,
+            customSchema: input.customSchema,
+            noindex: !!input.noindex,
 
-          ...discount,
+            isFeatured: !!input.isFeatured,
+            featureSort: input.featureSort ?? 0,
+            promoTitle: input.promoTitle,
+            promoBadge: input.promoBadge,
+            promoActive: !!input.promoActive,
 
-          tags: input.tags ?? [],
-          complementaryIds: input.complementaryIds ?? [],
-        },
-      });
-      return { data: this.toDto(data) };
-    } catch (e) {
-      throw mapPrisma(e);
+            ...discount,
+
+            tags: input.tags ?? [],
+            complementaryIds: input.complementaryIds ?? [],
+          },
+        });
+        return { data: this.toDto(data) };
+      } catch (e) {
+        if (!explicitSlug && isUniqueConflictFor(e, "slug")) {
+          slugAttempt += 1;
+          skuAttempt = 1;
+          continue;
+        }
+        if (!explicitSku && isUniqueConflictFor(e, "sku")) {
+          skuAttempt += 1;
+          continue;
+        }
+        throw mapPrisma(e);
+      }
     }
+
+    throw new ConflictException("product_identifier_exhausted");
   }
 
   // ---- Update (patch) ----
@@ -674,8 +671,8 @@ export class ProductServiceImpl {
           title: patch.title ?? undefined,
           description: patch.description ?? undefined,
           excerpt: patch.excerpt ?? undefined,
-          slug: patch.slug ?? undefined,
-          sku: patch.sku ?? undefined,
+          slug: patch.slug?.trim() ? basicSlugify(patch.slug) : undefined,
+          sku: patch.sku?.trim() || undefined,
           price:
             patch.price != null ? new Prisma.Decimal(patch.price) : undefined,
           currency: nextCurrency,

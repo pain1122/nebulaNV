@@ -22,6 +22,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
   let draftId = "";
   let categoryId = "";
   let userAccess = "";
+  let sku = "";
 
   beforeAll(async () => {
     // (Optional) login admin – not strictly needed for S2S, but handy to ensure auth-service is alive
@@ -65,6 +66,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
     );
 
     id = res.data.id;
+    sku = res.data.sku;
     expect(res.data.title).toBe(input.title);
     expect(res.data.categoryId).toBe(categoryId);
     expect(res.data).toMatchObject({
@@ -74,6 +76,28 @@ describe("ProductService gRPC (admin required on writes)", () => {
       discountValue: 0,
       discountActive: false,
       effectivePrice: 149.5,
+    });
+  });
+
+  it("returns ALREADY_EXISTS for an explicit duplicate SKU", async () => {
+    await expect(
+      call<any>(
+        client,
+        "CreateProduct",
+        {
+          data: {
+            title: "Explicit SKU conflict",
+            slug: `unique-grpc-sku-conflict-${Date.now()}`,
+            sku,
+            price: 10,
+            categoryId,
+          },
+        },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.ALREADY_EXISTS,
+      details: "product_sku_conflict",
     });
   });
 

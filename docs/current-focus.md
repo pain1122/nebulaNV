@@ -246,8 +246,9 @@ Each D1 batch must:
 
 ## Next Action
 
-The [gallery append repair](reports/2026-09-21-d1-gallery-append-checkpoint.md)
-is complete. Continue the narrow existing-contract repair order with identifier
-conflicts and stable destructive-operation errors. No frontend source change is
-part of this action. The Product-owned shop-currency repair is complete;
-Order-owned currency and in-flight cart transition policy remains a D2 handoff.
+The
+[identifier conflict repair](reports/2026-09-21-d1-identifier-conflict-checkpoint.md)
+is complete. Continue the narrow existing-contract repair order with stable
+destructive-operation errors. No frontend source change is part of this action.
+The Product-owned shop-currency repair is complete; Order-owned currency and
+in-flight cart transition policy remains a D2 handoff.
