@@ -60,6 +60,7 @@ type PublicListProductsInput = Omit<
 
 type PrismaMappingOptions = {
   missingTarget?: string;
+  foreignKeyConflict?: string;
 };
 
 type DiscountState = Pick<
@@ -106,6 +107,10 @@ function mapPrisma(e: unknown, options?: PrismaMappingOptions): Error {
     }
 
     return new BadRequestException("Related record not found");
+  }
+
+  if (isRecord(e) && e.code === "P2003" && options?.foreignKeyConflict) {
+    return new ConflictException(options.foreignKeyConflict);
   }
 
   if (e instanceof Error) {
@@ -772,8 +777,6 @@ export class ProductServiceImpl {
 
   // ---- Soft delete / restore / hard delete ----
   async softDelete(id: string) {
-    const existing = await this.prisma.product.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("product_not_found");
     try {
       const data = await this.prisma.product.update({
         where: { id },
@@ -781,13 +784,11 @@ export class ProductServiceImpl {
       });
       return { data: this.toDto(data) };
     } catch (e) {
-      throw mapPrisma(e);
+      throw mapPrisma(e, { missingTarget: "product_not_found" });
     }
   }
 
   async restore(id: string) {
-    const existing = await this.prisma.product.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("product_not_found");
     try {
       const data = await this.prisma.product.update({
         where: { id },
@@ -795,18 +796,19 @@ export class ProductServiceImpl {
       });
       return { data: this.toDto(data) };
     } catch (e) {
-      throw mapPrisma(e);
+      throw mapPrisma(e, { missingTarget: "product_not_found" });
     }
   }
 
   async hardDelete(id: string) {
-    const existing = await this.prisma.product.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("product_not_found");
     try {
       const data = await this.prisma.product.delete({ where: { id } });
       return { data: this.toDto(data) };
     } catch (e) {
-      throw mapPrisma(e);
+      throw mapPrisma(e, {
+        missingTarget: "product_not_found",
+        foreignKeyConflict: "product_has_dependents",
+      });
     }
   }
 
@@ -896,17 +898,34 @@ export class ProductServiceImpl {
   }
 
   // ---- Gallery
+  private async assertProductExists(productId: string): Promise<void> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException("product_not_found");
+  }
+
+  private listGalleryRows(productId: string, includeDeleted: boolean) {
+    return this.prisma.productGalleryImage.findMany({
+      where: { productId, ...(includeDeleted ? {} : { deletedAt: null }) },
+      orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }],
+      select: {
+        id: true,
+        url: true,
+        alt: true,
+        sortOrder: true,
+        deletedAt: true,
+      },
+    });
+  }
+
   async addImages(
     productId: string,
     images: { url: string; alt?: string; sort?: number }[],
   ) {
     try {
-      // (Optional) ensure product exists
-      const exists = await this.prisma.product.findUnique({
-        where: { id: productId },
-        select: { id: true },
-      });
-      if (!exists) throw new NotFoundException("product_not_found");
+      await this.assertProductExists(productId);
 
       const max = await this.prisma.productGalleryImage.findFirst({
         where: { productId, deletedAt: null },
@@ -925,7 +944,7 @@ export class ProductServiceImpl {
       if (data.length) {
         await this.prisma.productGalleryImage.createMany({ data });
       }
-      return this.listAdminGallery(productId, false);
+      return this.listGalleryRows(productId, false);
     } catch (e) {
       throw mapPrisma(e);
     }
@@ -941,21 +960,12 @@ export class ProductServiceImpl {
       select: { id: true },
     });
     if (!visible) throw new NotFoundException("product_not_found");
-    return this.listAdminGallery(productId, false);
+    return this.listGalleryRows(productId, false);
   }
 
   async listAdminGallery(productId: string, includeDeleted = false) {
-    return this.prisma.productGalleryImage.findMany({
-      where: { productId, ...(includeDeleted ? {} : { deletedAt: null }) },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: {
-        id: true,
-        url: true,
-        alt: true,
-        sortOrder: true,
-        deletedAt: true,
-      },
-    });
+    await this.assertProductExists(productId);
+    return this.listGalleryRows(productId, includeDeleted);
   }
 
   async reorderImages(
@@ -965,6 +975,8 @@ export class ProductServiceImpl {
     const safeOrders = Array.isArray(orders) ? orders : [];
 
     try {
+      await this.assertProductExists(productId);
+
       if (safeOrders.length) {
         // Ensure all provided image ids belong to this product
         const ids = safeOrders.map((o) => o.id);
@@ -990,7 +1002,7 @@ export class ProductServiceImpl {
       }
 
       // Normalize 0..n among non-deleted
-      const rows = await this.listAdminGallery(productId, false);
+      const rows = await this.listGalleryRows(productId, false);
       let i = 0;
       await this.prisma.$transaction(
         rows
@@ -1003,7 +1015,7 @@ export class ProductServiceImpl {
           ),
       );
 
-      return this.listAdminGallery(productId, false);
+      return this.listGalleryRows(productId, false);
     } catch (e) {
       throw mapPrisma(e);
     }
@@ -1011,6 +1023,8 @@ export class ProductServiceImpl {
 
   async removeImage(productId: string, imageId: string, hard = false) {
     try {
+      await this.assertProductExists(productId);
+
       const img = await this.prisma.productGalleryImage.findUnique({
         where: { id: imageId },
         select: { id: true, productId: true },
@@ -1031,9 +1045,9 @@ export class ProductServiceImpl {
       }
 
       // return including deleted so callers can see state
-      return this.listAdminGallery(productId, true);
+      return this.listGalleryRows(productId, true);
     } catch (e) {
-      throw mapPrisma(e);
+      throw mapPrisma(e, { missingTarget: "image_not_found" });
     }
   }
 }

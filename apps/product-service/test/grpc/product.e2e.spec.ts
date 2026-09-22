@@ -239,6 +239,34 @@ describe("ProductService gRPC (admin required on writes)", () => {
     ]);
   });
 
+  it("returns NOT_FOUND when an admin gallery read names a missing Product", async () => {
+    await expect(
+      call(
+        client,
+        "AdminListGallery",
+        { productId: MISSING_ID, includeDeleted: true },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.NOT_FOUND,
+      details: "product_not_found",
+    });
+  });
+
+  it("blocks hard delete while a Product has dependent gallery rows", async () => {
+    await expect(
+      call(
+        client,
+        "HardDeleteProduct",
+        { id: draftId },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.ALREADY_EXISTS,
+      details: "product_has_dependents",
+    });
+  });
+
   it("UpdateProduct (admin) changes title and calculates its discount", async () => {
     const res = await call<any>(
       client,
@@ -292,5 +320,36 @@ describe("ProductService gRPC (admin required on writes)", () => {
     );
     expect(adminGet.data.id).toBe(id);
     expect(adminGet.data.deletedAt).not.toBe("");
+  });
+
+  it("restores a soft-deleted Product", async () => {
+    const restored = await call<any>(
+      client,
+      "RestoreProduct",
+      { id },
+      mdS2S({ role: "admin" }),
+    );
+    expect(restored.data).toMatchObject({ id, deletedAt: "" });
+
+    await expect(
+      call<any>(client, "GetProduct", { id }, mdS2S()),
+    ).resolves.toMatchObject({ data: { id } });
+  });
+
+  it("hard-deletes a dependency-free Product", async () => {
+    const removed = await call<any>(
+      client,
+      "HardDeleteProduct",
+      { id },
+      mdS2S({ role: "admin" }),
+    );
+    expect(removed.data.id).toBe(id);
+
+    await expect(
+      call(client, "AdminGetProduct", { id }, mdS2S({ role: "admin" })),
+    ).rejects.toMatchObject({
+      code: status.NOT_FOUND,
+      details: "product_not_found",
+    });
   });
 });

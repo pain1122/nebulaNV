@@ -247,8 +247,9 @@ Each D1 batch must:
 ## Next Action
 
 The
-[identifier conflict repair](reports/2026-09-21-d1-identifier-conflict-checkpoint.md)
-is complete. Continue the narrow existing-contract repair order with stable
-destructive-operation errors. No frontend source change is part of this action.
-The Product-owned shop-currency repair is complete; Order-owned currency and
-in-flight cart transition policy remains a D2 handoff.
+[destructive-operation repair](reports/2026-09-22-d1-destructive-operation-checkpoint.md)
+is complete. Continue D1 by defining the minimum base-product
+stock/availability and mutation-concurrency contract from current Product and
+Order behavior before introducing bounded variants. No frontend source change
+is part of this action. The Product-owned shop-currency repair is complete;
+Order-owned currency and in-flight cart transition policy remains a D2 handoff.
