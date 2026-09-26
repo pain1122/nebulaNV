@@ -28,6 +28,16 @@ const toBool = (value: unknown): boolean =>
 const toBoolTransform = ({ value }: TransformFnParams): boolean =>
   toBool(value);
 
+const toStrictBoolTransform = ({ value }: TransformFnParams): unknown => {
+  if (value === true || value === "true" || value === "1" || value === 1) {
+    return true;
+  }
+  if (value === false || value === "false" || value === "0" || value === 0) {
+    return false;
+  }
+  return value;
+};
+
 type DiscountAwareInput = {
   discountType?: unknown;
 };
@@ -218,6 +228,25 @@ export class ProductInputDto {
   @ArrayMaxSize(64)
   @IsUUID("4", { each: true }) // ← these are IDs; validate items
   complementaryIds?: string[];
+
+  @Expose({ name: "trackInventory" })
+  @IsOptional()
+  @Transform(toStrictBoolTransform)
+  @IsBoolean()
+  trackInventory?: boolean;
+
+  @Expose({ name: "stockQuantity" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2_147_483_647)
+  stockQuantity?: number;
+}
+
+export class ProductPatchDto extends ProductInputDto {
+  @IsOptional()
+  override title!: string;
 }
 
 export class CreateProductRequestDto {
@@ -229,8 +258,14 @@ export class CreateProductRequestDto {
 
 export class UpdateProductRequestDto {
   @ValidateNested() // 👈 accept nested patch
-  @Type(() => ProductInputDto)
-  patch!: Partial<ProductInputDto>; // 👈 remove the `id` field here
+  @Type(() => ProductPatchDto)
+  patch!: ProductPatchDto; // 👈 remove the `id` field here
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  expectedVersion!: number;
 }
 
 export class IdRequestDto {

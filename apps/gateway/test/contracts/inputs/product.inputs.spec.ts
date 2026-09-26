@@ -29,9 +29,27 @@ describe("product input profiles", () => {
     ).toEqual([]);
     expect(
       validateGatewayInput("product-write", {
-        body: { title: "Desk", price: 100, description: "Internal field" },
+        body: {
+          title: "Desk",
+          price: 100,
+          trackInventory: true,
+          stockQuantity: 5,
+        },
       }),
-    ).toEqual([{ field: "body.description", code: "unknown_field" }]);
+    ).toEqual([]);
+    expect(
+      validateGatewayInput("product-write", {
+        body: {
+          title: "Desk",
+          price: 100,
+          description: "Internal field",
+          expectedVersion: 1,
+        },
+      }),
+    ).toEqual([
+      { field: "body.description", code: "unknown_field" },
+      { field: "body.expectedVersion", code: "unknown_field" },
+    ]);
   });
 
   it("requires a product ID and at least one patch field", () => {
@@ -39,7 +57,7 @@ describe("product input profiles", () => {
       params: {},
       body: {},
     });
-    expect(issues).toHaveLength(2);
+    expect(issues).toHaveLength(3);
     expect(issues).toContainEqual({
       field: "params.id",
       code: "required_field",
@@ -48,6 +66,27 @@ describe("product input profiles", () => {
       field: expect.stringContaining("body.title|slug|sku"),
       code: "required_field",
     });
+    expect(issues).toContainEqual({
+      field: "body.expectedVersion",
+      code: "required_field",
+    });
+    expect(
+      validateGatewayInput("product-patch", {
+        params: { id: "product-id" },
+        body: { stockQuantity: 0, expectedVersion: 1 },
+      }),
+    ).toEqual([]);
+    expect(
+      validateGatewayInput("product-patch", {
+        params: { id: "product-id" },
+        body: { expectedVersion: 1 },
+      }),
+    ).toEqual([
+      {
+        field: expect.stringContaining("body.title|slug|sku"),
+        code: "required_field",
+      },
+    ]);
   });
 
   it("requires a bulk selector and bounds gallery collections", () => {

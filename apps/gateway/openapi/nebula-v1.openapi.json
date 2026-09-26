@@ -1682,6 +1682,13 @@
       },
       "GatewayProductDto": {
         "properties": {
+          "availability": {
+            "enum": [
+              "AVAILABLE",
+              "OUT_OF_STOCK"
+            ],
+            "type": "string"
+          },
           "categoryId": {
             "format": "uuid",
             "type": "string"
@@ -1794,6 +1801,10 @@
             ],
             "type": "string"
           },
+          "stockQuantity": {
+            "minimum": 0,
+            "type": "number"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -1806,9 +1817,16 @@
           "title": {
             "type": "string"
           },
+          "trackInventory": {
+            "type": "boolean"
+          },
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "number"
           },
           "vrEnabled": {
             "type": "boolean"
@@ -1855,7 +1873,11 @@
           "complementaryIds",
           "createdAt",
           "updatedAt",
-          "deletedAt"
+          "deletedAt",
+          "trackInventory",
+          "stockQuantity",
+          "availability",
+          "version"
         ],
         "type": "object"
       },
@@ -1932,6 +1954,10 @@
           "excerpt": {
             "type": "string"
           },
+          "expectedVersion": {
+            "minimum": 1,
+            "type": "number"
+          },
           "featureSort": {
             "maximum": 1000000,
             "minimum": 0,
@@ -2000,6 +2026,11 @@
             ],
             "type": "string"
           },
+          "stockQuantity": {
+            "default": 0,
+            "minimum": 0,
+            "type": "number"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -2015,6 +2046,10 @@
             "maxLength": 180,
             "type": "string"
           },
+          "trackInventory": {
+            "default": false,
+            "type": "boolean"
+          },
           "vrEnabled": {
             "type": "boolean"
           },
@@ -2023,6 +2058,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "expectedVersion"
+        ],
         "type": "object"
       },
       "GatewayProductWriteDto": {
@@ -2145,6 +2183,11 @@
             ],
             "type": "string"
           },
+          "stockQuantity": {
+            "default": 0,
+            "minimum": 0,
+            "type": "number"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -2159,6 +2202,10 @@
           "title": {
             "maxLength": 180,
             "type": "string"
+          },
+          "trackInventory": {
+            "default": false,
+            "type": "boolean"
           },
           "vrEnabled": {
             "type": "boolean"

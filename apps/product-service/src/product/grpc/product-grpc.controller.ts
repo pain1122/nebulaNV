@@ -89,6 +89,7 @@ export class ProductGrpcController {
     return this.svc.update(
       dto.id,
       dto.patch,
+      dto.expectedVersion,
       createVerifiedServiceDownstreamContext(metadata, call),
     );
   }

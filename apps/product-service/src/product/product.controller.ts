@@ -68,6 +68,6 @@ export class ProductController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @Body() body: UpdateProductRequestDto,
   ) {
-    return this.svc.update(id, body.patch);
+    return this.svc.update(id, body.patch, body.expectedVersion);
   }
 }

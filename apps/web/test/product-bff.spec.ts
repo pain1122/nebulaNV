@@ -35,11 +35,12 @@ describe("current web product BFF gateway mapping", () => {
     const fetchMock = jest.fn<
       Promise<Response>,
       [RequestInfo | URL, RequestInit?]
-    >(async () =>
-      new Response(JSON.stringify(productEnvelope("Solid oak")), {
-        status: 201,
-        headers: { "content-type": "application/json" },
-      }),
+    >(
+      async () =>
+        new Response(JSON.stringify(productEnvelope("Solid oak")), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        }),
     );
     global.fetch = fetchMock as unknown as typeof fetch;
     const response = await createProduct(
@@ -65,16 +66,18 @@ describe("current web product BFF gateway mapping", () => {
     const fetchMock = jest.fn<
       Promise<Response>,
       [RequestInfo | URL, RequestInit?]
-    >(async () =>
-      new Response(JSON.stringify(productEnvelope("Updated")), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+    >(
+      async () =>
+        new Response(JSON.stringify(productEnvelope("Updated")), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
     global.fetch = fetchMock as unknown as typeof fetch;
     await updateProduct(
       request("/api/products/product-1", {
         patch: { content: "Updated", promoActive: false },
+        expectedVersion: 3,
       }),
       { params: Promise.resolve({ id: "product-1" }) },
     );
@@ -85,6 +88,7 @@ describe("current web product BFF gateway mapping", () => {
     expect(JSON.parse(String(call[1]?.body))).toEqual({
       content: "Updated",
       promoActive: false,
+      expectedVersion: 3,
     });
   });
 });

@@ -775,6 +775,39 @@ export function verifyTenantAuthorityDefaultSeed(
   );
 }
 
+export function verifyProductInventoryContract(
+  database,
+  { env = process.env, executeDocker = run, platform = process.platform } = {},
+) {
+  const verificationSql = readFileSync(
+    path.join(
+      repositoryRoot,
+      "scripts",
+      "db",
+      "verify-d1-product-inventory.sql",
+    ),
+    "utf8",
+  );
+  runPostgresTool(
+    [
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--file=-",
+    ],
+    {
+      label: `product_inventory_${database}`,
+      env,
+      execute: executeDocker,
+      input: verificationSql,
+      platform,
+    },
+  );
+}
+
 function runPackageScript(
   packageName,
   script,
@@ -2610,6 +2643,15 @@ export function verifyCleanMigrations({
         execute: executePrisma,
         logger,
       });
+      if (service.packageName === "@nebula/product-service") {
+        verifyProductInventoryContract(service.database, {
+          env,
+          executeDocker,
+        });
+        logger.log(
+          `[backend] Product inventory database contract verified: ${service.name}`,
+        );
+      }
       if (service.packageName === "@nebula/tenant-authority-service") {
         verifyTenantAuthorityRegistrationRecords(service.database, {
           env,

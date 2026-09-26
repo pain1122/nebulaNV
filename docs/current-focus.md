@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-09-15
+Last updated: 2026-09-26
 
 Status: active backend execution checklist.
 
@@ -54,7 +54,7 @@ but they are not permanent production topology decisions.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Gateway            | F3 exposes generated, gateway-only external Auth, User, Settings, Media, Taxonomy, Product, Blog, and Order APIs              | Preserve this boundary and close only proven Product contract gaps                                           |
 | Product lifecycle  | `DRAFT`, `ACTIVE`, and `ARCHIVED` exist; public reads force active/non-deleted visibility and admin reads are separate        | Keep the mechanism and extend it without weakening visibility                                                |
-| Product model      | Product, gallery, attributes, comments, sets, hotspots, price, slug, and SKU fields exist; stock and availability do not      | Repair inconsistent facts, then add the minimum commercial state required for ecommerce                      |
+| Product model      | Product now owns bounded base stock, derived availability, and mutation version alongside its existing commercial fields      | Prove the new migration/live contract, then introduce bounded variants without widening inventory topology   |
 | Variants           | No authoritative variant model or selected-option contract exists                                                             | Confirmed ecommerce implementation gap                                                                       |
 | Taxonomy           | Product-scoped taxonomy facade and default-category initialization exist                                                      | Preserve ownership; prove category/tag/brand needs against current taxonomy contracts                        |
 | Media              | Media-service owns media policy, while Product currently stores URL strings and does not validate Media records               | Replace product-facing URL authority with the minimum validated Media-reference contract; no file-manager UI |
@@ -132,17 +132,17 @@ Each D1 batch must:
       and create/bulk omission defects across Product, gRPC, gateway, OpenAPI,
       generated client, focused tests, container-backed Product tests, and
       preserved F3 live flows.
-- [ ] Finalize required product fields: title, slug, excerpt, description, base
+- [x] Finalize required product fields: title, slug, excerpt, description, base
       SKU, lifecycle, availability, price, currency, and basic stock.
-- [ ] Preserve deterministic global slug/SKU uniqueness for the current
+- [x] Preserve deterministic global slug/SKU uniqueness for the current
       single-site release and record the later F4 scoped-uniqueness migration.
 - [ ] Define and implement bounded variants with option values, variant SKU,
       price/stock overrides, active/deleted state, and deterministic ordering.
 - [ ] Reject invalid price, currency, stock, option, SKU, lifecycle, and
       availability combinations at the owning service boundary.
-- [ ] Define optimistic concurrency or another explicit lost-update behavior
+- [x] Define optimistic concurrency or another explicit lost-update behavior
       for admin mutations.
-- [ ] Keep public reads restricted to purchasable visible state and ensure
+- [x] Keep public reads restricted to purchasable visible state and ensure
       hidden records cannot be revealed by caller-supplied filters.
 
 ### Batch 1 Exit
@@ -247,9 +247,14 @@ Each D1 batch must:
 ## Next Action
 
 The
-[destructive-operation repair](reports/2026-09-22-d1-destructive-operation-checkpoint.md)
-is complete. Continue D1 by defining the minimum base-product
-stock/availability and mutation-concurrency contract from current Product and
-Order behavior before introducing bounded variants. No frontend source change
-is part of this action. The Product-owned shop-currency repair is complete;
-Order-owned currency and in-flight cart transition policy remains a D2 handoff.
+[base-product inventory and concurrency contract](reports/2026-09-22-d1-inventory-concurrency-checkpoint.md)
+is complete across Product, gRPC, Gateway, OpenAPI, and the generated client.
+Its disposable migration proof, Product e2e (15 suites, 103 tests), D1 live
+proof, preserved F3 live flows, and running Compose health checks pass. Next,
+implement bounded variants as the D1-V vertical slice. Follow the
+[D1-D2 backend ecommerce acceleration plan](reports/2026-09-26-d1-d2-acceleration-plan.md)
+to batch schema, service, transport, client, and proof work into vertical slices
+and avoid forced or repeated image builds. The small `apps/web` change only
+preserves its existing BFF envelope against the required `expectedVersion`
+field; it does not add or redesign frontend behavior. Order-owned price, stock
+decrement, currency, and in-flight cart transition policy remains a D2 handoff.

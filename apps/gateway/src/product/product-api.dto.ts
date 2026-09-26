@@ -30,6 +30,11 @@ export enum GatewayDiscountType {
   NONE = "NONE",
 }
 
+export enum GatewayProductAvailability {
+  AVAILABLE = "AVAILABLE",
+  OUT_OF_STOCK = "OUT_OF_STOCK",
+}
+
 function strictBoolean({ value }: TransformFnParams): unknown {
   if (value === "true") return true;
   if (value === "false") return false;
@@ -273,11 +278,31 @@ export class GatewayProductWriteDto {
   @ArrayMaxSize(64)
   @IsUUID("4", { each: true })
   complementaryIds?: string[];
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  trackInventory?: boolean;
+
+  @ApiPropertyOptional({ minimum: 0, default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2_147_483_647)
+  stockQuantity?: number;
 }
 
 export class GatewayProductPatchDto extends PartialType(
   GatewayProductWriteDto,
-) {}
+) {
+  @ApiProperty({ minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  expectedVersion!: number;
+}
 
 export class GatewayProductBulkDiscountDto {
   @ApiPropertyOptional({ type: [String], maxItems: 1000 })
@@ -450,6 +475,11 @@ export class GatewayProductDto {
   @ApiProperty({ format: "date-time" }) createdAt!: string;
   @ApiProperty({ format: "date-time" }) updatedAt!: string;
   @ApiProperty() deletedAt!: string;
+  @ApiProperty() trackInventory!: boolean;
+  @ApiProperty({ minimum: 0 }) stockQuantity!: number;
+  @ApiProperty({ enum: GatewayProductAvailability })
+  availability!: GatewayProductAvailability;
+  @ApiProperty({ minimum: 1 }) version!: number;
 }
 
 export class GatewayGalleryImageDto {

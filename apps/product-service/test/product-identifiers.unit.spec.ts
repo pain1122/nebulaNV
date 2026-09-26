@@ -53,6 +53,9 @@ function product(overrides: Partial<Product> = {}): Product {
     promoEnd: null,
     tags: [],
     complementaryIds: [],
+    trackInventory: false,
+    stockQuantity: 0,
+    version: 1,
     deletedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -196,10 +199,14 @@ describe("product identifier conflicts", () => {
       .fn()
       .mockResolvedValue(product({ slug: "cafe-table", sku: "CAFE-TABLE-1" }));
 
-    await service(jest.fn(), update).update("product-1", {
-      slug: "  Café Table  ",
-      sku: "  CAFE-TABLE-1  ",
-    });
+    await service(jest.fn(), update).update(
+      "product-1",
+      {
+        slug: "  Café Table  ",
+        sku: "  CAFE-TABLE-1  ",
+      },
+      1,
+    );
 
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -215,9 +222,11 @@ describe("product identifier conflicts", () => {
     const update = jest.fn().mockRejectedValue(uniqueConflict("slug"));
 
     await expect(
-      service(jest.fn(), update).update("product-1", {
-        slug: "reserved-slug",
-      }),
+      service(jest.fn(), update).update(
+        "product-1",
+        { slug: "reserved-slug" },
+        1,
+      ),
     ).rejects.toEqual(new ConflictException("product_slug_conflict"));
   });
 });

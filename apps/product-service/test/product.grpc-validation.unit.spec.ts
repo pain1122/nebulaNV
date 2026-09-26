@@ -6,6 +6,7 @@ import { RpcException } from "@nestjs/microservices";
 import { createGrpcValidationPipe } from "@nebula/grpc-auth";
 import { createHttpValidationPipe } from "@packages/config";
 import { CreateProductDto } from "../src/product/dto/create-product.dto";
+import { UpdateProductDto } from "../src/product/dto/update-product.dto";
 import { CreateProductRequestDto } from "../src/product/dto/product-input.dto";
 
 type RpcError = {
@@ -53,6 +54,28 @@ describe("product HTTP/gRPC validation parity", () => {
 
     expect(grpc).toMatchObject(http as object);
     expect(grpc).toMatchObject({ data: { price: 19.95 } });
+  });
+
+  it("accepts a stock-only gRPC patch with an explicit zero quantity", async () => {
+    const updateMetadata: ArgumentMetadata = {
+      type: "body",
+      metatype: UpdateProductDto,
+    };
+
+    const result: unknown = await createGrpcValidationPipe().transform(
+      {
+        id: "da59cbd6-cc7e-4b4e-87b6-d1cd39b54498",
+        data: { stockQuantity: 0 },
+        expectedVersion: 1,
+      },
+      updateMetadata,
+    );
+
+    expect(result).toMatchObject({
+      id: "da59cbd6-cc7e-4b4e-87b6-d1cd39b54498",
+      patch: { stockQuantity: 0 },
+      expectedVersion: 1,
+    });
   });
 
   it.each([

@@ -59,6 +59,7 @@ import {
   verifyF4R2DefaultActors,
   verifyF4R3RealmAuthFoundation,
   verifyF4R4AdminSplitStaged,
+  verifyProductInventoryContract,
   verifyTenantAuthorityDefaultSeed,
   verifyTenantAuthorityRegistrationRecords,
   waitForExpectedDatabases,
@@ -334,10 +335,10 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     /FROM node:22-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base/,
     "the runtime base must use an immutable official-image index",
   );
-  assert.match(
+  assert.doesNotMatch(
     dockerfile,
-    /id=nebula-corepack,target=\/root\/\.cache\/node\/corepack,sharing=locked/,
-    "Corepack downloads must survive sequential target builds",
+    /RUN --mount=type=cache,id=nebula-corepack[^\n]*\n\s*set -eu;/,
+    "Corepack preparation must persist in build-base for descendant stages",
   );
   assert.match(
     dockerfile,
@@ -1760,6 +1761,32 @@ test("clean migration verification uses disposable databases and always cleans u
       ),
   );
   assert.notEqual(seedEvidence, undefined);
+});
+
+test("product migration verification executes the inventory database proof", () => {
+  let invocation;
+
+  verifyProductInventoryContract("nebula_product_verify_contract", {
+    executeDocker(command, args, options) {
+      invocation = { command, args, options };
+      return { status: 0 };
+    },
+  });
+
+  assert.match(invocation.command, /docker/);
+  assert.deepEqual(invocation.args.slice(0, 4), [
+    "compose",
+    "exec",
+    "-T",
+    "postgres",
+  ]);
+  assert.equal(
+    invocation.args[invocation.args.indexOf("--dbname") + 1],
+    "nebula_product_verify_contract",
+  );
+  assert.match(invocation.options.input, /Product_untracked_stock_zero/);
+  assert.match(invocation.options.input, /Product_version_positive/);
+  assert.match(invocation.options.input, /ROLLBACK;/);
 });
 
 test("migration verification can select one scoped service", () => {

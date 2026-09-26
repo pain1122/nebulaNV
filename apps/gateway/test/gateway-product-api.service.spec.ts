@@ -8,6 +8,7 @@ import type { GatewayHttpRequest } from "../src/http/public-client-boundary";
 import { GatewayProductApiService } from "../src/product/gateway-product-api.service";
 import {
   GatewayDiscountType,
+  GatewayProductAvailability,
   GatewayProductStatus,
 } from "../src/product/product-api.dto";
 
@@ -59,6 +60,8 @@ function product(
     status: GatewayProductStatus.ACTIVE,
     price: 100,
     effectivePrice: 100,
+    availability: GatewayProductAvailability.AVAILABLE,
+    version: 1,
     createdAt: "2026-08-15T00:00:00.000Z",
     updatedAt: "2026-08-15T00:00:00.000Z",
     ...overrides,
@@ -112,7 +115,16 @@ describe("GatewayProductApiService", () => {
 
     await expect(
       service.listPublic(gatewayRequest(false), { page: 1, limit: 20 }),
-    ).resolves.toMatchObject({ total: 1 });
+    ).resolves.toMatchObject({
+      total: 1,
+      data: [
+        {
+          availability: GatewayProductAvailability.AVAILABLE,
+          stockQuantity: 0,
+          version: 1,
+        },
+      ],
+    });
     expect(listProducts.mock.calls[0]?.[0]).toMatchObject({
       page: 1,
       limit: 20,
@@ -134,6 +146,24 @@ describe("GatewayProductApiService", () => {
     });
     await expect(
       widened.service.listPublic(gatewayRequest(false), {}),
+    ).rejects.toMatchObject({ status: 502 });
+
+    const depleted = createHarness({
+      ListProducts: jest.fn(() =>
+        of({
+          data: [
+            product({
+              trackInventory: true,
+              stockQuantity: 0,
+              availability: GatewayProductAvailability.OUT_OF_STOCK,
+            }),
+          ],
+          total: 1,
+        }),
+      ),
+    });
+    await expect(
+      depleted.service.listPublic(gatewayRequest(false), {}),
     ).rejects.toMatchObject({ status: 502 });
   });
 
@@ -164,21 +194,32 @@ describe("GatewayProductApiService", () => {
       title: "Desk",
       price: 100,
       content: "Solid oak",
+      trackInventory: true,
+      stockQuantity: 4,
     });
     expect(createProduct.mock.calls[0]?.[0]).toEqual({
-      data: { title: "Desk", price: 100, description: "Solid oak" },
+      data: {
+        title: "Desk",
+        price: 100,
+        description: "Solid oak",
+        trackInventory: true,
+        stockQuantity: 4,
+      },
     });
 
     await service.update(gatewayRequest(true), PRODUCT_ID, {
       content: "Updated",
       promoActive: false,
+      expectedVersion: 7,
     });
     const patch = updateProduct.mock.calls[0]?.[0] as {
       id: string;
       data: Record<string, unknown>;
+      expectedVersion: number;
     };
     expect(patch.id).toBe(PRODUCT_ID);
     expect(patch.data).toEqual({ description: "Updated", promoActive: false });
+    expect(patch).toMatchObject({ expectedVersion: 7 });
 
     const metadata = updateProduct.mock.calls[0]?.[1] as Metadata;
     expect(metadata.get(AUTHORIZATION_HEADER)).toEqual([

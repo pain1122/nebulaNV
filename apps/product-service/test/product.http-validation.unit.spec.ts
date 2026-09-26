@@ -140,4 +140,27 @@ describe("product HTTP validation migration", () => {
       createMetadata,
     );
   });
+
+  it("rejects ambiguous inventory flags and out-of-range quantities", async () => {
+    await bothReject(
+      {
+        data: {
+          title: "Chair",
+          trackInventory: "sometimes",
+          stockQuantity: 1,
+        },
+      },
+      createMetadata,
+    );
+    await bothReject(
+      {
+        data: {
+          title: "Chair",
+          trackInventory: true,
+          stockQuantity: 2_147_483_648,
+        },
+      },
+      createMetadata,
+    );
+  });
 });

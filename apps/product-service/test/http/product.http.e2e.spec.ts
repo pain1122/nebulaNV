@@ -13,6 +13,7 @@ describe("product-service HTTP (admin writes, public reads)", () => {
   let id = "";
   let slug = "";
   let sku = "";
+  let version = 1;
 
   beforeAll(async () => {
     // login normal user
@@ -67,6 +68,7 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     id = res.data.id;
     slug = res.data.slug;
     sku = res.data.sku;
+    version = res.data.version;
     expect(res.data.title).toBe("E2E Widget");
     expect(res.data).toMatchObject({
       price: 199.99,
@@ -75,6 +77,10 @@ describe("product-service HTTP (admin writes, public reads)", () => {
       discountValue: 0,
       discountActive: false,
       effectivePrice: 199.99,
+      trackInventory: false,
+      stockQuantity: 0,
+      availability: "AVAILABLE",
+      version: 1,
     });
     // categoryId should be auto-filled with default_product_category
     expect(typeof res.data.categoryId).toBe("string");
@@ -148,10 +154,12 @@ describe("product-service HTTP (admin writes, public reads)", () => {
     const res = await httpJson<any>(
       "PATCH",
       `${PRODUCT_HTTP}/products/${id}`,
-      { patch: { title: "E2E Widget Pro" } },
+      { patch: { title: "E2E Widget Pro" }, expectedVersion: version },
       { authorization: `Bearer ${admin}` },
     );
     expect(res.data.title).toBe("E2E Widget Pro");
+    expect(res.data.version).toBe(version + 1);
+    version = res.data.version;
   });
 
   it("PATCH /products/:id returns 404 for a missing product", async () => {
@@ -161,7 +169,10 @@ describe("product-service HTTP (admin writes, public reads)", () => {
         authorization: `Bearer ${admin}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ patch: { title: "Missing product" } }),
+      body: JSON.stringify({
+        patch: { title: "Missing product" },
+        expectedVersion: 1,
+      }),
     });
     const body = (await res.json()) as { message?: string };
 

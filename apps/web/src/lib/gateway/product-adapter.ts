@@ -17,9 +17,13 @@ export function productCreateInput(value: unknown): GatewayProductWriteDto {
 }
 
 export function productPatchInput(value: unknown): GatewayProductPatchDto {
-  const input = record(record(value)?.patch);
+  const envelope = record(value);
+  const input = record(envelope?.patch);
   if (!input) throw new Error("product_patch_envelope_required");
-  return input as GatewayProductPatchDto;
+  return {
+    ...input,
+    expectedVersion: envelope?.expectedVersion,
+  } as GatewayProductPatchDto;
 }
 
 export function productForCurrentUi(product: GatewayProductDto) {

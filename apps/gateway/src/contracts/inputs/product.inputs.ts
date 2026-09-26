@@ -34,6 +34,13 @@ const PRODUCT_WRITE_FIELDS = Object.freeze([
   "discountEnd",
   "tags",
   "complementaryIds",
+  "trackInventory",
+  "stockQuantity",
+] as const);
+
+const PRODUCT_PATCH_FIELDS = Object.freeze([
+  ...PRODUCT_WRITE_FIELDS,
+  "expectedVersion",
 ] as const);
 
 export const PRODUCT_INPUT_PROFILES = Object.freeze({
@@ -49,8 +56,9 @@ export const PRODUCT_INPUT_PROFILES = Object.freeze({
   }),
   "product-patch": profile({
     params: ["id"],
-    body: PRODUCT_WRITE_FIELDS,
+    body: PRODUCT_PATCH_FIELDS,
     requiredParams: ["id"],
+    requiredBody: ["expectedVersion"],
     rules: [
       {
         kind: "at-least-one",

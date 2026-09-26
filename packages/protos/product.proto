@@ -61,6 +61,10 @@ message Product {
   string createdAt = 36;
   string updatedAt = 37;
   string deletedAt = 38; // "" if not soft-deleted
+  bool   trackInventory = 39;
+  int32  stockQuantity = 40;
+  string availability = 41; // AVAILABLE|OUT_OF_STOCK
+  int32  version = 42;
 }
 
 // -----------------------------------------
@@ -111,6 +115,8 @@ message ProductInput {
 
   repeated string tags = 80;
   repeated string complementaryIds = 81;
+  bool   trackInventory = 82;
+  int32  stockQuantity = 83;
 }
 
 message ProductPatch {
@@ -155,13 +161,19 @@ message ProductPatch {
 
   repeated string tags = 80;
   repeated string complementaryIds = 81;
+  bool   trackInventory = 82;
+  int32  stockQuantity = 83;
 }
 
 // -----------------------------------------
 // Requests / Responses
 // -----------------------------------------
 message CreateProductRequest { ProductInput data = 1; }
-message UpdateProductRequest { string id = 1; ProductPatch data = 2; }
+message UpdateProductRequest {
+  string id = 1;
+  ProductPatch data = 2;
+  int32 expectedVersion = 3;
+}
 message GetProductRequest { string id = 1; }
 
 message ListProductsRequest {

@@ -59,6 +59,7 @@ describe("Product public/admin read separation", () => {
         id: "product-1",
         status: ProductStatus.ACTIVE,
         deletedAt: null,
+        OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
       },
     });
   });
@@ -78,6 +79,7 @@ describe("Product public/admin read separation", () => {
     const expectedWhere = {
       status: ProductStatus.ACTIVE,
       deletedAt: null,
+      AND: [{ OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }] }],
       OR: [
         { title: { contains: "chair", mode: "insensitive" } },
         { sku: { contains: "chair", mode: "insensitive" } },
@@ -124,6 +126,7 @@ describe("Product public/admin read separation", () => {
         id: "product-1",
         status: ProductStatus.ACTIVE,
         deletedAt: null,
+        OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
       },
       select: { id: true },
     });

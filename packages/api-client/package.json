@@ -16,6 +16,7 @@
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\" \"test/**/*.{ts,mjs}\" \"scripts/**/*.mjs\" \"index.ts\"",
     "test": "pnpm run build && node --test ./test/client.test.mjs && tsc -p test/tsconfig.browser.json && tsc -p test/tsconfig.react-native.json",
     "test:live": "pnpm run build && node ./test/f3-live-flows.mjs",
+    "test:d1-product-live": "pnpm run build && node ./test/d1-product-live.mjs",
     "clean": "rimraf dist"
   },
   "devDependencies": {

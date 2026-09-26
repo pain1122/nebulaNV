@@ -105,6 +105,7 @@ describe("product taxonomy error translation", () => {
     const prisma = {
       product: {
         update: jest.fn().mockRejectedValue({ code: "P2025" }),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
     } as unknown as PrismaService;
     const emptyClient = {
@@ -113,7 +114,7 @@ describe("product taxonomy error translation", () => {
     const service = new ProductServiceImpl(prisma, emptyClient, emptyClient);
 
     await expect(
-      service.update(MISSING_ID, { title: "Missing product" }),
+      service.update(MISSING_ID, { title: "Missing product" }, 1),
     ).rejects.toEqual(new NotFoundException("product_not_found"));
   });
 });

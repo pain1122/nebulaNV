@@ -17,6 +17,7 @@ import { createGatewayDownstreamContext } from "../downstream/gateway-downstream
 import type { GatewayHttpRequest } from "../http/public-client-boundary";
 import {
   GatewayDiscountType,
+  GatewayProductAvailability,
   GatewayProductStatus,
   type GatewayAdminProductListQueryDto,
   type GatewayBulkResultDto,
@@ -52,8 +53,26 @@ function knownDiscountType(value: string): GatewayDiscountType {
   return value as GatewayDiscountType;
 }
 
+function knownAvailability(value: string): GatewayProductAvailability {
+  if (
+    !Object.values(GatewayProductAvailability).includes(
+      value as GatewayProductAvailability,
+    )
+  ) {
+    throw new BadGatewayException("product_response_availability_invalid");
+  }
+  return value as GatewayProductAvailability;
+}
+
 function finiteNumber(value: number, name: string): number {
   if (!Number.isFinite(value)) {
+    throw new BadGatewayException(`product_response_${name}_invalid`);
+  }
+  return value;
+}
+
+function finiteInteger(value: number, name: string, minimum: number): number {
+  if (!Number.isInteger(value) || value < minimum) {
     throw new BadGatewayException(`product_response_${name}_invalid`);
   }
   return value;
@@ -107,6 +126,10 @@ function product(value: productv1.Product | undefined): GatewayProductDto {
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     deletedAt: value.deletedAt,
+    trackInventory: value.trackInventory,
+    stockQuantity: finiteInteger(value.stockQuantity, "stock_quantity", 0),
+    availability: knownAvailability(value.availability),
+    version: finiteInteger(value.version, "version", 1),
   });
 }
 
@@ -114,7 +137,11 @@ function publicProduct(
   value: productv1.Product | undefined,
 ): GatewayProductDto {
   const mapped = product(value);
-  if (mapped.status !== GatewayProductStatus.ACTIVE || mapped.deletedAt) {
+  if (
+    mapped.status !== GatewayProductStatus.ACTIVE ||
+    mapped.deletedAt ||
+    mapped.availability !== GatewayProductAvailability.AVAILABLE
+  ) {
     throw new NotFoundException("product_not_found");
   }
   return mapped;
@@ -127,7 +154,9 @@ function publicProducts(
   if (
     mapped.some(
       (value) =>
-        value.status !== GatewayProductStatus.ACTIVE || value.deletedAt,
+        value.status !== GatewayProductStatus.ACTIVE ||
+        value.deletedAt ||
+        value.availability !== GatewayProductAvailability.AVAILABLE,
     )
   ) {
     throw new BadGatewayException("product_public_visibility_violation");
@@ -212,6 +241,8 @@ const PATCH_FIELDS = Object.freeze([
   "discountEnd",
   "tags",
   "complementaryIds",
+  "trackInventory",
+  "stockQuantity",
 ] as const);
 
 function sparsePatch(input: GatewayProductPatchDto): ProductPatchInput {
@@ -342,7 +373,11 @@ export class GatewayProductApiService {
     const result = await wrapGrpc(
       firstValueFrom(
         products.proxy.UpdateProduct(
-          { id, data: sparsePatch(input) },
+          {
+            id,
+            data: sparsePatch(input),
+            expectedVersion: input.expectedVersion,
+          },
           products.metadata,
         ),
       ),

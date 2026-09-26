@@ -7,8 +7,10 @@ ENV PNPM_HOME=/root/.local/share/pnpm
 ENV COREPACK_HOME=/root/.cache/node/corepack
 ENV PATH=$PNPM_HOME:$PATH
 
-RUN --mount=type=cache,id=nebula-corepack,target=/root/.cache/node/corepack,sharing=locked \
-    set -eu; \
+# Keep the prepared package manager in the build-base layer. A cache mount here
+# hides Corepack's files from descendant stages and makes each stage download
+# pnpm again before it can use the offline dependency store.
+RUN set -eu; \
     corepack enable; \
     attempt=1; \
     until corepack prepare pnpm@10.17.1 --activate; do \

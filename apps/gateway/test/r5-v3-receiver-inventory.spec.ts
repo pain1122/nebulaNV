@@ -55,7 +55,7 @@ const legacyProtoSha256 = {
   "packages/protos/settings.proto":
     "da4e82fed896c382144717fde6a2fe550341ecdb66f08cbef2c25c54ca65d5f9",
   "packages/protos/product.proto":
-    "a5864c5e565c27bc8aacbf15d1da7f9935ba5ecff20618f49611ce5880c15fde",
+    "ed63224617a75b77471be2f3fa628293ad2b97324c668625394cc717a4fc98e8",
   "packages/protos/blog.proto":
     "82ec00ddc5d77fa41c7615e96439e30dd4f87c4d1d6a3bb6daaaa145e8651d45",
   "packages/protos/order.proto":

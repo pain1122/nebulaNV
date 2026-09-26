@@ -23,6 +23,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
   let categoryId = "";
   let userAccess = "";
   let sku = "";
+  let version = 1;
 
   beforeAll(async () => {
     // (Optional) login admin – not strictly needed for S2S, but handy to ensure auth-service is alive
@@ -67,6 +68,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
 
     id = res.data.id;
     sku = res.data.sku;
+    version = res.data.version;
     expect(res.data.title).toBe(input.title);
     expect(res.data.categoryId).toBe(categoryId);
     expect(res.data).toMatchObject({
@@ -76,6 +78,10 @@ describe("ProductService gRPC (admin required on writes)", () => {
       discountValue: 0,
       discountActive: false,
       effectivePrice: 149.5,
+      trackInventory: false,
+      stockQuantity: 0,
+      availability: "AVAILABLE",
+      version: 1,
     });
   });
 
@@ -279,6 +285,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
           discountValue: 10,
           discountActive: true,
         },
+        expectedVersion: version,
       },
       mdS2S({ role: "admin" }),
     );
@@ -288,6 +295,25 @@ describe("ProductService gRPC (admin required on writes)", () => {
       discountValue: 10,
       discountActive: true,
       effectivePrice: 134.55,
+      version: version + 1,
+    });
+    const staleVersion = version;
+    version = res.data.version;
+
+    await expect(
+      call<any>(
+        client,
+        "UpdateProduct",
+        {
+          id,
+          data: { title: "Stale overwrite" },
+          expectedVersion: staleVersion,
+        },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.ALREADY_EXISTS,
+      details: "product_version_conflict",
     });
   });
 
@@ -296,7 +322,11 @@ describe("ProductService gRPC (admin required on writes)", () => {
       call<any>(
         client,
         "UpdateProduct",
-        { id: MISSING_ID, data: { title: "Missing product" } },
+        {
+          id: MISSING_ID,
+          data: { title: "Missing product" },
+          expectedVersion: 1,
+        },
         mdS2S({ role: "admin" }),
       ),
     ).rejects.toMatchObject({

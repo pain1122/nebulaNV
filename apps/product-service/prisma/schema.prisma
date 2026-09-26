@@ -47,6 +47,9 @@ model Product {
   promoEnd         DateTime?
   tags             String[]
   complementaryIds String[]
+  trackInventory    Boolean               @default(false)
+  stockQuantity     Int                   @default(0)
+  version           Int                   @default(1)
   deletedAt        DateTime?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt

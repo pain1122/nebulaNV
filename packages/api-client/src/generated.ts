@@ -446,6 +446,7 @@ export type GatewayProductBulkDiscountDto = Readonly<{
 }>;
 
 export type GatewayProductDto = Readonly<{
+  readonly "availability": "AVAILABLE" | "OUT_OF_STOCK";
   readonly "categoryId": string;
   readonly "complementaryIds": ReadonlyArray<string>;
   readonly "createdAt": string;
@@ -478,10 +479,13 @@ export type GatewayProductDto = Readonly<{
   readonly "sku": string;
   readonly "slug": string;
   readonly "status": "DRAFT" | "ACTIVE" | "ARCHIVED";
+  readonly "stockQuantity": number;
   readonly "tags": ReadonlyArray<string>;
   readonly "thumbnailUrl": string;
   readonly "title": string;
+  readonly "trackInventory": boolean;
   readonly "updatedAt": string;
+  readonly "version": number;
   readonly "vrEnabled": boolean;
   readonly "vrPlanImageUrl": string;
 }>;
@@ -505,6 +509,7 @@ export type GatewayProductPatchDto = Readonly<{
   readonly "discountType"?: "PERCENTAGE" | "FIXED" | "NONE";
   readonly "discountValue"?: number;
   readonly "excerpt"?: string;
+  readonly "expectedVersion": number;
   readonly "featureSort"?: number;
   readonly "isFeatured"?: boolean;
   readonly "metaDescription"?: string;
@@ -522,9 +527,11 @@ export type GatewayProductPatchDto = Readonly<{
   readonly "sku"?: string;
   readonly "slug"?: string;
   readonly "status"?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  readonly "stockQuantity"?: number;
   readonly "tags"?: ReadonlyArray<string>;
   readonly "thumbnailUrl"?: string;
   readonly "title"?: string;
+  readonly "trackInventory"?: boolean;
   readonly "vrEnabled"?: boolean;
   readonly "vrPlanImageUrl"?: string;
 }>;
@@ -558,9 +565,11 @@ export type GatewayProductWriteDto = Readonly<{
   readonly "sku"?: string;
   readonly "slug"?: string;
   readonly "status"?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  readonly "stockQuantity"?: number;
   readonly "tags"?: ReadonlyArray<string>;
   readonly "thumbnailUrl"?: string;
   readonly "title": string;
+  readonly "trackInventory"?: boolean;
   readonly "vrEnabled"?: boolean;
   readonly "vrPlanImageUrl"?: string;
 }>;

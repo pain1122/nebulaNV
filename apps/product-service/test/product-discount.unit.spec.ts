@@ -52,6 +52,9 @@ function product(overrides: Partial<Product> = {}): Product {
     promoEnd: null,
     tags: [],
     complementaryIds: [],
+    trackInventory: false,
+    stockQuantity: 0,
+    version: 1,
     deletedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -181,7 +184,7 @@ describe("product discount contract", () => {
       },
     });
 
-    await svc.update("product-1", { discountType: DiscountTypeDto.NONE });
+    await svc.update("product-1", { discountType: DiscountTypeDto.NONE }, 1);
 
     expect(update).toHaveBeenCalledTimes(1);
     expect(update.mock.calls[0]?.[0]).toMatchObject({
@@ -191,6 +194,7 @@ describe("product discount contract", () => {
         discountActive: false,
         discountStart: null,
         discountEnd: null,
+        version: { increment: 1 },
       },
     });
   });
@@ -201,14 +205,18 @@ describe("product discount contract", () => {
     const svc = service({ product: { findUnique, update } });
 
     await expect(
-      svc.update("product-1", {
-        title: "Updated",
-        discountType: undefined,
-        discountValue: undefined,
-        discountActive: undefined,
-        discountStart: undefined,
-        discountEnd: undefined,
-      }),
+      svc.update(
+        "product-1",
+        {
+          title: "Updated",
+          discountType: undefined,
+          discountValue: undefined,
+          discountActive: undefined,
+          discountStart: undefined,
+          discountEnd: undefined,
+        },
+        1,
+      ),
     ).resolves.toMatchObject({ data: { title: "Updated" } });
 
     expect(findUnique).not.toHaveBeenCalled();
@@ -231,9 +239,13 @@ describe("product discount contract", () => {
     });
 
     await expect(
-      svc.update("product-1", {
-        discountEnd: "2026-09-19T00:00:00.000Z",
-      }),
+      svc.update(
+        "product-1",
+        {
+          discountEnd: "2026-09-19T00:00:00.000Z",
+        },
+        1,
+      ),
     ).rejects.toEqual(
       new BadRequestException("discountEnd must be >= discountStart"),
     );
@@ -250,10 +262,14 @@ describe("product discount contract", () => {
     });
 
     await expect(
-      svc.update("product-1", {
-        discountType: DiscountTypeDto.PERCENTAGE,
-        discountValue: 101,
-      }),
+      svc.update(
+        "product-1",
+        {
+          discountType: DiscountTypeDto.PERCENTAGE,
+          discountValue: 101,
+        },
+        1,
+      ),
     ).rejects.toEqual(
       new BadRequestException("percentage discountValue must be at most 100"),
     );
@@ -308,6 +324,7 @@ describe("product discount contract", () => {
         discountActive: false,
         discountStart: null,
         discountEnd: null,
+        version: { increment: 1 },
       },
     });
   });
