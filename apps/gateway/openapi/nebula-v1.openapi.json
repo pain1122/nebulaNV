@@ -1787,6 +1787,13 @@
           "promoTitle": {
             "type": "string"
           },
+          "selectionMode": {
+            "enum": [
+              "BASE",
+              "VARIANT"
+            ],
+            "type": "string"
+          },
           "sku": {
             "type": "string"
           },
@@ -1823,6 +1830,12 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/GatewayProductVariantDto"
+            },
+            "type": "array"
           },
           "version": {
             "minimum": 1,
@@ -1877,7 +1890,9 @@
           "trackInventory",
           "stockQuantity",
           "availability",
-          "version"
+          "version",
+          "selectionMode",
+          "variants"
         ],
         "type": "object"
       },
@@ -2010,6 +2025,13 @@
             "maxLength": 120,
             "type": "string"
           },
+          "selectionMode": {
+            "enum": [
+              "BASE",
+              "VARIANT"
+            ],
+            "type": "string"
+          },
           "sku": {
             "maxLength": 120,
             "type": "string"
@@ -2060,6 +2082,72 @@
         },
         "required": [
           "expectedVersion"
+        ],
+        "type": "object"
+      },
+      "GatewayProductVariantDto": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "availability": {
+            "enum": [
+              "AVAILABLE",
+              "OUT_OF_STOCK"
+            ],
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string"
+          },
+          "effectivePrice": {
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "price": {
+            "type": "number"
+          },
+          "priceOverride": {
+            "nullable": true,
+            "type": "object"
+          },
+          "productId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "stockQuantity": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "sku",
+          "options",
+          "price",
+          "effectivePrice",
+          "stockQuantity",
+          "availability",
+          "active",
+          "sortOrder",
+          "deletedAt"
         ],
         "type": "object"
       },
@@ -2165,6 +2253,13 @@
           },
           "promoTitle": {
             "maxLength": 120,
+            "type": "string"
+          },
+          "selectionMode": {
+            "enum": [
+              "BASE",
+              "VARIANT"
+            ],
             "type": "string"
           },
           "sku": {
@@ -2542,6 +2637,99 @@
         "required": [
           "field",
           "code"
+        ],
+        "type": "object"
+      },
+      "GatewayVariantDeleteQueryDto": {
+        "properties": {
+          "expectedVersion": {
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "type": "object"
+      },
+      "GatewayVariantPatchDto": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "clearPriceOverride": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "options": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "One to three option names mapped to values.",
+            "type": "object"
+          },
+          "priceOverride": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "sku": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "sortOrder": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "stockQuantity": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "type": "object"
+      },
+      "GatewayVariantWriteDto": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "options": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "One to three option names mapped to values.",
+            "type": "object"
+          },
+          "priceOverride": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "sku": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "sortOrder": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "stockQuantity": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "sku",
+          "options",
+          "expectedVersion"
         ],
         "type": "object"
       },
@@ -9527,6 +9715,549 @@
           }
         ],
         "summary": "admin.products.restore",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/v1/admin/products/{id}/variants": {
+      "post": {
+        "operationId": "admin_products_variants_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayVariantWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayProductDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.products.variants.create",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/v1/admin/products/{id}/variants/{variantId}": {
+      "delete": {
+        "operationId": "admin_products_variants_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expectedVersion",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayProductDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.products.variants.delete",
+        "tags": [
+          "Products"
+        ]
+      },
+      "patch": {
+        "operationId": "admin_products_variants_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayVariantPatchDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayProductDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.products.variants.update",
         "tags": [
           "Products"
         ]

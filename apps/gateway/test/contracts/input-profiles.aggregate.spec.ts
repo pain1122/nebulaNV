@@ -8,8 +8,8 @@ import {
 } from "../../src/contracts/inputs/input-profile.core";
 
 describe("gateway input-profile aggregate", () => {
-  it("assembles all 41 unique frozen profiles", () => {
-    expect(Object.keys(GATEWAY_INPUT_PROFILES)).toHaveLength(41);
+  it("assembles all 44 unique landed profiles", () => {
+    expect(Object.keys(GATEWAY_INPUT_PROFILES)).toHaveLength(44);
     expect(Object.isFrozen(GATEWAY_INPUT_PROFILES)).toBe(true);
 
     for (const definition of Object.values(GATEWAY_INPUT_PROFILES)) {

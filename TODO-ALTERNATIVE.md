@@ -417,9 +417,10 @@ F4 work.
       currency, stock, availability, and `DRAFT | ACTIVE | ARCHIVED` lifecycle.
 - [ ] Preserve deterministic current global slug/SKU uniqueness and record the
       later F4 scoped-uniqueness migration requirement.
-- [ ] Add bounded product variants with option values, per-variant SKU,
+- [x] Add bounded product variants with option values, per-variant SKU,
       price/stock overrides, active/deleted state, and deterministic ordering.
-- [ ] Define explicit concurrency behavior for product and variant mutations.
+- [x] Define explicit concurrency behavior for product and variant mutations.
+      D1-V evidence: `docs/reports/2026-09-26-d1-variants-checkpoint.md`.
 - [ ] Preserve authoritative public reads that cannot expose draft, archived,
       deleted, unavailable, or invalid records through query flags.
 - [ ] Keep advanced comments, sets, VR, showroom, recommendation, and premium

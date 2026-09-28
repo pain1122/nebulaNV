@@ -12,8 +12,10 @@ import { firstValueFrom } from "rxjs";
 import {
   Prisma,
   ProductStatus,
+  ProductSelectionMode,
   DiscountType,
   type Product,
+  type ProductVariant,
 } from "../../prisma/generated";
 import { SETTINGS_SERVICE } from "../settings-client.module";
 import { getSettings, type SettingsProxy } from "@nebula/clients";
@@ -73,6 +75,16 @@ type DiscountState = Pick<
 >;
 
 type InventoryState = Pick<Product, "trackInventory" | "stockQuantity">;
+type ProductWithVariants = Product & { variants?: ProductVariant[] };
+type VariantInput = {
+  sku: string;
+  options: Record<string, string>;
+  priceOverride?: number | null;
+  stockQuantity?: number;
+  active?: boolean;
+  sortOrder?: number;
+};
+type VariantPatch = Partial<VariantInput>;
 
 const INT32_MAX = 2_147_483_647;
 
@@ -143,12 +155,28 @@ function uniqueConflictFields(e: unknown): string[] {
   if (!isRecord(e) || e.code !== "P2002") return [];
   const meta = isRecord(e.meta) ? e.meta : undefined;
   const target = meta?.target;
-  if (Array.isArray(target)) {
-    return target.filter((item): item is string => typeof item === "string");
+  const fields = Array.isArray(target)
+    ? target.filter((item): item is string => typeof item === "string")
+    : typeof target === "string"
+      ? target.split(",").map((field) => field.trim())
+      : [];
+  if (
+    fields.some((field) =>
+      ["CatalogSku_pkey", "ProductVariant_sku_key", "Product_sku_key"].some(
+        (name) => field.includes(name),
+      ),
+    )
+  ) {
+    fields.push("sku");
   }
-  return typeof target === "string"
-    ? target.split(",").map((field) => field.trim())
-    : [];
+  if (
+    fields.some((field) =>
+      field.includes("ProductVariant_productId_optionKey_key"),
+    )
+  ) {
+    fields.push("optionKey");
+  }
+  return fields;
 }
 
 function isUniqueConflictFor(e: unknown, field: "slug" | "sku"): boolean {
@@ -165,6 +193,12 @@ const asStatus = (value: unknown): ProductStatus | undefined =>
     ? (value as ProductStatus)
     : undefined;
 
+const asSelectionMode = (value: unknown): ProductSelectionMode | undefined =>
+  typeof value === "string" &&
+  Object.values(ProductSelectionMode).includes(value as ProductSelectionMode)
+    ? (value as ProductSelectionMode)
+    : undefined;
+
 const asDiscountType = (value: unknown): DiscountType | null | undefined => {
   if (value === DiscountTypeDto.NONE) return null;
 
@@ -173,6 +207,58 @@ const asDiscountType = (value: unknown): DiscountType | null | undefined => {
     ? (value as DiscountType)
     : undefined;
 };
+
+function variantOptions(value: unknown): {
+  options: Record<string, string>;
+  optionKey: string;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new BadRequestException("variant_options_invalid");
+  }
+  const entries = Object.entries(value);
+  if (entries.length < 1 || entries.length > 3) {
+    throw new BadRequestException("variant_options_invalid");
+  }
+  const normalized = entries
+    .map(([name, raw]) => {
+      const key = name.trim();
+      const option = typeof raw === "string" ? raw.trim() : "";
+      if (!key || key.length > 40 || !option || option.length > 80) {
+        throw new BadRequestException("variant_options_invalid");
+      }
+      return [key, option] as const;
+    })
+    .sort(([a], [b]) => a.localeCompare(b));
+  const canonical = normalized.map(([key, option]) => [
+    key.toLowerCase(),
+    option.toLowerCase(),
+  ]);
+  if (new Set(canonical.map(([key]) => key)).size !== canonical.length) {
+    throw new BadRequestException("variant_options_invalid");
+  }
+  return {
+    options: Object.fromEntries(normalized),
+    optionKey: JSON.stringify(canonical),
+  };
+}
+
+function variantSku(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > 120) {
+    throw new BadRequestException("variant_sku_invalid");
+  }
+  return value.trim();
+}
+
+function variantQuantity(value: unknown): number {
+  if (
+    !Number.isInteger(value) ||
+    (value as number) < 0 ||
+    (value as number) > INT32_MAX
+  ) {
+    throw new BadRequestException("variant_stock_invalid");
+  }
+  return value as number;
+}
 
 @Injectable()
 export class ProductServiceImpl {
@@ -245,8 +331,12 @@ export class ProductServiceImpl {
     return shopCurrency;
   }
 
-  private effectivePrice(p: Product, now = new Date()): number {
-    const price = new Prisma.Decimal(p.price);
+  private effectivePrice(
+    p: Product,
+    now = new Date(),
+    basePrice: Prisma.Decimal = new Prisma.Decimal(p.price),
+  ): number {
+    const price = basePrice;
     const value = p.discountValue ? new Prisma.Decimal(p.discountValue) : null;
     const outsideWindow =
       (p.discountStart !== null && now < p.discountStart) ||
@@ -274,8 +364,33 @@ export class ProductServiceImpl {
       .toNumber();
   }
 
-  private toDto = (p: Product) => {
+  private variantDto(p: Product, v: ProductVariant) {
+    const price = new Prisma.Decimal(v.priceOverride ?? p.price);
+    return {
+      id: v.id,
+      productId: v.productId,
+      sku: v.sku,
+      options: v.options as Record<string, string>,
+      price: price.toNumber(),
+      priceOverride:
+        v.priceOverride === null
+          ? null
+          : new Prisma.Decimal(v.priceOverride).toNumber(),
+      effectivePrice: this.effectivePrice(p, new Date(), price),
+      stockQuantity: v.stockQuantity,
+      availability:
+        !v.active || v.deletedAt || (p.trackInventory && v.stockQuantity === 0)
+          ? "OUT_OF_STOCK"
+          : "AVAILABLE",
+      active: v.active,
+      sortOrder: v.sortOrder,
+      deletedAt: v.deletedAt?.toISOString() ?? "",
+    };
+  }
+
+  private toDto = (p: ProductWithVariants) => {
     const hasDiscount = p.discountType !== null;
+    const variants = p.variants ?? [];
     return {
       id: p.id,
       slug: p.slug,
@@ -324,10 +439,21 @@ export class ProductServiceImpl {
       deletedAt: p.deletedAt ? p.deletedAt.toISOString() : "",
       trackInventory: p.trackInventory,
       stockQuantity: p.stockQuantity,
+      selectionMode: p.selectionMode ?? ProductSelectionMode.BASE,
+      variants: variants.map((variant) => this.variantDto(p, variant)),
       availability:
-        p.trackInventory && p.stockQuantity === 0
-          ? "OUT_OF_STOCK"
-          : "AVAILABLE",
+        p.selectionMode === ProductSelectionMode.VARIANT
+          ? variants.some(
+              (variant) =>
+                variant.active &&
+                !variant.deletedAt &&
+                (!p.trackInventory || variant.stockQuantity > 0),
+            )
+            ? "AVAILABLE"
+            : "OUT_OF_STOCK"
+          : p.trackInventory && p.stockQuantity === 0
+            ? "OUT_OF_STOCK"
+            : "AVAILABLE",
       version: p.version,
     };
   };
@@ -600,6 +726,21 @@ export class ProductServiceImpl {
       downstream,
     );
     const discount = this.createDiscountState(input);
+    const selectionMode =
+      asSelectionMode(input.selectionMode) ?? ProductSelectionMode.BASE;
+    const status = asStatus(input.status) ?? ProductStatus.DRAFT;
+    if (
+      selectionMode === ProductSelectionMode.VARIANT &&
+      status !== ProductStatus.DRAFT
+    ) {
+      throw new BadRequestException("product_variants_require_draft");
+    }
+    if (
+      selectionMode === ProductSelectionMode.VARIANT &&
+      inventory.stockQuantity !== 0
+    ) {
+      throw new BadRequestException("product_variant_base_stock_invalid");
+    }
 
     let slugAttempt = 1;
     let skuAttempt = 1;
@@ -621,7 +762,9 @@ export class ProductServiceImpl {
 
             price: new Prisma.Decimal(input.price ?? 0),
             currency,
-            status: asStatus(input.status) ?? ProductStatus.DRAFT,
+            status,
+            selectionMode,
+            skuReservation: { create: { sku } },
 
             categoryId,
 
@@ -653,6 +796,7 @@ export class ProductServiceImpl {
             complementaryIds: input.complementaryIds ?? [],
             ...inventory,
           },
+          include: { variants: true },
         });
         return { data: this.toDto(data) };
       } catch (e) {
@@ -688,6 +832,44 @@ export class ProductServiceImpl {
       throw new BadRequestException("expected_version_invalid");
     }
     if (patch.price != null) this.assertPrice(patch.price);
+    const nextSku = patch.sku?.trim() || undefined;
+    const nextSelectionMode = asSelectionMode(patch.selectionMode);
+    if (patch.selectionMode !== undefined && !nextSelectionMode) {
+      throw new BadRequestException("product_selection_mode_invalid");
+    }
+    if (nextSelectionMode !== undefined) {
+      const current = await this.prisma.product.findUnique({
+        where: { id },
+        select: { status: true, stockQuantity: true, selectionMode: true },
+      });
+      if (!current) throw new NotFoundException("product_not_found");
+      if (nextSelectionMode !== current.selectionMode) {
+        if (
+          current.status !== ProductStatus.DRAFT ||
+          (patch.status !== undefined && patch.status !== "DRAFT") ||
+          current.stockQuantity !== 0
+        ) {
+          throw new BadRequestException(
+            "product_selection_mode_requires_draft_empty_stock",
+          );
+        }
+        if (nextSelectionMode === ProductSelectionMode.BASE) {
+          const variantCount = await this.prisma.productVariant.count({
+            where: { productId: id, deletedAt: null },
+          });
+          if (variantCount !== 0) {
+            throw new BadRequestException("product_variants_exist");
+          }
+        }
+      }
+    }
+    if (
+      nextSelectionMode === ProductSelectionMode.VARIANT &&
+      patch.stockQuantity !== undefined &&
+      patch.stockQuantity !== 0
+    ) {
+      throw new BadRequestException("product_variant_base_stock_invalid");
+    }
 
     let nextCategoryId: string | undefined;
     let nextCurrency: string | undefined;
@@ -730,6 +912,7 @@ export class ProductServiceImpl {
             discountEnd: true,
             trackInventory: true,
             stockQuantity: true,
+            selectionMode: true,
           },
         });
         if (!current) throw new NotFoundException("product_not_found");
@@ -738,6 +921,27 @@ export class ProductServiceImpl {
         }
         if (changesInventory) {
           inventoryData = this.patchInventoryState(current, patch);
+          if (
+            (nextSelectionMode ?? current.selectionMode) ===
+              ProductSelectionMode.VARIANT &&
+            inventoryData.stockQuantity !== 0
+          ) {
+            throw new BadRequestException("product_variant_base_stock_invalid");
+          }
+          if (
+            current.selectionMode === ProductSelectionMode.VARIANT &&
+            !inventoryData.trackInventory
+          ) {
+            const stockedVariants = await this.prisma.productVariant.count({
+              where: {
+                productId: id,
+                stockQuantity: { gt: 0 },
+                deletedAt: null,
+              },
+            });
+            if (stockedVariants > 0)
+              throw new BadRequestException("variant_stock_invalid");
+          }
         }
       }
 
@@ -748,7 +952,9 @@ export class ProductServiceImpl {
           description: patch.description ?? undefined,
           excerpt: patch.excerpt ?? undefined,
           slug: patch.slug?.trim() ? basicSlugify(patch.slug) : undefined,
-          sku: patch.sku?.trim() || undefined,
+          sku: nextSku,
+          skuReservation: nextSku ? { update: { sku: nextSku } } : undefined,
+          selectionMode: nextSelectionMode,
           price:
             patch.price != null ? new Prisma.Decimal(patch.price) : undefined,
           currency: nextCurrency,
@@ -780,6 +986,9 @@ export class ProductServiceImpl {
           ...(inventoryData ?? {}),
           version: { increment: 1 },
         },
+        include: {
+          variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+        },
       });
       return { data: this.toDto(data) };
     } catch (e) {
@@ -797,6 +1006,180 @@ export class ProductServiceImpl {
     }
   }
 
+  private async mutateVariant(
+    productId: string,
+    expectedVersion: number,
+    action:
+      | { kind: "create"; input: VariantInput }
+      | { kind: "update"; variantId: string; patch: VariantPatch }
+      | { kind: "delete"; variantId: string },
+  ) {
+    if (
+      !Number.isInteger(expectedVersion) ||
+      expectedVersion < 1 ||
+      expectedVersion > INT32_MAX
+    ) {
+      throw new BadRequestException("expected_version_invalid");
+    }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const product = await tx.product.findUnique({
+          where: { id: productId },
+        });
+        if (!product || product.deletedAt)
+          throw new NotFoundException("product_not_found");
+        if (product.selectionMode !== ProductSelectionMode.VARIANT) {
+          throw new BadRequestException("product_variant_mode_required");
+        }
+        const claimed = await tx.product.updateMany({
+          where: { id: productId, version: expectedVersion },
+          data: { version: { increment: 1 } },
+        });
+        if (claimed.count !== 1)
+          throw new ConflictException("product_version_conflict");
+
+        if (action.kind === "create") {
+          const count = await tx.productVariant.count({
+            where: { productId, deletedAt: null },
+          });
+          if (count >= 50)
+            throw new BadRequestException("product_variant_limit");
+          const { options, optionKey } = variantOptions(action.input.options);
+          const sku = variantSku(action.input.sku);
+          const stockQuantity = variantQuantity(
+            action.input.stockQuantity ?? 0,
+          );
+          if (!product.trackInventory && stockQuantity !== 0)
+            throw new BadRequestException("variant_stock_invalid");
+          if (
+            action.input.priceOverride !== undefined &&
+            action.input.priceOverride !== null
+          )
+            this.assertPrice(action.input.priceOverride);
+          await tx.productVariant.create({
+            data: {
+              productId,
+              sku,
+              options,
+              optionKey,
+              priceOverride:
+                action.input.priceOverride == null
+                  ? null
+                  : new Prisma.Decimal(action.input.priceOverride),
+              stockQuantity,
+              active: action.input.active ?? true,
+              sortOrder: action.input.sortOrder ?? 0,
+              skuReservation: { create: { sku } },
+            },
+          });
+        } else {
+          const current = await tx.productVariant.findFirst({
+            where: { id: action.variantId, productId, deletedAt: null },
+          });
+          if (!current) throw new NotFoundException("variant_not_found");
+          if (action.kind === "delete") {
+            await tx.productVariant.update({
+              where: { id: current.id },
+              data: {
+                deletedAt: new Date(),
+                active: false,
+                optionKey: `${current.optionKey}#deleted:${current.id}`,
+              },
+            });
+          } else {
+            const patch = action.patch;
+            const sku =
+              patch.sku === undefined ? undefined : variantSku(patch.sku);
+            const normalized =
+              patch.options === undefined
+                ? undefined
+                : variantOptions(patch.options);
+            const stockQuantity =
+              patch.stockQuantity === undefined
+                ? undefined
+                : variantQuantity(patch.stockQuantity);
+            if (
+              !product.trackInventory &&
+              stockQuantity !== undefined &&
+              stockQuantity !== 0
+            )
+              throw new BadRequestException("variant_stock_invalid");
+            if (
+              patch.priceOverride !== undefined &&
+              patch.priceOverride !== null
+            )
+              this.assertPrice(patch.priceOverride);
+            await tx.productVariant.update({
+              where: { id: current.id },
+              data: {
+                sku,
+                skuReservation: sku ? { update: { sku } } : undefined,
+                options: normalized?.options,
+                optionKey: normalized?.optionKey,
+                priceOverride:
+                  patch.priceOverride === undefined
+                    ? undefined
+                    : patch.priceOverride === null
+                      ? null
+                      : new Prisma.Decimal(patch.priceOverride),
+                stockQuantity,
+                active: patch.active,
+                sortOrder: patch.sortOrder,
+              },
+            });
+          }
+        }
+        const updated = await tx.product.findUniqueOrThrow({
+          where: { id: productId },
+          include: {
+            variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+          },
+        });
+        return { data: this.toDto(updated) };
+      });
+    } catch (e) {
+      if (isPrismaCode(e, "P2002")) {
+        const target = uniqueConflictFields(e);
+        if (target.includes("sku"))
+          throw new ConflictException("product_sku_conflict");
+        if (target.includes("optionKey"))
+          throw new ConflictException("variant_options_conflict");
+      }
+      throw mapPrisma(e);
+    }
+  }
+
+  createVariant(
+    productId: string,
+    input: VariantInput,
+    expectedVersion: number,
+  ) {
+    return this.mutateVariant(productId, expectedVersion, {
+      kind: "create",
+      input,
+    });
+  }
+
+  updateVariant(
+    productId: string,
+    variantId: string,
+    patch: VariantPatch,
+    expectedVersion: number,
+  ) {
+    return this.mutateVariant(productId, expectedVersion, {
+      kind: "update",
+      variantId,
+      patch,
+    });
+  }
+
+  deleteVariant(productId: string, variantId: string, expectedVersion: number) {
+    return this.mutateVariant(productId, expectedVersion, {
+      kind: "delete",
+      variantId,
+    });
+  }
+
   // ---- Public/admin reads ----
   async getPublic(id: string) {
     const p = await this.prisma.product.findFirst({
@@ -804,7 +1187,13 @@ export class ProductServiceImpl {
         id,
         status: ProductStatus.ACTIVE,
         deletedAt: null,
-        OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+        ...this.publicAvailabilityWhere(),
+      },
+      include: {
+        variants: {
+          where: { active: true, deletedAt: null },
+          orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+        },
       },
     });
     if (!p) throw new NotFoundException("product_not_found");
@@ -812,17 +1201,54 @@ export class ProductServiceImpl {
   }
 
   async getAdmin(id: string) {
-    const p = await this.prisma.product.findUnique({ where: { id } });
+    const p = await this.prisma.product.findUnique({
+      where: { id },
+      include: { variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    });
     if (!p) throw new NotFoundException("product_not_found");
     return { data: this.toDto(p) };
   }
 
   async listPublic(req: PublicListProductsInput) {
-    return this.listMatching(req, {
-      status: ProductStatus.ACTIVE,
-      deletedAt: null,
-      AND: [{ OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }] }],
-    });
+    return this.listMatching(
+      req,
+      {
+        status: ProductStatus.ACTIVE,
+        deletedAt: null,
+        AND: [this.publicAvailabilityWhere()],
+      },
+      true,
+    );
+  }
+
+  private publicAvailabilityWhere(): Prisma.ProductWhereInput {
+    return {
+      OR: [
+        {
+          selectionMode: ProductSelectionMode.BASE,
+          OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+        },
+        {
+          selectionMode: ProductSelectionMode.VARIANT,
+          OR: [
+            {
+              trackInventory: false,
+              variants: { some: { active: true, deletedAt: null } },
+            },
+            {
+              trackInventory: true,
+              variants: {
+                some: {
+                  active: true,
+                  deletedAt: null,
+                  stockQuantity: { gt: 0 },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
   }
 
   async listAdmin(req: ListProductsInput) {
@@ -835,6 +1261,7 @@ export class ProductServiceImpl {
   private async listMatching(
     req: PublicListProductsInput,
     where: Prisma.ProductWhereInput,
+    publicOnly = false,
   ) {
     const page = Math.max(1, Number(req.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.limit) || 10));
@@ -850,6 +1277,12 @@ export class ProductServiceImpl {
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where,
+        include: {
+          variants: {
+            where: publicOnly ? { active: true, deletedAt: null } : undefined,
+            orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+          },
+        },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: [
@@ -870,6 +1303,7 @@ export class ProductServiceImpl {
       const data = await this.prisma.product.update({
         where: { id },
         data: { deletedAt: new Date(), version: { increment: 1 } },
+        include: { variants: true },
       });
       return { data: this.toDto(data) };
     } catch (e) {
@@ -882,6 +1316,7 @@ export class ProductServiceImpl {
       const data = await this.prisma.product.update({
         where: { id },
         data: { deletedAt: null, version: { increment: 1 } },
+        include: { variants: true },
       });
       return { data: this.toDto(data) };
     } catch (e) {
@@ -891,7 +1326,10 @@ export class ProductServiceImpl {
 
   async hardDelete(id: string) {
     try {
-      const data = await this.prisma.product.delete({ where: { id } });
+      const data = await this.prisma.product.delete({
+        where: { id },
+        include: { variants: true },
+      });
       return { data: this.toDto(data) };
     } catch (e) {
       throw mapPrisma(e, {
@@ -1047,7 +1485,7 @@ export class ProductServiceImpl {
         id: productId,
         status: ProductStatus.ACTIVE,
         deletedAt: null,
-        OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+        ...this.publicAvailabilityWhere(),
       },
       select: { id: true },
     });

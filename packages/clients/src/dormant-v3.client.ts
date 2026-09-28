@@ -148,6 +148,9 @@ type ProductV3Method =
   | "UpdateProduct"
   | "AdminGetProduct"
   | "AdminListProducts"
+  | "CreateVariant"
+  | "UpdateVariant"
+  | "DeleteVariant"
   | "DeleteProduct"
   | "RestoreProduct"
   | "HardDeleteProduct"
@@ -175,6 +178,9 @@ export function getDormantProductV3(
       UpdateProductV3: productv1.ProductServiceService.updateProductV3,
       AdminGetProductV3: productv1.ProductServiceService.adminGetProductV3,
       AdminListProductsV3: productv1.ProductServiceService.adminListProductsV3,
+      CreateVariantV3: productv1.ProductServiceService.createVariantV3,
+      UpdateVariantV3: productv1.ProductServiceService.updateVariantV3,
+      DeleteVariantV3: productv1.ProductServiceService.deleteVariantV3,
       DeleteProductV3: productv1.ProductServiceService.deleteProductV3,
       RestoreProductV3: productv1.ProductServiceService.restoreProductV3,
       HardDeleteProductV3: productv1.ProductServiceService.hardDeleteProductV3,

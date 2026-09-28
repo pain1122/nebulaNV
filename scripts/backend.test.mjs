@@ -1763,7 +1763,7 @@ test("clean migration verification uses disposable databases and always cleans u
   assert.notEqual(seedEvidence, undefined);
 });
 
-test("product migration verification executes the inventory database proof", () => {
+test("product migration verification executes the inventory and variant database proofs", () => {
   let invocation;
 
   verifyProductInventoryContract("nebula_product_verify_contract", {
@@ -1786,6 +1786,11 @@ test("product migration verification executes the inventory database proof", () 
   );
   assert.match(invocation.options.input, /Product_untracked_stock_zero/);
   assert.match(invocation.options.input, /Product_version_positive/);
+  assert.match(
+    invocation.options.input,
+    /ProductVariant_stockQuantity_nonnegative/,
+  );
+  assert.match(invocation.options.input, /CatalogSku_pkey/);
   assert.match(invocation.options.input, /ROLLBACK;/);
 });
 

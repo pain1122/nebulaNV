@@ -77,6 +77,9 @@ function createHarness(overrides: Record<string, jest.Mock>) {
     ListProducts: overrides.ListProducts ?? unused,
     AdminGetProduct: overrides.AdminGetProduct ?? unused,
     AdminListProducts: overrides.AdminListProducts ?? unused,
+    CreateVariant: overrides.CreateVariant ?? unused,
+    UpdateVariant: overrides.UpdateVariant ?? unused,
+    DeleteVariant: overrides.DeleteVariant ?? unused,
     DeleteProduct: overrides.DeleteProduct ?? unused,
     RestoreProduct: overrides.RestoreProduct ?? unused,
     HardDeleteProduct: overrides.HardDeleteProduct ?? unused,
@@ -311,5 +314,59 @@ describe("GatewayProductApiService", () => {
     await expect(
       mismatch.service.listGallery(gatewayRequest(true), PRODUCT_ID, false),
     ).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("passes versioned variant creation and maps its public commercial fields", async () => {
+    const createVariant = jest.fn(() =>
+      of({
+        data: product({
+          selectionMode: "VARIANT",
+          variants: [
+            productv1.ProductVariant.create({
+              id: "variant-1",
+              productId: PRODUCT_ID,
+              sku: "DESK-BLUE",
+              options: { Color: "Blue" },
+              price: 120,
+              priceOverride: 120,
+              effectivePrice: 120,
+              stockQuantity: 2,
+              active: true,
+              availability: "AVAILABLE",
+              sortOrder: 0,
+            }),
+          ],
+        }),
+      }),
+    );
+    const { service } = createHarness({ CreateVariant: createVariant });
+    const result = await service.createVariant(
+      gatewayRequest(true),
+      PRODUCT_ID,
+      {
+        sku: "DESK-BLUE",
+        options: { Color: "Blue" },
+        stockQuantity: 2,
+        priceOverride: 120,
+        expectedVersion: 1,
+      },
+    );
+    expect(createVariant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productId: PRODUCT_ID,
+        expectedVersion: 1,
+        data: expect.objectContaining({
+          sku: "DESK-BLUE",
+          options: { Color: "Blue" },
+        }),
+      }),
+      expect.any(Metadata),
+    );
+    expect(result.selectionMode).toBe("VARIANT");
+    expect(result.variants[0]).toMatchObject({
+      sku: "DESK-BLUE",
+      price: 120,
+      priceOverride: 120,
+    });
   });
 });

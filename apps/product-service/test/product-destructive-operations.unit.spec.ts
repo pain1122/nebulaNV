@@ -52,7 +52,10 @@ describe("product destructive-operation errors", () => {
     await expect(
       service({ product: { delete: remove } }).hardDelete("product-1"),
     ).rejects.toEqual(new ConflictException("product_has_dependents"));
-    expect(remove).toHaveBeenCalledWith({ where: { id: "product-1" } });
+    expect(remove).toHaveBeenCalledWith({
+      where: { id: "product-1" },
+      include: { variants: true },
+    });
   });
 
   it("rejects an admin gallery read for a missing Product", async () => {

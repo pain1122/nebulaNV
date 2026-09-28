@@ -1,7 +1,12 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import type { ClientGrpc } from "@nestjs/microservices";
 import type { PrismaService } from "../src/prisma.service";
-import { Prisma, ProductStatus, type Product } from "../prisma/generated";
+import {
+  Prisma,
+  ProductStatus,
+  ProductSelectionMode,
+  type Product,
+} from "../prisma/generated";
 import { ProductServiceImpl } from "../src/product/product.service";
 
 function emptyClient(): ClientGrpc {
@@ -22,6 +27,7 @@ function product(overrides: Partial<Product> = {}): Product {
     excerpt: null,
     sku: "DESK-1",
     status: ProductStatus.ACTIVE,
+    selectionMode: ProductSelectionMode.BASE,
     price: new Prisma.Decimal(100),
     currency: "USD",
     categoryId: "11111111-1111-4111-8111-111111111111",

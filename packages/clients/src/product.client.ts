@@ -33,6 +33,18 @@ type ProductRaw = {
     productv1.AdminListProductsRequest,
     productv1.ListProductsResponse
   >;
+  CreateVariant: RawGrpcUnary<
+    productv1.CreateVariantRequest,
+    productv1.ProductResponse
+  >;
+  UpdateVariant: RawGrpcUnary<
+    productv1.UpdateVariantRequest,
+    productv1.ProductResponse
+  >;
+  DeleteVariant: RawGrpcUnary<
+    productv1.DeleteVariantRequest,
+    productv1.ProductResponse
+  >;
   DeleteProduct: RawGrpcUnary<
     productv1.DeleteProductRequest,
     productv1.ProductResponse
@@ -118,6 +130,18 @@ export interface ProductProxy {
   AdminListProducts: SignedGrpcUnary<
     productv1.AdminListProductsRequest,
     productv1.ListProductsResponse
+  >;
+  CreateVariant: SignedGrpcUnary<
+    productv1.CreateVariantRequest,
+    productv1.ProductResponse
+  >;
+  UpdateVariant: SignedGrpcUnary<
+    productv1.UpdateVariantRequest,
+    productv1.ProductResponse
+  >;
+  DeleteVariant: SignedGrpcUnary<
+    productv1.DeleteVariantRequest,
+    productv1.ProductResponse
   >;
   DeleteProduct: SignedGrpcUnary<
     productv1.DeleteProductRequest,
@@ -216,6 +240,21 @@ export function getProduct(
       ...common,
       method: raw.AdminListProducts.bind(raw),
       definition: productv1.ProductServiceService.adminListProducts,
+    }),
+    CreateVariant: createSignedGrpcUnary({
+      ...common,
+      method: raw.CreateVariant.bind(raw),
+      definition: productv1.ProductServiceService.createVariant,
+    }),
+    UpdateVariant: createSignedGrpcUnary({
+      ...common,
+      method: raw.UpdateVariant.bind(raw),
+      definition: productv1.ProductServiceService.updateVariant,
+    }),
+    DeleteVariant: createSignedGrpcUnary({
+      ...common,
+      method: raw.DeleteVariant.bind(raw),
+      definition: productv1.ProductServiceService.deleteVariant,
     }),
     DeleteProduct: createSignedGrpcUnary({
       ...common,

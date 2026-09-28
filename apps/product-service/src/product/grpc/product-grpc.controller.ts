@@ -23,6 +23,12 @@ import { AddImagesDto } from "../dto/add-images.dto";
 import { ListGalleryDto } from "../dto/list-gallery.dto";
 import { ReorderImagesDto } from "../dto/reorder-images.dto";
 import { RemoveImageDto } from "../dto/remove-image.dto";
+import {
+  CreateVariantDto,
+  UpdateVariantDto,
+  DeleteVariantDto,
+} from "../dto/variant.dto";
+import { BadRequestException } from "@nestjs/common";
 
 const Pipe = createGrpcValidationPipe();
 
@@ -140,6 +146,57 @@ export class ProductGrpcController {
       limit: req.limit,
       includeDeleted: req.includeDeleted,
     });
+  }
+
+  @DormantS2SAuthorizationV3Receiver("ProductService", "CreateVariantV3")
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "CreateVariant")
+  createVariant(req: CreateVariantDto) {
+    return this.svc.createVariant(req.productId, req.data, req.expectedVersion);
+  }
+
+  @DormantS2SAuthorizationV3Receiver("ProductService", "UpdateVariantV3")
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "UpdateVariant")
+  updateVariant(req: UpdateVariantDto) {
+    const {
+      clearPriceOverride,
+      priceOverride,
+      replaceOptions,
+      options,
+      ...patch
+    } = req.data;
+    if (clearPriceOverride && priceOverride !== undefined) {
+      throw new BadRequestException("variant_price_override_conflict");
+    }
+    return this.svc.updateVariant(
+      req.productId,
+      req.variantId,
+      {
+        ...patch,
+        ...(clearPriceOverride
+          ? { priceOverride: null }
+          : priceOverride === undefined
+            ? {}
+            : { priceOverride }),
+        ...(replaceOptions ? { options } : {}),
+      },
+      req.expectedVersion,
+    );
+  }
+
+  @DormantS2SAuthorizationV3Receiver("ProductService", "DeleteVariantV3")
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "DeleteVariant")
+  deleteVariant(req: DeleteVariantDto) {
+    return this.svc.deleteVariant(
+      req.productId,
+      req.variantId,
+      req.expectedVersion,
+    );
   }
 
   // ------------------------------------------------------

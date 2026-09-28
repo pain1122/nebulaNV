@@ -55,7 +55,7 @@ const legacyProtoSha256 = {
   "packages/protos/settings.proto":
     "da4e82fed896c382144717fde6a2fe550341ecdb66f08cbef2c25c54ca65d5f9",
   "packages/protos/product.proto":
-    "ed63224617a75b77471be2f3fa628293ad2b97324c668625394cc717a4fc98e8",
+    "62e587e5c62610c1eb85cf1473e4e0eaddb267ba8389db2d3f1f34dd17a38dd2",
   "packages/protos/blog.proto":
     "82ec00ddc5d77fa41c7615e96439e30dd4f87c4d1d6a3bb6daaaa145e8651d45",
   "packages/protos/order.proto":
@@ -112,7 +112,7 @@ describe("R5 dormant context-v3 receiver inventory", () => {
   ].sort();
 
   it("declares an exact separate v3 receiver for every protected RPC", () => {
-    expect(protectedRpcs).toHaveLength(56);
+    expect(protectedRpcs).toHaveLength(59);
 
     for (const rpc of protectedRpcs) {
       const match = /^(\w+)\.(\w+)$/.exec(rpc);
@@ -147,7 +147,7 @@ describe("R5 dormant context-v3 receiver inventory", () => {
     }
   });
 
-  it("keeps every legacy protobuf source byte except additive V3 RPC lines", () => {
+  it("pins the landed protobuf source except additive V3 RPC lines", () => {
     for (const [relativePath, expectedHash] of Object.entries(
       legacyProtoSha256,
     )) {

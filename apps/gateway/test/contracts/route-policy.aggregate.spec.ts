@@ -30,18 +30,18 @@ class DecoratorProbe {
 }
 
 describe("gateway route-policy aggregate", () => {
-  it("is the unique executable source for all 70 frozen F3 endpoints", () => {
-    expect(GATEWAY_ROUTE_POLICIES).toHaveLength(70);
+  it("is the unique executable source for all 73 landed endpoints", () => {
+    expect(GATEWAY_ROUTE_POLICIES).toHaveLength(73);
     expect(
       new Set(GATEWAY_ROUTE_POLICIES.map((policy) => policy.id)).size,
-    ).toBe(70);
+    ).toBe(73);
     expect(
       new Set(
         GATEWAY_ROUTE_POLICIES.map(
           (policy) => `${policy.method} ${policy.path}`,
         ),
       ).size,
-    ).toBe(70);
+    ).toBe(73);
     expect(
       GATEWAY_ROUTE_POLICIES.every((policy) =>
         Object.hasOwn(GATEWAY_INPUT_PROFILES, policy.input),
@@ -62,8 +62,9 @@ describe("gateway route-policy aggregate", () => {
   });
 
   it("keeps cart and personal order routes user-only", () => {
-    for (const policy of GATEWAY_ROUTE_POLICIES.filter((value) =>
-      value.id.startsWith("orders.") && !value.id.startsWith("admin."),
+    for (const policy of GATEWAY_ROUTE_POLICIES.filter(
+      (value) =>
+        value.id.startsWith("orders.") && !value.id.startsWith("admin."),
     )) {
       expect(policy.actor).toBe("user");
       expect(policy.applications).toEqual(["storefront-web", "mobile"]);

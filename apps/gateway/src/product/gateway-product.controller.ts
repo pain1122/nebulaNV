@@ -23,6 +23,10 @@ import {
   GatewayProductListQueryDto,
   GatewayProductPatchDto,
   GatewayProductWriteDto,
+  GatewayVariantWriteDto,
+  GatewayVariantPatchDto,
+  GatewayVariantDeleteQueryDto,
+  GatewayProductVariantPathDto,
 } from "./product-api.dto";
 
 function requestId(request: GatewayHttpRequest): string {
@@ -133,6 +137,61 @@ export class GatewayProductController {
     );
   }
 
+  @GatewayApiRoute("admin.products.variants.create", {
+    requestType: GatewayVariantWriteDto,
+    responseType: GatewayProductDto,
+  })
+  async createVariant(
+    @Req() request: GatewayHttpRequest,
+    @Param() params: GatewayUuidPathDto,
+    @Body() body: GatewayVariantWriteDto,
+  ) {
+    return gatewayItemEnvelope(
+      await this.products.createVariant(request, params.id, body),
+      requestId(request),
+    );
+  }
+
+  @GatewayApiRoute("admin.products.variants.update", {
+    requestType: GatewayVariantPatchDto,
+    responseType: GatewayProductDto,
+  })
+  async updateVariant(
+    @Req() request: GatewayHttpRequest,
+    @Param() params: GatewayProductVariantPathDto,
+    @Body() body: GatewayVariantPatchDto,
+  ) {
+    return gatewayItemEnvelope(
+      await this.products.updateVariant(
+        request,
+        params.id,
+        params.variantId,
+        body,
+      ),
+      requestId(request),
+    );
+  }
+
+  @GatewayApiRoute("admin.products.variants.delete", {
+    queryType: GatewayVariantDeleteQueryDto,
+    responseType: GatewayProductDto,
+  })
+  async deleteVariant(
+    @Req() request: GatewayHttpRequest,
+    @Param() params: GatewayProductVariantPathDto,
+    @Query() query: GatewayVariantDeleteQueryDto,
+  ) {
+    return gatewayItemEnvelope(
+      await this.products.deleteVariant(
+        request,
+        params.id,
+        params.variantId,
+        query.expectedVersion,
+      ),
+      requestId(request),
+    );
+  }
+
   @GatewayApiRoute("admin.products.delete", { responseType: GatewayProductDto })
   async delete(
     @Req() request: GatewayHttpRequest,
@@ -144,7 +203,9 @@ export class GatewayProductController {
     );
   }
 
-  @GatewayApiRoute("admin.products.restore", { responseType: GatewayProductDto })
+  @GatewayApiRoute("admin.products.restore", {
+    responseType: GatewayProductDto,
+  })
   async restore(
     @Req() request: GatewayHttpRequest,
     @Param() params: GatewayUuidPathDto,

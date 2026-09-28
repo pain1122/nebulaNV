@@ -3,7 +3,7 @@ import { NotFoundException } from "@nestjs/common";
 import type { ClientGrpc } from "@nestjs/microservices";
 import { IS_PUBLIC_KEY, ROLES_KEY } from "@nebula/grpc-auth";
 import type { PrismaService } from "../src/prisma.service";
-import { ProductStatus } from "../prisma/generated";
+import { ProductStatus, ProductSelectionMode } from "../prisma/generated";
 import { ProductController } from "../src/product/product.controller";
 import { ListProductsRequestDto } from "../src/product/dto/product-input.dto";
 import { ProductGrpcController } from "../src/product/grpc/product-grpc.controller";
@@ -17,6 +17,30 @@ function productService(prisma: object) {
   const client = emptyClient();
   return new ProductServiceImpl(prisma as PrismaService, client, client);
 }
+
+const availabilityWhere = {
+  OR: [
+    {
+      selectionMode: ProductSelectionMode.BASE,
+      OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+    },
+    {
+      selectionMode: ProductSelectionMode.VARIANT,
+      OR: [
+        {
+          trackInventory: false,
+          variants: { some: { active: true, deletedAt: null } },
+        },
+        {
+          trackInventory: true,
+          variants: {
+            some: { active: true, deletedAt: null, stockQuantity: { gt: 0 } },
+          },
+        },
+      ],
+    },
+  ],
+};
 
 function handler(
   name: keyof ProductGrpcController,
@@ -59,7 +83,13 @@ describe("Product public/admin read separation", () => {
         id: "product-1",
         status: ProductStatus.ACTIVE,
         deletedAt: null,
-        OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+        ...availabilityWhere,
+      },
+      include: {
+        variants: {
+          where: { active: true, deletedAt: null },
+          orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+        },
       },
     });
   });
@@ -79,7 +109,7 @@ describe("Product public/admin read separation", () => {
     const expectedWhere = {
       status: ProductStatus.ACTIVE,
       deletedAt: null,
-      AND: [{ OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }] }],
+      AND: [availabilityWhere],
       OR: [
         { title: { contains: "chair", mode: "insensitive" } },
         { sku: { contains: "chair", mode: "insensitive" } },
@@ -126,7 +156,7 @@ describe("Product public/admin read separation", () => {
         id: "product-1",
         status: ProductStatus.ACTIVE,
         deletedAt: null,
-        OR: [{ trackInventory: false }, { stockQuantity: { gt: 0 } }],
+        ...availabilityWhere,
       },
       select: { id: true },
     });

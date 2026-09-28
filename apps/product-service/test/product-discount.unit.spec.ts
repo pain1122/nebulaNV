@@ -5,6 +5,7 @@ import {
   DiscountType,
   Prisma,
   ProductStatus,
+  ProductSelectionMode,
   type Product,
 } from "../prisma/generated";
 import { DiscountTypeDto } from "../src/product/dto/product-input.dto";
@@ -23,6 +24,7 @@ function product(overrides: Partial<Product> = {}): Product {
     excerpt: null,
     sku: "DESK-1",
     status: ProductStatus.ACTIVE,
+    selectionMode: ProductSelectionMode.BASE,
     price: new Prisma.Decimal("100.00"),
     currency: "USD",
     thumbnailUrl: null,

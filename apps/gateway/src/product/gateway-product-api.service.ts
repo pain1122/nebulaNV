@@ -18,6 +18,7 @@ import type { GatewayHttpRequest } from "../http/public-client-boundary";
 import {
   GatewayDiscountType,
   GatewayProductAvailability,
+  GatewayProductSelectionMode,
   GatewayProductStatus,
   type GatewayAdminProductListQueryDto,
   type GatewayBulkResultDto,
@@ -29,6 +30,8 @@ import {
   type GatewayProductListQueryDto,
   type GatewayProductPatchDto,
   type GatewayProductWriteDto,
+  type GatewayVariantWriteDto,
+  type GatewayVariantPatchDto,
 } from "./product-api.dto";
 
 type ProductPatchInput = GrpcRequestInput<productv1.ProductPatch>;
@@ -62,6 +65,54 @@ function knownAvailability(value: string): GatewayProductAvailability {
     throw new BadGatewayException("product_response_availability_invalid");
   }
   return value as GatewayProductAvailability;
+}
+
+function knownSelectionMode(value: string): GatewayProductSelectionMode {
+  if (value === "") return GatewayProductSelectionMode.BASE;
+  if (
+    !Object.values(GatewayProductSelectionMode).includes(
+      value as GatewayProductSelectionMode,
+    )
+  ) {
+    throw new BadGatewayException("product_response_selection_mode_invalid");
+  }
+  return value as GatewayProductSelectionMode;
+}
+
+function variant(value: productv1.ProductVariant) {
+  if (
+    !value.id ||
+    !value.productId ||
+    !value.sku ||
+    !value.options ||
+    typeof value.options !== "object"
+  ) {
+    throw new BadGatewayException("product_variant_response_invalid");
+  }
+  return Object.freeze({
+    id: value.id,
+    productId: value.productId,
+    sku: value.sku,
+    options: Object.freeze({ ...value.options }),
+    price: finiteNumber(value.price, "variant_price"),
+    priceOverride:
+      value.priceOverride === undefined
+        ? null
+        : finiteNumber(value.priceOverride, "variant_price_override"),
+    effectivePrice: finiteNumber(
+      value.effectivePrice,
+      "variant_effective_price",
+    ),
+    stockQuantity: finiteInteger(
+      value.stockQuantity,
+      "variant_stock_quantity",
+      0,
+    ),
+    availability: knownAvailability(value.availability),
+    active: value.active,
+    sortOrder: finiteInteger(value.sortOrder, "variant_sort_order", 0),
+    deletedAt: value.deletedAt,
+  });
 }
 
 function finiteNumber(value: number, name: string): number {
@@ -130,6 +181,8 @@ function product(value: productv1.Product | undefined): GatewayProductDto {
     stockQuantity: finiteInteger(value.stockQuantity, "stock_quantity", 0),
     availability: knownAvailability(value.availability),
     version: finiteInteger(value.version, "version", 1),
+    selectionMode: knownSelectionMode(value.selectionMode),
+    variants: Object.freeze((value.variants ?? []).map(variant)),
   });
 }
 
@@ -243,6 +296,7 @@ const PATCH_FIELDS = Object.freeze([
   "complementaryIds",
   "trackInventory",
   "stockQuantity",
+  "selectionMode",
 ] as const);
 
 function sparsePatch(input: GatewayProductPatchDto): ProductPatchInput {
@@ -384,6 +438,105 @@ export class GatewayProductApiService {
     );
     const mapped = product(result.data);
     if (mapped.id !== id)
+      throw new BadGatewayException("product_response_identity_mismatch");
+    return mapped;
+  }
+
+  async createVariant(
+    request: GatewayHttpRequest,
+    productId: string,
+    input: GatewayVariantWriteDto,
+  ) {
+    const products = this.products(request);
+    const result = await wrapGrpc(
+      firstValueFrom(
+        products.proxy.CreateVariant(
+          {
+            productId,
+            expectedVersion: input.expectedVersion,
+            data: {
+              sku: input.sku,
+              options: input.options,
+              ...(input.priceOverride === undefined
+                ? {}
+                : { priceOverride: input.priceOverride }),
+              ...(input.stockQuantity === undefined
+                ? {}
+                : { stockQuantity: input.stockQuantity }),
+              ...(input.active === undefined ? {} : { active: input.active }),
+              ...(input.sortOrder === undefined
+                ? {}
+                : { sortOrder: input.sortOrder }),
+            },
+          },
+          products.metadata,
+        ),
+      ),
+    );
+    const mapped = product(result.data);
+    if (mapped.id !== productId)
+      throw new BadGatewayException("product_response_identity_mismatch");
+    return mapped;
+  }
+
+  async updateVariant(
+    request: GatewayHttpRequest,
+    productId: string,
+    variantId: string,
+    input: GatewayVariantPatchDto,
+  ) {
+    const products = this.products(request);
+    const result = await wrapGrpc(
+      firstValueFrom(
+        products.proxy.UpdateVariant(
+          {
+            productId,
+            variantId,
+            expectedVersion: input.expectedVersion,
+            data: {
+              options: input.options ?? {},
+              replaceOptions: input.options !== undefined,
+              clearPriceOverride: input.clearPriceOverride ?? false,
+              ...(input.sku === undefined ? {} : { sku: input.sku }),
+              ...(input.priceOverride === undefined
+                ? {}
+                : { priceOverride: input.priceOverride }),
+              ...(input.stockQuantity === undefined
+                ? {}
+                : { stockQuantity: input.stockQuantity }),
+              ...(input.active === undefined ? {} : { active: input.active }),
+              ...(input.sortOrder === undefined
+                ? {}
+                : { sortOrder: input.sortOrder }),
+            },
+          },
+          products.metadata,
+        ),
+      ),
+    );
+    const mapped = product(result.data);
+    if (mapped.id !== productId)
+      throw new BadGatewayException("product_response_identity_mismatch");
+    return mapped;
+  }
+
+  async deleteVariant(
+    request: GatewayHttpRequest,
+    productId: string,
+    variantId: string,
+    expectedVersion: number,
+  ) {
+    const products = this.products(request);
+    const result = await wrapGrpc(
+      firstValueFrom(
+        products.proxy.DeleteVariant(
+          { productId, variantId, expectedVersion },
+          products.metadata,
+        ),
+      ),
+    );
+    const mapped = product(result.data);
+    if (mapped.id !== productId)
       throw new BadGatewayException("product_response_identity_mismatch");
     return mapped;
   }

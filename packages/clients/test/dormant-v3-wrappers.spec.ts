@@ -123,6 +123,9 @@ const cases: Array<{
       UpdateProductV3: productv1.ProductServiceService.updateProductV3,
       AdminGetProductV3: productv1.ProductServiceService.adminGetProductV3,
       AdminListProductsV3: productv1.ProductServiceService.adminListProductsV3,
+      CreateVariantV3: productv1.ProductServiceService.createVariantV3,
+      UpdateVariantV3: productv1.ProductServiceService.updateVariantV3,
+      DeleteVariantV3: productv1.ProductServiceService.deleteVariantV3,
       DeleteProductV3: productv1.ProductServiceService.deleteProductV3,
       RestoreProductV3: productv1.ProductServiceService.restoreProductV3,
       HardDeleteProductV3: productv1.ProductServiceService.hardDeleteProductV3,
@@ -234,7 +237,7 @@ describe("dormant context-v3 typed service wrappers", () => {
         (total, current) => total + Object.keys(current.definitions).length,
         0,
       ),
-    ).toBe(56);
+    ).toBe(59);
   });
 
   it.each(cases)(

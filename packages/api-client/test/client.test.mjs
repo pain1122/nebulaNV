@@ -20,7 +20,7 @@ function jsonResponse(status, body, responseHeaders = {}) {
 }
 
 test("generated inventory contains the complete gateway operation surface", () => {
-  assert.equal(Object.keys(gatewayOperations).length, 70);
+  assert.equal(Object.keys(gatewayOperations).length, 73);
   assert.equal(
     gatewayOperations.products_list.pathTemplate,
     "/api/v1/products",
@@ -28,6 +28,10 @@ test("generated inventory contains the complete gateway operation surface", () =
   assert.equal(
     gatewayOperations.admin_products_create.requiresAccessToken,
     true,
+  );
+  assert.equal(
+    gatewayOperations.admin_products_variants_create.pathTemplate,
+    "/api/v1/admin/products/{id}/variants",
   );
 });
 

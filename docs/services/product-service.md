@@ -1,10 +1,15 @@
 # Product Service
 
-Last reviewed: 2026-09-15
+Last reviewed: 2026-09-26
 
 ## Purpose
 
 Product-service owns product catalog data, product pricing fields, product presentation metadata, product gallery records, discount fields, and product-scoped taxonomy facade routes.
+
+The D1 variant slice adds bounded sellable combinations under a Product. Each
+variant has one to three option values, its own globally reserved SKU, optional
+price override, stock, active flag, and deterministic sort order. The parent
+Product still owns status, currency, discount policy, and inventory tracking.
 
 Product-service does not own media storage. It currently stores media-related URLs as strings.
 
@@ -61,7 +66,11 @@ exist in gRPC and are already exposed externally through the gateway.
 
 The public gateway exposes public Product list/get/gallery reads and admin
 list/get/create/update/delete/restore/hard-delete, bulk-discount, and gallery
-management. Generated `@nebula/api-client` methods cover the same routes.
+management. It also exposes admin variant create/update/delete at
+`/api/v1/admin/products/:id/variants`, with a versioned PATCH/DELETE at
+`/api/v1/admin/products/:id/variants/:variantId`. Product responses include
+`selectionMode` and `variants`; public responses omit inactive and deleted
+variants. Generated `@nebula/api-client` methods cover the same routes.
 External callers must use this gateway contract; the direct Product HTTP
 listener remains an internal compatibility surface.
 
@@ -88,6 +97,9 @@ Product methods:
 - `ListProducts`
 - `AdminGetProduct`
 - `AdminListProducts`
+- `CreateVariant`
+- `UpdateVariant`
+- `DeleteVariant`
 - `DeleteProduct`
 - `RestoreProduct`
 - `HardDeleteProduct`
@@ -134,6 +146,8 @@ for the shared commands and complete database order.
 Main Prisma models:
 
 - `Product`
+- `ProductVariant`
+- `CatalogSku`
 - `ProductGalleryImage`
 - `ProductVrHotspot`
 - `ProductAttribute`
@@ -143,11 +157,24 @@ Main Prisma models:
 Enums:
 
 - `ProductStatus = DRAFT | ACTIVE | ARCHIVED`
+- `ProductSelectionMode = BASE | VARIANT`
 - `DiscountType = PERCENTAGE | FIXED`
 - `AttributeValueType = STRING | INT | BOOL`
 - `CommentStatus = PENDING | APPROVED | REJECTED`
 
 Important note:
+
+`BASE` products use their own stock. `VARIANT` products are publicly visible
+only when an active, non-deleted variant is available; base stock cannot be
+used to make a variant product sellable. Variant mutations compare and advance
+the parent Product version in the same transaction. Deleted variants remain
+as tombstones and their SKUs remain reserved. The `CatalogSku` table reserves
+SKUs across base products and variants; its migration backfills existing
+Product SKUs.
+
+The D1 variant migration and generated-client live proof passed on the local
+Docker backend on 2026-09-28. The broader D1 exit proof still needs populated
+upgrade, rerun, rollback, and malformed-data evidence.
 
 The DB already has fields for attributes, comments, product sets, VR hotspots, 3D URLs, gallery, SEO, promos, and discounts. Not all of those have full HTTP/gRPC contracts yet.
 

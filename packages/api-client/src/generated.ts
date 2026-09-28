@@ -476,6 +476,7 @@ export type GatewayProductDto = Readonly<{
   readonly "promoActive": boolean;
   readonly "promoBadge": string;
   readonly "promoTitle": string;
+  readonly "selectionMode": "BASE" | "VARIANT";
   readonly "sku": string;
   readonly "slug": string;
   readonly "status": "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -485,6 +486,7 @@ export type GatewayProductDto = Readonly<{
   readonly "title": string;
   readonly "trackInventory": boolean;
   readonly "updatedAt": string;
+  readonly "variants": ReadonlyArray<GatewayProductVariantDto>;
   readonly "version": number;
   readonly "vrEnabled": boolean;
   readonly "vrPlanImageUrl": string;
@@ -524,6 +526,7 @@ export type GatewayProductPatchDto = Readonly<{
   readonly "promoActive"?: boolean;
   readonly "promoBadge"?: string;
   readonly "promoTitle"?: string;
+  readonly "selectionMode"?: "BASE" | "VARIANT";
   readonly "sku"?: string;
   readonly "slug"?: string;
   readonly "status"?: "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -534,6 +537,21 @@ export type GatewayProductPatchDto = Readonly<{
   readonly "trackInventory"?: boolean;
   readonly "vrEnabled"?: boolean;
   readonly "vrPlanImageUrl"?: string;
+}>;
+
+export type GatewayProductVariantDto = Readonly<{
+  readonly "active": boolean;
+  readonly "availability": "AVAILABLE" | "OUT_OF_STOCK";
+  readonly "deletedAt": string;
+  readonly "effectivePrice": number;
+  readonly "id": string;
+  readonly "options": Readonly<Record<never, never>> & Readonly<Record<string, string>>;
+  readonly "price": number;
+  readonly "priceOverride"?: (Readonly<Record<never, never>>) | null;
+  readonly "productId": string;
+  readonly "sku": string;
+  readonly "sortOrder": number;
+  readonly "stockQuantity": number;
 }>;
 
 export type GatewayProductWriteDto = Readonly<{
@@ -562,6 +580,7 @@ export type GatewayProductWriteDto = Readonly<{
   readonly "promoActive"?: boolean;
   readonly "promoBadge"?: string;
   readonly "promoTitle"?: string;
+  readonly "selectionMode"?: "BASE" | "VARIANT";
   readonly "sku"?: string;
   readonly "slug"?: string;
   readonly "status"?: "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -662,6 +681,31 @@ export type GatewayUserUpdateRequestDto = Readonly<{
 export type GatewayValidationDetailDto = Readonly<{
   readonly "code": "unknown_field" | "required_field" | "invalid_type" | "invalid_format" | "invalid_value" | "out_of_range" | "unsupported_combination" | "too_many_items";
   readonly "field": string;
+}>;
+
+export type GatewayVariantDeleteQueryDto = Readonly<{
+  readonly "expectedVersion": number;
+}>;
+
+export type GatewayVariantPatchDto = Readonly<{
+  readonly "active"?: boolean;
+  readonly "clearPriceOverride"?: boolean;
+  readonly "expectedVersion": number;
+  readonly "options"?: Readonly<Record<never, never>> & Readonly<Record<string, string>>;
+  readonly "priceOverride"?: number;
+  readonly "sku"?: string;
+  readonly "sortOrder"?: number;
+  readonly "stockQuantity"?: number;
+}>;
+
+export type GatewayVariantWriteDto = Readonly<{
+  readonly "active"?: boolean;
+  readonly "expectedVersion": number;
+  readonly "options": Readonly<Record<never, never>> & Readonly<Record<string, string>>;
+  readonly "priceOverride"?: number;
+  readonly "sku": string;
+  readonly "sortOrder"?: number;
+  readonly "stockQuantity"?: number;
 }>;
 
 export type OffsetTakePaginationDto = Readonly<{
@@ -1337,6 +1381,58 @@ export interface GatewayOperationMap {
 }>;
     query: Readonly<Record<never, never>>;
     body: GatewayProductPatchDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayProductDto;
+}>;
+  }>;
+  readonly "admin_products_variants_create": Readonly<{
+    method: "POST";
+    pathTemplate: "/api/v1/admin/products/{id}/variants";
+    path: Readonly<{
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayVariantWriteDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayProductDto;
+}>;
+  }>;
+  readonly "admin_products_variants_delete": Readonly<{
+    method: "DELETE";
+    pathTemplate: "/api/v1/admin/products/{id}/variants/{variantId}";
+    path: Readonly<{
+  readonly "id": string;
+  readonly "variantId": string;
+}>;
+    query: Readonly<{
+  readonly "expectedVersion": number;
+}>;
+    body: never;
+    bodyRequired: false;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayProductDto;
+}>;
+  }>;
+  readonly "admin_products_variants_update": Readonly<{
+    method: "PATCH";
+    pathTemplate: "/api/v1/admin/products/{id}/variants/{variantId}";
+    path: Readonly<{
+  readonly "id": string;
+  readonly "variantId": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayVariantPatchDto;
     bodyRequired: true;
     requiresAccessToken: true;
     requiresIdempotencyKey: true;
@@ -2177,6 +2273,30 @@ export const gatewayOperations = {
   "admin_products_update": {
     method: "PATCH",
     pathTemplate: "/api/v1/admin/products/{id}",
+    bodyRequired: true,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
+    responseKind: "json",
+  },
+  "admin_products_variants_create": {
+    method: "POST",
+    pathTemplate: "/api/v1/admin/products/{id}/variants",
+    bodyRequired: true,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
+    responseKind: "json",
+  },
+  "admin_products_variants_delete": {
+    method: "DELETE",
+    pathTemplate: "/api/v1/admin/products/{id}/variants/{variantId}",
+    bodyRequired: false,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
+    responseKind: "json",
+  },
+  "admin_products_variants_update": {
+    method: "PATCH",
+    pathTemplate: "/api/v1/admin/products/{id}/variants/{variantId}",
     bodyRequired: true,
     requiresAccessToken: true,
     requiresIdempotencyKey: true,

@@ -52,6 +52,9 @@ describe("gateway Product HTTP routes", () => {
       getAdmin: jest.fn().mockResolvedValue(product()),
       create: jest.fn().mockResolvedValue(product()),
       update: jest.fn().mockResolvedValue(product()),
+      createVariant: jest.fn().mockResolvedValue(product()),
+      updateVariant: jest.fn().mockResolvedValue(product()),
+      deleteVariant: jest.fn().mockResolvedValue(product()),
       mutateById: jest.fn().mockResolvedValue(product()),
       applyDiscount: jest.fn().mockResolvedValue({ updated: 2 }),
       listGallery: jest.fn().mockResolvedValue([]),
@@ -221,6 +224,52 @@ describe("gateway Product HTTP routes", () => {
       PRODUCT_ID,
       IMAGE_ID,
       true,
+    );
+  });
+
+  it("requires versioned admin variant writes and validates their path", async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/products/${PRODUCT_ID}/variants`)
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-variant-invalid`)
+      .send({ sku: "SHIRT-M", options: { Size: "M" } })
+      .expect(400);
+    expect(products.createVariant).not.toHaveBeenCalled();
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/products/${PRODUCT_ID}/variants`)
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-variant-create`)
+      .send({ sku: "SHIRT-M", options: { Size: "M" }, expectedVersion: 1 })
+      .expect(201);
+    expect(products.createVariant).toHaveBeenCalledWith(
+      expect.any(Object),
+      PRODUCT_ID,
+      expect.objectContaining({ sku: "SHIRT-M", expectedVersion: 1 }),
+    );
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/products/${PRODUCT_ID}/variants/${IMAGE_ID}`)
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-variant-patch`)
+      .send({ expectedVersion: 2 })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/admin/products/${PRODUCT_ID}/variants/${IMAGE_ID}`)
+      .query({ expectedVersion: 2 })
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-variant-delete`)
+      .expect(200);
+    expect(products.deleteVariant).toHaveBeenCalledWith(
+      expect.any(Object),
+      PRODUCT_ID,
+      IMAGE_ID,
+      2,
     );
   });
 });

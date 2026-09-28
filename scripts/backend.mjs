@@ -779,12 +779,21 @@ export function verifyProductInventoryContract(
   database,
   { env = process.env, executeDocker = run, platform = process.platform } = {},
 ) {
-  const verificationSql = readFileSync(
+  const inventorySql = readFileSync(
     path.join(
       repositoryRoot,
       "scripts",
       "db",
       "verify-d1-product-inventory.sql",
+    ),
+    "utf8",
+  );
+  const variantsSql = readFileSync(
+    path.join(
+      repositoryRoot,
+      "scripts",
+      "db",
+      "verify-d1-product-variants.sql",
     ),
     "utf8",
   );
@@ -802,7 +811,7 @@ export function verifyProductInventoryContract(
       label: `product_inventory_${database}`,
       env,
       execute: executeDocker,
-      input: verificationSql,
+      input: `${inventorySql}\n${variantsSql}`,
       platform,
     },
   );
@@ -2649,7 +2658,7 @@ export function verifyCleanMigrations({
           executeDocker,
         });
         logger.log(
-          `[backend] Product inventory database contract verified: ${service.name}`,
+          `[backend] Product inventory and variant database contracts verified: ${service.name}`,
         );
       }
       if (service.packageName === "@nebula/tenant-authority-service") {

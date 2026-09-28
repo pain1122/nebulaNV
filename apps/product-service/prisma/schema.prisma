@@ -47,9 +47,10 @@ model Product {
   promoEnd         DateTime?
   tags             String[]
   complementaryIds String[]
-  trackInventory    Boolean               @default(false)
-  stockQuantity     Int                   @default(0)
-  version           Int                   @default(1)
+  trackInventory   Boolean               @default(false)
+  stockQuantity    Int                   @default(0)
+  version          Int                   @default(1)
+  selectionMode    ProductSelectionMode  @default(BASE)
   deletedAt        DateTime?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
@@ -57,11 +58,41 @@ model Product {
   comments         ProductComment[]
   gallery          ProductGalleryImage[]
   vrHotspots       ProductVrHotspot[]
+  variants         ProductVariant[]
+  skuReservation   CatalogSku?
 
   @@index([categoryId])
   @@index([status])
   @@index([deletedAt])
   @@index([isFeatured, featureSort])
+}
+
+model ProductVariant {
+  id             String      @id @default(uuid())
+  productId      String
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String      @unique
+  options        Json
+  optionKey      String
+  priceOverride  Decimal?    @db.Decimal(18, 2)
+  stockQuantity  Int         @default(0)
+  active         Boolean     @default(true)
+  sortOrder      Int         @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  skuReservation CatalogSku?
+
+  @@unique([productId, optionKey])
+  @@index([productId, active, sortOrder])
+}
+
+model CatalogSku {
+  sku       String          @id
+  productId String?         @unique
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?         @unique
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 }
 
 model ProductGalleryImage {
@@ -154,6 +185,11 @@ model ProductSet {
 
   @@index([active])
   @@index([deletedAt])
+}
+
+enum ProductSelectionMode {
+  BASE
+  VARIANT
 }
 
 enum ProductStatus {

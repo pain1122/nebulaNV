@@ -8,6 +8,7 @@ import {
   IsISO8601,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -22,6 +23,11 @@ export enum GatewayProductStatus {
   DRAFT = "DRAFT",
   ACTIVE = "ACTIVE",
   ARCHIVED = "ARCHIVED",
+}
+
+export enum GatewayProductSelectionMode {
+  BASE = "BASE",
+  VARIANT = "VARIANT",
 }
 
 export enum GatewayDiscountType {
@@ -115,6 +121,11 @@ export class GatewayProductWriteDto {
   @IsOptional()
   @IsEnum(GatewayProductStatus)
   status?: GatewayProductStatus;
+
+  @ApiPropertyOptional({ enum: GatewayProductSelectionMode })
+  @IsOptional()
+  @IsEnum(GatewayProductSelectionMode)
+  selectionMode?: GatewayProductSelectionMode;
 
   @ApiPropertyOptional({
     description: "Maps to the internal description field.",
@@ -304,6 +315,88 @@ export class GatewayProductPatchDto extends PartialType(
   expectedVersion!: number;
 }
 
+export class GatewayVariantFieldsDto {
+  @ApiProperty({ maxLength: 120 }) @IsString() @MaxLength(120) sku!: string;
+  @ApiProperty({
+    type: "object",
+    additionalProperties: { type: "string" },
+    description: "One to three option names mapped to values.",
+  })
+  @IsObject()
+  options!: Record<string, string>;
+  @ApiPropertyOptional({ minimum: 0 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  priceOverride?: number;
+  @ApiPropertyOptional({ minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2_147_483_647)
+  stockQuantity?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean;
+  @ApiPropertyOptional({ minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  sortOrder?: number;
+}
+
+export class GatewayVariantWriteDto extends GatewayVariantFieldsDto {
+  @ApiProperty({ minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  expectedVersion!: number;
+}
+
+export class GatewayVariantPatchDto extends PartialType(
+  GatewayVariantFieldsDto,
+) {
+  @ApiProperty({ minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  expectedVersion!: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  clearPriceOverride?: boolean;
+}
+
+export class GatewayVariantDeleteQueryDto {
+  @ApiProperty({ minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  expectedVersion!: number;
+}
+
+export class GatewayProductVariantPathDto {
+  @ApiProperty({ format: "uuid" }) @IsUUID("4") id!: string;
+  @ApiProperty({ format: "uuid" }) @IsUUID("4") variantId!: string;
+}
+
+export class GatewayProductVariantDto {
+  @ApiProperty({ format: "uuid" }) id!: string;
+  @ApiProperty({ format: "uuid" }) productId!: string;
+  @ApiProperty() sku!: string;
+  @ApiProperty({ type: "object", additionalProperties: { type: "string" } })
+  options!: Readonly<Record<string, string>>;
+  @ApiProperty() price!: number;
+  @ApiPropertyOptional({ nullable: true }) priceOverride!: number | null;
+  @ApiProperty() effectivePrice!: number;
+  @ApiProperty({ minimum: 0 }) stockQuantity!: number;
+  @ApiProperty({ enum: GatewayProductAvailability })
+  availability!: GatewayProductAvailability;
+  @ApiProperty() active!: boolean;
+  @ApiProperty({ minimum: 0 }) sortOrder!: number;
+  @ApiProperty() deletedAt!: string;
+}
+
 export class GatewayProductBulkDiscountDto {
   @ApiPropertyOptional({ type: [String], maxItems: 1000 })
   @IsOptional()
@@ -480,6 +573,10 @@ export class GatewayProductDto {
   @ApiProperty({ enum: GatewayProductAvailability })
   availability!: GatewayProductAvailability;
   @ApiProperty({ minimum: 1 }) version!: number;
+  @ApiProperty({ enum: GatewayProductSelectionMode })
+  selectionMode!: GatewayProductSelectionMode;
+  @ApiProperty({ type: [GatewayProductVariantDto] })
+  variants!: readonly GatewayProductVariantDto[];
 }
 
 export class GatewayGalleryImageDto {

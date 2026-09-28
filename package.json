@@ -165,6 +165,7 @@
     "test:web:current": "pnpm --filter web test",
     "test:f3:live": "pnpm --filter @nebula/api-client test:live",
     "test:d1:product:live": "pnpm --filter @nebula/api-client test:d1-product-live",
+    "test:d1:variants:live": "pnpm --filter @nebula/api-client test:d1-variants-live",
     "scan:dependencies:backend": "node ./scripts/backend.mjs security dependencies",
     "scan:source:backend": "node ./scripts/backend.mjs security source",
     "scan:images:backend": "node ./scripts/backend.mjs security images",

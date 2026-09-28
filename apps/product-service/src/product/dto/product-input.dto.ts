@@ -53,6 +53,10 @@ export enum ProductStatusDto {
   ACTIVE = "ACTIVE",
   ARCHIVED = "ARCHIVED",
 }
+export enum ProductSelectionModeDto {
+  BASE = "BASE",
+  VARIANT = "VARIANT",
+}
 export enum DiscountTypeDto {
   PERCENTAGE = "PERCENTAGE",
   FIXED = "FIXED",
@@ -72,6 +76,10 @@ export class ProductInputDto {
 
   @IsOptional() @IsString() @MaxLength(8) currency?: string;
   @IsOptional() @IsEnum(ProductStatusDto) status?: ProductStatusDto;
+
+  @IsOptional()
+  @IsEnum(ProductSelectionModeDto)
+  selectionMode?: ProductSelectionModeDto;
 
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() excerpt?: string;

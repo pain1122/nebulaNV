@@ -101,6 +101,8 @@ describe("gateway OpenAPI contract setup", () => {
       "/api/v1/admin/products/{id}/gallery/{imageId}",
       "/api/v1/admin/products/{id}/hard",
       "/api/v1/admin/products/{id}/restore",
+      "/api/v1/admin/products/{id}/variants",
+      "/api/v1/admin/products/{id}/variants/{variantId}",
       "/api/v1/admin/settings/{ns}/{key}",
       "/api/v1/admin/users",
       "/api/v1/admin/users/{id}",
@@ -168,9 +170,7 @@ describe("gateway OpenAPI contract setup", () => {
     expect(document.components?.schemas).toHaveProperty(
       "GatewayErrorEnvelopeDto",
     );
-    expect(document.components?.schemas).toHaveProperty(
-      "GatewayAuthTokenDto",
-    );
+    expect(document.components?.schemas).toHaveProperty("GatewayAuthTokenDto");
     expect(document.components?.schemas).toHaveProperty("GatewayUserDto");
     expect(document.components?.schemas).not.toHaveProperty(
       "GatewayAuthUserDto",
@@ -207,8 +207,7 @@ describe("gateway OpenAPI contract setup", () => {
       expect.objectContaining({ in: "header", name: "Idempotency-Key" }),
     );
 
-    const productTaxonomies =
-      document.paths["/api/v1/product-taxonomies"]?.get;
+    const productTaxonomies = document.paths["/api/v1/product-taxonomies"]?.get;
     expect(productTaxonomies?.parameters).toContainEqual(
       expect.objectContaining({
         in: "query",
@@ -218,7 +217,9 @@ describe("gateway OpenAPI contract setup", () => {
     );
     const blogCreate = document.paths["/api/v1/admin/blog/posts"]?.post;
     expect(blogCreate?.security).toEqual([{ "access-token": [] }]);
-    expect(document.paths).not.toHaveProperty("/api/v1/admin/blog/posts/{slug}");
+    expect(document.paths).not.toHaveProperty(
+      "/api/v1/admin/blog/posts/{slug}",
+    );
     expect(document.paths).not.toHaveProperty("/api/v1/taxonomies");
 
     expect(document.paths["/api/v1/orders"]?.get?.security).toEqual([
@@ -315,8 +316,7 @@ describe("gateway OpenAPI contract setup", () => {
       }),
     );
 
-    const publicSetting =
-      document.paths["/api/v1/settings/{ns}/{key}"]?.get;
+    const publicSetting = document.paths["/api/v1/settings/{ns}/{key}"]?.get;
     expect(publicSetting?.security).toBeUndefined();
     expect(publicSetting?.parameters).toEqual(
       expect.arrayContaining([

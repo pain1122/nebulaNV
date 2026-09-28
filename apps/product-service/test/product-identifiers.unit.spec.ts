@@ -2,7 +2,12 @@ import { ConflictException } from "@nestjs/common";
 import type { ClientGrpc } from "@nestjs/microservices";
 import { of } from "rxjs";
 import type { PrismaService } from "../src/prisma.service";
-import { Prisma, ProductStatus, type Product } from "../prisma/generated";
+import {
+  Prisma,
+  ProductStatus,
+  ProductSelectionMode,
+  type Product,
+} from "../prisma/generated";
 import { ProductServiceImpl } from "../src/product/product.service";
 
 const CATEGORY_ID = "11111111-1111-4111-8111-111111111111";
@@ -24,6 +29,7 @@ function product(overrides: Partial<Product> = {}): Product {
     excerpt: null,
     sku: "SKU-DESK-CHAIR",
     status: ProductStatus.DRAFT,
+    selectionMode: ProductSelectionMode.BASE,
     price: new Prisma.Decimal(100),
     currency: "USD",
     thumbnailUrl: null,

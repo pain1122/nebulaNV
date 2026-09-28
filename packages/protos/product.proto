@@ -65,6 +65,23 @@ message Product {
   int32  stockQuantity = 40;
   string availability = 41; // AVAILABLE|OUT_OF_STOCK
   int32  version = 42;
+  string selectionMode = 43; // BASE|VARIANT
+  repeated ProductVariant variants = 44;
+}
+
+message ProductVariant {
+  string id = 1;
+  string productId = 2;
+  string sku = 3;
+  map<string, string> options = 4;
+  double price = 5;
+  optional double priceOverride = 6;
+  double effectivePrice = 7;
+  int32 stockQuantity = 8;
+  string availability = 9;
+  bool active = 10;
+  int32 sortOrder = 11;
+  string deletedAt = 12;
 }
 
 // -----------------------------------------
@@ -117,6 +134,7 @@ message ProductInput {
   repeated string complementaryIds = 81;
   bool   trackInventory = 82;
   int32  stockQuantity = 83;
+  string selectionMode = 84;
 }
 
 message ProductPatch {
@@ -163,6 +181,7 @@ message ProductPatch {
   repeated string complementaryIds = 81;
   bool   trackInventory = 82;
   int32  stockQuantity = 83;
+  string selectionMode = 84;
 }
 
 // -----------------------------------------
@@ -200,6 +219,30 @@ message HardDeleteProductRequest { string id = 1; }
 
 message ProductResponse { Product data = 1; }
 message ListProductsResponse { repeated Product data = 1; int32 total = 2; }
+
+message VariantInput {
+  string sku = 1;
+  map<string, string> options = 2;
+  optional double priceOverride = 3;
+  optional int32 stockQuantity = 4;
+  optional bool active = 5;
+  optional int32 sortOrder = 6;
+}
+
+message VariantPatch {
+  optional string sku = 1;
+  map<string, string> options = 2;
+  optional double priceOverride = 3;
+  bool clearPriceOverride = 4;
+  optional int32 stockQuantity = 5;
+  optional bool active = 6;
+  optional int32 sortOrder = 7;
+  bool replaceOptions = 8;
+}
+
+message CreateVariantRequest { string productId = 1; int32 expectedVersion = 2; VariantInput data = 3; }
+message UpdateVariantRequest { string productId = 1; string variantId = 2; int32 expectedVersion = 3; VariantPatch data = 4; }
+message DeleteVariantRequest { string productId = 1; string variantId = 2; int32 expectedVersion = 3; }
 
 message ApplyDiscountBulkRequest {
   repeated string ids = 1; // specific targets (optional)
@@ -280,6 +323,12 @@ service ProductService {
   rpc AdminGetProductV3 (GetProductRequest)          returns (ProductResponse);
   rpc AdminListProducts (AdminListProductsRequest)   returns (ListProductsResponse);
   rpc AdminListProductsV3 (AdminListProductsRequest) returns (ListProductsResponse);
+  rpc CreateVariant (CreateVariantRequest) returns (ProductResponse);
+  rpc CreateVariantV3 (CreateVariantRequest) returns (ProductResponse);
+  rpc UpdateVariant (UpdateVariantRequest) returns (ProductResponse);
+  rpc UpdateVariantV3 (UpdateVariantRequest) returns (ProductResponse);
+  rpc DeleteVariant (DeleteVariantRequest) returns (ProductResponse);
+  rpc DeleteVariantV3 (DeleteVariantRequest) returns (ProductResponse);
 
   rpc DeleteProduct      (DeleteProductRequest)      returns (ProductResponse); // soft
   rpc DeleteProductV3    (DeleteProductRequest)      returns (ProductResponse);
