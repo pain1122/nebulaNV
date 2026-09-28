@@ -68,6 +68,19 @@ function product(overrides: Partial<Product> = {}): Product {
 }
 
 describe("product inventory and optimistic concurrency", () => {
+  it.each([1.234, 10_000_000_000_000_000])(
+    "rejects a base price that cannot fit Decimal(18,2): %s",
+    async (price) => {
+      const update = jest.fn();
+      const svc = service({ product: { update } });
+
+      await expect(svc.update("product-1", { price }, 1)).rejects.toEqual(
+        new BadRequestException("price must fit Decimal(18,2)"),
+      );
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects contradictory untracked stock before persistence", async () => {
     const create = jest.fn();
     const svc = service({ product: { create } });

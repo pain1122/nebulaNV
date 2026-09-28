@@ -26,7 +26,11 @@ import {
   type VerifiedServiceDownstreamContext,
 } from "@nebula/grpc-auth";
 import { isRecord } from "../error.utils";
-import { DiscountTypeDto, type ProductInputDto } from "./dto/product-input.dto";
+import {
+  DiscountTypeDto,
+  ProductStatusDto,
+  type ProductInputDto,
+} from "./dto/product-input.dto";
 import { type ApplyDiscountBulkDto } from "./dto/apply-discount-bulk.dto";
 
 type ProductPatchInput = Partial<
@@ -661,9 +665,15 @@ export class ProductServiceImpl {
   }
 
   private assertPrice(value: unknown): void {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
       throw new BadRequestException("price must be a non-negative number");
+    }
+    const price = new Prisma.Decimal(value);
+    if (
+      price.decimalPlaces() > 2 ||
+      price.greaterThanOrEqualTo("10000000000000000")
+    ) {
+      throw new BadRequestException("price must fit Decimal(18,2)");
     }
   }
 
@@ -846,7 +856,8 @@ export class ProductServiceImpl {
       if (nextSelectionMode !== current.selectionMode) {
         if (
           current.status !== ProductStatus.DRAFT ||
-          (patch.status !== undefined && patch.status !== "DRAFT") ||
+          (patch.status !== undefined &&
+            patch.status !== ProductStatusDto.DRAFT) ||
           current.stockQuantity !== 0
         ) {
           throw new BadRequestException(

@@ -1,6 +1,6 @@
 # Current Focus
 
-Last updated: 2026-09-26
+Last updated: 2026-09-28
 
 Status: active backend execution checklist.
 
@@ -50,19 +50,19 @@ but they are not permanent production topology decisions.
 
 ## Repository Truth At Entry
 
-| Area               | Current implementation                                                                                                                                 | D1 consequence                                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Gateway            | F3 exposes generated, gateway-only external Auth, User, Settings, Media, Taxonomy, Product, Blog, and Order APIs                                       | Preserve this boundary and close only proven Product contract gaps                                           |
-| Product lifecycle  | `DRAFT`, `ACTIVE`, and `ARCHIVED` exist; public reads force active/non-deleted visibility and admin reads are separate                                 | Keep the mechanism and extend it without weakening visibility                                                |
-| Product model      | Product now owns bounded base stock, derived availability, and mutation version alongside its existing commercial fields                               | Prove the new migration/live contract, then introduce bounded variants without widening inventory topology   |
-| Variants           | Bounded ProductVariant, shared SKU reservation, versioned mutation, and Gateway/client contracts passed Docker migration and live Gateway proof | Preserve this slice while completing D1-R and D1-X                                                            |
-| Taxonomy           | Product-scoped taxonomy facade and default-category initialization exist                                                                               | Preserve ownership; prove category/tag/brand needs against current taxonomy contracts                        |
-| Media              | Media-service owns media policy, while Product currently stores URL strings and does not validate Media records                                        | Replace product-facing URL authority with the minimum validated Media-reference contract; no file-manager UI |
-| Currency           | Product fallback, Product database default, and Order behavior are not standardized                                                                    | Confirmed cross-service invariant gap shared with D2                                                         |
-| Product operations | Internal HTTP is limited, but the gateway already exposes all current gRPC management operations and generates client methods                          | Preserve the route boundary and repair its commercial data and response contracts                            |
-| Orders             | Cart, checkout, order snapshots, ownership checks, and admin status mutation already exist                                                             | D2 will harden idempotency, stock, currency, transitions, rollback, and response mapping                     |
-| Frontends          | `apps/web` remains the compatibility client; the intended admin is an external Vite project and no storefront is required now                          | Do not change frontend source during D1/D2                                                                   |
-| Tenant work        | F4 R0-R5 is dormant and the paused R6.1 experiment is preserved in a named path-scoped stash                                                           | Preserve that stash untouched and make no tenant-isolation claim                                             |
+| Area               | Current implementation                                                                                                                          | D1 consequence                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Gateway            | F3 exposes generated, gateway-only external Auth, User, Settings, Media, Taxonomy, Product, Blog, and Order APIs                                | Preserve this boundary and close only proven Product contract gaps                                           |
+| Product lifecycle  | `DRAFT`, `ACTIVE`, and `ARCHIVED` exist; public reads force active/non-deleted visibility and admin reads are separate                          | Keep the mechanism and extend it without weakening visibility                                                |
+| Product model      | Product owns bounded base stock, derived availability, mutation version, and bounded variants alongside its existing commercial fields          | Preserve the verified Batch 1 contract while completing taxonomy, Media references, and D1 exit proof        |
+| Variants           | Bounded ProductVariant, shared SKU reservation, versioned mutation, and Gateway/client contracts passed Docker migration and live Gateway proof | Preserve this slice while completing D1-R and D1-X                                                           |
+| Taxonomy           | Product-scoped taxonomy facade and default-category initialization exist                                                                        | Preserve ownership; prove category/tag/brand needs against current taxonomy contracts                        |
+| Media              | Media-service owns media policy, while Product currently stores URL strings and does not validate Media records                                 | Replace product-facing URL authority with the minimum validated Media-reference contract; no file-manager UI |
+| Currency           | Product validates writes against the Settings shop currency; Order still has a separate cart default                                            | Align Order during D2 without reopening Product's completed write authority                                  |
+| Product operations | Internal HTTP is limited, but the gateway already exposes all current gRPC management operations and generates client methods                   | Preserve the route boundary and repair its commercial data and response contracts                            |
+| Orders             | Cart, checkout, order snapshots, ownership checks, and admin status mutation already exist                                                      | D2 will harden idempotency, stock, currency, transitions, rollback, and response mapping                     |
+| Frontends          | `apps/web` remains the compatibility client; the intended admin is an external Vite project and no storefront is required now                   | Do not change frontend source during D1/D2                                                                   |
+| Tenant work        | F4 R0-R5 is dormant and the paused R6.1 experiment is preserved in a named path-scoped stash                                                    | Preserve that stash untouched and make no tenant-isolation claim                                             |
 
 ## Finding Classification
 
@@ -136,9 +136,9 @@ Each D1 batch must:
       SKU, lifecycle, availability, price, currency, and basic stock.
 - [x] Preserve deterministic global slug/SKU uniqueness for the current
       single-site release and record the later F4 scoped-uniqueness migration.
-- [ ] Define and implement bounded variants with option values, variant SKU,
+- [x] Define and implement bounded variants with option values, variant SKU,
       price/stock overrides, active/deleted state, and deterministic ordering.
-- [ ] Reject invalid price, currency, stock, option, SKU, lifecycle, and
+- [x] Reject invalid price, currency, stock, option, SKU, lifecycle, and
       availability combinations at the owning service boundary.
 - [x] Define optimistic concurrency or another explicit lost-update behavior
       for admin mutations.
@@ -147,11 +147,22 @@ Each D1 batch must:
 
 ### Batch 1 Exit
 
-- [ ] Base and variant products have deterministic validated commercial state.
-- [ ] Public/admin visibility, uniqueness, and concurrent mutation behavior are
+- [x] Base and variant products have deterministic validated commercial state.
+- [x] Public/admin visibility, uniqueness, and concurrent mutation behavior are
       covered by focused service tests.
-- [ ] Product core contains no payment, showroom, recommendation, tenant, or
+- [x] Product core contains no payment, showroom, recommendation, tenant, or
       storage-provider policy.
+
+Batch 1 evidence: the
+[inventory/concurrency checkpoint](reports/2026-09-22-d1-inventory-concurrency-checkpoint.md),
+[shop-currency checkpoint](reports/2026-09-19-d1-shop-currency-authority-checkpoint.md),
+and [variant checkpoint](reports/2026-09-26-d1-variants-checkpoint.md) record
+schema, transport, migration, and live behavior. The 2026-09-28 closure review
+confirmed service/DTO validation for lifecycle, selection mode, stock, options,
+SKU, and currency; added a price-scale/range check matching `Decimal(18,2)` for
+base prices and variant overrides; and passed Product unit tests (12 suites,
+76 tests) and Product type checking. D1-wide populated-upgrade and cross-service
+exit proof remain in Batch 4.
 
 ## Batch 2 - Taxonomy, Media References, And Shop Currency
 
@@ -246,15 +257,10 @@ Each D1 batch must:
 
 ## Next Action
 
-The
-[base-product inventory and concurrency contract](reports/2026-09-22-d1-inventory-concurrency-checkpoint.md)
-is complete across Product, gRPC, Gateway, OpenAPI, and the generated client.
-Its disposable migration proof, Product e2e (15 suites, 103 tests), D1 live
-proof, preserved F3 live flows, and running Compose health checks pass. Next,
-implement bounded variants as the D1-V vertical slice. Follow the
-[D1-D2 backend ecommerce acceleration plan](reports/2026-09-26-d1-d2-acceleration-plan.md)
-to batch schema, service, transport, client, and proof work into vertical slices
-and avoid forced or repeated image builds. The small `apps/web` change only
-preserves its existing BFF envelope against the required `expectedVersion`
-field; it does not add or redesign frontend behavior. Order-owned price, stock
-decrement, currency, and in-flight cart transition policy remains a D2 handoff.
+Batch 1 is closed. Execute D1-R, the Batch 2 taxonomy, validated Media-reference,
+and shop-currency slice, following the
+[D1-D2 backend ecommerce acceleration plan](reports/2026-09-26-d1-d2-acceleration-plan.md).
+Preserve the Product currency authority already established; align Order's
+currency and cart transitions during D2. After D1-R, complete Batch 3 contracts
+and Batch 4 migration, fixture, rollback, and gateway-only live proof before
+declaring D1 complete.

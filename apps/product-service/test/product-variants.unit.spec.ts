@@ -60,6 +60,24 @@ function harness(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Product variants", () => {
+  it.each([1.234, 10_000_000_000_000_000])(
+    "rejects a variant price override that cannot fit Decimal(18,2): %s",
+    async (priceOverride) => {
+      const { service, create } = harness();
+
+      await expect(
+        service.createVariant(
+          "product-1",
+          { sku: "SHIRT-BLUE-M", options: { Color: "Blue" }, priceOverride },
+          1,
+        ),
+      ).rejects.toEqual(
+        new BadRequestException("price must fit Decimal(18,2)"),
+      );
+      expect(create).not.toHaveBeenCalled();
+    },
+  );
+
   it("creates a canonical combination and reserves its SKU under the product version", async () => {
     const { service, create, updateMany } = harness();
     const result = await service.createVariant(
