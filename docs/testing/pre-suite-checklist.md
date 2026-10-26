@@ -89,6 +89,9 @@ Use this table in the slice's dated report. Revisit it after implementation.
 - [ ] Inspect the selected test config and global setup before execution.
       Filtering to unit files does not bypass integration startup hooks; use
       the existing unit-only config when live dependencies are not required.
+- [ ] Include new test files in a real typed lint project. Check sibling owners
+      using the same fallback configuration; do not raise default-project file
+      limits or disable typed rules to hide missing project coverage.
 - [ ] Exercise tooling fixtures with `CI=true` and `GITHUB_ACTIONS=true` when
       hosted CI runs them. Check frozen-lock defaults and grouped/colored output
       against the pinned tools. Author temporary fixture locks with the package

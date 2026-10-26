@@ -1,12 +1,16 @@
 ﻿// @ts-check
-import {createRequire} from "node:module"
+import { createRequire } from "node:module";
 
-import eslint from "@eslint/js"
-import globals from "globals"
+import eslint from "@eslint/js";
+import globals from "globals";
 
-const authServiceRequire = createRequire(new URL("../auth-service/package.json", import.meta.url))
-const eslintPluginPrettierRecommended = authServiceRequire("eslint-plugin-prettier/recommended")
-const tseslint = authServiceRequire("typescript-eslint")
+const authServiceRequire = createRequire(
+  new URL("../auth-service/package.json", import.meta.url),
+);
+const eslintPluginPrettierRecommended = authServiceRequire(
+  "eslint-plugin-prettier/recommended",
+);
+const tseslint = authServiceRequire("typescript-eslint");
 
 export default tseslint.config(
   {
@@ -23,10 +27,7 @@ export default tseslint.config(
       },
       sourceType: "commonjs",
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["test/*.ts", "test/*/*.ts"],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -49,4 +50,4 @@ export default tseslint.config(
       "@typescript-eslint/no-redundant-type-constituents": "warn",
     },
   },
-)
+);

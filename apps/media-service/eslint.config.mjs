@@ -28,12 +28,7 @@ export default tseslint.config(
       sourceType: "commonjs",
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            "test/*.ts",
-            "test/*/*.ts",
-            "jest.processing-db.config.ts",
-          ],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
+          allowDefaultProject: ["jest.processing-db.config.ts"],
         },
         tsconfigRootDir: import.meta.dirname,
       },

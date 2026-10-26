@@ -286,3 +286,48 @@ Next proof: authorized main push runs fresh frozen install, quality/types/tests,
   then hosted build/runtime/security/archive gates. No gate weakened or skipped.
 Readiness: READY FOR HOSTED PATCHED-DEPENDENCY VALIDATION; Segment 3 not closed.
 ```
+
+## Hosted lint project coverage
+
+Run 40324606740 (`d404575`) passed fresh frozen installation, all 80 tooling,
+nine graph, COPY, dependency and proto freshness gates. Lint stopped on
+`apps/media-service/test/utils/image.ts`: 21 Media test TypeScript files exceed
+its fallback-project cap of 20. Existing warnings are separate from this parsing
+error. Sibling review found the same confirmed coverage defect in Order (22 test
+files / cap 20); Product has 27 / cap 32 and does not require this correction.
+
+Before-edit trace: `apps/media-service/eslint.config.mjs` and
+`apps/order-service/eslint.config.mjs` use type-aware Project Service but their
+respective `tsconfig.json` files exclude tests. Add each owner's
+`test/tsconfig.json` extending its production compiler options with noEmit and a
+test include; remove test-file fallback allowances from those two ESLint configs.
+This lets Project Service find the nearest real project without raising a cap,
+disabling type-aware rules or excluding files. Media's single root processing-DB
+Jest config allowance remains. See the supported
+[parser/project-service configuration](https://typescript-eslint.io/packages/parser/).
+
+Consumers: unchanged `apps/{media-service,order-service}/package.json` lint globs,
+`apps/{media-service,order-service}/jest.config.ts`, their production
+`tsconfig.json`/`tsconfig.build.json`, Media's `jest.processing-db.config.ts`, and
+the failing Media `test/utils/image.ts`. Existing source/test rule severities
+stay intact. New test configs are excluded from Docker by the existing
+`**/test` rule; no application/SQL/transport/generated-contract changes. Run both
+complete owner lint commands and inspect warnings/errors before the next push.
+
+Actual owner lint results: Media exit 0, zero errors / 486 existing warnings;
+Order exit 0, zero errors / 122 existing warnings. No rules/severities changed.
+TypeScript config parsing confirms each complete test tree belongs to its new
+noEmit project; production/Jest configs and compiler emission remain unchanged.
+The mandatory preparation checklist now requires this project membership check
+when adding tests, rather than discovering fallback overflow in broad CI.
+
+Fresh-install hosted dependency artifact from `d404575` confirms runtime=0,
+tooling=2, deferred-web=43. This is authoritative for the patched installation,
+separate from the retained local older node_modules. No unrelated warning cleanup
+or Web/tooling advisory remediation is claimed.
+
+Handoff receipt: before-edit/revisited files above; both actual owner lint runs,
+config inclusion/noEmit checks, syntax/format/diff pass. Prior preflight remains
+valid: this lint-project correction changes no application/public contracts.
+Hosted all-workspace lint/types/tests and downstream image/archive/cache gates
+remain pending. READY FOR HOSTED LINT-PROJECT VALIDATION, not Segment 3 completion.
