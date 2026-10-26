@@ -276,23 +276,23 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.9.0",
-    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/grpc-js": "^1.14.6",
     "@grpc/proto-loader": "^0.8.1",
     "@nebula/clients": "workspace:*",
     "@nebula/grpc-auth": "workspace:*",
     "@nebula/protos": "workspace:*",
-    "@nestjs/common": "11.1.28",
+    "@nestjs/common": "11.2.5",
     "@nestjs/config": "^4.0.4",
-    "@nestjs/core": "11.1.28",
+    "@nestjs/core": "11.2.5",
     "@nestjs/jwt": "^11.0.2",
-    "@nestjs/microservices": "11.1.28",
-    "@nestjs/platform-express": "11.1.28",
+    "@nestjs/microservices": "11.2.5",
+    "@nestjs/platform-express": "11.2.5",
     "@prisma/client": "6.16.2",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "express": "^5.2.1",
-    "joi": "^18.0.1",
+    "joi": "18.2.6",
     "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
@@ -303,7 +303,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@nestjs/testing": "11.1.28",
+      "@nestjs/testing": "11.2.5",
       "@aws-sdk/xml-builder>fast-xml-parser": "5.5.6",
       "@nestjs/swagger>js-yaml": "5.2.3",
       "@prisma/config>deepmerge-ts": "8.0.2",
@@ -317,7 +317,10 @@
       "inflight": "^2.0.0",
       "node-domexception": "^2.0.0",
       "glob": "^10.4.5",
-      "rimraf": "^6.0.1"
+      "rimraf": "^6.0.1",
+      "@nestjs/platform-express>multer": "2.5.0",
+      "express>body-parser": "2.4.0",
+      "express>proxy-addr": "2.0.8"
     },
     "onlyBuiltDependencies": [
       "@prisma/client",

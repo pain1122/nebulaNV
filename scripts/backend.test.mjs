@@ -1364,6 +1364,68 @@ test("dependency report writes classifications and blocks runtime findings", () 
   }
 });
 
+test("dependency report rejects failed or malformed audits before reporting success", () => {
+  const temporary = mkdtempSync(path.join(tmpdir(), "nebula-audit-failure-"));
+  try {
+    for (const audit of [
+      { error: { code: "ECONNRESET" } },
+      {},
+      null,
+      { advisories: {}, metadata: {} },
+      { advisories: [], metadata: { vulnerabilities: {} } },
+      {
+        error: { code: "E503" },
+        advisories: {},
+        metadata: { vulnerabilities: {} },
+      },
+    ]) {
+      assert.throws(
+        () =>
+          generateBackendDependencyReport({
+            execute(args) {
+              assert.equal(
+                args[0],
+                "audit",
+                "invalid audits must stop before inventory reads",
+              );
+              return { status: 1, stdout: JSON.stringify(audit) };
+            },
+            logger: {
+              log() {
+                assert.fail("invalid audits must not log a pass");
+              },
+            },
+            outputDirectory: temporary,
+          }),
+        /backend_dependency_audit_invalid_response/,
+      );
+      assert.equal(
+        existsSync(path.join(temporary, "backend-dependencies.json")),
+        false,
+      );
+    }
+    const report = generateBackendDependencyReport({
+      execute: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          advisories: {},
+          metadata: { vulnerabilities: {} },
+        }),
+      }),
+      services: [],
+      logger: { log() {} },
+      outputDirectory: temporary,
+    });
+    assert.equal(
+      report.summary.highCritical,
+      0,
+      "a valid empty audit remains supported",
+    );
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
 test("Trivy source scope excludes web, env, generated, and vendor inputs", () => {
   const args = buildTrivySourceArgs("source.json");
   assert.deepEqual(args.slice(0, 11), [

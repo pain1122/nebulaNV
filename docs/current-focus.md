@@ -51,14 +51,19 @@ to push the current project snapshot to main; no hosted pass is claimed yet. Doc
 are separate. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
 Final release tooling fixes include the previously omitted scanner (sixteen unique
-images), Windows JSON array handling and -Input path handling. All 79 tooling
+images), Windows JSON array handling and -Input path handling. All 80 tooling
 checks pass; the hosted workflow will exercise native metadata upgrade, F3/e2e/
 scan gates and a streamed archive round trip without leaving a large tar.
+Hosted graph/COPY checks now pass. The next gate found ten dependency advisories
+across seven backend packages; same-major fixes and an audit-error validation
+regression are prepared. Local graph 9/9, preflight 23/23, frozen lock and valid
+dependency audit pass; fresh installation/runtime acceptance remains hosted-pending.
 
 Remaining [Segment 3 gates](ASAP-BUILD-CLEANUP.md#3-generalize-and-align-integrationrelease):
 hosted CI proof and integration/release/D2 deployment/live evidence. Earlier
-9 graph / 12 tooling / 22 health checks and native closures remain valid; CI-only
-files do not change production build inputs. Heavy execution remains with Salar;
+9 graph / 12 tooling / 22 health checks remain historical evidence. The dependency
+patch changes Docker inputs; closure evidence for the new lock is pending in CI.
+Heavy local execution remains with Salar;
 do not restart new images before the pending D2 deployment gate.
 Optional packaging/env/watch/package splits remain separate decisions.
 

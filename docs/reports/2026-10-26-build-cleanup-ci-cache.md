@@ -204,3 +204,85 @@ real compilation and restored-artifact assertions remain strict. Added the
 observed hosted-default check to the mandatory pre-suite preparation gate.
 Scoped lint/syntax/format/diff pass before the next push; hosted acceptance is
 still pending and the two failed runs remain recorded.
+
+## Hosted dependency gate - confirmed blockers
+
+Run 40321660634 (`f188118`) passed all 79 backend tooling checks, all nine graph
+checks and the actual COPY-context probe. Its dependency gate correctly stopped
+on ten high/critical advisories across seven runtime packages: grpc-js 1.14.4,
+Nest microservices 11.1.28, body-parser 2.3.0, compression 1.8.1, Joi 18.0.1,
+Multer 2.2.0 (four advisories), and proxy-addr 2.0.7. The downloaded allowlisted
+report is retained under `.ci-evidence/build-ci-cache/hosted-f188118/`.
+
+The local scanner reported zero with empty audit metadata. This is a confirmed
+validation defect: `generateBackendDependencyReport` accepts an exit-1 JSON error
+object as an empty advisory report. That local result is invalid evidence.
+Validate the audit response before classifying it, preserving the runtime gate
+and all advisory assertions. No advisory suppression or threshold change.
+
+Before-edit consumer trace:
+
+| Owner                                                    | Exact consumers inspected                                                                                                                                                                                                                                    | Action and validation                                                                                                                                                                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/backend.mjs` audit response parsing             | `scripts/backend.test.mjs` dependency classification/report tests; root `scan:dependencies:backend`; `.github/workflows/ci.yml` quality gate                                                                                                                 | Reject error/missing/malformed reports before inventory or green report; regress failed registry responses and valid empty reports. CLI/CI command unchanged.                                                                     |
+| Root/workspace dependency manifests and `pnpm-lock.yaml` | Root; `apps/{auth-service,blog-service,gateway,media-service,order-service,product-service,realm-auth-service,settings-service,taxonomy-service,tenant-authority-service,user-service}/package.json`; `packages/{clients,config,grpc-auth}/package.json`     | Keep aligned Nest 11/Joi versions; use same-major supported fixes and pnpm-authored lock. Exact versions/final resolution recorded after verification.                                                                            |
+| Shared dependency/build consumers                        | `scripts/docker/backend-build-graph.mjs`, `scripts/docker/backend-build-graph.test.mjs`, `docker/backend.Dockerfile`, `scripts/backend.test.mjs` Joi alignment assertion, `packages/config/src`, `packages/grpc-auth/src`, Gateway transport/contract checks | No application or generated contract edits planned. Dependency changes invalidate image evidence for the new lock; focused checks/preflight first, hosted build/runtime gates pending. Preserve graph/cache and runtime policies. |
+
+Authoritative sources checked before choosing patches: [Nest advisory](https://github.com/nestjs/nest/security/advisories/GHSA-m8vh-jmq9-5rjg),
+[grpc-node releases](https://github.com/grpc/grpc-node/releases),
+[Joi advisory](https://github.com/hapijs/joi/security/advisories/GHSA-6h2x-m376-mqjq),
+[body-parser advisory](https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828),
+[Multer releases](https://github.com/expressjs/multer/releases),
+[compression advisory](https://github.com/advisories/GHSA-vc2v-76pw-4v95) and
+[Express proxy dependency correction](https://github.com/expressjs/express/issues/7473).
+Registry manifests confirm Nest 11.2.5 remains on Express 5.2.1 and pins Multer
+2.2.0, so that transitive pin needs a scoped correction. Staying on the existing
+major avoids a Nest 12 migration; application compatibility remains subject to
+the existing tests. Unrelated deferred-web/tooling findings remain classified
+under the established policy, not represented as fixed.
+
+Correction and revisited consumers: all fifteen root/backend/shared manifests
+align Nest runtime/testing/peers to 11.2.5 and Joi schema owners to exact 18.2.6;
+grpc-js minimum is 1.14.6, compression minimum 1.8.2. Scoped overrides select
+Nest platform's Multer 2.5.0 and Express's body-parser 2.4.0 / proxy-addr 2.0.8.
+The pnpm-authored lock also brings required content-type 2.1.0, destroy 1.2.0,
+and qs 6.16.1, and removes obsolete concat-stream/typedarray. No other package
+versions changed. pnpm normalized two optional ESLint parser peer suffixes under
+the unchanged Web importer; no Web manifest/runtime version changed. The existing
+Web CKEditor/React peer warning remains visible and outside this backend patch.
+
+Reviewed `packages/config/src/validation.ts`, `packages/grpc-auth/src/s2s.ts`,
+`apps/gateway/src/main.ts`, `apps/gateway/src/order/order-api.dto.ts` and their
+preflight contract consumers. Strict validation, signed metadata and Order enums
+remain unchanged. No route, protobuf, generated OpenAPI/client, fixture or SQL
+change is required by these same-major dependency updates. Hosted runtime suites
+must still verify compatibility after installing the new lock.
+
+The raw local audit error is ECONNRESET. pnpm registry requests also timed out
+and fell back to stale package metadata. An owned temporary local bridge was
+unsuccessful and stopped; it changed no registry policy or lock. Official TLS
+registry metadata was refreshed in the local pnpm metadata cache; pinned pnpm
+10.17.1 then authored the lock offline (33.2s), followed by a successful explicit
+frozen-lockfile validation (889ms). No loopback registry/tarball references entered
+the lock; no hand-edited lock data or production registry configuration change.
+
+```text
+Requirement: retain security gates while correcting audited backend dependencies
+  and rejecting an audit transport error as an empty success.
+Impact trace: before-edit table plus exact manifests/lock and revisited transport
+  consumers above. Existing classification/threshold/approval policy unchanged.
+Cheap checks: backend tooling 80/80; graph tests 9/9 (49.7s); preflight 4 suites,
+  23 tests; scoped ESLint recommended/Node globals, JS syntax and formatting pass.
+Lock: package-manager generation and frozen lock validation pass. No unexpected
+  runtime version changes; unchanged Web parser peer suffix normalization noted.
+Audit: subsequent actual pnpm audit returned valid metadata; scanner reports
+  runtime=0, tooling=2, deferred-web=43. Old error-only zero report is invalidated.
+Runtime caveat: local installed dependencies and images still precede this new
+  lock. Local focused checks do not certify the newly patched runtime closure.
+SQL: unchanged. Native metadata proof remains a separate hosted acceptance step.
+Build decision: lock/manifests/backend tooling are Docker inputs; hosted image
+  build/closure/integration/scans/archive and cache persistence remain pending.
+Next proof: authorized main push runs fresh frozen install, quality/types/tests,
+  then hosted build/runtime/security/archive gates. No gate weakened or skipped.
+Readiness: READY FOR HOSTED PATCHED-DEPENDENCY VALIDATION; Segment 3 not closed.
+```

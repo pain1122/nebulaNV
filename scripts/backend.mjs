@@ -5072,6 +5072,14 @@ export function generateBackendDependencyReport({
     "backend_dependency_audit",
     [0, 1],
   );
+  if (
+    !isRecord(auditReport) ||
+    auditReport.error ||
+    !isRecord(auditReport.advisories) ||
+    !isRecord(auditReport.metadata?.vulnerabilities)
+  ) {
+    throw new Error("backend_dependency_audit_invalid_response");
+  }
   const gatedPackages = [
     ...new Set(
       Object.values(auditReport.advisories ?? {})
