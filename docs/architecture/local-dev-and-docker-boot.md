@@ -142,6 +142,11 @@ Gateway is the HTTP-only exception. Its app-local env contains
 idempotency bounds, and `MEDIA_RENDER_HTTP_URL`; it has no database, inbound
 S2S/replay, `PUBLIC_MODE`, or gRPC listener fields.
 
+Native Gateway examples use `http://127.0.0.1:3007` for Media rendering. Local
+Compose explicitly sets `http://media-service:3007` inside Gateway's container;
+the native host variable must not override that internal address. Release uses
+its separate production environment with the internal origin.
+
 Do not document secret values. Document names, purpose, and expected format only.
 
 ## Local URL Convention

@@ -367,6 +367,9 @@ Important env groups:
   `GATEWAY_OUTBOUND_KEYS`, `GATEWAY_REDIS_URL`, idempotency bounds,
   `GATEWAY_HTTP_PORT`, and fixed `MEDIA_RENDER_HTTP_URL`
 
+Local Compose pins Gateway's Media render origin to `http://media-service:3007`.
+The native `.env.example` origin uses loopback and is not a container target.
+
 ## Release Image Flow
 
 Build images on a machine that can install dependencies:

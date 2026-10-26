@@ -1735,6 +1735,23 @@ test("Compose evidence is non-interpolated and sanitized", () => {
   }
 });
 
+test("local Compose keeps the internal Media origin separate from native examples", () => {
+  const require = createRequire(import.meta.url);
+  const yaml = createRequire(require.resolve("eslint/package.json"))("js-yaml");
+  const local = yaml.load(source("docker-compose.yml"));
+  assert.equal(
+    local.services.gateway.environment.MEDIA_RENDER_HTTP_URL,
+    "http://media-service:3007",
+    "container routing must not interpolate a native-host loopback origin",
+  );
+  for (const example of [".env.example", "apps/gateway/.env.example"]) {
+    assert.equal(
+      envValues(source(example)).get("MEDIA_RENDER_HTTP_URL"),
+      "http://127.0.0.1:3007",
+    );
+  }
+});
+
 test("rendered Compose boundary permits only the selected release data plane", () => {
   assert.doesNotThrow(() =>
     validateRenderedComposeBoundary("local", renderedBoundaryFixture("local")),

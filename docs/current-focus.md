@@ -51,7 +51,7 @@ to push the current project snapshot to main; no hosted pass is claimed yet. Doc
 are separate. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
 Final release tooling fixes include the previously omitted scanner (sixteen unique
-images), Windows JSON array handling and -Input path handling. All 80 tooling
+images), Windows JSON array handling and -Input path handling. All 81 tooling
 checks pass; the hosted workflow will exercise native metadata upgrade, F3/e2e/
 scan gates and a streamed archive round trip without leaving a large tar.
 Hosted graph/COPY checks now pass. The next gate found ten dependency advisories
@@ -61,6 +61,9 @@ dependency audit pass; fresh installation/runtime acceptance remains hosted-pend
 Hosted fresh install, lint, types, security, shared checks, Gateway 270/270,
 client/Web checks and all backend source builds now pass. Compose verifier
 corrections pass both actual renders locally, preserving scanner-outage behavior.
+The clean tracked-example render also exposed/fixed a native Media origin leaking
+into local Docker Gateway; both clean local/release renders now pass, plus 14
+focused environment/render tests. Unused inherited fields remain Segment 4 work.
 Hosted source/image scans, integration, cache persistence and archive gates remain.
 
 Remaining [Segment 3 gates](ASAP-BUILD-CLEANUP.md#3-generalize-and-align-integrationrelease):

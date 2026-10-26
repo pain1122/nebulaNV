@@ -566,7 +566,7 @@ services:
       <<: *internal-targets
       GATEWAY_HTTP_PORT: 3002
       GATEWAY_REDIS_URL: redis://redis:6379/0
-      MEDIA_RENDER_HTTP_URL: ${MEDIA_RENDER_HTTP_URL:-http://media-service:3007}
+      MEDIA_RENDER_HTTP_URL: http://media-service:3007
     healthcheck:
       test:
         [

@@ -70,7 +70,7 @@ CI persistence is implemented and locally checked; actual hosted round-trip
 validation remains pending. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 Image-only release behavior is retained. Final archive review corrected the
 omitted scanner, PowerShell JSON-array flattening and the automatic Input-variable
-collision. All 80 tooling checks pass. Hosted graph/COPY checks pass; audited
+collision. All 81 tooling checks pass. Hosted graph/COPY checks pass; audited
 same-major dependency fixes now await fresh-install/runtime CI acceptance.
 Hosted CI runs populated metadata
 upgrade, F3/native integration, scans and a streamed sixteen-image save/load round
