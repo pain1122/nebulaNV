@@ -20,6 +20,7 @@ const adminControllers = [
   "apps/settings-service/src/settings.controller.ts",
   "apps/settings-service/src/grpc/settings-grpc.controller.ts",
   "apps/order-service/src/order/order.controller.ts",
+  "apps/order-service/src/order/admin-order.controller.ts",
   "apps/order-service/src/order/grpc/order-grpc.controller.ts",
 ] as const;
 
@@ -149,7 +150,7 @@ describe("canonical gRPC security wiring", () => {
       "apps/order-service/src/order/grpc/order-grpc.controller.ts",
     );
     expect(controller).toMatch(
-      /@DormantS2SAuthorizationV3Receiver\("OrderService", "UpdateOrderStatusV3"\)\s*@Roles\("admin", "root-admin"\)\s*@GrpcMethod\("OrderService", "UpdateOrderStatus"\)/,
+      /@DormantS2SAuthorizationV3Receiver\("OrderService", "UpdateOrderStatusV3"\)\s*@Roles\("admin", "root-admin"\)\s*@RequireUserId\(\)\s*@GrpcMethod\("OrderService", "UpdateOrderStatus"\)/,
     );
   });
 
@@ -192,7 +193,55 @@ describe("canonical gRPC security wiring", () => {
       "apps/order-service/src/order/grpc/order-grpc.controller.ts",
     );
 
-    expect(http.match(/@Roles\("user"\)/g)).toHaveLength(7);
-    expect(grpc.match(/@Roles\("user"\)/g)).toHaveLength(7);
+    expect(http.match(/@Roles\("user"\)/g)).toHaveLength(8);
+    expect(grpc.match(/@Roles\("user"\)/g)).toHaveLength(8);
+    expect(
+      Array.from(
+        grpc.matchAll(
+          /@Roles\("user"\)\s*@RequireUserId\(\)\s*@GrpcMethod\("OrderService", "([^"]+)"\)/g,
+        ),
+        (match) => match[1],
+      ).sort(),
+    ).toEqual([
+      "AddToCart",
+      "Checkout",
+      "GetCart",
+      "GetOrder",
+      "ListOrders",
+      "RemoveCartItem",
+      "StartDemoPayment",
+      "UpdateCartItem",
+    ]);
+    expect(http).toMatch(
+      /@Roles\("user"\)\s*@Post\(":id\/demo-payment-attempts"\)\s*startDemoPayment\(/,
+    );
+  });
+
+  it("keeps all admin Order RPCs and demo outcome HTTP policies exact", () => {
+    const grpc = source(
+      "apps/order-service/src/order/grpc/order-grpc.controller.ts",
+    );
+    const http = source(
+      "apps/order-service/src/order/admin-order.controller.ts",
+    );
+    expect(grpc.match(/@Roles\("admin", "root-admin"\)/g)).toHaveLength(4);
+    expect(
+      Array.from(
+        grpc.matchAll(
+          /@Roles\("admin", "root-admin"\)\s*@RequireUserId\(\)\s*@GrpcMethod\("OrderService", "([^"]+)"\)/g,
+        ),
+        (match) => match[1],
+      ).sort(),
+    ).toEqual([
+      "AdminGetOrder",
+      "AdminListOrders",
+      "ResolveDemoPayment",
+      "UpdateOrderStatus",
+    ]);
+    expect(http.match(/@Roles\("admin", "root-admin"\)/g)).toHaveLength(3);
+    expect(http).not.toContain("@Public()");
+    expect(http).toMatch(
+      /@Roles\("admin", "root-admin"\)\s*@Post\(":id\/demo-payment-attempts\/:attemptId\/outcome"\)\s*@HttpCode\(200\)\s*resolveDemoPayment\(/,
+    );
   });
 });

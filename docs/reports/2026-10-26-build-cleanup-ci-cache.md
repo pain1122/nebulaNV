@@ -331,3 +331,39 @@ config inclusion/noEmit checks, syntax/format/diff pass. Prior preflight remains
 valid: this lint-project correction changes no application/public contracts.
 Hosted all-workspace lint/types/tests and downstream image/archive/cache gates
 remain pending. READY FOR HOSTED LINT-PROJECT VALIDATION, not Segment 3 completion.
+
+## Hosted shared security consumer inventory
+
+Run 40325605728 (`60df304`) passed whole-backend lint and types. The container-free
+security gate passed 131/133 assertions; two stale `packages/grpc-auth/test/service-wiring.spec.ts`
+checks still described pre-D2 Order wiring. The status RPC now also requires a
+user ID between its admin role and GrpcMethod decorators; customer methods grew
+from seven to eight when the explicitly approved customer-started demo payment
+operation was added. Neither failure establishes an authorization regression.
+
+Before-edit trace: read that full wiring test, `packages/grpc-auth/jest.config.ts`
+(no live startup), `apps/order-service/src/order/grpc/order-grpc.controller.ts`,
+`apps/order-service/src/order/order.controller.ts`,
+`apps/order-service/src/order/admin-order.controller.ts`,
+`packages/protos/order.proto`, `packages/clients/src/order.client.ts`, and
+`apps/gateway/test/r5-v3-receiver-inventory.spec.ts`. Preserve status RPC's dormant
+V3 marker, exact admin/root-admin role and new RequireUserId; explicitly inventory
+all eight customer RPC names with RequireUserId, all four admin RPC names, and
+HTTP customer-start/admin-resolve policies. Add the new admin HTTP controller to
+the existing root-admin inclusion check. No production decorator/policy changes.
+The F4 post-R5 deferral inventory remains unchanged; these RPCs are not promoted
+into dormant V3 coverage. Run focused wiring/security and mandatory preflight.
+
+Result/receipt: shared security passes 13 suites / 134 tests (9.0s); preflight
+passes four suites / 23 tests (4.6s). Exact role counts are retained and supported
+by sorted explicit method inventories, required user context, both demo HTTP
+policies, and root-admin inclusion. No snapshot/hash refresh, production edit or
+authorization broadening. Format/diff and scoped typed lint pass. The initial
+local direct ESLint config load could not resolve its root plugin from retained
+older node_modules; the scoped check used the same installed Auth-owned pinned
+TypeScript ESLint/Prettier plugins, recommended typed rules and spec tsconfig.
+This is a local installation limitation; the preceding fresh hosted full lint
+and types already passed with the current lock. No install/runtime claim is
+inferred from it. The unchanged application build/SQL proofs and current-source
+contract checks remain valid; full hosted pipeline acceptance remains pending.
+READY FOR HOSTED SECURITY-CONSUMER VALIDATION; Segment 3 is still open.
