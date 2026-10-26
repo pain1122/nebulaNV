@@ -96,6 +96,10 @@ Use this table in the slice's dated report. Revisit it after implementation.
       hosted CI runs them. Check frozen-lock defaults and grouped/colored output
       against the pinned tools. Author temporary fixture locks with the package
       manager, then validate frozen installs; keep production installs frozen.
+- [ ] Verify environment-sensitive tests in a clean owned snapshot without local
+      `.env` files or inherited deployment variables. Supply and restore every
+      required fixture input; import pure contract inventories without runtime
+      module startup effects. Local developer configuration must not mask gaps.
 - [ ] Run `pnpm test:preflight` whenever Gateway contracts, RPC/protobuf source,
       route/input inventories, OpenAPI or generated client consumers are involved.
       It runs freshness checks and the four focused inventory suites before a

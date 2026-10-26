@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { RequestMethod } from "@nestjs/common";
-import { GATEWAY_HTTP_CONTROLLERS } from "../src/app.module";
+import { GATEWAY_HTTP_CONTROLLERS } from "../src/contracts/gateway-http-controllers";
 import { GatewayAuthController } from "../src/auth/gateway-auth.controller";
 import { GatewayUserController } from "../src/user/gateway-user.controller";
 import { GatewaySettingsController } from "../src/settings/gateway-settings.controller";

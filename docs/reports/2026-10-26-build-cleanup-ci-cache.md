@@ -367,3 +367,40 @@ and types already passed with the current lock. No install/runtime claim is
 inferred from it. The unchanged application build/SQL proofs and current-source
 contract checks remain valid; full hosted pipeline acceptance remains pending.
 READY FOR HOSTED SECURITY-CONSUMER VALIDATION; Segment 3 is still open.
+
+## Hosted Gateway tests without local environment files
+
+Run 40326533719 (`5fd4c46`) passed all prior gates and shared/security tests,
+including grpc-auth 134, Auth 26, Media 140, Order 177, Config 84, migration
+artifacts 3, and shared clients 23. Gateway passed 268/270 tests. Its OpenAPI test
+still imports the runtime AppModule re-export rather than the already-existing
+pure controller registry, triggering deployment-env validation in a clean
+checkout. Its AppModule test supplies outbound/registry/Redis/GRPC fixtures but
+omits the now-required Media render origin. Local `.env` files masked both stale
+test consumers. The generator itself already uses the pure registry correctly;
+no runtime refactor or relaxed validation is needed.
+
+Before-edit trace: `apps/gateway/test/openapi-contract.spec.ts`,
+`apps/gateway/test/app-module.spec.ts`,
+`apps/gateway/test/application-fixture.ts` (existing TEST_MEDIA_RENDER_HTTP_URL),
+`apps/gateway/src/contracts/gateway-http-controllers.ts`,
+`apps/gateway/src/app.module.ts`, `apps/gateway/src/config/env.validation.ts`,
+`apps/gateway/src/openapi/gateway-openapi.ts`,
+`apps/gateway/src/openapi/openapi-file.ts`, and Gateway `jest.config.ts`.
+Change only the OpenAPI test import and complete/restore the AppModule fixture.
+Controller inventory, generator output, schemas, environment policy, production
+consumers and generated client remain unchanged. Prove both tests in an owned
+snapshot without `.env` files or inherited Gateway targets, then run preflight.
+
+Result/receipt: both tests pass in the clean snapshot (two suites / 11 tests,
+8.2s), with inherited GATEWAY\_\* / service GRPC targets / Media render origin
+removed from the child environment and no `.env` files copied. Source/test/
+checked OpenAPI inputs are copied; only installed dependencies/shared libraries
+are linked. Evidence: `.ci-evidence/build-ci-cache/gateway-clean-env-tests.log`.
+No operator env file was read, moved or overwritten by snapshot preparation.
+Preflight passes four suites / 23 tests (4.1s); scoped owner lint, formatting and
+diff checks pass. Output schema bytes and all prior route/role assertions remain
+unchanged. The preparation checklist now requires an environment-clean test
+proof so local configuration cannot certify an incomplete fixture. No production
+or image input changed; full hosted Gateway and subsequent pipeline gates remain
+pending. READY FOR HOSTED ENVIRONMENT-INDEPENDENT GATEWAY VALIDATION.

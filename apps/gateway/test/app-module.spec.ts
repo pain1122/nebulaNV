@@ -23,6 +23,7 @@ import {
   TEST_APPLICATION_REGISTRY_JSON,
   TEST_GATEWAY_GRPC_TARGETS,
   TEST_GATEWAY_OUTBOUND_KEYS,
+  TEST_MEDIA_RENDER_HTTP_URL,
 } from "./application-fixture";
 
 describe("gateway application module", () => {
@@ -34,6 +35,7 @@ describe("gateway application module", () => {
   const originalRegistry = process.env.GATEWAY_APPLICATION_REGISTRY_JSON;
   const originalGatewayKeys = process.env.GATEWAY_OUTBOUND_KEYS;
   const originalGatewayRedisUrl = process.env.GATEWAY_REDIS_URL;
+  const originalMediaRenderUrl = process.env.MEDIA_RENDER_HTTP_URL;
   const originalGrpcTargets = Object.fromEntries(
     Object.keys(TEST_GATEWAY_GRPC_TARGETS).map((name) => [
       name,
@@ -46,6 +48,7 @@ describe("gateway application module", () => {
       TEST_APPLICATION_REGISTRY_JSON;
     process.env.GATEWAY_OUTBOUND_KEYS = TEST_GATEWAY_OUTBOUND_KEYS;
     process.env.GATEWAY_REDIS_URL = "redis://127.0.0.1:6379/0";
+    process.env.MEDIA_RENDER_HTTP_URL = TEST_MEDIA_RENDER_HTTP_URL;
     Object.assign(process.env, TEST_GATEWAY_GRPC_TARGETS);
     ({ AppModule, GATEWAY_HTTP_CONTROLLERS } = await import(
       "../src/app.module"
@@ -78,6 +81,11 @@ describe("gateway application module", () => {
     for (const [name, value] of Object.entries(originalGrpcTargets)) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
+    }
+    if (originalMediaRenderUrl === undefined) {
+      delete process.env.MEDIA_RENDER_HTTP_URL;
+    } else {
+      process.env.MEDIA_RENDER_HTTP_URL = originalMediaRenderUrl;
     }
   });
 
