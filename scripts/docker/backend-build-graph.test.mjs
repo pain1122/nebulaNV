@@ -55,11 +55,24 @@ function run(command, args, { cwd }) {
   const binary = isTurbo ? turbo : pnpm;
   const parameters =
     command === "turbo" ? args : isTurbo ? args.slice(2) : args;
-  const result = spawnSync(process.execPath, [binary, ...parameters], {
-    cwd,
-    encoding: "utf8",
-    env: { ...process.env, CI: "true", TURBO_TELEMETRY_DISABLED: "1" },
-  });
+  const logging =
+    isTurbo && parameters[0] === "run"
+      ? ["--log-order=stream", "--log-prefix=task"]
+      : [];
+  const result = spawnSync(
+    process.execPath,
+    [binary, ...parameters, ...logging],
+    {
+      cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CI: "true",
+        GITHUB_ACTIONS: "true",
+        TURBO_TELEMETRY_DISABLED: "1",
+      },
+    },
+  );
   assert.equal(
     result.status,
     0,
@@ -650,7 +663,7 @@ test("union builds compile real shared producers once before both injected consu
             .match(new RegExp(`@nebula/${name}:build: cache miss`, "g")) ?? []
         ).length,
         1,
-        name,
+        `${name}\n${logs.join("\n")}`,
       );
     for (const name of ["order-service", "product-service"])
       assert.equal(

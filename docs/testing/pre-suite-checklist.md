@@ -89,6 +89,10 @@ Use this table in the slice's dated report. Revisit it after implementation.
 - [ ] Inspect the selected test config and global setup before execution.
       Filtering to unit files does not bypass integration startup hooks; use
       the existing unit-only config when live dependencies are not required.
+- [ ] Exercise tooling fixtures with `CI=true` and `GITHUB_ACTIONS=true` when
+      hosted CI runs them. Check frozen-lock defaults and grouped/colored output
+      against the pinned tools. Author temporary fixture locks with the package
+      manager, then validate frozen installs; keep production installs frozen.
 - [ ] Run `pnpm test:preflight` whenever Gateway contracts, RPC/protobuf source,
       route/input inventories, OpenAPI or generated client consumers are involved.
       It runs freshness checks and the four focused inventory suites before a

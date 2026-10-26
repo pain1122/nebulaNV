@@ -178,3 +178,29 @@ pinned-tool tests pass (53.97s) with exact producer counts and no skipped checks
 syntax, scoped lint and formatting pass. Production frozen installs, source,
 root lockfile and graph/build logic are unchanged. A new hosted run is required;
 no remote success is inferred from this Windows check.
+
+Second hosted run (`1b69388`, run 40320881055) confirms fixture lock authoring is
+fixed, but both exact-count checks still see zero headers. Reproduced locally
+with **both CI=true and GITHUB_ACTIONS=true**: Turbo emits
+`::group::@nebula/protos:build` followed by unprefixed `cache miss`, rather than
+`@nebula/protos:build: cache miss`. Capturing stderr/stripping ANSI alone was
+insufficient; this is now a confirmed formatting cause, not an inferred cache miss.
+Raw reproduction retained in `.ci-evidence/build-ci-cache/github-grouped-repro.log`.
+Pinned Turbo help documents `--log-order=stream` and `--log-prefix=task`.
+
+Before-edit extension: fixture `run` uses those explicit formatting flags only
+for `turbo run`, preserving prune/install arguments and exact producer assertions;
+its environment always simulates CI and GitHub Actions. No production command,
+root lock, app or image changed. Add this observed environment-default case to
+`docs/testing/pre-suite-checklist.md` Gate 3 so tooling checks cover hosted output
+and lock-policy differences before another handoff. Keep full failed-output
+diagnostics and verify real pinned-tool behavior before pushing the correction.
+
+The exact GitHub-default reproduction now passes 9/9 (45.91s), no skipped tests.
+Fixture Turbo run calls explicitly request stream/task-prefixed output; prune,
+lock authoring and frozen install arguments remain unchanged. `CI=true` and
+`GITHUB_ACTIONS=true` are both exercised even on Windows. Parser expectations,
+real compilation and restored-artifact assertions remain strict. Added the
+observed hosted-default check to the mandatory pre-suite preparation gate.
+Scoped lint/syntax/format/diff pass before the next push; hosted acceptance is
+still pending and the two failed runs remain recorded.
