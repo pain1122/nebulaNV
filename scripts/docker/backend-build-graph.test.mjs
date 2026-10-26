@@ -17,6 +17,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { stripVTControlCharacters } from "node:util";
 import {
   buildSelected,
   collectArtifacts,
@@ -57,14 +58,14 @@ function run(command, args, { cwd }) {
   const result = spawnSync(process.execPath, [binary, ...parameters], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
+    env: { ...process.env, CI: "true", TURBO_TELEMETRY_DISABLED: "1" },
   });
   assert.equal(
     result.status,
     0,
     `${command} ${parameters.join(" ")}\n${result.stdout}\n${result.stderr}`,
   );
-  return result.stdout;
+  return stripVTControlCharacters(result.stdout + result.stderr);
 }
 
 function temporary(check) {
@@ -610,7 +611,24 @@ test("union builds compile real shared producers once before both injected consu
       "apps/product-service/build.cjs",
       "const fs=require('node:fs'); fs.mkdirSync('dist',{recursive:true}); fs.writeFileSync('dist/result.txt', require('@nebula/clients').value);\n",
     );
-    run("pnpm", ["install", "--offline", "--ignore-scripts"], { cwd: root });
+    // Author only this temporary fixture's changed dependency lock, then prove
+    // its install under the same frozen policy as CI/production.
+    run(
+      "pnpm",
+      [
+        "install",
+        "--lockfile-only",
+        "--offline",
+        "--ignore-scripts",
+        "--no-frozen-lockfile",
+      ],
+      { cwd: root },
+    );
+    run(
+      "pnpm",
+      ["install", "--offline", "--ignore-scripts", "--frozen-lockfile"],
+      { cwd: root },
+    );
     const logs = [];
     buildSelected(root, "order-service,product-service", {
       run(command, args, options) {

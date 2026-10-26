@@ -146,3 +146,35 @@ Next validation: next authorized GitHub CI run followed by another comparable
   existing quality/live/scan results. No commit/push/run triggered by the agent.
 Readiness: READY FOR HOSTED CI VALIDATION; remote proof still pending.
 ```
+
+## First hosted run - fixture preparation defects
+
+Snapshot `60b678e` was pushed normally to main with explicit user authorization.
+[Run 40320030037](https://github.com/pain1122/nebulaNV/actions/runs/40320030037)
+passed frozen installation and all 79 backend tooling tests, then graph checks
+passed 7/9. Union fixture failed pnpm's CI-default frozen lock: it adds a Product
+workspace after creating the first lockfile without regenerating that fixture's
+lock. The exact-once fixture recorded zero prototype compile headers under CI;
+the capture helper reads stdout only, while Turbo's CI output may use stderr/ANSI.
+No actual service build/image run failed at this checkpoint. No later step is
+claimed green or bypassed.
+
+Before-edit trace: `scripts/docker/backend-build-graph.test.mjs` fixture `run`,
+union fixture's second install and producer log assertions; `pnpm test:build-graph`
+invoked unchanged by CI quality; `scripts/docker/backend-build-graph.mjs` production
+install/build logic and Dockerfile remain unchanged. Correct only owned temporary
+fixture lock authoring (pnpm lockfile-only generation followed by explicit frozen
+install) and normalize both output streams for assertions. Run fixture processes
+with CI defaults locally to reproduce/guard platform differences. Preserve exact
+producer counts, failure restoration and real pnpm/Turbo tests. No root lockfile,
+package, service or schema edit. Fresh hosted rerun remains required after focused
+checks; native image rebuild is unnecessary for this test-only correction.
+
+Fixture correction is locally verified: the temporary union lock is authored by
+pnpm lockfile-only generation, then installed with explicit frozen-lockfile.
+The test runner now always uses CI=true and normalizes captured stdout + stderr
+with Node's VT-control stripping before counting task headers. All nine real
+pinned-tool tests pass (53.97s) with exact producer counts and no skipped checks;
+syntax, scoped lint and formatting pass. Production frozen installs, source,
+root lockfile and graph/build logic are unchanged. A new hosted run is required;
+no remote success is inferred from this Windows check.
