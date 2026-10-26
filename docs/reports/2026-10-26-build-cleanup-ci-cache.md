@@ -404,3 +404,23 @@ unchanged. The preparation checklist now requires an environment-clean test
 proof so local configuration cannot certify an incomplete fixture. No production
 or image input changed; full hosted Gateway and subsequent pipeline gates remain
 pending. READY FOR HOSTED ENVIRONMENT-INDEPENDENT GATEWAY VALIDATION.
+
+## External-client live-helper lint
+
+Run 40327709841 (`19c40ad`) accepts the full Gateway suite (42 suites / 270
+tests) and authority checks. The external-client gate stops at exactly two
+undefined-global diagnostics in `packages/api-client/test/d2-cart-live.mjs`:
+console at line 27 and fetch at line 28. Before editing, reviewed that helper,
+the sibling `test/d2-checkout-live.mjs` explicit-global convention, API-client
+package lint/test commands, root ESLint globals and the CI external-client call.
+Use globalThis.console/globalThis.fetch, matching sibling Node helpers. No
+global lint-rule change, production client/API edit, network retry or behavior
+change. The Cart live command remains unchanged; validate syntax and the actual
+API-client lint gate before publishing. Runtime/live proof is still separate.
+
+Receipt: actual complete API-client lint exits 0 with no diagnostics; Node syntax,
+format and diff checks pass. Generated contract/preflight evidence remains valid
+because no schema, generated data or client request semantics changed. This is
+only a live-test source correction; no image build input changed. Hosted remaining
+client types/tests and subsequent Web/build/scan/integration gates remain pending.
+READY FOR HOSTED EXTERNAL-CLIENT VALIDATION.

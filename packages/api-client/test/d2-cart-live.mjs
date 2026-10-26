@@ -24,8 +24,8 @@ function success(operation, result) {
   assert.ok(result.data.data, `${operation}_data_missing`);
   return result.data.data;
 }
-const log = (label) => console.log(`[d2-cart-live] ${label}=ok`);
-const readiness = await fetch(`${baseUrl}/health/ready`);
+const log = (label) => globalThis.console.log(`[d2-cart-live] ${label}=ok`);
+const readiness = await globalThis.fetch(`${baseUrl}/health/ready`);
 assert.equal(readiness.status, 200, "d2_gateway_not_ready");
 const products = [];
 let adminToken, customerToken, customerRefresh, browserCookie, failure;
