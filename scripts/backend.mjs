@@ -4617,7 +4617,10 @@ function requireGatewayRuntimeContract(document, label) {
   const environment = isRecord(gateway.environment) ? gateway.environment : {};
   const expectedTargets = Object.fromEntries(
     hybridServices.map((service) => [
-      `${service.name.replace(/-service$/, "").toUpperCase()}_GRPC_URL`,
+      `${service.name
+        .replace(/-service$/, "")
+        .replaceAll("-", "_")
+        .toUpperCase()}_GRPC_URL`,
       `${service.dockerService}:${service.grpcPort}`,
     ]),
   );
@@ -4749,10 +4752,18 @@ export function validateRenderedComposeBoundary(label, value) {
     }
   }
 
-  for (const service of Object.values(document.services)) {
+  for (const [serviceName, service] of Object.entries(document.services)) {
     if (!isRecord(service) || !isRecord(service.depends_on)) continue;
-    for (const dependency of Object.values(service.depends_on)) {
-      if (isRecord(dependency) && dependency.condition === "service_started") {
+    for (const [dependencyName, dependency] of Object.entries(
+      service.depends_on,
+    )) {
+      const scannerStartup =
+        serviceName === "media-service" && dependencyName === "media-scanner";
+      if (
+        isRecord(dependency) &&
+        dependency.condition === "service_started" &&
+        !scannerStartup
+      ) {
         throw new Error(`compose_boundary_${label}_service_started_forbidden`);
       }
     }

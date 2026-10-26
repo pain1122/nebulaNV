@@ -424,3 +424,48 @@ because no schema, generated data or client request semantics changed. This is
 only a live-test source correction; no image build input changed. Hosted remaining
 client types/tests and subsequent Web/build/scan/integration gates remain pending.
 READY FOR HOSTED EXTERNAL-CLIENT VALIDATION.
+
+## Actual Compose boundary name conversion
+
+Run 40328633773 (`3cec8cf`) passed external-client checks, current Web tests and
+all backend source builds. Compose evidence then stopped at the constructed name
+`TENANT-AUTHORITY_GRPC_URL`. Confirmed defect: `requireGatewayRuntimeContract`
+removes the service suffix and uppercases but does not replace embedded hyphens.
+Both actual Compose shared target anchors already declare the correct underscore
+name `TENANT_AUTHORITY_GRPC_URL`. Gateway instantiates eight clients; the shared
+Compose anchor also carries this ninth, unused Authority address. That does not
+create a ninth client or justify changing the architecture/configuration.
+
+Before-edit trace: `scripts/backend.mjs` requireGatewayRuntimeContract and
+captureComposeConfigurations; `scripts/backend.test.mjs` renderedBoundaryFixture
+and boundary tests (fixture mirrors the same typo); both Compose target anchors
+and Gateway environments; `apps/gateway/src/downstream/gateway-grpc-clients.module.ts`,
+`apps/gateway/src/config/env.validation.ts`,
+`packages/grpc-auth/src/tokens.ts` outbound target inventory, root evidence command
+and CI caller. Normalize embedded hyphens in the verifier. Make fixture target
+names explicit, add a missing/correctly-spelled/typo-only negative regression,
+and run actual local/release rendered-boundary validation. No Compose, client,
+runtime env, application or public contract change; no security gate relaxed.
+
+The actual render then exposed a second stale verifier rule: a blanket ban on
+service_started contradicts the existing intentional Media -> scanner startup
+edge in both Compose files. Before changing that assertion, reviewed
+`docs/services/media-service.md` outage guarantees,
+`packages/api-client/test/media-processing-recovery.mjs` approved-render outage
+proof, and `apps/media-service/src/processing/media-processing.worker.ts` pause
+behavior. Scanner readiness gates processing, while an unavailable scanner must
+not prevent serving already-approved bytes. Preserve that architecture: allow
+only this exact owner/dependency pair, still reject service_started on every
+other edge. Add positive actual-shape fixtures plus negative wrong-owner and
+wrong-dependency cases. No Compose/runtime readiness change is justified.
+
+Receipt: all 80 backend tooling tests pass, including exact underscore target
+validation and both negative edge cases for local/release fixtures. Actual
+`pnpm evidence:compose:backend` now exits 0 against both current Compose files;
+only the existing redacted/non-interpolated evidence is retained. Syntax, scoped
+recommended Node lint, formatting and diff pass. No source contract change needs
+regeneration/preflight; its earlier passing checks remain applicable. The backend
+tooling file is a Docker input, so hosted image builds still validate the final
+checkpoint; its build orchestration functions are unchanged. Full hosted source
+scan, cache persistence, integration/image scan/archive gates remain pending.
+READY FOR HOSTED COMPOSE-BOUNDARY VALIDATION; Segment 3 remains open.

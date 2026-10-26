@@ -188,16 +188,23 @@ function renderedBoundaryFixture(label) {
       GATEWAY_OUTBOUND_KEYS: "configured",
       GATEWAY_APPLICATION_REGISTRY_JSON: "configured",
       MEDIA_RENDER_HTTP_URL: "http://media-service:3007",
-      ...Object.fromEntries(
-        hybridServices.map((service) => [
-          `${service.name.replace(/-service$/, "").toUpperCase()}_GRPC_URL`,
-          `${service.dockerService}:${service.grpcPort}`,
-        ]),
-      ),
+      USER_GRPC_URL: "user-service:50051",
+      AUTH_GRPC_URL: "auth-service:50052",
+      PRODUCT_GRPC_URL: "product-service:50053",
+      SETTINGS_GRPC_URL: "settings-service:50054",
+      BLOG_GRPC_URL: "blog-service:50055",
+      ORDER_GRPC_URL: "order-service:50056",
+      TAXONOMY_GRPC_URL: "taxonomy-service:50057",
+      MEDIA_GRPC_URL: "media-service:50058",
+      TENANT_AUTHORITY_GRPC_URL: "tenant-authority-service:50059",
     },
     healthcheck: {
       test: ["CMD", "http://localhost:3002/health/ready"],
     },
+  };
+  services["media-scanner"] = {};
+  services["media-service"].depends_on = {
+    "media-scanner": { condition: "service_started" },
   };
   return { services };
 }
@@ -1745,6 +1752,32 @@ test("rendered Compose boundary permits only the selected release data plane", (
     () => validateRenderedComposeBoundary("release", leakedBackend),
     /compose_boundary_release_product-service_ports_forbidden/,
   );
+
+  for (const label of ["local", "release"]) {
+    const wrongAuthorityName = renderedBoundaryFixture(label);
+    const environment = wrongAuthorityName.services.gateway.environment;
+    delete environment.TENANT_AUTHORITY_GRPC_URL;
+    environment["TENANT-AUTHORITY_GRPC_URL"] = "tenant-authority-service:50059";
+    assert.throws(
+      () => validateRenderedComposeBoundary(label, wrongAuthorityName),
+      new RegExp(
+        `compose_boundary_${label}_gateway_TENANT_AUTHORITY_GRPC_URL_invalid`,
+      ),
+    );
+    for (const [owner, dependency] of [
+      ["auth-service", "media-scanner"],
+      ["media-service", "postgres"],
+    ]) {
+      const wrongStartup = renderedBoundaryFixture(label);
+      wrongStartup.services[owner].depends_on = {
+        [dependency]: { condition: "service_started" },
+      };
+      assert.throws(
+        () => validateRenderedComposeBoundary(label, wrongStartup),
+        new RegExp(`compose_boundary_${label}_service_started_forbidden`),
+      );
+    }
+  }
 
   const closedMedia = renderedBoundaryFixture("release");
   closedMedia.services["media-service"].environment.PUBLIC_MODE =

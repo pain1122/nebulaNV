@@ -58,9 +58,10 @@ Hosted graph/COPY checks now pass. The next gate found ten dependency advisories
 across seven backend packages; same-major fixes and an audit-error validation
 regression are prepared. Local graph 9/9, preflight 23/23, frozen lock and valid
 dependency audit pass; fresh installation/runtime acceptance remains hosted-pending.
-Hosted fresh install, lint, types, security and shared checks now pass. Two
-environment-dependent Gateway test consumers are corrected and pass in a clean
-snapshot; the next hosted run must accept the full Gateway and later pipeline.
+Hosted fresh install, lint, types, security, shared checks, Gateway 270/270,
+client/Web checks and all backend source builds now pass. Compose verifier
+corrections pass both actual renders locally, preserving scanner-outage behavior.
+Hosted source/image scans, integration, cache persistence and archive gates remain.
 
 Remaining [Segment 3 gates](ASAP-BUILD-CLEANUP.md#3-generalize-and-align-integrationrelease):
 hosted CI proof and integration/release/D2 deployment/live evidence. Earlier
