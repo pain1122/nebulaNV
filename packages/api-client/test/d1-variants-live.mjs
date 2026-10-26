@@ -80,6 +80,7 @@ try {
     (variant) => variant.options.Color === "Blue",
   );
   assert.equal(blue.price, 30);
+  assert.equal(blue.priceOverride, 30);
   assert.equal(blue.effectivePrice, 30);
   assert.equal(blue.availability, "AVAILABLE");
 
@@ -98,6 +99,10 @@ try {
     }),
   );
   assert.equal(product.variants.length, 2);
+  const red = product.variants.find(
+    (variant) => variant.options.Color === "Red",
+  );
+  assert.equal(red.priceOverride, null);
   process.stdout.write("[d1-variants-live] options-sku-price-stock=ok\n");
 
   product = success(
@@ -115,6 +120,17 @@ try {
   );
   assert.equal(visible.availability, "AVAILABLE");
   assert.equal(visible.variants.length, 2);
+  assert.equal(
+    visible.variants.find((variant) => variant.id === blue.id).priceOverride,
+    30,
+  );
+  assert.equal(
+    visible.variants.find((variant) => variant.id === red.id).priceOverride,
+    null,
+  );
+  process.stdout.write(
+    "[d1-variants-live] numeric-null-override-contract=ok\n",
+  );
   assert.equal(
     visible.variants.find((variant) => variant.options.Color === "Red")
       .availability,

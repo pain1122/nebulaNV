@@ -33,6 +33,103 @@ class RouteDecoratorProbe {
 }
 
 describe("gateway OpenAPI contract setup", () => {
+  it("documents explicit demo attempts with distinct version limits and UUID targets", async () => {
+    const document = await generateGatewayOpenApiDocument();
+    const schemas = document.components?.schemas;
+    expect(schemas?.GatewayDemoPaymentStartDto).toMatchObject({
+      required: ["expectedVersion"],
+      properties: { expectedVersion: { minimum: 1, maximum: 2147483645 } },
+    });
+    expect(schemas?.GatewayDemoPaymentOutcomeDto).toMatchObject({
+      required: ["expectedVersion", "outcome"],
+      properties: {
+        expectedVersion: { maximum: 2147483646 },
+        outcome: { enum: ["SUCCEEDED", "FAILED", "CANCELLED", "UNKNOWN"] },
+      },
+    });
+    expect(schemas?.GatewayDemoPaymentReplyDto).toMatchObject({
+      required: ["order", "attempt"],
+    });
+    const start =
+      document.paths["/api/v1/orders/{id}/demo-payment-attempts"]?.post;
+    const outcome =
+      document.paths[
+        "/api/v1/admin/orders/{id}/demo-payment-attempts/{attemptId}/outcome"
+      ]?.post;
+    expect(start?.operationId).toBe("orders_demo_payment_start");
+    expect(outcome?.operationId).toBe("admin_orders_demo_payment_outcome");
+    for (const operation of [start, outcome]) {
+      expect(operation?.parameters).toContainEqual(
+        expect.objectContaining({
+          name: "Idempotency-Key",
+          in: "header",
+          required: true,
+        }),
+      );
+      expect(operation?.parameters).toContainEqual(
+        expect.objectContaining({
+          name: "id",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        }),
+      );
+      expect(operation?.requestBody).toMatchObject({ required: true });
+    }
+    expect(outcome?.parameters).toContainEqual(
+      expect.objectContaining({
+        name: "attemptId",
+        in: "path",
+        required: true,
+        schema: { type: "string", format: "uuid" },
+      }),
+    );
+  });
+  it("requires status command versions while retaining absent historical replay versions", async () => {
+    const document = await generateGatewayOpenApiDocument();
+    expect(
+      document.components?.schemas?.GatewayOrderStatusUpdateDto,
+    ).toMatchObject({
+      required: expect.arrayContaining(["status", "expectedVersion"]),
+    });
+    const order = document.components?.schemas?.GatewayOrderDto;
+    if (!order || "$ref" in order) throw new Error("order_schema_missing");
+    expect(order.properties).toHaveProperty("version");
+    expect(order.required).not.toContain("version");
+  });
+  it("documents required numeric/null variant overrides and UUID mutation paths", async () => {
+    const document = await generateGatewayOpenApiDocument();
+    expect(
+      document.components?.schemas?.GatewayProductVariantDto,
+    ).toMatchObject({
+      required: expect.arrayContaining(["priceOverride"]),
+      properties: { priceOverride: { type: "number", nullable: true } },
+    });
+    const create = document.paths["/api/v1/admin/products/{id}/variants"]?.post;
+    const detail =
+      document.paths["/api/v1/admin/products/{id}/variants/{variantId}"];
+    for (const operation of [create, detail?.patch, detail?.delete]) {
+      expect(operation?.parameters).toContainEqual(
+        expect.objectContaining({
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        }),
+      );
+    }
+    for (const operation of [detail?.patch, detail?.delete]) {
+      expect(operation?.parameters).toContainEqual(
+        expect.objectContaining({
+          in: "path",
+          name: "variantId",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        }),
+      );
+    }
+  });
+
   it("derives runtime method/path from the route manifest ID", () => {
     expect(
       Reflect.getMetadata(
@@ -90,6 +187,11 @@ describe("gateway OpenAPI contract setup", () => {
       "/api/v1/admin/media/strict-library/{id}",
       "/api/v1/admin/media/strict-library/{id}/read-url",
       "/api/v1/admin/media/{id}",
+      "/api/v1/admin/media/{id}/derivatives",
+      "/api/v1/admin/media/{id}/metadata",
+      "/api/v1/admin/orders",
+      "/api/v1/admin/orders/{id}",
+      "/api/v1/admin/orders/{id}/demo-payment-attempts/{attemptId}/outcome",
       "/api/v1/admin/orders/{id}/status",
       "/api/v1/admin/product-taxonomies",
       "/api/v1/admin/product-taxonomies/{id}",
@@ -99,6 +201,7 @@ describe("gateway OpenAPI contract setup", () => {
       "/api/v1/admin/products/{id}/gallery",
       "/api/v1/admin/products/{id}/gallery/order",
       "/api/v1/admin/products/{id}/gallery/{imageId}",
+      "/api/v1/admin/products/{id}/gallery/{imageId}/metadata",
       "/api/v1/admin/products/{id}/hard",
       "/api/v1/admin/products/{id}/restore",
       "/api/v1/admin/products/{id}/variants",
@@ -124,6 +227,7 @@ describe("gateway OpenAPI contract setup", () => {
       "/api/v1/orders/cart/items/{id}",
       "/api/v1/orders/checkout",
       "/api/v1/orders/{id}",
+      "/api/v1/orders/{id}/demo-payment-attempts",
       "/api/v1/product-taxonomies",
       "/api/v1/product-taxonomies/{id}",
       "/api/v1/products",
@@ -155,10 +259,11 @@ describe("gateway OpenAPI contract setup", () => {
         ) {
           continue;
         }
-        const parameterKeys = (operation.parameters ?? []).map((parameter) =>
-          "$ref" in parameter
-            ? `$ref:${parameter.$ref}`
-            : `${parameter.in}:${parameter.name}`,
+        const parameterKeys = (operation.parameters ?? []).map(
+          (parameter: { $ref: string } | { in: string; name: string }) =>
+            "$ref" in parameter
+              ? `$ref:${parameter.$ref}`
+              : `${parameter.in}:${parameter.name}`,
         );
         expect(new Set(parameterKeys).size).toBe(parameterKeys.length);
       }
@@ -225,7 +330,18 @@ describe("gateway OpenAPI contract setup", () => {
     expect(document.paths["/api/v1/orders"]?.get?.security).toEqual([
       { "access-token": [] },
     ]);
-    expect(document.paths).not.toHaveProperty("/api/v1/admin/orders");
+    const adminOrders = document.paths["/api/v1/admin/orders"]?.get;
+    expect(adminOrders?.security).toEqual([{ "access-token": [] }]);
+    expect(adminOrders?.parameters).toEqual(
+      expect.arrayContaining(
+        ["status", "userId", "page", "limit"].map((name) =>
+          expect.objectContaining({ in: "query", name }),
+        ),
+      ),
+    );
+    expect(document.paths["/api/v1/admin/orders/{id}"]?.get?.security).toEqual([
+      { "access-token": [] },
+    ]);
 
     const render = document.paths["/api/v1/media/render/{id}"]?.get;
     expect(render?.security).toBeUndefined();
@@ -247,7 +363,9 @@ describe("gateway OpenAPI contract setup", () => {
       expect.objectContaining({
         in: "query",
         name: "variant",
-        schema: expect.objectContaining({ enum: ["web"] }),
+        schema: expect.objectContaining({
+          enum: ["web", "thumbnail", "card", "detail", "mobile"],
+        }),
       }),
     );
 

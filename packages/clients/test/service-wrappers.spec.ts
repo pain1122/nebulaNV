@@ -106,6 +106,14 @@ const cases: Array<{
     target: PRODUCT_SERVICE_TARGET,
     create: (client, policy) => getProduct(client, policy),
     definitions: {
+      ReserveCheckoutStock:
+        productv1.ProductServiceService.reserveCheckoutStock,
+      FinalizeCheckoutStock:
+        productv1.ProductServiceService.finalizeCheckoutStock,
+      CancelCheckoutStock: productv1.ProductServiceService.cancelCheckoutStock,
+      RestoreCheckoutStock:
+        productv1.ProductServiceService.restoreCheckoutStock,
+      UpdateImageMetadata: productv1.ProductServiceService.updateImageMetadata,
       CreateProduct: productv1.ProductServiceService.createProduct,
       UpdateProduct: productv1.ProductServiceService.updateProduct,
       GetProduct: productv1.ProductServiceService.getProduct,
@@ -167,6 +175,10 @@ const cases: Array<{
     target: ORDER_SERVICE_TARGET,
     create: (client, policy) => getOrder(client, policy),
     definitions: {
+      StartDemoPayment: orderv1.OrderServiceService.startDemoPayment,
+      ResolveDemoPayment: orderv1.OrderServiceService.resolveDemoPayment,
+      AdminGetOrder: orderv1.OrderServiceService.adminGetOrder,
+      AdminListOrders: orderv1.OrderServiceService.adminListOrders,
       GetCart: orderv1.OrderServiceService.getCart,
       AddToCart: orderv1.OrderServiceService.addToCart,
       UpdateCartItem: orderv1.OrderServiceService.updateCartItem,
@@ -182,7 +194,12 @@ const cases: Array<{
     target: MEDIA_SERVICE_TARGET,
     create: (client, policy) => getMedia(client, policy),
     definitions: {
+      UpdateMetadata: media.MediaServiceService.updateMetadata,
+      GetDerivatives: media.MediaServiceService.getDerivatives,
+      RegenerateDerivatives: media.MediaServiceService.regenerateDerivatives,
       GetById: media.MediaServiceService.getById,
+      ResolveProductReference:
+        media.MediaServiceService.resolveProductReference,
       ListPublicLibrary: media.MediaServiceService.listPublicLibrary,
       ListProtectedLibrary: media.MediaServiceService.listProtectedLibrary,
       ListStrictLibrary: media.MediaServiceService.listStrictLibrary,

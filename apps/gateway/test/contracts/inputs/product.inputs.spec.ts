@@ -34,6 +34,9 @@ describe("product input profiles", () => {
           price: 100,
           trackInventory: true,
           stockQuantity: 5,
+          brandId: "brand-id",
+          tagIds: ["tag-id"],
+          thumbnailMediaId: "media-id",
         },
       }),
     ).toEqual([]);
@@ -43,14 +46,74 @@ describe("product input profiles", () => {
           title: "Desk",
           price: 100,
           description: "Internal field",
+          thumbnailUrl: "https://legacy.example/image.jpg",
           expectedVersion: 1,
         },
       }),
     ).toEqual([
       { field: "body.description", code: "unknown_field" },
       { field: "body.expectedVersion", code: "unknown_field" },
+      { field: "body.thumbnailUrl", code: "unknown_field" },
     ]);
   });
+
+  it("rejects caller-selected identity and site authority on product writes", () => {
+    expect(
+      validateGatewayInput("product-write", {
+        body: {
+          title: "Desk",
+          price: 100,
+          actorUserId: "caller-selected-user",
+          tenantId: "caller-selected-tenant",
+          siteId: "caller-selected-site",
+        },
+      }),
+    ).toEqual([
+      { field: "body.actorUserId", code: "unknown_field" },
+      { field: "body.siteId", code: "unknown_field" },
+      { field: "body.tenantId", code: "unknown_field" },
+    ]);
+    expect(
+      validateGatewayInput("product-patch", {
+        params: { id: "product-id" },
+        body: {
+          expectedVersion: 1,
+          title: "Desk",
+          actorUserId: "caller-selected-user",
+          siteId: "caller-selected-site",
+        },
+      }),
+    ).toEqual([
+      { field: "body.actorUserId", code: "unknown_field" },
+      { field: "body.siteId", code: "unknown_field" },
+    ]);
+  });
+
+  it.each(["model3dUrl", "model3dPosterUrl", "vrPlanImageUrl"])(
+    "rejects disabled %s in the early create and patch profiles",
+    (field) => {
+      const expected = { field: `body.${field}`, code: "unknown_field" };
+      expect(
+        validateGatewayInput("product-write", {
+          body: {
+            title: "Desk",
+            price: 100,
+            [field]: "https://provider.test/asset",
+          },
+        }),
+      ).toEqual([expected]);
+      expect(
+        validateGatewayInput("product-patch", {
+          params: { id: "product-id" },
+          body: {
+            title: "Desk",
+            expectedVersion: 1,
+            [field]: "https://provider.test/asset",
+          },
+        }),
+      ).toEqual([expected]);
+    },
+  );
 
   it("requires a product ID and at least one patch field", () => {
     const issues = validateGatewayInput("product-patch", {
@@ -74,6 +137,16 @@ describe("product input profiles", () => {
       validateGatewayInput("product-patch", {
         params: { id: "product-id" },
         body: { stockQuantity: 0, expectedVersion: 1 },
+      }),
+    ).toEqual([]);
+    expect(
+      validateGatewayInput("product-patch", {
+        params: { id: "product-id" },
+        body: {
+          clearBrand: true,
+          clearThumbnailMedia: true,
+          expectedVersion: 1,
+        },
       }),
     ).toEqual([]);
     expect(

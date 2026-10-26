@@ -16,17 +16,19 @@ import { OrderService } from "./order.service";
 import {
   AddToCartDto,
   CheckoutDto,
+  StartDemoPaymentDto,
   UpdateCartItemDto,
   UpdateOrderStatusDto,
 } from "./dto/order.dto";
-import { OrderStatus } from "../../prisma/generated/client";
 
 type RequestUser = {
   userId?: string;
+  role?: string;
 };
 
 type AuthenticatedRequest = Request & {
   user?: RequestUser;
+  requestId?: string;
 };
 
 @Controller("orders")
@@ -84,10 +86,25 @@ export class OrderController {
   @Post("checkout")
   async checkout(@Req() req: Request, @Body() dto: CheckoutDto) {
     const userId = this.getUserId(req);
-    return this.svc.checkout(userId, dto.note);
+    return this.svc.checkout(userId, req.headers["idempotency-key"], dto.note);
   }
 
   // ---------- Orders (user) ----------
+
+  @Roles("user")
+  @Post(":id/demo-payment-attempts")
+  startDemoPayment(
+    @Req() req: Request,
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() dto: StartDemoPaymentDto,
+  ) {
+    const verified = req as AuthenticatedRequest;
+    return this.svc.startDemoPayment(id, dto, req.headers["idempotency-key"], {
+      userId: verified.user?.userId,
+      role: verified.user?.role,
+      requestId: verified.requestId,
+    });
+  }
 
   @Roles("user")
   @Get()
@@ -111,11 +128,20 @@ export class OrderController {
   @Roles("admin", "root-admin")
   @Patch(":id/status")
   async updateStatusAdmin(
+    @Req() req: Request,
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @Body() dto: UpdateOrderStatusDto,
   ) {
-    // Map DTO enum to Prisma OrderStatus enum (same strings)
-    // If they differ, map explicitly.
-    return this.svc.updateOrderStatusAdmin(id, dto.status as OrderStatus);
+    const verified = req as AuthenticatedRequest;
+    return this.svc.updateOrderStatusAdmin(
+      id,
+      dto,
+      req.headers["idempotency-key"],
+      {
+        userId: verified.user?.userId,
+        role: verified.user?.role,
+        requestId: verified.requestId,
+      },
+    );
   }
 }

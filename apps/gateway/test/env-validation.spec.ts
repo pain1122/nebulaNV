@@ -163,9 +163,7 @@ describe("gateway environment validation", () => {
       "http://media-service",
     ]) {
       expect(
-        envSchema.validate(
-          validEnvironment({ MEDIA_RENDER_HTTP_URL }),
-        ).error,
+        envSchema.validate(validEnvironment({ MEDIA_RENDER_HTTP_URL })).error,
       ).toBeDefined();
     }
     expect(
@@ -238,7 +236,7 @@ describe("gateway environment validation", () => {
     delete (missing as Partial<typeof missing>).MEDIA_GRPC_URL;
     expect(
       envSchema.validate(
-        validEnvironment({ MEDIA_GRPC_URL: undefined, ...missing }),
+        validEnvironment({ ...missing, MEDIA_GRPC_URL: undefined }),
       ).error,
     ).toBeDefined();
     expect(

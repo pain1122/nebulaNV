@@ -16,6 +16,19 @@ jobs:
         with: { node-version: 22, cache: "pnpm" }
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
+      - name: Restore host Turbo build cache
+        id: host-turbo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-nebula-host-turbo-v1-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-nebula-host-turbo-v1-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+      - name: Verify backend orchestration, release and CI policies
+        run: pnpm test:backend-tooling
+      - name: Prove selected build graphs and injected cache restoration
+        run: pnpm test:build-graph
+      - name: Verify backend Docker COPY inputs against the build context
+        run: node scripts/docker/check-build-context.mjs
       - name: Classify and gate backend runtime dependencies
         run: pnpm scan:dependencies:backend
       - name: Install pinned Trivy
@@ -51,6 +64,22 @@ jobs:
         run: pnpm scan:source:backend
       - name: Verify checks leave tracked files unchanged
         run: git diff --exit-code
+      - name: Check host Turbo cache upload budget
+        id: turbo-budget
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.host-turbo.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          if [ -d .turbo/cache ] && [ "$(du -sb .turbo/cache | cut -f1)" -le 1073741824 ]; then
+            echo "save=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Host Turbo cache absent or above 1GiB; skipping upload."
+          fi
+      - name: Save bounded host Turbo build cache
+        if: success() && steps.turbo-budget.outputs.save == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo/cache
+          key: ${{ steps.host-turbo.outputs.cache-primary-key }}
       - name: Retain bounded quality evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -68,6 +97,9 @@ jobs:
   live-e2e:
     needs: quality
     runs-on: ubuntu-latest
+    env:
+      BUILDX_BAKE_FILE: docker-compose.yml:docker-bake.hcl:.github/backend-cache.hcl
+      NEBULA_CI_CACHE_WRITE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -75,19 +107,60 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: "pnpm" }
       - run: pnpm i --frozen-lockfile
+      - name: Restore host Turbo build cache
+        id: host-turbo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-nebula-host-turbo-v1-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-nebula-host-turbo-v1-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
       - name: Install pinned Trivy
         uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
           cache: true
           version: ${{ env.TRIVY_VERSION }}
+      - name: Set up pinned CI builder
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          version: v0.28.0
+          driver: docker-container
+          driver-opts: image=moby/buildkit:v0.24.0@sha256:6eceb8971ce4fceb3daca562832642706238b7eea72941fcf9896c93c3c4a53e
+          cache-binary: false
+          cleanup: true
+      - name: Expose masked cache runtime credentials
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            for (const name of ['ACTIONS_RUNTIME_TOKEN', 'ACTIONS_RESULTS_URL']) {
+              const value = process.env[name];
+              if (!value) throw new Error(`Missing cache runtime field: ${name}`);
+              if (name === 'ACTIONS_RUNTIME_TOKEN') core.setSecret(value);
+              core.exportVariable(name, value);
+            }
       - name: Provision live integration services
         run: pnpm backend:boot
+      - name: Verify historical Product metadata upgrade with current migration tails
+        run: pnpm db:verify:product:metadata:upgrade
       - name: Prove live F3 gateway client profiles
         run: pnpm test:f3:live
       - name: Run live integration and e2e tests
         run: pnpm test:e2e
       - name: Scan the tested backend images
         run: pnpm scan:images:backend
+      - name: Verify complete release archive round trip without a temporary tar
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/docker/release-image-inventory.mjs > "$RUNNER_TEMP/release-images.json"
+          node -e "for (const image of JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8'))) console.log(image)" "$RUNNER_TEMP/release-images.json" > "$RUNNER_TEMP/release-images.txt"
+          mapfile -t release_images < "$RUNNER_TEMP/release-images.txt"
+          test "${#release_images[@]}" -gt 0
+          docker image inspect "${release_images[@]}" --format '{{.Id}}' > "$RUNNER_TEMP/release-image-ids-before.txt"
+          docker image save "${release_images[@]}" | docker image load
+          docker image inspect "${release_images[@]}" --format '{{.Id}}' > "$RUNNER_TEMP/release-image-ids-after.txt"
+          cmp "$RUNNER_TEMP/release-image-ids-before.txt" "$RUNNER_TEMP/release-image-ids-after.txt"
+      - name: Record tested backend image identities
+        run: node scripts/docker/record-image-identities.mjs
       - name: Verify live checks leave tracked files unchanged
         if: always()
         run: git diff --exit-code
@@ -101,6 +174,7 @@ jobs:
           name: backend-live-evidence
           path: |
             .security-reports/nebulanv-main-*.json
+            .ci-evidence/backend-tested-images.json
             .ci-evidence/compose-state.jsonl
             .ci-evidence/compose-logs.txt
           if-no-files-found: warn

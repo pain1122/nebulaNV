@@ -36,7 +36,7 @@ function anonymousRequest(): GatewayHttpRequest {
     rawHeaders: [],
     requestContext,
     actor: { kind: "anonymous" },
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
 }
 
 function authenticatedRequest(): GatewayHttpRequest {
@@ -136,9 +136,8 @@ describe("GatewayAuthApiService", () => {
         requestContext.requestId,
       );
       expect(
-        decodeS2SSignedContext(
-          metadataText(metadata, X_S2S_CONTEXT_HEADER),
-        ).context,
+        decodeS2SSignedContext(metadataText(metadata, X_S2S_CONTEXT_HEADER))
+          .context,
       ).toEqual({
         version: "1",
         applicationId: "admin-web-local",
@@ -172,11 +171,12 @@ describe("GatewayAuthApiService", () => {
     expect(metadataText(metadata, AUTHORIZATION_HEADER)).toBe(
       "Bearer verified-access-token",
     );
-    expect(
-      decodeS2SSignedContext(
-        metadataText(metadata, X_S2S_CONTEXT_HEADER),
-      ).context.actor,
-    ).toEqual({
+    const signed = decodeS2SSignedContext(
+      metadataText(metadata, X_S2S_CONTEXT_HEADER),
+    ).context;
+    if (!("actor" in signed))
+      throw new Error("expected_legacy_signed_actor_context");
+    expect(signed.actor).toEqual({
       userId: "user-1",
       role: "user",
       sessionRef: "session-ref-1",

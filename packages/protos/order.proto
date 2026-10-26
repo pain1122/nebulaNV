@@ -11,6 +11,8 @@ message OrderItem {
   string unitPrice = 6; // decimal as string
   string lineTotal = 7; // decimal as string
   string meta      = 8; // JSON
+  optional string variantId = 9;
+  map<string, string> selectedOptions = 10;
 }
 
 message Order {
@@ -30,6 +32,8 @@ message Order {
   string updatedAt       = 14;
 
   repeated OrderItem items = 15;
+  string checkoutMode = 16; // DEMO_NO_PAYMENT; status is not provider settlement
+  optional int32 version = 17; // absent only in historical immutable Checkout receipts
 }
 
 message CartItem {
@@ -40,6 +44,9 @@ message CartItem {
   int32  quantity  = 5;
   string unitPrice = 6; // decimal as string
   string meta      = 7; // JSON
+  optional string variantId = 8;
+  map<string, string> selectedOptions = 9;
+  string lineTotal = 10; // fixed two-decimal amount
 }
 
 message Cart {
@@ -48,6 +55,8 @@ message Cart {
   string currency  = 3;
   string expiresAt = 4;
   repeated CartItem items = 5;
+  string subtotal = 6;
+  string total = 7; // merchandise total; no tax/shipping engine in Batch 1
 }
 
 message Empty {}
@@ -64,6 +73,7 @@ message AddToCartRequest {
   string userId    = 1;
   string productId = 2;
   int32  quantity  = 3;
+  optional string variantId = 4;
 }
 
 message UpdateCartItemRequest {
@@ -80,6 +90,7 @@ message RemoveCartItemRequest {
 message CheckoutRequest {
   string userId = 1;
   string note   = 2;
+  string idempotencyKey = 3; // required at Order; propagated validated HTTP header
 }
 
 message OrderResponse {
@@ -103,6 +114,62 @@ message ListOrdersResponse {
 message UpdateOrderStatusRequest {
   string id     = 1;
   string status = 2;
+  optional int32 expectedVersion = 3;
+  string idempotencyKey = 4;
+}
+
+message AdminGetOrderRequest {
+  string id = 1;
+}
+
+message AdminListOrdersRequest {
+  optional string status = 1;
+  optional string userId = 2;
+  optional int32 page = 3;
+  optional int32 limit = 4;
+}
+
+message AdminListOrdersResponse {
+  repeated Order data = 1;
+  int32 page = 2;
+  int32 limit = 3;
+  int32 total = 4;
+}
+
+// Explicit demo-only operations; actor identity is verified transport context.
+message StartDemoPaymentRequest {
+  string id = 1;
+  optional int32 expectedVersion = 2;
+  string idempotencyKey = 3;
+}
+
+message ResolveDemoPaymentRequest {
+  string id = 1;
+  string attemptId = 2;
+  string outcome = 3;
+  optional int32 expectedVersion = 4;
+  string idempotencyKey = 5;
+}
+
+message DemoPaymentAttempt {
+  string id = 1;
+  string orderId = 2;
+  string state = 3;
+  string mode = 4; // DEMO; never provider settlement
+  string amount = 5;
+  string currency = 6;
+  string failureCode = 7;
+  string createdAt = 8;
+  string updatedAt = 9;
+}
+
+message DemoPaymentReply {
+  Order order = 1;
+  DemoPaymentAttempt attempt = 2;
+}
+
+message DemoPaymentResponse {
+  DemoPaymentReply data = 1;
 }
 
 service OrderService {
@@ -125,4 +192,9 @@ service OrderService {
   rpc UpdateOrderStatusV3(UpdateOrderStatusRequest)returns (OrderResponse);
 
   rpc Ping             (Empty)                   returns (Empty);
+  // Post-R5 admin reads; dormant F4 context-v3 compatibility is deferred.
+  rpc AdminGetOrder (AdminGetOrderRequest) returns (OrderResponse);
+  rpc AdminListOrders (AdminListOrdersRequest) returns (AdminListOrdersResponse);
+  rpc StartDemoPayment (StartDemoPaymentRequest) returns (DemoPaymentResponse);
+  rpc ResolveDemoPayment (ResolveDemoPaymentRequest) returns (DemoPaymentResponse);
 }

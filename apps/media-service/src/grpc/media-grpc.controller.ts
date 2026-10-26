@@ -1,4 +1,9 @@
-import { Controller, Logger, UsePipes } from "@nestjs/common";
+import {
+  Controller,
+  Logger,
+  UsePipes,
+  BadRequestException,
+} from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { Metadata, status } from "@grpc/grpc-js";
 import {
@@ -11,6 +16,8 @@ import type { Media as MediaRecord } from "../../prisma/generated";
 import {
   createGrpcValidationPipe,
   DormantS2SAuthorizationV3Receiver,
+  AllowedS2SCallers,
+  InternalOnly,
   Public,
   Roles,
   resolveCtxUser,
@@ -23,6 +30,10 @@ import {
   PublicLibraryDeleteConfirmDto,
   PublicLibraryDeletePreviewDto,
 } from "../dto";
+import { ResolveProductReferenceDto } from "../dto/resolve-product-reference.dto";
+import { ImageDerivativesGrpcDto } from "../dto/image-derivatives.dto";
+import { MediaMetadataGrpcDto } from "../dto/media-metadata.dto";
+import { GetMediaDto } from "../dto/get-media.dto";
 
 type GrpcPresignOutput = {
   storage?: string | null;
@@ -49,6 +60,66 @@ const Pipe = createGrpcValidationPipe();
 export class MediaGrpcController {
   private readonly log = new Logger(MediaGrpcController.name);
   constructor(private readonly svc: MediaService) {}
+
+  @Roles("admin", "root-admin")
+  @AllowedS2SCallers("gateway", "bucket")
+  @GrpcMethod("MediaService", "GetDerivatives")
+  @UsePipes(Pipe)
+  async getDerivatives(
+    req: GetMediaDto,
+    meta: Metadata,
+  ): Promise<media.ImageDerivativesRes> {
+    if (!resolveCtxUser(meta))
+      throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+    return media.ImageDerivativesRes.create(
+      await this.svc.getDerivatives(req.id),
+    );
+  }
+
+  @Roles("admin", "root-admin")
+  @AllowedS2SCallers("gateway", "bucket")
+  @GrpcMethod("MediaService", "RegenerateDerivatives")
+  @UsePipes(Pipe)
+  async regenerateDerivatives(
+    req: ImageDerivativesGrpcDto,
+    meta: Metadata,
+  ): Promise<media.ImageDerivativesRes> {
+    if (!resolveCtxUser(meta))
+      throw toRpc(status.UNAUTHENTICATED, "Missing user context");
+    let recipes: unknown;
+    if (req.recipesJson) {
+      try {
+        recipes = JSON.parse(req.recipesJson) as unknown;
+      } catch {
+        throw new BadRequestException("image_recipe_json_invalid");
+      }
+      if (!Array.isArray(recipes))
+        throw new BadRequestException("image_recipe_count_invalid");
+    }
+    return media.ImageDerivativesRes.create(
+      await this.svc.regenerateDerivatives(
+        req.id,
+        recipes as unknown[] | undefined,
+        req.retryFailed,
+      ),
+    );
+  }
+
+  @Roles("admin", "root-admin")
+  @AllowedS2SCallers("gateway", "bucket")
+  @GrpcMethod("MediaService", "UpdateMetadata")
+  @UsePipes(Pipe)
+  async updateMetadata(
+    req: MediaMetadataGrpcDto,
+    meta: Metadata,
+  ): Promise<media.MediaRes> {
+    const actor = resolveCtxUser(meta);
+    return media.MediaRes.create({
+      media: toProtoMedia(
+        await this.svc.updateMetadata(req.id, req, actor ?? undefined),
+      ),
+    });
+  }
 
   private resolveOwnerId(
     ctx: { userId?: string | null; role?: string },
@@ -287,6 +358,22 @@ export class MediaGrpcController {
 
     const row = await this.svc.getById(req.id);
     return media.MediaRes.create({ media: toProtoMedia(row) });
+  }
+
+  @DormantS2SAuthorizationV3Receiver(
+    "MediaService",
+    "ResolveProductReferenceV3",
+  )
+  @UsePipes(Pipe)
+  @Public()
+  @InternalOnly()
+  @AllowedS2SCallers("product-service")
+  @GrpcMethod("MediaService", "ResolveProductReference")
+  async resolveProductReference(
+    req: ResolveProductReferenceDto,
+  ): Promise<media.ResolveProductReferenceRes> {
+    const resolved = await this.svc.resolveProductReference(req.id, req.role);
+    return media.ResolveProductReferenceRes.create(resolved);
   }
 
   @Roles("admin", "root-admin")
@@ -799,6 +886,9 @@ function toProtoMedia(row: MediaRecord): media.Media {
     path: row.path ?? "",
     folderPath: row.folderPath ?? "/",
     displayName: row.displayName ?? "",
+    title: row.title ?? undefined,
+    defaultAlt: row.defaultAlt ?? undefined,
+    metadataVersion: row.metadataVersion,
     originalFilename: row.originalFilename ?? "",
     filename: row.filename ?? "",
     mimeType: row.mimeType ?? "",

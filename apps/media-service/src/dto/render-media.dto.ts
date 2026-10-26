@@ -8,6 +8,6 @@ export class RenderMediaDto {
   @IsOptional()
   @IsString()
   @Transform(lowerTrim)
-  @IsIn(["web"])
+  @IsIn(["web", "thumbnail", "card", "detail", "mobile"])
   variant?: string;
 }

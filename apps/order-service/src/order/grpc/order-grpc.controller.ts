@@ -12,7 +12,7 @@ import {
   type MetadataWithContext,
   type RpcContextWithContext,
 } from "@nebula/grpc-auth";
-import type { orderv1 } from "@nebula/protos";
+import { orderv1 } from "@nebula/protos";
 import { OrderService } from "../order.service";
 import { OrderStatus } from "../../../prisma/generated/client";
 
@@ -82,6 +82,7 @@ export class OrderGrpcController {
       ctxUser.userId,
       {
         productId: req.productId,
+        variantId: req.variantId,
         quantity: req.quantity,
       },
       createVerifiedServiceDownstreamContext(meta, call),
@@ -136,7 +137,12 @@ export class OrderGrpcController {
   ) {
     const ctxUser = resolveCtxUser(meta, call);
     if (!ctxUser) throw toRpc(status.UNAUTHENTICATED, "missing_user_id");
-    return this.svc.checkout(ctxUser.userId, req.note);
+    return this.svc.checkout(
+      ctxUser.userId,
+      req.idempotencyKey,
+      req.note,
+      createVerifiedServiceDownstreamContext(meta, call),
+    );
   }
 
   @DormantS2SAuthorizationV3Receiver("OrderService", "GetOrderV3")
@@ -170,13 +176,99 @@ export class OrderGrpcController {
 
   @DormantS2SAuthorizationV3Receiver("OrderService", "UpdateOrderStatusV3")
   @Roles("admin", "root-admin")
+  @RequireUserId()
   @GrpcMethod("OrderService", "UpdateOrderStatus")
   async updateOrderStatus(
     req: ProtoLoaderRequest<orderv1.UpdateOrderStatusRequest>,
+    meta: MetadataWithContext,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.UpdateOrderStatusRequest>>,
   ) {
-    const orderStatus = toOrderStatus(req.status);
-    if (!orderStatus)
-      throw toRpc(status.INVALID_ARGUMENT, "missing_order_status");
-    return this.svc.updateOrderStatusAdmin(req.id, orderStatus);
+    const user = resolveCtxUser(meta, call);
+    return this.svc.updateOrderStatusAdmin(
+      req.id,
+      {
+        status: req.status,
+        expectedVersion: req.expectedVersion,
+      },
+      req.idempotencyKey,
+      {
+        userId: user?.userId,
+        role: user?.role,
+        requestId: meta.requestId ?? call.requestId,
+      },
+      createVerifiedServiceDownstreamContext(meta, call),
+    );
+  }
+
+  // Post-R5 operations: F4 V3 activation is explicitly deferred and inventoried.
+  @Roles("user")
+  @RequireUserId()
+  @GrpcMethod("OrderService", "StartDemoPayment")
+  async startDemoPayment(
+    req: ProtoLoaderRequest<orderv1.StartDemoPaymentRequest>,
+    meta: MetadataWithContext,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.StartDemoPaymentRequest>>,
+  ) {
+    const user = resolveCtxUser(meta, call);
+    return orderv1.DemoPaymentResponse.create(
+      await this.svc.startDemoPayment(
+        req.id,
+        { expectedVersion: req.expectedVersion },
+        req.idempotencyKey,
+        {
+          userId: user?.userId,
+          role: user?.role,
+          requestId: meta.requestId ?? call.requestId,
+        },
+        createVerifiedServiceDownstreamContext(meta, call),
+      ),
+    );
+  }
+
+  @Roles("admin", "root-admin")
+  @RequireUserId()
+  @GrpcMethod("OrderService", "ResolveDemoPayment")
+  async resolveDemoPayment(
+    req: ProtoLoaderRequest<orderv1.ResolveDemoPaymentRequest>,
+    meta: MetadataWithContext,
+    call: GrpcCall<ProtoLoaderRequest<orderv1.ResolveDemoPaymentRequest>>,
+  ) {
+    const user = resolveCtxUser(meta, call);
+    return orderv1.DemoPaymentResponse.create(
+      await this.svc.resolveDemoPayment(
+        req.id,
+        {
+          attemptId: req.attemptId,
+          outcome: req.outcome,
+          expectedVersion: req.expectedVersion,
+        },
+        req.idempotencyKey,
+        {
+          userId: user?.userId,
+          role: user?.role,
+          requestId: meta.requestId ?? call.requestId,
+        },
+        createVerifiedServiceDownstreamContext(meta, call),
+      ),
+    );
+  }
+
+  @Roles("admin", "root-admin")
+  @RequireUserId()
+  @GrpcMethod("OrderService", "AdminGetOrder")
+  adminGetOrder(req: ProtoLoaderRequest<orderv1.AdminGetOrderRequest>) {
+    return this.svc.getOrderForAdmin(req.id);
+  }
+
+  @Roles("admin", "root-admin")
+  @RequireUserId()
+  @GrpcMethod("OrderService", "AdminListOrders")
+  adminListOrders(req: ProtoLoaderRequest<orderv1.AdminListOrdersRequest>) {
+    return this.svc.listOrdersForAdmin({
+      status: req.status,
+      userId: req.userId,
+      page: req.page,
+      limit: req.limit,
+    });
   }
 }

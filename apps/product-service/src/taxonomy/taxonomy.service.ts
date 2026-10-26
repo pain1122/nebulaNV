@@ -80,7 +80,8 @@ export class TaxonomyService {
     );
 
     return {
-      data: res.data,
+      // The protobuf loader omits empty repeated fields without defaults.
+      data: res.data ?? [],
       page: res.page,
       limit: res.limit,
       total: res.total,

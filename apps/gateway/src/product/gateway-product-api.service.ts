@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   BadGatewayException,
   Inject,
   Injectable,
@@ -33,6 +34,8 @@ import {
   type GatewayVariantWriteDto,
   type GatewayVariantPatchDto,
 } from "./product-api.dto";
+
+import type { GatewayGalleryMetadataDto } from "../media/media-metadata-api.dto";
 
 type ProductPatchInput = GrpcRequestInput<productv1.ProductPatch>;
 
@@ -149,13 +152,16 @@ function product(value: productv1.Product | undefined): GatewayProductDto {
     price: finiteNumber(value.price, "price"),
     currency: value.currency,
     categoryId: value.categoryId,
-    thumbnailUrl: value.thumbnailUrl,
-    model3dUrl: value.model3dUrl,
+    brandId: value.brandId,
+    tagIds: Object.freeze([...value.tagIds]),
+    thumbnailMediaId: value.thumbnailMediaId,
+    thumbnailTitle: value.thumbnailTitle,
+    thumbnailAlt: value.thumbnailAlt,
+    thumbnailTitleOverride: value.thumbnailTitleOverride ?? null,
+    thumbnailAltOverride: value.thumbnailAltOverride ?? null,
     model3dFormat: value.model3dFormat,
     model3dLiveView: value.model3dLiveView,
-    model3dPosterUrl: value.model3dPosterUrl,
     vrEnabled: value.vrEnabled,
-    vrPlanImageUrl: value.vrPlanImageUrl,
     metaTitle: value.metaTitle,
     metaDescription: value.metaDescription,
     metaKeywords: value.metaKeywords,
@@ -197,13 +203,33 @@ function publicProduct(
   ) {
     throw new NotFoundException("product_not_found");
   }
-  return mapped;
+  assertPublicThumbnail(value);
+  return publicDescription(mapped);
+}
+
+function assertPublicThumbnail(value: productv1.Product | undefined): void {
+  if (
+    !value ||
+    value.thumbnailUrl !==
+      (value.thumbnailMediaId
+        ? `/api/v1/media/render/${value.thumbnailMediaId}`
+        : "")
+  ) {
+    throw new BadGatewayException("product_thumbnail_media_reference_invalid");
+  }
+}
+
+function publicDescription(value: GatewayProductDto): GatewayProductDto {
+  const result = { ...value };
+  delete result.thumbnailTitleOverride;
+  delete result.thumbnailAltOverride;
+  return Object.freeze(result);
 }
 
 function publicProducts(
   values: readonly productv1.Product[],
 ): readonly GatewayProductDto[] {
-  const mapped = values.map(product);
+  const mapped = values.map((value) => publicDescription(product(value)));
   if (
     mapped.some(
       (value) =>
@@ -214,17 +240,35 @@ function publicProducts(
   ) {
     throw new BadGatewayException("product_public_visibility_violation");
   }
+  values.forEach(assertPublicThumbnail);
   return Object.freeze(mapped);
 }
 
-function galleryImage(value: productv1.GalleryImage): GatewayGalleryImageDto {
-  if (!value.id || !value.url || !Number.isInteger(value.sort)) {
+function galleryImage(
+  value: productv1.GalleryImage,
+  requirePublic: boolean,
+): GatewayGalleryImageDto {
+  if (!value.id || !Number.isInteger(value.sort)) {
     throw new BadGatewayException("product_gallery_response_invalid");
+  }
+  if (
+    requirePublic &&
+    (!value.mediaId || value.url !== `/api/v1/media/render/${value.mediaId}`)
+  ) {
+    throw new BadGatewayException("product_gallery_media_reference_invalid");
   }
   return Object.freeze({
     id: value.id,
-    url: value.url,
+    mediaId: value.mediaId ?? "",
     alt: value.alt,
+    title: value.title,
+    metadataVersion: value.metadataVersion,
+    ...(requirePublic
+      ? {}
+      : {
+          altOverride: value.altOverride ?? null,
+          titleOverride: value.titleOverride ?? null,
+        }),
     sort: value.sort,
     deletedAt: value.deletedAt,
   });
@@ -238,7 +282,9 @@ function gallery(
   if (response.productId !== productId || !Array.isArray(response.images)) {
     throw new BadGatewayException("product_gallery_response_invalid");
   }
-  const images = response.images.map(galleryImage);
+  const images = response.images.map((image) =>
+    galleryImage(image, requirePublic),
+  );
   if (requirePublic && images.some((image) => image.deletedAt)) {
     throw new BadGatewayException("product_gallery_visibility_violation");
   }
@@ -258,6 +304,8 @@ function createInput(
     if (value !== undefined) Object.assign(data, { [field]: value });
   }
   if (input.content !== undefined) data.description = input.content;
+  if (input.thumbnailTitle != null) data.thumbnailTitle = input.thumbnailTitle;
+  if (input.thumbnailAlt != null) data.thumbnailAlt = input.thumbnailAlt;
   return data as GrpcRequestInput<productv1.ProductInput>;
 }
 
@@ -267,16 +315,15 @@ const PATCH_FIELDS = Object.freeze([
   "sku",
   "price",
   "categoryId",
+  "brandId",
+  "tagIds",
   "excerpt",
   "currency",
   "status",
-  "thumbnailUrl",
-  "model3dUrl",
+  "thumbnailMediaId",
   "model3dFormat",
   "model3dLiveView",
-  "model3dPosterUrl",
   "vrEnabled",
-  "vrPlanImageUrl",
   "metaTitle",
   "metaDescription",
   "metaKeywords",
@@ -306,6 +353,17 @@ function sparsePatch(input: GatewayProductPatchDto): ProductPatchInput {
     if (value !== undefined) Object.assign(patch, { [field]: value });
   }
   if (input.content !== undefined) patch.description = input.content;
+  if (input.thumbnailTitle === null) patch.clearThumbnailTitle = true;
+  else if (input.thumbnailTitle !== undefined)
+    patch.thumbnailTitle = input.thumbnailTitle;
+  if (input.thumbnailAlt === null) patch.clearThumbnailAlt = true;
+  else if (input.thumbnailAlt !== undefined)
+    patch.thumbnailAlt = input.thumbnailAlt;
+  if (input.clearThumbnailMedia !== undefined) {
+    patch.clearThumbnailMedia = input.clearThumbnailMedia;
+  }
+  if (input.clearBrand !== undefined) patch.clearBrand = input.clearBrand;
+  if (input.tagIds !== undefined) patch.replaceTagIds = true;
   // The product receiver uses defaults:false, so this deliberately sparse
   // object preserves field presence. Generated fromPartial/create helpers must
   // not be used here because they materialize omitted scalar defaults.
@@ -626,6 +684,9 @@ export class GatewayProductApiService {
     productId: string,
     input: GatewayGalleryAddDto,
   ) {
+    if (input.images.some((image) => !image.mediaId || image.url?.trim())) {
+      throw new BadRequestException("gallery_media_id_required");
+    }
     const products = this.products(request);
     const result = await wrapGrpc(
       firstValueFrom(
@@ -633,8 +694,10 @@ export class GatewayProductApiService {
           {
             productId,
             images: input.images.map((image) => ({
-              url: image.url,
-              alt: image.alt ?? "",
+              url: "",
+              mediaId: image.mediaId,
+              ...(image.alt == null ? {} : { alt: image.alt }),
+              ...(image.title == null ? {} : { title: image.title }),
               ...(image.sort === undefined ? {} : { sort: image.sort }),
             })),
           },
@@ -643,6 +706,41 @@ export class GatewayProductApiService {
       ),
     );
     return gallery(result, productId, false);
+  }
+
+  async updateImageMetadata(
+    request: GatewayHttpRequest,
+    productId: string,
+    imageId: string,
+    input: GatewayGalleryMetadataDto,
+  ) {
+    const client = this.products(request);
+    const result = await wrapGrpc(
+      firstValueFrom(
+        client.proxy.UpdateImageMetadata(
+          {
+            productId,
+            imageId,
+            expectedVersion: input.expectedVersion,
+            clearTitle: input.title === null,
+            clearAlt: input.alt === null,
+            ...(input.title == null ? {} : { title: input.title }),
+            ...(input.alt == null ? {} : { alt: input.alt }),
+          },
+          client.metadata,
+        ),
+      ),
+    );
+    const rows = gallery(result, productId, false);
+    if (
+      !rows.some(
+        (row) =>
+          row.id === imageId &&
+          row.metadataVersion === input.expectedVersion + 1,
+      )
+    )
+      throw new BadGatewayException("gallery_metadata_response_invalid");
+    return rows;
   }
 
   async reorderImages(

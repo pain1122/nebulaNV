@@ -144,17 +144,33 @@ export class GatewayProductWriteDto {
   @IsUUID("4")
   categoryId?: string;
 
-  @ApiPropertyOptional({ maxLength: 1024 })
+  @ApiPropertyOptional({ format: "uuid" })
   @IsOptional()
-  @IsString()
-  @MaxLength(1024)
-  thumbnailUrl?: string;
+  @IsUUID("4")
+  brandId?: string;
 
-  @ApiPropertyOptional({ maxLength: 1024 })
+  @ApiPropertyOptional({ type: [String], format: "uuid", maxItems: 64 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(64)
+  @IsUUID("4", { each: true })
+  tagIds?: string[];
+
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID("4")
+  thumbnailMediaId?: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 200 })
   @IsOptional()
   @IsString()
-  @MaxLength(1024)
-  model3dUrl?: string;
+  @MaxLength(200)
+  thumbnailTitle?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 180 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  thumbnailAlt?: string | null;
 
   @ApiPropertyOptional({ maxLength: 16 })
   @IsOptional()
@@ -167,24 +183,12 @@ export class GatewayProductWriteDto {
   @IsBoolean()
   model3dLiveView?: boolean;
 
-  @ApiPropertyOptional({ maxLength: 1024 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(1024)
-  model3dPosterUrl?: string;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   vrEnabled?: boolean;
 
-  @ApiPropertyOptional({ maxLength: 1024 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(1024)
-  vrPlanImageUrl?: string;
-
-  @ApiPropertyOptional({ maxLength: 180 })
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 180 })
   @IsOptional()
   @IsString()
   @MaxLength(180)
@@ -307,6 +311,16 @@ export class GatewayProductWriteDto {
 export class GatewayProductPatchDto extends PartialType(
   GatewayProductWriteDto,
 ) {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  clearBrand?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  clearThumbnailMedia?: boolean;
+
   @ApiProperty({ minimum: 1 })
   @Type(() => Number)
   @IsInt()
@@ -387,7 +401,7 @@ export class GatewayProductVariantDto {
   @ApiProperty({ type: "object", additionalProperties: { type: "string" } })
   options!: Readonly<Record<string, string>>;
   @ApiProperty() price!: number;
-  @ApiPropertyOptional({ nullable: true }) priceOverride!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) priceOverride!: number | null;
   @ApiProperty() effectivePrice!: number;
   @ApiProperty({ minimum: 0 }) stockQuantity!: number;
   @ApiProperty({ enum: GatewayProductAvailability })
@@ -479,16 +493,27 @@ export class GatewayProductGalleryPathDto {
 }
 
 export class GatewayGalleryImageInputDto {
-  @ApiProperty({ maxLength: 1024 })
+  @ApiPropertyOptional({ maxLength: 1024, deprecated: true })
+  @IsOptional()
   @IsString()
   @MaxLength(1024)
-  url!: string;
+  url?: string;
+
+  @ApiProperty({ format: "uuid" })
+  @IsUUID("4")
+  mediaId!: string;
 
   @ApiPropertyOptional({ maxLength: 180 })
   @IsOptional()
   @IsString()
   @MaxLength(180)
-  alt?: string;
+  alt?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string | null;
 
   @ApiPropertyOptional({ minimum: 0, maximum: 1_000_000 })
   @IsOptional()
@@ -539,13 +564,19 @@ export class GatewayProductDto {
   @ApiProperty() price!: number;
   @ApiProperty() currency!: string;
   @ApiProperty({ format: "uuid" }) categoryId!: string;
-  @ApiProperty() thumbnailUrl!: string;
-  @ApiProperty() model3dUrl!: string;
+  @ApiProperty() brandId!: string;
+  @ApiProperty({ type: [String] }) tagIds!: readonly string[];
+  @ApiProperty() thumbnailMediaId!: string;
+  @ApiProperty() thumbnailTitle!: string;
+  @ApiProperty() thumbnailAlt!: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  thumbnailTitleOverride?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) thumbnailAltOverride?:
+    | string
+    | null;
   @ApiProperty() model3dFormat!: string;
   @ApiProperty() model3dLiveView!: boolean;
-  @ApiProperty() model3dPosterUrl!: string;
   @ApiProperty() vrEnabled!: boolean;
-  @ApiProperty() vrPlanImageUrl!: string;
   @ApiProperty() metaTitle!: string;
   @ApiProperty() metaDescription!: string;
   @ApiProperty() metaKeywords!: string;
@@ -581,8 +612,16 @@ export class GatewayProductDto {
 
 export class GatewayGalleryImageDto {
   @ApiProperty({ format: "uuid" }) id!: string;
-  @ApiProperty() url!: string;
+  @ApiProperty() mediaId!: string;
   @ApiProperty() alt!: string;
+  @ApiProperty() title!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) altOverride?:
+    | string
+    | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) titleOverride?:
+    | string
+    | null;
+  @ApiProperty({ minimum: 1 }) metadataVersion!: number;
   @ApiProperty() sort!: number;
   @ApiProperty() deletedAt!: string;
 }

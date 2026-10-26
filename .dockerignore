@@ -84,3 +84,4 @@ docker-compose.*.yml
 # -------------------------------------------
 **/prisma/generated
 /packages/protos/generated
+.nebula-demo/

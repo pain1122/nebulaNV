@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   ServiceUnavailableException,
+  HttpException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
 import { ClientGrpc } from "@nestjs/microservices";
@@ -18,7 +19,13 @@ import {
   type ProductVariant,
 } from "../../prisma/generated";
 import { SETTINGS_SERVICE } from "../settings-client.module";
-import { getSettings, type SettingsProxy } from "@nebula/clients";
+import { MEDIA_SERVICE } from "../media-client.module";
+import {
+  getMedia,
+  getSettings,
+  type MediaProxy,
+  type SettingsProxy,
+} from "@nebula/clients";
 import { TAXONOMY_SERVICE } from "../taxonomy-client.module";
 import { getTaxonomy, type TaxonomyProxy } from "@nebula/clients";
 import {
@@ -31,6 +38,8 @@ import {
   ProductStatusDto,
   type ProductInputDto,
 } from "./dto/product-input.dto";
+import { descriptiveText, textPatch } from "./descriptive-text";
+import { effectiveProductPrice } from "./product-price";
 import { type ApplyDiscountBulkDto } from "./dto/apply-discount-bulk.dto";
 
 type ProductPatchInput = Partial<
@@ -43,6 +52,10 @@ type ProductPatchInput = Partial<
     | "discountEnd"
   >
 > & {
+  clearThumbnailMedia?: boolean;
+  clearThumbnailTitle?: boolean;
+  clearThumbnailAlt?: boolean;
+  clearBrand?: boolean;
   categoryId?: string | null;
   discountType?: DiscountTypeDto | null;
   discountValue?: number | null;
@@ -77,6 +90,9 @@ type DiscountState = Pick<
   | "discountStart"
   | "discountEnd"
 >;
+
+type MediaDescriptions = { title?: string; defaultAlt?: string };
+type DescriptionCache = Map<string, Promise<MediaDescriptions>>;
 
 type InventoryState = Pick<Product, "trackInventory" | "stockQuantity">;
 type ProductWithVariants = Product & { variants?: ProductVariant[] };
@@ -270,6 +286,7 @@ export class ProductServiceImpl {
     private prisma: PrismaService,
     @Inject(TAXONOMY_SERVICE) private readonly taxonomyClient: ClientGrpc,
     @Inject(SETTINGS_SERVICE) private readonly settingsClient: ClientGrpc,
+    @Inject(MEDIA_SERVICE) private readonly mediaClient: ClientGrpc,
   ) {}
 
   private settings(
@@ -282,6 +299,128 @@ export class ProductServiceImpl {
     downstream?: VerifiedServiceDownstreamContext,
   ): TaxonomyProxy {
     return getTaxonomy(this.taxonomyClient, downstream?.signingPolicy);
+  }
+
+  private media(downstream?: VerifiedServiceDownstreamContext): MediaProxy {
+    return getMedia(this.mediaClient, downstream?.signingPolicy);
+  }
+
+  private async resolveProductDescriptions(
+    id: string,
+    role: "THUMBNAIL" | "GALLERY",
+    downstream?: VerifiedServiceDownstreamContext,
+    cache: DescriptionCache = new Map(),
+  ): Promise<MediaDescriptions> {
+    let pending = cache.get(id);
+    if (!pending) {
+      pending = (async () => {
+        const result = await wrapGrpc(
+          firstValueFrom(
+            this.media(downstream).ResolveProductReference(
+              { id, role },
+              downstream?.metadata,
+            ),
+          ),
+        );
+        if (
+          result.mediaId !== id ||
+          result.role !== role ||
+          result.renderPath !== `/api/v1/media/render/${id}`
+        )
+          throw new ServiceUnavailableException(
+            "product_media_resolution_invalid",
+          );
+        descriptiveText(result.title, "media_title", 200);
+        descriptiveText(result.defaultAlt, "media_defaultAlt", 180);
+        return { title: result.title, defaultAlt: result.defaultAlt };
+      })();
+      cache.set(id, pending);
+    }
+    return pending;
+  }
+
+  private async resolveProductMediaId(
+    id: string,
+    role: "THUMBNAIL" | "GALLERY",
+    downstream?: VerifiedServiceDownstreamContext,
+    cache?: DescriptionCache,
+  ): Promise<string> {
+    await this.resolveProductDescriptions(id, role, downstream, cache);
+    return id;
+  }
+
+  private async descriptions(
+    id: string | null | undefined,
+    role: "THUMBNAIL" | "GALLERY",
+    requirePublic: boolean,
+    cache: DescriptionCache,
+  ): Promise<MediaDescriptions> {
+    if (!id) return {};
+    try {
+      return await this.resolveProductDescriptions(id, role, undefined, cache);
+    } catch (error) {
+      // Admins must still inspect/edit broken or revoked references. Do not hide outages.
+      if (
+        !requirePublic &&
+        error instanceof HttpException &&
+        [400, 403, 404].includes(error.getStatus())
+      )
+        return {};
+      if (
+        requirePublic &&
+        error instanceof HttpException &&
+        [400, 403, 404].includes(error.getStatus())
+      )
+        throw new ServiceUnavailableException(
+          "product_public_reference_invalid",
+        );
+      throw error;
+    }
+  }
+
+  private async describeProduct(
+    p: ProductWithVariants,
+    publicOnly = false,
+    cache: DescriptionCache = new Map(),
+  ) {
+    const defaults = await this.descriptions(
+      p.thumbnailMediaId,
+      "THUMBNAIL",
+      publicOnly,
+      cache,
+    );
+    return {
+      ...this.toDto(p, publicOnly),
+      thumbnailTitle: p.thumbnailTitle ?? defaults.title ?? "",
+      thumbnailAlt: p.thumbnailAlt ?? defaults.defaultAlt ?? "",
+    };
+  }
+
+  private async describeGallery<
+    T extends {
+      mediaId: string | null;
+      alt: string | null;
+      title?: string | null;
+      metadataVersion?: number;
+    },
+  >(rows: T[], requirePublic = false, cache: DescriptionCache = new Map()) {
+    return Promise.all(
+      rows.map(async (row) => {
+        const defaults = await this.descriptions(
+          row.mediaId,
+          "GALLERY",
+          requirePublic,
+          cache,
+        );
+        return {
+          ...row,
+          altOverride: requirePublic ? undefined : (row.alt ?? undefined),
+          titleOverride: requirePublic ? undefined : (row.title ?? undefined),
+          alt: row.alt ?? defaults.defaultAlt ?? "",
+          title: row.title ?? defaults.title ?? "",
+        };
+      }),
+    );
   }
 
   private normalizeCurrency(value: string): string | null {
@@ -335,41 +474,17 @@ export class ProductServiceImpl {
     return shopCurrency;
   }
 
-  private effectivePrice(
+  private effectivePriceDecimal(
     p: Product,
     now = new Date(),
     basePrice: Prisma.Decimal = new Prisma.Decimal(p.price),
-  ): number {
-    const price = basePrice;
-    const value = p.discountValue ? new Prisma.Decimal(p.discountValue) : null;
-    const outsideWindow =
-      (p.discountStart !== null && now < p.discountStart) ||
-      (p.discountEnd !== null && now > p.discountEnd);
-
-    if (
-      !p.discountActive ||
-      !p.discountType ||
-      value === null ||
-      value.isNegative() ||
-      outsideWindow
-    ) {
-      return price.toNumber();
-    }
-
-    const discounted =
-      p.discountType === DiscountType.PERCENTAGE
-        ? price.mul(new Prisma.Decimal(100).minus(value)).div(100)
-        : price.minus(value);
-    const nonNegative = discounted.isNegative()
-      ? new Prisma.Decimal(0)
-      : discounted;
-    return nonNegative
-      .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
-      .toNumber();
+  ): Prisma.Decimal {
+    return effectiveProductPrice(p, now, basePrice);
   }
 
   private variantDto(p: Product, v: ProductVariant) {
     const price = new Prisma.Decimal(v.priceOverride ?? p.price);
+    const effectivePrice = this.effectivePriceDecimal(p, new Date(), price);
     return {
       id: v.id,
       productId: v.productId,
@@ -380,7 +495,8 @@ export class ProductServiceImpl {
         v.priceOverride === null
           ? null
           : new Prisma.Decimal(v.priceOverride).toNumber(),
-      effectivePrice: this.effectivePrice(p, new Date(), price),
+      effectivePrice: effectivePrice.toNumber(),
+      effectivePriceAmount: effectivePrice.toFixed(2),
       stockQuantity: v.stockQuantity,
       availability:
         !v.active || v.deletedAt || (p.trackInventory && v.stockQuantity === 0)
@@ -392,9 +508,10 @@ export class ProductServiceImpl {
     };
   }
 
-  private toDto = (p: ProductWithVariants) => {
+  private toDto = (p: ProductWithVariants, publicOnly = false) => {
     const hasDiscount = p.discountType !== null;
     const variants = p.variants ?? [];
+    const effectivePrice = this.effectivePriceDecimal(p);
     return {
       id: p.id,
       slug: p.slug,
@@ -407,14 +524,24 @@ export class ProductServiceImpl {
       currency: p.currency,
 
       categoryId: p.categoryId,
+      brandId: p.brandId ?? "",
+      tagIds: p.tagIds ?? [],
 
-      thumbnailUrl: p.thumbnailUrl ?? "",
-      model3dUrl: p.model3dUrl ?? "",
+      thumbnailMediaId: p.thumbnailMediaId ?? "",
+      thumbnailTitle: p.thumbnailTitle ?? "",
+      thumbnailAlt: p.thumbnailAlt ?? "",
+      thumbnailTitleOverride: publicOnly
+        ? undefined
+        : (p.thumbnailTitle ?? undefined),
+      thumbnailAltOverride: publicOnly
+        ? undefined
+        : (p.thumbnailAlt ?? undefined),
+      thumbnailUrl: p.thumbnailMediaId
+        ? `/api/v1/media/render/${p.thumbnailMediaId}`
+        : "",
       model3dFormat: p.model3dFormat ?? "",
       model3dLiveView: !!p.model3dLiveView,
-      model3dPosterUrl: p.model3dPosterUrl ?? "",
       vrEnabled: !!p.vrEnabled,
-      vrPlanImageUrl: p.vrPlanImageUrl ?? "",
       metaTitle: p.metaTitle ?? "",
       metaDescription: p.metaDescription ?? "",
       metaKeywords: p.metaKeywords ?? "",
@@ -435,8 +562,9 @@ export class ProductServiceImpl {
         hasDiscount && p.discountStart ? p.discountStart.toISOString() : "",
       discountEnd:
         hasDiscount && p.discountEnd ? p.discountEnd.toISOString() : "",
-      effectivePrice: this.effectivePrice(p),
-      tags: p.tags ?? [],
+      effectivePrice: effectivePrice.toNumber(),
+      effectivePriceAmount: effectivePrice.toFixed(2),
+      tags: publicOnly ? [] : (p.tags ?? []),
       complementaryIds: p.complementaryIds ?? [],
       createdAt: p.createdAt ? p.createdAt.toISOString() : "",
       updatedAt: p.updatedAt ? p.updatedAt.toISOString() : "",
@@ -514,7 +642,12 @@ export class ProductServiceImpl {
         throw new BadRequestException(`Category ${categoryId} does not exist`);
       }
 
-      if (t.scope !== "product" || t.kind !== "category.default") {
+      if (
+        t.id !== categoryId ||
+        t.scope !== "product" ||
+        t.kind !== "category.default" ||
+        t.isHidden
+      ) {
         throw new BadRequestException(
           `Category ${categoryId} is not a valid product.category.default taxonomy`,
         );
@@ -524,6 +657,156 @@ export class ProductServiceImpl {
         throw new BadRequestException(`Category ${categoryId} does not exist`);
       }
       throw e;
+    }
+  }
+
+  private async assertProductTaxonomy(
+    id: string,
+    kind: "brand" | "tag",
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<void> {
+    try {
+      const result = await wrapGrpc(
+        firstValueFrom(
+          this.taxonomy(downstream).GetTaxonomy({ id }, downstream?.metadata),
+        ),
+      );
+      const record = result?.data;
+      if (
+        !record ||
+        record.id !== id ||
+        record.scope !== "product" ||
+        record.kind !== kind ||
+        record.isHidden
+      ) {
+        throw new BadRequestException(`product_${kind}_invalid`);
+      }
+    } catch (error: unknown) {
+      if (error instanceof NotFoundException) {
+        throw new BadRequestException(`product_${kind}_invalid`);
+      }
+      throw error;
+    }
+  }
+
+  private async validateTagIds(
+    ids: string[],
+    downstream?: VerifiedServiceDownstreamContext,
+  ): Promise<string[]> {
+    if (ids.length > 64 || new Set(ids).size !== ids.length) {
+      throw new BadRequestException("product_tag_ids_invalid");
+    }
+    const ordered = [...ids].sort();
+    for (const id of ordered) {
+      await this.assertProductTaxonomy(id, "tag", downstream);
+    }
+    return ordered;
+  }
+
+  private async assertPublishReferences(
+    id: string,
+    patch: ProductPatchInput,
+    next: {
+      categoryId?: string;
+      brandId?: string | null;
+      tagIds?: string[];
+      thumbnailMediaId?: string;
+    },
+    downstream?: VerifiedServiceDownstreamContext,
+    shopCurrency?: string,
+    descriptions?: DescriptionCache,
+  ): Promise<void> {
+    const current = await this.prisma.product.findUnique({
+      where: { id },
+      select: {
+        categoryId: true,
+        brandId: true,
+        tagIds: true,
+        tags: true,
+        thumbnailUrl: true,
+        thumbnailMediaId: true,
+        currency: true,
+      },
+    });
+    if (!current) throw new NotFoundException("product_not_found");
+
+    await this.assertCategoryExists(
+      next.categoryId ?? current.categoryId,
+      downstream,
+    );
+    const brandId = next.brandId === undefined ? current.brandId : next.brandId;
+    if (brandId) await this.assertProductTaxonomy(brandId, "brand", downstream);
+    await this.validateTagIds(next.tagIds ?? current.tagIds ?? [], downstream);
+    if ((patch.tags ?? current.tags).length > 0) {
+      throw new BadRequestException("product_legacy_tags_unresolved");
+    }
+
+    const thumbnailMediaId = patch.clearThumbnailMedia
+      ? null
+      : (next.thumbnailMediaId ?? current.thumbnailMediaId);
+    if (thumbnailMediaId) {
+      await this.resolveProductMediaId(
+        thumbnailMediaId,
+        "THUMBNAIL",
+        downstream,
+        descriptions,
+      );
+    } else if (!patch.clearThumbnailMedia && current.thumbnailUrl?.trim()) {
+      throw new BadRequestException("product_legacy_thumbnail_unresolved");
+    }
+
+    const gallery = await this.prisma.productGalleryImage.findMany({
+      where: { productId: id, deletedAt: null },
+      select: { mediaId: true, url: true },
+    });
+    for (const image of gallery) {
+      if (!image.mediaId) {
+        if (image.url.trim()) {
+          throw new BadRequestException("product_legacy_gallery_unresolved");
+        }
+        continue;
+      }
+      await this.resolveProductMediaId(
+        image.mediaId,
+        "GALLERY",
+        downstream,
+        descriptions,
+      );
+    }
+    if (
+      current.currency !==
+      (shopCurrency ?? (await this.getShopCurrency(downstream)))
+    ) {
+      throw new BadRequestException("product_currency_mismatch");
+    }
+  }
+
+  private async assertPublicEligibility(
+    id: string,
+    currency: string,
+    shopCurrency?: string,
+    descriptions?: DescriptionCache,
+  ): Promise<void> {
+    try {
+      const configuredCurrency = shopCurrency ?? (await this.getShopCurrency());
+      if (currency !== configuredCurrency) {
+        throw new ServiceUnavailableException("product_currency_mismatch");
+      }
+      await this.assertPublishReferences(
+        id,
+        {},
+        {},
+        undefined,
+        configuredCurrency,
+        descriptions,
+      );
+    } catch (error: unknown) {
+      if (error instanceof HttpException) {
+        throw new ServiceUnavailableException(
+          "product_public_reference_invalid",
+        );
+      }
+      throw error;
     }
   }
 
@@ -713,14 +996,29 @@ export class ProductServiceImpl {
     return state;
   }
 
+  private assertNoDeferredMediaUrls(input: object): void {
+    for (const field of ["model3dUrl", "model3dPosterUrl", "vrPlanImageUrl"]) {
+      if (Object.prototype.hasOwnProperty.call(input, field)) {
+        throw new BadRequestException("product_deferred_media_url_disabled");
+      }
+    }
+  }
+
   // ---- Create ----
   async create(
     n: ProductInputDto,
     downstream?: VerifiedServiceDownstreamContext,
   ) {
     const input = n;
+    this.assertNoDeferredMediaUrls(input);
     this.assertCreate(input);
     this.assertPrice(input.price);
+    if (input.thumbnailUrl?.trim()) {
+      throw new BadRequestException("thumbnail_media_id_required");
+    }
+    if (input.tags?.length) {
+      throw new BadRequestException("product_tag_ids_required");
+    }
     const inventory = this.createInventoryState(input);
 
     const title = input.title;
@@ -730,11 +1028,22 @@ export class ProductServiceImpl {
     const categoryId =
       input.categoryId ?? (await this.getDefaultCategoryId(downstream));
     await this.assertCategoryExists(categoryId, downstream);
+    if (input.brandId) {
+      await this.assertProductTaxonomy(input.brandId, "brand", downstream);
+    }
+    const tagIds = await this.validateTagIds(input.tagIds ?? [], downstream);
 
     const currency = await this.resolveProductCurrency(
       input.currency,
       downstream,
     );
+    const thumbnailMediaId = input.thumbnailMediaId
+      ? await this.resolveProductMediaId(
+          input.thumbnailMediaId,
+          "THUMBNAIL",
+          downstream,
+        )
+      : null;
     const discount = this.createDiscountState(input);
     const selectionMode =
       asSelectionMode(input.selectionMode) ?? ProductSelectionMode.BASE;
@@ -777,16 +1086,26 @@ export class ProductServiceImpl {
             skuReservation: { create: { sku } },
 
             categoryId,
+            brandId: input.brandId || null,
+            tagIds,
 
             // ✅ use normalized camelCase
-            thumbnailUrl: input.thumbnailUrl,
-            model3dUrl: input.model3dUrl,
+            thumbnailUrl: null,
+            thumbnailMediaId,
+            thumbnailTitle: descriptiveText(
+              input.thumbnailTitle,
+              "thumbnailTitle",
+              200,
+            ),
+            thumbnailAlt: descriptiveText(
+              input.thumbnailAlt,
+              "thumbnailAlt",
+              180,
+            ),
             model3dFormat: input.model3dFormat,
             model3dLiveView: !!input.model3dLiveView,
-            model3dPosterUrl: input.model3dPosterUrl,
 
             vrEnabled: !!input.vrEnabled,
-            vrPlanImageUrl: input.vrPlanImageUrl,
 
             metaTitle: input.metaTitle,
             metaDescription: input.metaDescription,
@@ -802,13 +1121,13 @@ export class ProductServiceImpl {
 
             ...discount,
 
-            tags: input.tags ?? [],
+            tags: [],
             complementaryIds: input.complementaryIds ?? [],
             ...inventory,
           },
           include: { variants: true },
         });
-        return { data: this.toDto(data) };
+        return { data: await this.describeProduct(data) };
       } catch (e) {
         if (!explicitSlug && isUniqueConflictFor(e, "slug")) {
           slugAttempt += 1;
@@ -834,6 +1153,7 @@ export class ProductServiceImpl {
     downstream?: VerifiedServiceDownstreamContext,
   ) {
     const patch = n ?? {};
+    this.assertNoDeferredMediaUrls(patch);
     if (
       !Number.isInteger(expectedVersion) ||
       (expectedVersion ?? 0) < 1 ||
@@ -842,6 +1162,18 @@ export class ProductServiceImpl {
       throw new BadRequestException("expected_version_invalid");
     }
     if (patch.price != null) this.assertPrice(patch.price);
+    if (patch.thumbnailUrl?.trim()) {
+      throw new BadRequestException("thumbnail_media_id_required");
+    }
+    if (patch.tags?.length) {
+      throw new BadRequestException("product_tag_ids_required");
+    }
+    if (patch.clearBrand && patch.brandId !== undefined) {
+      throw new BadRequestException("product_brand_patch_conflict");
+    }
+    if (patch.clearThumbnailMedia && patch.thumbnailMediaId !== undefined) {
+      throw new BadRequestException("thumbnail_media_patch_conflict");
+    }
     const nextSku = patch.sku?.trim() || undefined;
     const nextSelectionMode = asSelectionMode(patch.selectionMode);
     if (patch.selectionMode !== undefined && !nextSelectionMode) {
@@ -882,8 +1214,27 @@ export class ProductServiceImpl {
       throw new BadRequestException("product_variant_base_stock_invalid");
     }
 
+    if (
+      patch.clearThumbnailMedia &&
+      (patch.thumbnailTitle !== undefined ||
+        patch.thumbnailAlt !== undefined ||
+        patch.clearThumbnailTitle ||
+        patch.clearThumbnailAlt)
+    )
+      throw new BadRequestException("thumbnail_text_patch_conflict");
+    // Validate text before any transactional mutation or downstream effect.
+    textPatch(
+      patch.thumbnailTitle,
+      patch.clearThumbnailTitle,
+      "thumbnailTitle",
+      200,
+    );
+    textPatch(patch.thumbnailAlt, patch.clearThumbnailAlt, "thumbnailAlt", 180);
     let nextCategoryId: string | undefined;
     let nextCurrency: string | undefined;
+    let nextThumbnailMediaId: string | undefined;
+    let nextBrandId: string | null | undefined;
+    let nextTagIds: string[] | undefined;
 
     // ✅ Only change category if the client actually sent categoryId
     if (patch.categoryId !== undefined) {
@@ -899,6 +1250,36 @@ export class ProductServiceImpl {
     if (patch.currency !== undefined && patch.currency.trim() !== "") {
       nextCurrency = await this.resolveProductCurrency(
         patch.currency,
+        downstream,
+      );
+    }
+
+    if (patch.thumbnailMediaId !== undefined) {
+      nextThumbnailMediaId = await this.resolveProductMediaId(
+        patch.thumbnailMediaId,
+        "THUMBNAIL",
+        downstream,
+      );
+    }
+    if (patch.brandId !== undefined) {
+      await this.assertProductTaxonomy(patch.brandId, "brand", downstream);
+      nextBrandId = patch.brandId;
+    } else if (patch.clearBrand) {
+      nextBrandId = null;
+    }
+    if (patch.tagIds !== undefined) {
+      nextTagIds = await this.validateTagIds(patch.tagIds, downstream);
+    }
+    if (patch.status === ProductStatusDto.ACTIVE) {
+      await this.assertPublishReferences(
+        id,
+        patch,
+        {
+          categoryId: nextCategoryId,
+          brandId: nextBrandId,
+          tagIds: nextTagIds,
+          thumbnailMediaId: nextThumbnailMediaId,
+        },
         downstream,
       );
     }
@@ -957,7 +1338,14 @@ export class ProductServiceImpl {
       }
 
       const data = await this.prisma.product.update({
-        where: { id, version: expectedVersion },
+        where: {
+          id,
+          version: expectedVersion,
+          // A stock replacement must not overwrite quantities held by checkout.
+          ...(changesInventory || nextSelectionMode !== undefined
+            ? { heldStockLines: { none: {} } }
+            : {}),
+        },
         data: {
           title: patch.title ?? undefined,
           description: patch.description ?? undefined,
@@ -973,14 +1361,35 @@ export class ProductServiceImpl {
 
           // ✅ Only set when we actually decided a nextCategoryId
           categoryId: nextCategoryId,
+          brandId: nextBrandId,
+          tagIds: nextTagIds,
 
-          thumbnailUrl: patch.thumbnailUrl ?? undefined,
-          model3dUrl: patch.model3dUrl ?? undefined,
+          thumbnailUrl:
+            patch.clearThumbnailMedia || nextThumbnailMediaId !== undefined
+              ? null
+              : undefined,
+          thumbnailTitle: patch.clearThumbnailMedia
+            ? null
+            : textPatch(
+                patch.thumbnailTitle,
+                patch.clearThumbnailTitle,
+                "thumbnailTitle",
+                200,
+              ),
+          thumbnailAlt: patch.clearThumbnailMedia
+            ? null
+            : textPatch(
+                patch.thumbnailAlt,
+                patch.clearThumbnailAlt,
+                "thumbnailAlt",
+                180,
+              ),
+          thumbnailMediaId: patch.clearThumbnailMedia
+            ? null
+            : nextThumbnailMediaId,
           model3dFormat: patch.model3dFormat ?? undefined,
           model3dLiveView: patch.model3dLiveView ?? undefined,
-          model3dPosterUrl: patch.model3dPosterUrl ?? undefined,
           vrEnabled: patch.vrEnabled ?? undefined,
-          vrPlanImageUrl: patch.vrPlanImageUrl ?? undefined,
           metaTitle: patch.metaTitle ?? undefined,
           metaDescription: patch.metaDescription ?? undefined,
           metaKeywords: patch.metaKeywords ?? undefined,
@@ -1001,7 +1410,7 @@ export class ProductServiceImpl {
           variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
         },
       });
-      return { data: this.toDto(data) };
+      return { data: await this.describeProduct(data) };
     } catch (e) {
       if (isPrismaCode(e, "P2025")) {
         const existing = await this.prisma.product.findUnique({
@@ -1109,6 +1518,12 @@ export class ProductServiceImpl {
               patch.stockQuantity === undefined
                 ? undefined
                 : variantQuantity(patch.stockQuantity);
+            if (stockQuantity !== undefined) {
+              const held = await tx.checkoutStockLine.count({
+                where: { heldVariantId: current.id },
+              });
+              if (held > 0) throw new ConflictException("checkout_stock_held");
+            }
             if (
               !product.trackInventory &&
               stockQuantity !== undefined &&
@@ -1146,7 +1561,7 @@ export class ProductServiceImpl {
             variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
           },
         });
-        return { data: this.toDto(updated) };
+        return { data: await this.describeProduct(updated) };
       });
     } catch (e) {
       if (isPrismaCode(e, "P2002")) {
@@ -1208,7 +1623,14 @@ export class ProductServiceImpl {
       },
     });
     if (!p) throw new NotFoundException("product_not_found");
-    return { data: this.toDto(p) };
+    const descriptions: DescriptionCache = new Map();
+    await this.assertPublicEligibility(
+      p.id,
+      p.currency,
+      undefined,
+      descriptions,
+    );
+    return { data: await this.describeProduct(p, true, descriptions) };
   }
 
   async getAdmin(id: string) {
@@ -1217,7 +1639,7 @@ export class ProductServiceImpl {
       include: { variants: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
     });
     if (!p) throw new NotFoundException("product_not_found");
-    return { data: this.toDto(p) };
+    return { data: await this.describeProduct(p) };
   }
 
   async listPublic(req: PublicListProductsInput) {
@@ -1305,7 +1727,26 @@ export class ProductServiceImpl {
       this.prisma.product.count({ where }),
     ]);
 
-    return { data: rows.map(this.toDto), total };
+    const descriptions: DescriptionCache = new Map();
+    if (publicOnly && rows.length > 0) {
+      const shopCurrency = await this.getShopCurrency();
+      await Promise.all(
+        rows.map((row) =>
+          this.assertPublicEligibility(
+            row.id,
+            row.currency,
+            shopCurrency,
+            descriptions,
+          ),
+        ),
+      );
+    }
+    return {
+      data: await Promise.all(
+        rows.map((row) => this.describeProduct(row, publicOnly, descriptions)),
+      ),
+      total,
+    };
   }
 
   // ---- Soft delete / restore / hard delete ----
@@ -1316,7 +1757,7 @@ export class ProductServiceImpl {
         data: { deletedAt: new Date(), version: { increment: 1 } },
         include: { variants: true },
       });
-      return { data: this.toDto(data) };
+      return { data: await this.describeProduct(data) };
     } catch (e) {
       throw mapPrisma(e, { missingTarget: "product_not_found" });
     }
@@ -1329,7 +1770,7 @@ export class ProductServiceImpl {
         data: { deletedAt: null, version: { increment: 1 } },
         include: { variants: true },
       });
-      return { data: this.toDto(data) };
+      return { data: await this.describeProduct(data) };
     } catch (e) {
       throw mapPrisma(e, { missingTarget: "product_not_found" });
     }
@@ -1341,7 +1782,7 @@ export class ProductServiceImpl {
         where: { id },
         include: { variants: true },
       });
-      return { data: this.toDto(data) };
+      return { data: await this.describeProduct(data) };
     } catch (e) {
       throw mapPrisma(e, {
         missingTarget: "product_not_found",
@@ -1446,14 +1887,25 @@ export class ProductServiceImpl {
     if (!product) throw new NotFoundException("product_not_found");
   }
 
-  private listGalleryRows(productId: string, includeDeleted: boolean) {
+  private listGalleryRows(
+    productId: string,
+    includeDeleted: boolean,
+    publicOnly = false,
+  ) {
     return this.prisma.productGalleryImage.findMany({
-      where: { productId, ...(includeDeleted ? {} : { deletedAt: null }) },
+      where: {
+        productId,
+        ...(includeDeleted ? {} : { deletedAt: null }),
+        ...(publicOnly ? { mediaId: { not: null } } : {}),
+      },
       orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }],
       select: {
         id: true,
         url: true,
+        mediaId: true,
         alt: true,
+        title: true,
+        metadataVersion: true,
         sortOrder: true,
         deletedAt: true,
       },
@@ -1462,10 +1914,37 @@ export class ProductServiceImpl {
 
   async addImages(
     productId: string,
-    images: { url: string; alt?: string; sort?: number }[],
+    images: {
+      url?: string;
+      mediaId?: string;
+      alt?: string | null;
+      title?: string | null;
+      sort?: number;
+    }[],
+    downstream?: VerifiedServiceDownstreamContext,
   ) {
     try {
       await this.assertProductExists(productId);
+
+      const resolved = await Promise.all(
+        (images ?? []).map(async (image) => {
+          if (image.mediaId && image.url?.trim()) {
+            throw new BadRequestException("gallery_media_input_conflict");
+          }
+          if (image.mediaId) {
+            return {
+              image,
+              mediaId: await this.resolveProductMediaId(
+                image.mediaId,
+                "GALLERY",
+                downstream,
+              ),
+              url: "",
+            };
+          }
+          throw new BadRequestException("gallery_media_id_required");
+        }),
+      );
 
       const max = await this.prisma.productGalleryImage.findFirst({
         where: { productId, deletedAt: null },
@@ -1474,20 +1953,80 @@ export class ProductServiceImpl {
       });
       let next = (max?.sortOrder ?? -1) + 1;
 
-      const data = (images ?? []).map((img) => ({
+      const data = resolved.map(({ image, mediaId, url }) => ({
         productId,
-        url: img.url,
-        alt: img.alt ?? null,
-        sortOrder: Number.isInteger(img.sort) ? (img.sort as number) : next++,
+        url,
+        mediaId,
+        alt: descriptiveText(image.alt, "alt", 180) ?? null,
+        title: descriptiveText(image.title, "title", 200) ?? null,
+        sortOrder: Number.isInteger(image.sort)
+          ? (image.sort as number)
+          : next++,
       }));
 
       if (data.length) {
         await this.prisma.productGalleryImage.createMany({ data });
       }
-      return this.listGalleryRows(productId, false);
+      return this.describeGallery(await this.listGalleryRows(productId, false));
     } catch (e) {
       throw mapPrisma(e);
     }
+  }
+
+  async updateImageMetadata(
+    productId: string,
+    imageId: string,
+    input: {
+      expectedVersion: number;
+      title?: string | null;
+      alt?: string | null;
+      clearTitle?: boolean;
+      clearAlt?: boolean;
+    },
+  ) {
+    if (
+      !Number.isInteger(input.expectedVersion) ||
+      input.expectedVersion < 1 ||
+      input.expectedVersion >= 2147483647
+    )
+      throw new BadRequestException("metadata_version_invalid");
+    const title = textPatch(input.title, input.clearTitle, "title", 200);
+    const alt = textPatch(input.alt, input.clearAlt, "alt", 180);
+    if (title === undefined && alt === undefined)
+      throw new BadRequestException("metadata_patch_empty");
+    await this.prisma.$transaction(async (tx) => {
+      // Coordinate with Product's existing deletion lock; do not increment its commercial version.
+      const products = await tx.$queryRaw<
+        Array<{ id: string }>
+      >`SELECT "id" FROM "Product" WHERE "id" = ${productId} AND "deletedAt" IS NULL FOR UPDATE`;
+      if (products.length !== 1)
+        throw new NotFoundException("product_not_found");
+      const changed = await tx.productGalleryImage.updateMany({
+        where: {
+          id: imageId,
+          productId,
+          deletedAt: null,
+          metadataVersion: input.expectedVersion,
+        },
+        data: {
+          ...(title === undefined ? {} : { title }),
+          ...(alt === undefined ? {} : { alt }),
+          metadataVersion: { increment: 1 },
+        },
+      });
+      if (changed.count !== 1) {
+        const row = await tx.productGalleryImage.findFirst({
+          where: { id: imageId, productId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!row)
+          throw new NotFoundException("product_gallery_image_not_found");
+        throw new ConflictException(
+          "product_gallery_metadata_version_conflict",
+        );
+      }
+    });
+    return this.listAdminGallery(productId, false);
   }
 
   async listPublicGallery(productId: string) {
@@ -1498,15 +2037,28 @@ export class ProductServiceImpl {
         deletedAt: null,
         ...this.publicAvailabilityWhere(),
       },
-      select: { id: true },
+      select: { id: true, currency: true },
     });
     if (!visible) throw new NotFoundException("product_not_found");
-    return this.listGalleryRows(productId, false);
+    const descriptions: DescriptionCache = new Map();
+    await this.assertPublicEligibility(
+      productId,
+      visible.currency,
+      undefined,
+      descriptions,
+    );
+    return this.describeGallery(
+      await this.listGalleryRows(productId, false, true),
+      true,
+      descriptions,
+    );
   }
 
   async listAdminGallery(productId: string, includeDeleted = false) {
     await this.assertProductExists(productId);
-    return this.listGalleryRows(productId, includeDeleted);
+    return this.describeGallery(
+      await this.listGalleryRows(productId, includeDeleted),
+    );
   }
 
   async reorderImages(
@@ -1556,7 +2108,7 @@ export class ProductServiceImpl {
           ),
       );
 
-      return this.listGalleryRows(productId, false);
+      return this.describeGallery(await this.listGalleryRows(productId, false));
     } catch (e) {
       throw mapPrisma(e);
     }
@@ -1586,7 +2138,7 @@ export class ProductServiceImpl {
       }
 
       // return including deleted so callers can see state
-      return this.listGalleryRows(productId, true);
+      return this.describeGallery(await this.listGalleryRows(productId, true));
     } catch (e) {
       throw mapPrisma(e, { missingTarget: "image_not_found" });
     }

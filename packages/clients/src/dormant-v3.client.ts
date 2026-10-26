@@ -259,7 +259,14 @@ export function getDormantBlogTaxonomyV3(
   });
 }
 
-type OrderV3Method = keyof OrderProxy;
+// New admin reads are post-R5 and await the paused F4 compatibility audit.
+type OrderV3Method = Exclude<
+  keyof OrderProxy,
+  | "AdminGetOrder"
+  | "AdminListOrders"
+  | "StartDemoPayment"
+  | "ResolveDemoPayment"
+>;
 export type DormantOrderV3Proxy = DormantV3Proxy<OrderProxy, OrderV3Method>;
 
 export function getDormantOrderV3(
@@ -284,7 +291,11 @@ export function getDormantOrderV3(
   });
 }
 
-type MediaV3Method = keyof MediaProxy;
+// New image operations remain on the active v2 boundary; F4 v3 is frozen.
+type MediaV3Method = Exclude<
+  keyof MediaProxy,
+  "GetDerivatives" | "RegenerateDerivatives" | "UpdateMetadata"
+>;
 export type DormantMediaV3Proxy = DormantV3Proxy<MediaProxy, MediaV3Method>;
 
 export function getDormantMediaV3(
@@ -298,6 +309,8 @@ export function getDormantMediaV3(
     policy,
     bindings: {
       GetByIdV3: media.MediaServiceService.getByIdV3,
+      ResolveProductReferenceV3:
+        media.MediaServiceService.resolveProductReferenceV3,
       ListPublicLibraryV3: media.MediaServiceService.listPublicLibraryV3,
       ListProtectedLibraryV3: media.MediaServiceService.listProtectedLibraryV3,
       ListStrictLibraryV3: media.MediaServiceService.listStrictLibraryV3,

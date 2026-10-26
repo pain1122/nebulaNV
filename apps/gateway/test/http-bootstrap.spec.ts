@@ -312,7 +312,7 @@ describe("gateway HTTP bootstrap", () => {
     const response = await request(app.getHttpServer())
       .get("/api/v1/probe")
       .set("Origin", "http://localhost:3000")
-      .set("X-Nebula-Client-ID", ["admin-web-local", "mobile-local"])
+      .set({ "X-Nebula-Client-ID": ["admin-web-local", "mobile-local"] })
       .expect(400);
     expect(response.body).toEqual({
       error: {

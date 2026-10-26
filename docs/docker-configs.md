@@ -9,7 +9,7 @@ Use this as a map. Do not duplicate full deployment instructions here; detailed 
 ## Main Files
 
 - `docker-compose.yml`: local/dev backend stack with build blocks.
-- `docker-bake.hcl`: official ten-image backend target set.
+- `docker-bake.hcl`: official eleven-image backend target set.
 - `docker-compose.release.yml`: release stack with prebuilt/preloaded images only.
 - `docker/backend.Dockerfile`: shared multi-stage backend image builder.
 - `.dockerignore`: root Docker build context filter.
@@ -122,14 +122,23 @@ Purpose:
   eleven backend/ingress services.
 - Uses `pnpm fetch` for dependency cache.
 - Copies package manifests first for better Docker layer caching.
-- Copies Prisma schemas before install because workspace postinstall runs Prisma generation.
+- Prunes the selected graph and separates fetch, frozen install, selected Prisma
+  generation and compilation. Approved native install scripts remain enabled;
+  workspace Prisma postinstall is replaced only in generated install manifests
+  by explicit, selected-owner generation after install.
 - Serializes build-stage dependency lifecycle scripts so the Prisma services do
   not open concurrent engine-download connections through Docker Desktop. This
   can make a cold install slower, while the dependency layer remains cached by
   the lockfile and manifests.
 - Excludes host-generated proto TypeScript from the Docker context and regenerates it through the package-owned pinned toolchain before compiling `@nebula/protos`.
-- Runs one shared backend build through Turbo.
-- Builds the four small shared runtime packages before the cached Turbo service build. This refreshes pnpm's injected workspace copies even when Turbo would otherwise restore a shared-package build and skip its post-build synchronization hook.
+- Runs the same selected compilation union for each sequential image export in
+  a requested batch, or `all` for a full-inventory request. Direct Compose/Bake
+  targets default to their own graph; the explicit legacy override is diagnostic.
+- Builds only declared shared prerequisites in dependency order, restores cached
+  outputs and refreshes pnpm injected copies before consumers compile. This
+  preserves runtime resolution when a cache hit skips pnpm's build hook. Root
+  tooling source dependencies and shared production dependencies remain separate
+  from selected application compilation.
 - Uses a versioned Docker-only Turbo cache namespace so artifacts admitted by the runtime-import verifier are not mixed with older incompatible compiler output.
 - Creates one production workspace dependency graph instead of per-runtime
   `pnpm deploy` trees.
@@ -392,16 +401,23 @@ Save images:
 .\scripts\docker\save-release-images.ps1
 ```
 
-The save script derives the ten backend image names from the root inventory;
-the Postgres, Redis, and MinIO images remain explicit infrastructure entries.
-Use `-WhatIf` to verify the resolved repository path and complete 14-image list
-without writing the archive.
+The save script derives all runtime references from Compose, checks the eleven
+backend inventory entries, and includes Postgres, Redis, MinIO/client and the
+pinned Media scanner: sixteen unique default images. The scanner is required for
+release processing. Prefix/tag overrides are preserved; `-EnvFile` can supply the
+image environment for another deployment. Local/release image expressions are
+checked for exact parity. Use `-WhatIf` to verify the complete list without writing
+an archive. Save uses a typed string array for Windows PowerShell compatibility.
 
 Load images on deployment machine:
 
 ```powershell
 .\scripts\docker\load-release-images.ps1
 ```
+
+`-Input` remains supported as an alias for `-ArchivePath`; the internal variable
+avoids PowerShell's automatic `$Input`. Explicit paths containing spaces are
+validated through the actual wrapper before native archive execution.
 
 Start release stack:
 
@@ -448,6 +464,22 @@ Cross-platform direct equivalent:
 pnpm docker:build:backend
 ```
 
+Preview or build only selected targets:
+
+```powershell
+pnpm docker:build:backend order-service gateway --plan
+pnpm docker:build:backend order-service gateway
+.\scripts\docker\build-backend.ps1 -Services order-service,gateway -Plan
+```
+
+The plan makes no Docker calls. Selected builds stay sequential, report elapsed
+seconds and stop on the first error. Omitting service names still selects the
+full inventory with one shared full compilation. Partial-request application
+compilation is scoped per target. Product/Order use the selected-graph pilot for
+fetch/install/Prisma/compile, with native benchmark/runtime sign-off pending in
+the [ASAP cleanup](ASAP-BUILD-CLEANUP.md). Other targets retain the legacy path;
+the stable production dependency layer remains backend-wide during the pilot.
+
 Deliberate cold build:
 
 ```powershell
@@ -492,3 +524,26 @@ Release start without build:
 ```powershell
 docker compose --env-file deploy\.env.production -f docker-compose.release.yml up -d --no-build
 ```
+
+## CI build-cache boundary (2026-10-26)
+
+The eleven-image shared-graph build and offline packaged imports pass locally;
+unchanged warm full batch takes 111.1s with cached RUNs and unchanged app/config
+bytes. CI now restores the host `.turbo/cache` in both jobs, saving only successful
+main pushes with at most 1GiB. OS/architecture/policy/commit keys keep host cache
+identity explicit. This is distinct from Docker's local Turbo/pnpm cache mounts.
+
+Only the live CI job loads `.github/backend-cache.hcl` using `BUILDX_BAKE_FILE`,
+with the normal Compose/Bake files first. Independent per-image GHA v2 scopes
+retain max-mode build layers; PRs import only and main pushes can export.
+Pinned Buildx/BuildKit use a cleanup-enabled container builder. Local Compose/
+Bake and the approved Desktop resource/cache budgets are unchanged. No new
+registry credentials or paid repository cache allowance is configured.
+
+Docker exports do not persist cache mounts across new builders. Hosted cache
+transfer/round-trip performance remains pending; don't equate a local Bake render
+with a remote cache hit. Existing quality, F3/live, image scans, tracked-diff and
+14-day allowlisted evidence gates remain. Successful live scans are followed by
+`.ci-evidence/backend-tested-images.json`, which records image IDs/digests without
+Config/env/labels. Detailed trace and local checks:
+[CI cache receipt](reports/2026-10-26-build-cleanup-ci-cache.md).

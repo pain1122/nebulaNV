@@ -11,13 +11,14 @@ const PRODUCT_WRITE_FIELDS = Object.freeze([
   "content",
   "excerpt",
   "categoryId",
-  "thumbnailUrl",
-  "model3dUrl",
+  "brandId",
+  "tagIds",
+  "thumbnailMediaId",
+  "thumbnailTitle",
+  "thumbnailAlt",
   "model3dFormat",
   "model3dLiveView",
-  "model3dPosterUrl",
   "vrEnabled",
-  "vrPlanImageUrl",
   "metaTitle",
   "metaDescription",
   "metaKeywords",
@@ -39,8 +40,14 @@ const PRODUCT_WRITE_FIELDS = Object.freeze([
   "stockQuantity",
 ] as const);
 
-const PRODUCT_PATCH_FIELDS = Object.freeze([
+const PRODUCT_PATCH_MUTATION_FIELDS = Object.freeze([
   ...PRODUCT_WRITE_FIELDS,
+  "clearBrand",
+  "clearThumbnailMedia",
+] as const);
+
+const PRODUCT_PATCH_FIELDS = Object.freeze([
+  ...PRODUCT_PATCH_MUTATION_FIELDS,
   "expectedVersion",
 ] as const);
 
@@ -64,7 +71,7 @@ export const PRODUCT_INPUT_PROFILES = Object.freeze({
       {
         kind: "at-least-one",
         location: "body",
-        fields: PRODUCT_WRITE_FIELDS,
+        fields: PRODUCT_PATCH_MUTATION_FIELDS,
       },
     ],
   }),
@@ -161,6 +168,15 @@ export const PRODUCT_INPUT_PROFILES = Object.freeze({
     requiredBody: ["images"],
     rules: [
       { kind: "max-items", location: "body", field: "images", maximum: 50 },
+    ],
+  }),
+  "gallery-metadata": profile({
+    params: ["id", "imageId"],
+    requiredParams: ["id", "imageId"],
+    body: ["title", "alt", "expectedVersion"],
+    requiredBody: ["expectedVersion"],
+    rules: [
+      { kind: "at-least-one", location: "body", fields: ["title", "alt"] },
     ],
   }),
   "gallery-order": profile({

@@ -42,7 +42,7 @@ function authenticatedRequest(role: "user" | "admin" = "user") {
     actor: { kind: "authenticated", identity },
     user: identity,
     accessToken: "verified-access-token",
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
 }
 
 function metadataText(metadata: Metadata, name: string): string {
@@ -86,11 +86,13 @@ describe("GatewayUserApiService", () => {
     });
     const service = createHarness({ GetUser: getUser });
 
-    await expect(service.get(authenticatedRequest(), USER_ID)).resolves.toEqual({
-      id: USER_ID,
-      email: "person@example.test",
-      role: "user",
-    });
+    await expect(service.get(authenticatedRequest(), USER_ID)).resolves.toEqual(
+      {
+        id: USER_ID,
+        email: "person@example.test",
+        role: "user",
+      },
+    );
     const metadata = getUser.mock.calls[0]?.[1] as Metadata;
     expect(metadataText(metadata, AUTHORIZATION_HEADER)).toBe(
       "Bearer verified-access-token",
@@ -98,11 +100,12 @@ describe("GatewayUserApiService", () => {
     expect(metadataText(metadata, X_REQUEST_ID_HEADER)).toBe(
       requestContext.requestId,
     );
-    expect(
-      decodeS2SSignedContext(
-        metadataText(metadata, X_S2S_CONTEXT_HEADER),
-      ).context.actor,
-    ).toEqual({
+    const signed = decodeS2SSignedContext(
+      metadataText(metadata, X_S2S_CONTEXT_HEADER),
+    ).context;
+    if (!("actor" in signed))
+      throw new Error("expected_legacy_signed_actor_context");
+    expect(signed.actor).toEqual({
       userId: USER_ID,
       role: "user",
       sessionRef: "session-ref-1",

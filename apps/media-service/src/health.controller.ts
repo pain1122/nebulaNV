@@ -29,6 +29,26 @@ export class HealthController extends StandardHealthController {
           (await this.mediaService.checkStorageHealth()).status,
       },
       {
+        name: "processingSchema",
+        check: async () => {
+          // Scanner availability gates new approval, not already-approved
+          // delivery. Its container health is checked independently.
+          await this.prisma.$queryRaw`SELECT 1 FROM "MediaProcessingJob"
+            LEFT JOIN "MediaVerifiedSource" ON FALSE
+            LEFT JOIN "MediaObjectCleanup" ON FALSE
+            LEFT JOIN "MediaDerivativeGeneration" ON FALSE
+            LEFT JOIN "MediaDerivativeState" ON FALSE
+            LEFT JOIN "MediaDerivative" ON FALSE LIMIT 0`;
+        },
+      },
+      {
+        name: "metadataSchema",
+        check: async () => {
+          await this.prisma
+            .$queryRaw`SELECT "title", "defaultAlt", "metadataVersion" FROM "Media" LIMIT 0`;
+        },
+      },
+      {
         name: "s2sReplay",
         check: () => this.replayStore.checkReadiness(),
       },

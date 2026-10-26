@@ -18,18 +18,34 @@ const requestContext: GatewayRequestContext = Object.freeze({
 
 function gatewayRequest(): GatewayHttpRequest {
   return {
-    headers: {}, rawHeaders: [], requestContext,
-    actor: { kind: "authenticated", identity: { userId: "admin-1", role: "admin", sessionRef: "session-1" } },
+    headers: {},
+    rawHeaders: [],
+    requestContext,
+    actor: {
+      kind: "authenticated",
+      identity: { userId: "admin-1", role: "admin", sessionRef: "session-1" },
+    },
     user: { userId: "admin-1", role: "admin", sessionRef: "session-1" },
     accessToken: "admin-token",
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
 }
 
 function record(scope: "product" | "blog") {
   return {
-    id: TAXONOMY_ID, scope, kind: "category.default", slug: "desks", title: "Desks",
-    description: "", parentId: "", path: "desks", isHidden: false, isSystem: false,
-    sortOrder: 0, hasChildren: false, createdAt: "", updatedAt: "",
+    id: TAXONOMY_ID,
+    scope,
+    kind: "category.default",
+    slug: "desks",
+    title: "Desks",
+    description: "",
+    parentId: "",
+    path: "desks",
+    isHidden: false,
+    isSystem: false,
+    sortOrder: 0,
+    hasChildren: false,
+    createdAt: "",
+    updatedAt: "",
   };
 }
 
@@ -49,8 +65,14 @@ describe("GatewayTaxonomyApiService", () => {
 
   beforeEach(() => {
     process.env.GATEWAY_OUTBOUND_KEYS = JSON.stringify({
-      "product-service": { id: "gateway-product-v1", secret: "gateway-product-taxonomy-secret-0000001" },
-      "blog-service": { id: "gateway-blog-v1", secret: "gateway-blog-taxonomy-secret-0000000001" },
+      "product-service": {
+        id: "gateway-product-v1",
+        secret: "gateway-product-taxonomy-secret-0000001",
+      },
+      "blog-service": {
+        id: "gateway-blog-v1",
+        secret: "gateway-blog-taxonomy-secret-0000000001",
+      },
     });
   });
 
@@ -64,24 +86,38 @@ describe("GatewayTaxonomyApiService", () => {
       Create: jest.fn(() => of({ data: record("product") })),
     });
     const blogRaw = rawFacade({});
-    const productClient = { getService: jest.fn(() => productRaw) } as unknown as ClientGrpc;
-    const blogClient = { getService: jest.fn(() => blogRaw) } as unknown as ClientGrpc;
+    const productClient = {
+      getService: jest.fn(() => productRaw),
+    } as unknown as ClientGrpc;
+    const blogClient = {
+      getService: jest.fn(() => blogRaw),
+    } as unknown as ClientGrpc;
     const service = new GatewayTaxonomyApiService(productClient, blogClient);
 
     await service.create(gatewayRequest(), "product", {
-      kind: "category.default", slug: "desks", title: "Desks",
+      kind: "category.default",
+      slug: "desks",
+      title: "Desks",
     });
-    expect(productClient.getService).toHaveBeenCalledWith("ProductTaxonomyService");
+    expect(productClient.getService).toHaveBeenCalledWith(
+      "ProductTaxonomyService",
+    );
     expect(blogClient.getService).not.toHaveBeenCalled();
     expect(productRaw.Create.mock.calls[0]?.[0]).not.toHaveProperty("scope");
   });
 
   it("rejects a facade response with the wrong fixed scope", async () => {
     const productClient = {
-      getService: jest.fn(() => rawFacade({ Get: jest.fn(() => of({ data: record("blog") })) })),
+      getService: jest.fn(() =>
+        rawFacade({ Get: jest.fn(() => of({ data: record("blog") })) }),
+      ),
     } as unknown as ClientGrpc;
-    const blogClient = { getService: jest.fn(() => rawFacade({})) } as unknown as ClientGrpc;
+    const blogClient = {
+      getService: jest.fn(() => rawFacade({})),
+    } as unknown as ClientGrpc;
     const service = new GatewayTaxonomyApiService(productClient, blogClient);
-    await expect(service.get(gatewayRequest(), "product", TAXONOMY_ID)).rejects.toMatchObject({ status: 502 });
+    await expect(
+      service.get(gatewayRequest(), "product", TAXONOMY_ID),
+    ).rejects.toMatchObject({ status: 502 });
   });
 });

@@ -5,7 +5,11 @@ import {
   NotFoundException,
   ForbiddenException,
   OnModuleDestroy,
+  Optional,
+  ConflictException,
+  UnauthorizedException,
 } from "@nestjs/common";
+import { textPatch } from "./descriptive-text";
 import { safeErrorName } from "@packages/config";
 import { PrismaService } from "./prisma.service";
 import { CreateMediaDto, ListMediaDto, PresignUploadDto } from "./dto";
@@ -27,6 +31,14 @@ import {
 } from "../prisma/generated";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Readable } from "node:stream";
+import { processingPolicy } from "./processing/processing-policy";
+import { MediaDerivativeStore } from "./processing/media-derivative.store";
+import { derivativesEnabled } from "./processing/derivative-policy";
+import {
+  signUploadBinding,
+  matchesUploadBinding,
+  UPLOAD_BINDING_METADATA,
+} from "./processing/upload-binding";
 
 const SAFE_FILENAME = /^[a-zA-Z0-9][a-zA-Z0-9._()-]*$/;
 const SAFE_FOLDER_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
@@ -177,7 +189,28 @@ const SCAN_STATUS_SET = new Set<string>(Object.values(ScanStatus));
 @Injectable()
 export class MediaService implements OnModuleDestroy {
   private readonly log = new Logger(MediaService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional()
+    private readonly derivatives: MediaDerivativeStore = new MediaDerivativeStore(
+      prisma,
+    ),
+  ) {}
+
+  async regenerateDerivatives(
+    id: string,
+    recipes?: unknown[],
+    retryFailed = false,
+  ) {
+    if (!derivativesEnabled())
+      throw new BadRequestException("media_derivative_processing_disabled");
+    await this.derivatives.enqueue(id, recipes, retryFailed);
+    return this.derivatives.snapshot(id);
+  }
+
+  async getDerivatives(id: string) {
+    return this.derivatives.snapshot(id);
+  }
   private internalS3?: S3Client;
   private publicS3?: S3Client;
 
@@ -1351,11 +1384,13 @@ export class MediaService implements OnModuleDestroy {
 
       sha256: dto.sha256 ?? null,
 
-      status: MediaStatus.READY,
-      scanStatus: ScanStatus.CLEAN,
+      // Local metadata registration is not evidence of a real file scan.
+      status: MediaStatus.PENDING,
+      scanStatus: ScanStatus.NONE,
+      scanError: "local_media_not_verified",
       quarantineReason: null,
       etag: null,
-      promotedAt: new Date(),
+      promotedAt: null,
     };
 
     return this.prisma.media.create({ data });
@@ -1365,6 +1400,103 @@ export class MediaService implements OnModuleDestroy {
     const row = await this.prisma.media.findUnique({ where: { id } });
     if (!row) throw new NotFoundException("media_not_found");
     return row;
+  }
+
+  private async approvedStorageObject(row: Media) {
+    const source = await this.prisma.mediaVerifiedSource.findUnique({
+      where: { mediaId: row.id },
+    });
+    if (source) return { bucket: source.bucket, path: source.path };
+    const job = await this.prisma.mediaProcessingJob.findUnique({
+      where: { mediaId: row.id },
+      select: { id: true },
+    });
+    if (job) throw new ForbiddenException("media_verified_source_missing");
+    // Only pre-pipeline approvals retain the compatibility render object.
+    return {
+      bucket: row.bucket ?? process.env.MEDIA_S3_BUCKET ?? "media",
+      path: row.path,
+    };
+  }
+
+  async updateMetadata(
+    id: string,
+    input: {
+      expectedVersion: number;
+      title?: string | null;
+      defaultAlt?: string | null;
+      clearTitle?: boolean;
+      clearDefaultAlt?: boolean;
+    },
+    actor?: { userId?: string | null; role?: string | null },
+  ) {
+    if (!actor?.userId) throw new UnauthorizedException("missing_user_context");
+    if (actor.role !== "admin" && actor.role !== "root-admin")
+      throw new ForbiddenException("media_metadata_admin_required");
+    if (
+      !Number.isInteger(input.expectedVersion) ||
+      input.expectedVersion < 1 ||
+      input.expectedVersion >= 2147483647
+    )
+      throw new BadRequestException("metadata_version_invalid");
+    const title = textPatch(input.title, input.clearTitle, "title", 200);
+    const defaultAlt = textPatch(
+      input.defaultAlt,
+      input.clearDefaultAlt,
+      "defaultAlt",
+      180,
+    );
+    if (title === undefined && defaultAlt === undefined)
+      throw new BadRequestException("metadata_patch_empty");
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.media.updateMany({
+        where: {
+          id,
+          status: { not: MediaStatus.DELETED },
+          metadataVersion: input.expectedVersion,
+        },
+        data: {
+          ...(title === undefined ? {} : { title }),
+          ...(defaultAlt === undefined ? {} : { defaultAlt }),
+          metadataVersion: { increment: 1 },
+        },
+      });
+      if (result.count !== 1) {
+        const row = await tx.media.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+        if (!row || row.status === MediaStatus.DELETED)
+          throw new NotFoundException("media_not_found");
+        throw new ConflictException("media_metadata_version_conflict");
+      }
+      return tx.media.findUniqueOrThrow({ where: { id } });
+    });
+  }
+
+  async resolveProductReference(id: string, role: string) {
+    if (role !== "THUMBNAIL" && role !== "GALLERY") {
+      throw new BadRequestException("product_media_role_invalid");
+    }
+    const row = await this.getById(id);
+    this.assertPublicLibraryMedia(row);
+    if (
+      row.status !== MediaStatus.READY ||
+      row.scanStatus !== ScanStatus.CLEAN ||
+      row.storage !== "s3" ||
+      !ALLOWED_PRESIGN_MIME.has(row.mimeType)
+    ) {
+      throw new ForbiddenException("product_media_not_renderable");
+    }
+    await this.approvedStorageObject(row);
+    return {
+      mediaId: row.id,
+      role,
+      renderPath: `/api/v1/media/render/${row.id}`,
+      mimeType: row.mimeType,
+      title: row.title ?? undefined,
+      defaultAlt: row.defaultAlt ?? undefined,
+    };
   }
 
   async getPublicLibraryById(id: string) {
@@ -1646,7 +1778,7 @@ export class MediaService implements OnModuleDestroy {
       throw new BadRequestException("mimeType_not_allowed");
     }
 
-    this.enforceOwnerForWrite({
+    const ownerId = this.enforceOwnerForWrite({
       actorUserId: b.actorUserId ?? null,
       actorRole: b.actorRole ?? null,
       ownerId: b.ownerId ?? null,
@@ -1666,6 +1798,23 @@ export class MediaService implements OnModuleDestroy {
       Bucket: bucket,
       Key: libraryObject.path,
       ContentType: mimeType,
+      Metadata: {
+        [UPLOAD_BINDING_METADATA]: signUploadBinding(
+          {
+            bucket,
+            path: libraryObject.path,
+            actorUserId: b.actorUserId!,
+            ownerId,
+            accessClass,
+            scope: context.scope,
+            entityType: context.entityType,
+            entityId: context.entityId,
+            mimeType,
+            filename,
+          },
+          this.deleteConfirmSecret(),
+        ),
+      },
     });
 
     const expiresIn = this.readNumberEnv(
@@ -1686,6 +1835,7 @@ export class MediaService implements OnModuleDestroy {
       visibility,
       accessClass,
       scope,
+      ownerId,
       entityType: context.entityType,
       entityId: context.entityId,
       uploadUrl,
@@ -1734,6 +1884,23 @@ export class MediaService implements OnModuleDestroy {
       Bucket: bucket,
       Key: libraryObject.path,
       ContentType: mimeType,
+      Metadata: {
+        [UPLOAD_BINDING_METADATA]: signUploadBinding(
+          {
+            bucket,
+            path: libraryObject.path,
+            actorUserId: b.actorUserId!,
+            ownerId,
+            accessClass,
+            scope: context.scope,
+            entityType: context.entityType,
+            entityId: context.entityId,
+            mimeType,
+            filename: libraryObject.filename,
+          },
+          this.deleteConfirmSecret(),
+        ),
+      },
     });
 
     const expiresIn = this.readNumberEnv(
@@ -1835,8 +2002,11 @@ export class MediaService implements OnModuleDestroy {
     );
 
     const sizeBytes = Number(head.ContentLength ?? 0);
-    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    if (!Number.isInteger(sizeBytes) || sizeBytes <= 0) {
       throw new BadRequestException("upload_not_found_or_empty");
+    }
+    if (sizeBytes > processingPolicy().maxBytes) {
+      throw new BadRequestException("upload_too_large");
     }
 
     const mimeType = (
@@ -1850,11 +2020,42 @@ export class MediaService implements OnModuleDestroy {
     if (!ALLOWED_PRESIGN_MIME.has(mimeType)) {
       throw new BadRequestException("mimeType_not_allowed");
     }
+    if (input.mimeType && input.mimeType !== mimeType) {
+      throw new BadRequestException("upload_declared_mime_mismatch");
+    }
+    const expectedSha256 = input.sha256?.trim().toLowerCase() || null;
+    if (expectedSha256 && !/^[0-9a-f]{64}$/.test(expectedSha256)) {
+      throw new BadRequestException("upload_checksum_invalid");
+    }
 
     const visibility = this.visibilityFromAccessClass(accessClass);
 
     const etag =
       typeof head.ETag === "string" ? head.ETag.replaceAll('"', "") : null;
+    if (!etag) throw new BadRequestException("upload_integrity_missing");
+    const expectedUploadBinding = signUploadBinding(
+      {
+        bucket,
+        path,
+        actorUserId: input.actorUserId!,
+        ownerId,
+        accessClass,
+        scope: context.scope,
+        entityType: context.entityType,
+        entityId: context.entityId,
+        mimeType,
+        filename,
+      },
+      this.deleteConfirmSecret(),
+    );
+    if (
+      !matchesUploadBinding(
+        head.Metadata?.[UPLOAD_BINDING_METADATA],
+        expectedUploadBinding,
+      )
+    ) {
+      throw new ForbiddenException("upload_authorization_mismatch");
+    }
 
     // Create DB row as PENDING until scan/promotion pipeline runs
     const data: Prisma.MediaCreateInput = {
@@ -1875,13 +2076,21 @@ export class MediaService implements OnModuleDestroy {
       entityType: context.entityType,
       entityId: context.entityId,
 
-      sha256: input.sha256 ?? null,
+      sha256: null,
 
       status: MediaStatus.PENDING,
       scanStatus: ScanStatus.QUEUED,
       quarantineReason: null,
       etag,
       promotedAt: null,
+      // Nested creation is atomic: no finalized row can lose its queue entry.
+      processingJob: {
+        create: {
+          expectedSha256,
+          expectedUploadBinding,
+          maxAttempts: processingPolicy().maxAttempts,
+        },
+      },
     };
 
     return this.prisma.media.create({ data });
@@ -1918,9 +2127,10 @@ export class MediaService implements OnModuleDestroy {
       ? `attachment; filename="${row.filename}"`
       : `inline; filename="${row.filename}"`;
 
+    const source = await this.approvedStorageObject(row);
     const cmd = new GetObjectCommand({
-      Bucket: row.bucket ?? process.env.MEDIA_S3_BUCKET ?? "media",
-      Key: row.path,
+      Bucket: source.bucket,
+      Key: source.path,
       ResponseContentType: row.mimeType,
       ResponseContentDisposition: contentDisposition,
       ResponseCacheControl: "private, no-store",
@@ -1968,7 +2178,7 @@ export class MediaService implements OnModuleDestroy {
     input: CreateRenderInput = {},
   ): Promise<PublicRenderObject> {
     const variant = safeTrim(input.variant ?? "web") || "web";
-    if (variant !== "web") {
+    if (!["web", "thumbnail", "card", "detail", "mobile"].includes(variant)) {
       throw new BadRequestException("render_variant_not_supported");
     }
 
@@ -1991,12 +2201,22 @@ export class MediaService implements OnModuleDestroy {
       throw new BadRequestException("storage_not_supported");
     }
 
+    const derivative =
+      variant === "web"
+        ? null
+        : await this.derivatives.publicOutput(id, variant);
+    const source = derivative ?? (await this.approvedStorageObject(row));
+    const mimeType = derivative?.mimeType ?? row.mimeType;
+    const sizeBytes = derivative?.sizeBytes ?? row.sizeBytes;
+    const filename = derivative
+      ? `${row.filename.replace(/\.[^.]*$/, "")}.${derivative.mimeType.split("/")[1] === "jpeg" ? "jpg" : derivative.mimeType.split("/")[1]}`
+      : row.filename;
     const object = await this.getInternalS3().send(
       new GetObjectCommand({
-        Bucket: row.bucket ?? process.env.MEDIA_S3_BUCKET ?? "media",
-        Key: row.path,
-        ResponseContentType: row.mimeType,
-        ResponseContentDisposition: `inline; filename="${row.filename}"`,
+        Bucket: source.bucket,
+        Key: source.path,
+        ResponseContentType: mimeType,
+        ResponseContentDisposition: `inline; filename="${filename}"`,
         ResponseCacheControl:
           "public, max-age=60, s-maxage=300, stale-while-revalidate=60",
       }),
@@ -2009,16 +2229,16 @@ export class MediaService implements OnModuleDestroy {
 
     return {
       stream: body as Readable,
-      mimeType: row.mimeType,
-      sizeBytes: row.sizeBytes,
-      filename: row.filename,
+      mimeType,
+      sizeBytes,
+      filename,
       etag:
         typeof object.ETag === "string"
           ? object.ETag.replaceAll('"', "")
-          : row.etag,
+          : (derivative?.sha256 ?? row.etag),
       cacheControl:
         "public, max-age=60, s-maxage=300, stale-while-revalidate=60",
-      contentDisposition: `inline; filename="${row.filename}"`,
+      contentDisposition: `inline; filename="${filename}"`,
     };
   }
 
@@ -2061,16 +2281,58 @@ export class MediaService implements OnModuleDestroy {
   }
 
   async deleteById(id: string) {
-    const row = await this.prisma.media.findUnique({ where: { id } });
+    const row = await this.prisma.$transaction(async (tx) => {
+      // Lock before reading the source relation. A concurrent completion must
+      // not publish a copy between this snapshot and the DELETED transition.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id"
+        FROM "Media" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      if (!locked.length) return null;
+      const found = await tx.media.findUnique({
+        where: { id },
+        include: { verifiedSource: true },
+      });
+      if (!found) return null;
+      await this.derivatives.cancelForDeletion(tx, id);
+      // Deny reads and completion before doing object I/O. Retain DELETED rows
+      // on cleanup failure so a retry can finish without resurrecting content.
+      await tx.media.update({
+        where: { id },
+        data: { status: MediaStatus.DELETED },
+      });
+      await tx.mediaProcessingJob.updateMany({
+        where: { mediaId: id },
+        data: {
+          status: "CANCELLED",
+          leaseToken: null,
+          leaseUntil: null,
+        },
+      });
+      return found;
+    });
     if (!row) return false;
 
-    if (row.storage === "s3" && row.path) {
+    const objects =
+      row.storage === "s3" && row.path
+        ? [
+            {
+              bucket: row.bucket ?? process.env.MEDIA_S3_BUCKET ?? "media",
+              path: row.path,
+            },
+          ]
+        : [];
+    if (row.verifiedSource)
+      objects.push({
+        bucket: row.verifiedSource.bucket,
+        path: row.verifiedSource.path,
+      });
+    for (const object of objects) {
       try {
         await this.getInternalS3().send(
           new DeleteObjectCommand({
-            Bucket: row.bucket ?? process.env.MEDIA_S3_BUCKET ?? "media",
-            Key: row.path,
+            Bucket: object.bucket,
+            Key: object.path,
           }),
+          { abortSignal: AbortSignal.timeout(processingPolicy().ioTimeoutMs) },
         );
       } catch (error) {
         this.log.error(

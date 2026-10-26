@@ -14,7 +14,14 @@ import { GatewayIdempotencyService } from "../src/state/gateway-idempotency.serv
 import { TEST_APPLICATION_REGISTRY_JSON } from "./application-fixture";
 
 const MEDIA_ID = "8a73870a-ea95-47b7-a289-48ef65855c60";
-function quietLogger(): StructuredLogger { return { debug: jest.fn(), error: jest.fn(), log: jest.fn(), warn: jest.fn() }; }
+function quietLogger(): StructuredLogger {
+  return {
+    debug: jest.fn(),
+    error: jest.fn(),
+    log: jest.fn(),
+    warn: jest.fn(),
+  };
+}
 
 describe("gateway Media render stream", () => {
   let app: INestApplication;
@@ -44,23 +51,32 @@ describe("gateway Media render stream", () => {
       res.setHeader("x-content-type-options", "nosniff");
       res.end(body);
     });
-    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) =>
+      upstream.listen(0, "127.0.0.1", resolve),
+    );
     const address = upstream.address();
-    if (!address || typeof address === "string") throw new Error("test_upstream_address_missing");
+    if (!address || typeof address === "string")
+      throw new Error("test_upstream_address_missing");
 
     const moduleRef = await Test.createTestingModule({
       controllers: [GatewayMediaRenderController],
       providers: [
         Reflector,
         GatewayMediaRenderProxy,
-        { provide: ConfigService, useValue: { getOrThrow: () => `http://127.0.0.1:${address.port}` } },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: () => `http://127.0.0.1:${address.port}` },
+        },
         { provide: GatewayIdempotencyService, useValue: {} },
         { provide: APP_INTERCEPTOR, useClass: GatewayRoutePolicyInterceptor },
       ],
     }).compile();
     app = moduleRef.createNestApplication({ bodyParser: false, logger: false });
     configureGatewayHttp(app, {
-      applicationRegistry: StaticApplicationRegistry.fromJson(TEST_APPLICATION_REGISTRY_JSON, { nodeEnv: "test" }),
+      applicationRegistry: StaticApplicationRegistry.fromJson(
+        TEST_APPLICATION_REGISTRY_JSON,
+        { nodeEnv: "test" },
+      ),
       jsonLimitBytes: 262_144,
       logger: quietLogger(),
       nodeEnv: "test",
@@ -70,7 +86,9 @@ describe("gateway Media render stream", () => {
 
   afterEach(async () => {
     await app.close();
-    await new Promise<void>((resolve, reject) => upstream.close((error) => error ? reject(error) : resolve()));
+    await new Promise<void>((resolve, reject) =>
+      upstream.close((error) => (error ? reject(error) : resolve())),
+    );
   });
 
   it("streams bytes from only the fixed path and preserves selected headers", async () => {
@@ -97,6 +115,18 @@ describe("gateway Media render stream", () => {
     expect(response.headers).not.toHaveProperty("location");
     expect(observedUrl).toBe(`/media/render/${MEDIA_ID}`);
   });
+
+  it.each(["thumbnail", "card", "detail", "mobile"])(
+    "proxies the saved %s variant through the fixed Media route",
+    async (variant) => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/media/render/${MEDIA_ID}`)
+        .query({ variant })
+        .set({ "X-Nebula-Client-ID": "mobile-local" })
+        .expect(200);
+      expect(observedUrl).toBe(`/media/render/${MEDIA_ID}?variant=${variant}`);
+    },
+  );
 
   it("rejects unsupported variants and caller-selected upstream controls", async () => {
     observedUrl = "";

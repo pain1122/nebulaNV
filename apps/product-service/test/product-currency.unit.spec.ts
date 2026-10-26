@@ -27,6 +27,7 @@ function service(settingsRpc: jest.Mock): ProductServiceImpl {
     prisma,
     client({}),
     client({ GetString: settingsRpc }),
+    client({}),
   );
 }
 

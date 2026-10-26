@@ -26,6 +26,17 @@ describe("tenant-authority-service foundation", () => {
         "postgresql://nebula_authority_runtime:strong_runtime_password_123456789@postgres:5432/nebula_authority?schema=public",
     });
     expect(accepted.error).toBeUndefined();
+    const validControl = accepted.value as Record<string, unknown>;
+    expect(
+      envSchema.validate({
+        ...validControl,
+        HTTP_CORS_ORIGINS: "https://admin.example.com",
+      }).error,
+    ).toBeUndefined();
+    expect(
+      envSchema.validate({ ...validControl, HTTP_CORS_ORIGINS: "*" }).error
+        ?.details[0]?.path,
+    ).toEqual(["HTTP_CORS_ORIGINS"]);
 
     for (const databaseUrl of [
       "postgresql://postgres:strong_runtime_password_123456789@postgres:5432/nebula_authority?schema=public",

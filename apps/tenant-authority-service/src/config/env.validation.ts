@@ -1,5 +1,9 @@
 import * as Joi from "joi";
-import { runtimeEnvSchema, serviceBindEnvSchema } from "@packages/config";
+import {
+  httpPolicyEnvSchema,
+  runtimeEnvSchema,
+  serviceBindEnvSchema,
+} from "@packages/config";
 import { s2sEnvSchema } from "@nebula/grpc-auth";
 
 export const AUTHORITY_DATABASE_NAME = "nebula_authority";
@@ -28,6 +32,7 @@ function authorityRuntimeDatabaseUrl(
 
 export const envSchema = Joi.object({
   ...runtimeEnvSchema,
+  ...httpPolicyEnvSchema,
   ...serviceBindEnvSchema("TENANT_AUTHORITY"),
   ...s2sEnvSchema("tenant-authority-service"),
   AUTH_GRPC_URL: Joi.string().trim().min(1).required(),

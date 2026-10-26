@@ -14,11 +14,21 @@
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\" \"test/**/*.{ts,mjs}\" \"scripts/**/*.mjs\" \"index.ts\"",
-    "test": "pnpm run build && node --test ./test/client.test.mjs && tsc -p test/tsconfig.browser.json && tsc -p test/tsconfig.react-native.json",
+    "test": "pnpm run build && node --test ./test/client.test.mjs ./test/media-processing-recovery.test.mjs ./test/d2-checkout-recovery.test.mjs ./test/d2-demo-payment-live.test.mjs && tsc -p test/tsconfig.browser.json && tsc -p test/tsconfig.react-native.json",
     "test:live": "pnpm run build && node ./test/f3-live-flows.mjs",
     "test:d1-product-live": "pnpm run build && node ./test/d1-product-live.mjs",
+    "test:d1-references-live": "pnpm run build && node ./test/d1-references-live.mjs",
     "test:d1-variants-live": "pnpm run build && node ./test/d1-variants-live.mjs",
-    "clean": "rimraf dist"
+    "test:media-processing-live": "pnpm run build && node ./test/media-processing-live.mjs",
+    "test:media-metadata-live": "pnpm run build && node ./test/media-processing-live.mjs --metadata",
+    "test:media-derivatives-live": "pnpm run build && node ./test/media-processing-live.mjs --derivatives",
+    "test:media-recovery-live": "pnpm run build && node ./test/media-processing-live.mjs --recovery",
+    "clean": "rimraf dist",
+    "test:d2-cart-live": "pnpm run build && node ./test/d2-cart-live.mjs",
+    "test:d2-checkout-live": "pnpm run build && node ./test/d2-checkout-live.mjs",
+    "test:d2-checkout-recovery-live": "pnpm run build && node ./test/d2-checkout-live.mjs --recovery",
+    "test:d2-orders-live": "pnpm run build && node ./test/d2-checkout-live.mjs --admin-reads",
+    "test:d2-demo-payment-live": "pnpm run build && node ./test/d2-checkout-live.mjs --demo-payment"
   },
   "devDependencies": {
     "typescript": "5.9.2"

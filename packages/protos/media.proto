@@ -56,6 +56,9 @@ message Media {
   string originalFilename = 25; // original client filename when known
   string entityType = 26; // product|order|passport|...
   string entityId = 27;   // feature/business entity id
+  optional string title = 28;
+  optional string defaultAlt = 29;
+  int32 metadataVersion = 30;
 }
 
 // ---- RPCs ----
@@ -89,8 +92,32 @@ message MediaRes {
   Media media = 1;
 }
 
+message UpdateMetadataReq {
+  string id = 1;
+  int32 expectedVersion = 2;
+  optional string title = 3;
+  optional string defaultAlt = 4;
+  bool clearTitle = 5;
+  bool clearDefaultAlt = 6;
+}
+
 message GetByIdReq {
   string id = 1;
+}
+
+// Media owns eligibility for public Product image references.
+message ResolveProductReferenceReq {
+  string id = 1;
+  string role = 2; // THUMBNAIL|GALLERY
+}
+
+message ResolveProductReferenceRes {
+  string mediaId = 1;
+  string role = 2;
+  string renderPath = 3; // gateway-relative, never a provider URL
+  string mimeType = 4;
+  optional string title = 5;
+  optional string defaultAlt = 6;
 }
 
 message ListReq {
@@ -292,7 +319,36 @@ message FinalizeUploadReq {
   string entityId = 15;
 }
 
+message ImageDerivativesReq {
+  string id = 1;
+  string recipesJson = 2; // empty uses the configured default presets
+  bool retryFailed = 3;
+}
+message SavedImageSize {
+  string view = 1;
+  string generationId = 2;
+  string recipeHash = 3;
+  string sha256 = 4;
+  string mimeType = 5;
+  int32 width = 6;
+  int32 height = 7;
+  int32 sizeBytes = 8;
+  string renderPath = 9;
+}
+message ImageDerivativesRes {
+  string mediaId = 1;
+  string desiredGenerationId = 2;
+  string approvedGenerationId = 3;
+  string status = 4;
+  string lastError = 5;
+  int32 attempts = 6;
+  repeated SavedImageSize outputs = 7;
+}
+
 service MediaService {
+  rpc UpdateMetadata(UpdateMetadataReq) returns (MediaRes);
+  rpc GetDerivatives(GetByIdReq) returns (ImageDerivativesRes);
+  rpc RegenerateDerivatives(ImageDerivativesReq) returns (ImageDerivativesRes);
   rpc Ping(Empty) returns (Pong);
 
   // legacy (we'll stop using it in tests later, but keep for compatibility)
@@ -300,6 +356,8 @@ service MediaService {
 
   rpc GetById(GetByIdReq) returns (MediaRes);
   rpc GetByIdV3(GetByIdReq) returns (MediaRes);
+  rpc ResolveProductReference(ResolveProductReferenceReq) returns (ResolveProductReferenceRes);
+  rpc ResolveProductReferenceV3(ResolveProductReferenceReq) returns (ResolveProductReferenceRes);
   rpc List(ListReq) returns (ListRes);
   rpc DeleteById(DeleteByIdReq) returns (DeleteRes);
 

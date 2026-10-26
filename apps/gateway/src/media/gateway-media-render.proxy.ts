@@ -10,7 +10,7 @@ export class GatewayMediaRenderProxy {
 
   open(
     id: string,
-    variant: "web" | undefined,
+    variant: "web" | "thumbnail" | "card" | "detail" | "mobile" | undefined,
     requestId: string,
   ): Promise<IncomingMessage> {
     const base = this.config.getOrThrow<string>("MEDIA_RENDER_HTTP_URL");
@@ -28,7 +28,9 @@ export class GatewayMediaRenderProxy {
       request.setTimeout(MEDIA_RENDER_HEADER_TIMEOUT_MS, () => {
         request.destroy(new Error("media_render_header_timeout"));
       });
-      request.once("error", () => reject(new Error("media_render_upstream_unavailable")));
+      request.once("error", () =>
+        reject(new Error("media_render_upstream_unavailable")),
+      );
     });
   }
 }

@@ -147,6 +147,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: user-runtime
+      args:
+        BACKEND_BUILD_SERVICE: user-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: user-service
     depends_on:
       postgres:
@@ -171,6 +174,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: auth-runtime
+      args:
+        BACKEND_BUILD_SERVICE: auth-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: auth-service
     depends_on:
       postgres:
@@ -200,6 +206,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: realm-auth-runtime
+      args:
+        BACKEND_BUILD_SERVICE: realm-auth-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: realm-auth-service
     depends_on:
       realm-auth-db-init:
@@ -225,6 +234,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: realm-auth-runtime
+      args:
+        BACKEND_BUILD_SERVICE: realm-auth-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: operator-realm-auth-service
     depends_on:
       realm-auth-db-init:
@@ -251,6 +263,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: tenant-authority-runtime
+      args:
+        BACKEND_BUILD_SERVICE: tenant-authority-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: tenant-authority-service
     depends_on:
       tenant-authority-db-init:
@@ -287,6 +302,10 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: product-runtime
+      args:
+        BACKEND_BUILD_SERVICE: product-service
+        BACKEND_BUILD_PIPELINE: graph
+        BACKEND_BUILD_CONCURRENCY: "1"
     container_name: product-service
     depends_on:
       postgres:
@@ -296,6 +315,8 @@ services:
       settings-service:
         condition: service_healthy
       taxonomy-service:
+        condition: service_healthy
+      media-service:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -307,6 +328,7 @@ services:
       AUTH_GRPC_URL: auth-service:50052
       SETTINGS_GRPC_URL: settings-service:50054
       TAXONOMY_GRPC_URL: taxonomy-service:50057
+      MEDIA_GRPC_URL: media-service:50058
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nebula_products?schema=public
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres?schema=nebula_products_shadow
     ports:
@@ -320,6 +342,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: settings-runtime
+      args:
+        BACKEND_BUILD_SERVICE: settings-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: settings-service
     depends_on:
       postgres:
@@ -343,6 +368,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: taxonomy-runtime
+      args:
+        BACKEND_BUILD_SERVICE: taxonomy-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: taxonomy-service
     depends_on:
       postgres:
@@ -372,6 +400,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: blog-runtime
+      args:
+        BACKEND_BUILD_SERVICE: blog-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: blog-service
     depends_on:
       postgres:
@@ -404,6 +435,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: order-runtime
+      args:
+        BACKEND_BUILD_SERVICE: order-service
+        BACKEND_BUILD_PIPELINE: graph
     container_name: order-service
     depends_on:
       postgres:
@@ -430,14 +464,43 @@ services:
       - "3005:3005"
       - "50056:50056"
 
+  media-scanner:
+    image: ${MEDIA_SCANNER_IMAGE:-clamav/clamav:1.4@sha256:57deb108fc4c72778aa83eafbca7bb7153e28c3f57c005afd38d31f16da86f23}
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: 1.0
+    # clamd's unauthenticated TCP socket is never published on the host.
+    environment:
+      CLAMD_CONF_StreamMaxLength: 20M
+      CLAMD_CONF_MaxFileSize: 20M
+      CLAMD_CONF_MaxScanSize: 40M
+      CLAMD_CONF_MaxScanTime: 30000
+      CLAMD_CONF_MaxThreads: 2
+      CLAMD_CONF_MaxQueue: 8
+      CLAMD_CONF_AlertExceedsMax: "yes"
+    volumes:
+      - media-scanner-data:/var/lib/clamav
+    healthcheck:
+      start_period: 180s
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
   media-service:
     image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-media-service:${NEBULA_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: media-runtime
+      args:
+        BACKEND_BUILD_SERVICE: media-service
+        BACKEND_BUILD_PIPELINE: graph
+        BACKEND_BUILD_CONCURRENCY: "1"
     container_name: media-service
+    stop_grace_period: 240s
     depends_on:
+      media-scanner:
+        condition: service_started
       postgres:
         condition: service_healthy
       auth-service:
@@ -472,6 +535,9 @@ services:
       MEDIA_SYNC_DELETE_MAX_FILES: 500
       MEDIA_PUBLIC_FOLDER: uploads
       MEDIA_PRIVATE_FOLDER: private/objects
+      MEDIA_PROCESSING_ENABLED: ${MEDIA_PROCESSING_ENABLED:-true}
+      MEDIA_SCANNER_HOST: media-scanner
+      MEDIA_SCANNER_PORT: 3310
     ports:
       - "3007:3007"
       - "50058:50058"
@@ -482,6 +548,10 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       target: gateway-runtime
+      args:
+        BACKEND_BUILD_SERVICE: gateway
+        BACKEND_BUILD_PIPELINE: graph
+        BACKEND_BUILD_CONCURRENCY: "1"
     container_name: gateway
     depends_on:
       auth-service:
@@ -512,3 +582,4 @@ services:
 volumes:
   pgdata:
   minio-data:
+  media-scanner-data:

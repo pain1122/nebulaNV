@@ -9,6 +9,26 @@ import {
 } from "./s2s-metadata";
 
 type ProductRaw = {
+  ReserveCheckoutStock: RawGrpcUnary<
+    productv1.ReserveCheckoutStockRequest,
+    productv1.CheckoutStockResponse
+  >;
+  FinalizeCheckoutStock: RawGrpcUnary<
+    productv1.CheckoutStockIdentity,
+    productv1.CheckoutStockResponse
+  >;
+  CancelCheckoutStock: RawGrpcUnary<
+    productv1.CheckoutStockIdentity,
+    productv1.CheckoutStockResponse
+  >;
+  RestoreCheckoutStock: RawGrpcUnary<
+    productv1.CheckoutStockIdentity,
+    productv1.CheckoutStockResponse
+  >;
+  UpdateImageMetadata: RawGrpcUnary<
+    productv1.UpdateImageMetadataRequest,
+    productv1.GalleryResponse
+  >;
   CreateProduct: RawGrpcUnary<
     productv1.CreateProductRequest,
     productv1.ProductResponse
@@ -107,6 +127,26 @@ type ProductTaxonomyRaw = {
 };
 
 export interface ProductProxy {
+  ReserveCheckoutStock: SignedGrpcUnary<
+    productv1.ReserveCheckoutStockRequest,
+    productv1.CheckoutStockResponse
+  >;
+  FinalizeCheckoutStock: SignedGrpcUnary<
+    productv1.CheckoutStockIdentity,
+    productv1.CheckoutStockResponse
+  >;
+  CancelCheckoutStock: SignedGrpcUnary<
+    productv1.CheckoutStockIdentity,
+    productv1.CheckoutStockResponse
+  >;
+  RestoreCheckoutStock: SignedGrpcUnary<
+    productv1.CheckoutStockIdentity,
+    productv1.CheckoutStockResponse
+  >;
+  UpdateImageMetadata: SignedGrpcUnary<
+    productv1.UpdateImageMetadataRequest,
+    productv1.GalleryResponse
+  >;
   CreateProduct: SignedGrpcUnary<
     productv1.CreateProductRequest,
     productv1.ProductResponse
@@ -211,6 +251,31 @@ export function getProduct(
   const raw = client.getService<ProductRaw>("ProductService");
   const common = { policy: signingPolicy, target: PRODUCT_SERVICE_TARGET };
   return {
+    ReserveCheckoutStock: createSignedGrpcUnary({
+      ...common,
+      method: raw.ReserveCheckoutStock.bind(raw),
+      definition: productv1.ProductServiceService.reserveCheckoutStock,
+    }),
+    FinalizeCheckoutStock: createSignedGrpcUnary({
+      ...common,
+      method: raw.FinalizeCheckoutStock.bind(raw),
+      definition: productv1.ProductServiceService.finalizeCheckoutStock,
+    }),
+    CancelCheckoutStock: createSignedGrpcUnary({
+      ...common,
+      method: raw.CancelCheckoutStock.bind(raw),
+      definition: productv1.ProductServiceService.cancelCheckoutStock,
+    }),
+    RestoreCheckoutStock: createSignedGrpcUnary({
+      ...common,
+      method: raw.RestoreCheckoutStock.bind(raw),
+      definition: productv1.ProductServiceService.restoreCheckoutStock,
+    }),
+    UpdateImageMetadata: createSignedGrpcUnary({
+      ...common,
+      method: raw.UpdateImageMetadata.bind(raw),
+      definition: productv1.ProductServiceService.updateImageMetadata,
+    }),
     CreateProduct: createSignedGrpcUnary({
       ...common,
       method: raw.CreateProduct.bind(raw),

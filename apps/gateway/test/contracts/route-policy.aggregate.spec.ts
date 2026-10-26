@@ -30,18 +30,18 @@ class DecoratorProbe {
 }
 
 describe("gateway route-policy aggregate", () => {
-  it("is the unique executable source for all 73 landed endpoints", () => {
-    expect(GATEWAY_ROUTE_POLICIES).toHaveLength(73);
+  it("is the unique executable source for all 81 landed endpoints", () => {
+    expect(GATEWAY_ROUTE_POLICIES).toHaveLength(81);
     expect(
       new Set(GATEWAY_ROUTE_POLICIES.map((policy) => policy.id)).size,
-    ).toBe(73);
+    ).toBe(81);
     expect(
       new Set(
         GATEWAY_ROUTE_POLICIES.map(
           (policy) => `${policy.method} ${policy.path}`,
         ),
       ).size,
-    ).toBe(73);
+    ).toBe(81);
     expect(
       GATEWAY_ROUTE_POLICIES.every((policy) =>
         Object.hasOwn(GATEWAY_INPUT_PROFILES, policy.input),

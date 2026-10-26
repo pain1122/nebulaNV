@@ -198,6 +198,18 @@ export const PRODUCT_ROUTES: readonly GatewayRoutePolicy[] = Object.freeze([
     retry: "key",
   }),
   adminRoute({
+    id: "admin.products.gallery.metadata.update",
+    method: "PATCH",
+    path: "/api/v1/admin/products/:id/gallery/:imageId/metadata",
+    downstreamTarget: "product-service",
+    downstreamRpc: "ProductService.UpdateImageMetadata",
+    input: "gallery-metadata",
+    successStatus: 200,
+    response: "collection",
+    pagination: "unpaginated",
+    retry: "key",
+  }),
+  adminRoute({
     id: "admin.products.gallery.order",
     method: "PUT",
     path: "/api/v1/admin/products/:id/gallery/order",

@@ -1,6 +1,13 @@
 // Generated from apps/gateway/openapi/nebula-v1.openapi.json.
 // Run `pnpm --filter @nebula/api-client generate`; do not edit by hand.
 
+export type GatewayAdminOrderListQueryDto = Readonly<{
+  readonly "limit"?: number;
+  readonly "page"?: number;
+  readonly "status"?: "PENDING" | "PAYMENT_PROCESSING" | "PAID" | "FULFILLED" | "CANCELLED";
+  readonly "userId"?: string;
+}>;
+
 export type GatewayAdminProductListQueryDto = Readonly<{
   readonly "categoryId"?: string;
   readonly "includeDeleted"?: boolean;
@@ -104,6 +111,7 @@ export type GatewayBulkResultDto = Readonly<{
 export type GatewayCartAddDto = Readonly<{
   readonly "productId": string;
   readonly "quantity": number;
+  readonly "variantId"?: string;
 }>;
 
 export type GatewayCartDto = Readonly<{
@@ -111,17 +119,22 @@ export type GatewayCartDto = Readonly<{
   readonly "expiresAt": string;
   readonly "id": string;
   readonly "items": ReadonlyArray<GatewayCartItemDto>;
+  readonly "subtotal": string;
+  readonly "total": string;
   readonly "userId": string;
 }>;
 
 export type GatewayCartItemDto = Readonly<{
   readonly "id": string;
+  readonly "lineTotal": string;
   readonly "meta": string;
   readonly "name": string;
   readonly "productId": string;
   readonly "quantity": number;
+  readonly "selectedOptions": Readonly<Record<never, never>> & Readonly<Record<string, string>>;
   readonly "sku": string;
   readonly "unitPrice": string;
+  readonly "variantId"?: string;
 }>;
 
 export type GatewayCartUpdateDto = Readonly<{
@@ -140,6 +153,32 @@ export type GatewayCollectionEnvelopeDto = Readonly<{
 
 export type GatewayCollectionMetaDto = Readonly<{
   readonly "pagination": PageLimitTotalPaginationDto | TotalOnlyPaginationDto | OffsetTakePaginationDto | UnpaginatedPaginationDto;
+}>;
+
+export type GatewayDemoPaymentAttemptDto = Readonly<{
+  readonly "amount": string;
+  readonly "createdAt": string;
+  readonly "currency": string;
+  readonly "failureCode": "" | "SELECTION_CHANGED";
+  readonly "id": string;
+  readonly "mode": "DEMO";
+  readonly "orderId": string;
+  readonly "state": "PROCESSING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  readonly "updatedAt": string;
+}>;
+
+export type GatewayDemoPaymentOutcomeDto = Readonly<{
+  readonly "expectedVersion": number;
+  readonly "outcome": "SUCCEEDED" | "FAILED" | "CANCELLED" | "UNKNOWN";
+}>;
+
+export type GatewayDemoPaymentReplyDto = Readonly<{
+  readonly "attempt": GatewayDemoPaymentAttemptDto;
+  readonly "order": GatewayOrderDto;
+}>;
+
+export type GatewayDemoPaymentStartDto = Readonly<{
+  readonly "expectedVersion": number;
 }>;
 
 export type GatewayErrorBodyDto = Readonly<{
@@ -163,16 +202,28 @@ export type GatewayGalleryAdminQueryDto = Readonly<{
 
 export type GatewayGalleryImageDto = Readonly<{
   readonly "alt": string;
+  readonly "altOverride"?: (string) | null;
   readonly "deletedAt": string;
   readonly "id": string;
+  readonly "mediaId": string;
+  readonly "metadataVersion": number;
   readonly "sort": number;
-  readonly "url": string;
+  readonly "title": string;
+  readonly "titleOverride"?: (string) | null;
 }>;
 
 export type GatewayGalleryImageInputDto = Readonly<{
-  readonly "alt"?: string;
+  readonly "alt"?: Readonly<Record<never, never>>;
+  readonly "mediaId": string;
   readonly "sort"?: number;
-  readonly "url": string;
+  readonly "title"?: (string) | null;
+  readonly "url"?: string;
+}>;
+
+export type GatewayGalleryMetadataDto = Readonly<{
+  readonly "alt"?: (string) | null;
+  readonly "expectedVersion": number;
+  readonly "title"?: (string) | null;
 }>;
 
 export type GatewayGalleryOrderDto = Readonly<{
@@ -186,6 +237,21 @@ export type GatewayGalleryOrderItemDto = Readonly<{
 
 export type GatewayGalleryRemoveQueryDto = Readonly<{
   readonly "hardDelete"?: boolean;
+}>;
+
+export type GatewayImageDerivativesDto = Readonly<{
+  readonly "approvedGenerationId": string;
+  readonly "attempts": number;
+  readonly "desiredGenerationId": string;
+  readonly "lastError": string;
+  readonly "mediaId": string;
+  readonly "outputs": ReadonlyArray<GatewaySavedImageSizeDto>;
+  readonly "status": "NONE" | "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
+}>;
+
+export type GatewayImageRegenerationDto = Readonly<{
+  readonly "recipes"?: ReadonlyArray<ImageRecipeDto>;
+  readonly "retryFailed"?: boolean;
 }>;
 
 export type GatewayItemEnvelopeDto = Readonly<{
@@ -283,6 +349,7 @@ export type GatewayMediaDto = Readonly<{
   readonly "accessClass": "PUBLIC" | "PROTECTED" | "STRICT";
   readonly "bucket": string;
   readonly "createdAt": string;
+  readonly "defaultAlt": (string) | null;
   readonly "displayName": string;
   readonly "durationSec": number;
   readonly "entityId": string;
@@ -292,6 +359,7 @@ export type GatewayMediaDto = Readonly<{
   readonly "folderPath": string;
   readonly "height": number;
   readonly "id": string;
+  readonly "metadataVersion": number;
   readonly "mimeType": string;
   readonly "originalFilename": string;
   readonly "ownerId": string;
@@ -304,6 +372,7 @@ export type GatewayMediaDto = Readonly<{
   readonly "sizeBytes": string;
   readonly "status": string;
   readonly "storage": string;
+  readonly "title": (string) | null;
   readonly "updatedAt": string;
   readonly "visibility": "private" | "public";
   readonly "width": number;
@@ -341,6 +410,12 @@ export type GatewayMediaListQueryDto = Readonly<{
   readonly "sortBy"?: "name" | "createdAt" | "updatedAt" | "size";
   readonly "status"?: "PENDING" | "READY" | "BLOCKED" | "DELETED";
   readonly "take"?: number;
+}>;
+
+export type GatewayMediaMetadataDto = Readonly<{
+  readonly "defaultAlt"?: (string) | null;
+  readonly "expectedVersion": number;
+  readonly "title"?: (string) | null;
 }>;
 
 export type GatewayMediaOwnedReadUrlQueryDto = Readonly<{
@@ -393,11 +468,12 @@ export type GatewayMediaReadUrlResultDto = Readonly<{
 }>;
 
 export type GatewayMediaRenderQueryDto = Readonly<{
-  readonly "variant"?: "web";
+  readonly "variant"?: "web" | "thumbnail" | "card" | "detail" | "mobile";
 }>;
 
 export type GatewayOrderDto = Readonly<{
   readonly "billingAddress": string;
+  readonly "checkoutMode": "DEMO_NO_PAYMENT";
   readonly "createdAt": string;
   readonly "currency": string;
   readonly "discountTotal": string;
@@ -406,12 +482,13 @@ export type GatewayOrderDto = Readonly<{
   readonly "meta": string;
   readonly "orderNumber": string;
   readonly "shippingAddress": string;
-  readonly "status": "PENDING" | "PAID" | "FULFILLED" | "CANCELLED";
+  readonly "status": "PENDING" | "PAYMENT_PROCESSING" | "PAID" | "FULFILLED" | "CANCELLED";
   readonly "subtotal": string;
   readonly "taxTotal": string;
   readonly "total": string;
   readonly "updatedAt": string;
   readonly "userId": string;
+  readonly "version"?: number;
 }>;
 
 export type GatewayOrderItemDto = Readonly<{
@@ -421,16 +498,19 @@ export type GatewayOrderItemDto = Readonly<{
   readonly "name": string;
   readonly "productId": string;
   readonly "quantity": number;
+  readonly "selectedOptions": Readonly<Record<never, never>> & Readonly<Record<string, string>>;
   readonly "sku": string;
   readonly "unitPrice": string;
+  readonly "variantId"?: string;
 }>;
 
 export type GatewayOrderListQueryDto = Readonly<{
-  readonly "status"?: "PENDING" | "PAID" | "FULFILLED" | "CANCELLED";
+  readonly "status"?: "PENDING" | "PAYMENT_PROCESSING" | "PAID" | "FULFILLED" | "CANCELLED";
 }>;
 
 export type GatewayOrderStatusUpdateDto = Readonly<{
-  readonly "status": "PENDING" | "PAID" | "FULFILLED" | "CANCELLED";
+  readonly "expectedVersion": number;
+  readonly "status": "PENDING" | "PAYMENT_PROCESSING" | "PAID" | "FULFILLED" | "CANCELLED";
 }>;
 
 export type GatewayProductBulkDiscountDto = Readonly<{
@@ -447,6 +527,7 @@ export type GatewayProductBulkDiscountDto = Readonly<{
 
 export type GatewayProductDto = Readonly<{
   readonly "availability": "AVAILABLE" | "OUT_OF_STOCK";
+  readonly "brandId": string;
   readonly "categoryId": string;
   readonly "complementaryIds": ReadonlyArray<string>;
   readonly "createdAt": string;
@@ -469,8 +550,6 @@ export type GatewayProductDto = Readonly<{
   readonly "metaTitle": string;
   readonly "model3dFormat": string;
   readonly "model3dLiveView": boolean;
-  readonly "model3dPosterUrl": string;
-  readonly "model3dUrl": string;
   readonly "noindex": boolean;
   readonly "price": number;
   readonly "promoActive": boolean;
@@ -481,15 +560,19 @@ export type GatewayProductDto = Readonly<{
   readonly "slug": string;
   readonly "status": "DRAFT" | "ACTIVE" | "ARCHIVED";
   readonly "stockQuantity": number;
+  readonly "tagIds": ReadonlyArray<string>;
   readonly "tags": ReadonlyArray<string>;
-  readonly "thumbnailUrl": string;
+  readonly "thumbnailAlt": string;
+  readonly "thumbnailAltOverride"?: (string) | null;
+  readonly "thumbnailMediaId": string;
+  readonly "thumbnailTitle": string;
+  readonly "thumbnailTitleOverride"?: (string) | null;
   readonly "title": string;
   readonly "trackInventory": boolean;
   readonly "updatedAt": string;
   readonly "variants": ReadonlyArray<GatewayProductVariantDto>;
   readonly "version": number;
   readonly "vrEnabled": boolean;
-  readonly "vrPlanImageUrl": string;
 }>;
 
 export type GatewayProductListQueryDto = Readonly<{
@@ -500,7 +583,10 @@ export type GatewayProductListQueryDto = Readonly<{
 }>;
 
 export type GatewayProductPatchDto = Readonly<{
+  readonly "brandId"?: string;
   readonly "categoryId"?: string;
+  readonly "clearBrand"?: boolean;
+  readonly "clearThumbnailMedia"?: boolean;
   readonly "complementaryIds"?: ReadonlyArray<string>;
   readonly "content"?: string;
   readonly "currency"?: string;
@@ -516,11 +602,9 @@ export type GatewayProductPatchDto = Readonly<{
   readonly "isFeatured"?: boolean;
   readonly "metaDescription"?: string;
   readonly "metaKeywords"?: string;
-  readonly "metaTitle"?: string;
+  readonly "metaTitle"?: (string) | null;
   readonly "model3dFormat"?: string;
   readonly "model3dLiveView"?: boolean;
-  readonly "model3dPosterUrl"?: string;
-  readonly "model3dUrl"?: string;
   readonly "noindex"?: boolean;
   readonly "price"?: number;
   readonly "promoActive"?: boolean;
@@ -531,12 +615,14 @@ export type GatewayProductPatchDto = Readonly<{
   readonly "slug"?: string;
   readonly "status"?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   readonly "stockQuantity"?: number;
+  readonly "tagIds"?: ReadonlyArray<string>;
   readonly "tags"?: ReadonlyArray<string>;
-  readonly "thumbnailUrl"?: string;
+  readonly "thumbnailAlt"?: (string) | null;
+  readonly "thumbnailMediaId"?: string;
+  readonly "thumbnailTitle"?: (string) | null;
   readonly "title"?: string;
   readonly "trackInventory"?: boolean;
   readonly "vrEnabled"?: boolean;
-  readonly "vrPlanImageUrl"?: string;
 }>;
 
 export type GatewayProductVariantDto = Readonly<{
@@ -547,7 +633,7 @@ export type GatewayProductVariantDto = Readonly<{
   readonly "id": string;
   readonly "options": Readonly<Record<never, never>> & Readonly<Record<string, string>>;
   readonly "price": number;
-  readonly "priceOverride"?: (Readonly<Record<never, never>>) | null;
+  readonly "priceOverride": (number) | null;
   readonly "productId": string;
   readonly "sku": string;
   readonly "sortOrder": number;
@@ -555,6 +641,7 @@ export type GatewayProductVariantDto = Readonly<{
 }>;
 
 export type GatewayProductWriteDto = Readonly<{
+  readonly "brandId"?: string;
   readonly "categoryId"?: string;
   readonly "complementaryIds"?: ReadonlyArray<string>;
   readonly "content"?: string;
@@ -570,11 +657,9 @@ export type GatewayProductWriteDto = Readonly<{
   readonly "isFeatured"?: boolean;
   readonly "metaDescription"?: string;
   readonly "metaKeywords"?: string;
-  readonly "metaTitle"?: string;
+  readonly "metaTitle"?: (string) | null;
   readonly "model3dFormat"?: string;
   readonly "model3dLiveView"?: boolean;
-  readonly "model3dPosterUrl"?: string;
-  readonly "model3dUrl"?: string;
   readonly "noindex"?: boolean;
   readonly "price": number;
   readonly "promoActive"?: boolean;
@@ -585,12 +670,26 @@ export type GatewayProductWriteDto = Readonly<{
   readonly "slug"?: string;
   readonly "status"?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   readonly "stockQuantity"?: number;
+  readonly "tagIds"?: ReadonlyArray<string>;
   readonly "tags"?: ReadonlyArray<string>;
-  readonly "thumbnailUrl"?: string;
+  readonly "thumbnailAlt"?: (string) | null;
+  readonly "thumbnailMediaId"?: string;
+  readonly "thumbnailTitle"?: (string) | null;
   readonly "title": string;
   readonly "trackInventory"?: boolean;
   readonly "vrEnabled"?: boolean;
-  readonly "vrPlanImageUrl"?: string;
+}>;
+
+export type GatewaySavedImageSizeDto = Readonly<{
+  readonly "generationId": string;
+  readonly "height": number;
+  readonly "mimeType": string;
+  readonly "recipeHash": string;
+  readonly "renderPath": string;
+  readonly "sha256": string;
+  readonly "sizeBytes": number;
+  readonly "view": "thumbnail" | "card" | "detail" | "mobile";
+  readonly "width": number;
 }>;
 
 export type GatewaySettingDeleteResultDto = Readonly<{
@@ -708,6 +807,41 @@ export type GatewayVariantWriteDto = Readonly<{
   readonly "stockQuantity"?: number;
 }>;
 
+export type ImageCropDto = Readonly<{
+  readonly "height": number;
+  readonly "left": number;
+  readonly "top": number;
+  readonly "width": number;
+}>;
+
+export type ImageFocalPointDto = Readonly<{
+  readonly "x": number;
+  readonly "y": number;
+}>;
+
+export type ImageRecipeDto = Readonly<{
+  readonly "crop"?: ImageCropDto;
+  readonly "fit"?: "inside" | "cover";
+  readonly "focalPoint"?: ImageFocalPointDto;
+  readonly "format"?: "webp" | "png" | "jpeg";
+  readonly "height": number;
+  readonly "quality"?: number;
+  readonly "view": "thumbnail" | "card" | "detail" | "mobile";
+  readonly "watermark"?: ImageWatermarkDto;
+  readonly "width": number;
+}>;
+
+export type ImageWatermarkDto = Readonly<{
+  readonly "height"?: number;
+  readonly "kind": "text" | "image";
+  readonly "margin"?: number;
+  readonly "mediaId"?: string;
+  readonly "opacity"?: number;
+  readonly "position"?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  readonly "text"?: string;
+  readonly "width"?: number;
+}>;
+
 export type OffsetTakePaginationDto = Readonly<{
   readonly "profile": "offset-take";
   readonly "skip": number;
@@ -823,6 +957,38 @@ export interface GatewayOperationMap {
   readonly "data"?: GatewayTaxonomyDto;
 }>;
   }>;
+  readonly "admin_media_derivatives_get": Readonly<{
+    method: "GET";
+    pathTemplate: "/api/v1/admin/media/{id}/derivatives";
+    path: Readonly<{
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: never;
+    bodyRequired: false;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: false;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayImageDerivativesDto;
+}>;
+  }>;
+  readonly "admin_media_derivatives_regenerate": Readonly<{
+    method: "POST";
+    pathTemplate: "/api/v1/admin/media/{id}/derivatives";
+    path: Readonly<{
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayImageRegenerationDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayImageDerivativesDto;
+}>;
+  }>;
   readonly "admin_media_get": Readonly<{
     method: "GET";
     pathTemplate: "/api/v1/admin/media/{id}";
@@ -834,6 +1000,22 @@ export interface GatewayOperationMap {
     bodyRequired: false;
     requiresAccessToken: true;
     requiresIdempotencyKey: false;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayMediaDto;
+}>;
+  }>;
+  readonly "admin_media_metadata_update": Readonly<{
+    method: "PATCH";
+    pathTemplate: "/api/v1/admin/media/{id}/metadata";
+    path: Readonly<{
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayMediaMetadataDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
     responseKind: "json";
     response: GatewayItemEnvelopeDto & Readonly<{
   readonly "data"?: GatewayMediaDto;
@@ -1129,6 +1311,58 @@ export interface GatewayOperationMap {
   readonly "data"?: GatewayMediaReadUrlResultDto;
 }>;
   }>;
+  readonly "admin_orders_demo_payment_outcome": Readonly<{
+    method: "POST";
+    pathTemplate: "/api/v1/admin/orders/{id}/demo-payment-attempts/{attemptId}/outcome";
+    path: Readonly<{
+  readonly "attemptId": string;
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayDemoPaymentOutcomeDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayDemoPaymentReplyDto;
+}>;
+  }>;
+  readonly "admin_orders_get": Readonly<{
+    method: "GET";
+    pathTemplate: "/api/v1/admin/orders/{id}";
+    path: Readonly<{
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: never;
+    bodyRequired: false;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: false;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayOrderDto;
+}>;
+  }>;
+  readonly "admin_orders_list": Readonly<{
+    method: "GET";
+    pathTemplate: "/api/v1/admin/orders";
+    path: Readonly<Record<never, never>>;
+    query: Readonly<{
+  readonly "limit"?: number;
+  readonly "page"?: number;
+  readonly "status"?: "PENDING" | "PAYMENT_PROCESSING" | "PAID" | "FULFILLED" | "CANCELLED";
+  readonly "userId"?: string;
+}>;
+    body: never;
+    bodyRequired: false;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: false;
+    responseKind: "json";
+    response: GatewayCollectionEnvelopeDto & Readonly<{
+  readonly "data"?: ReadonlyArray<GatewayOrderDto>;
+}>;
+  }>;
   readonly "admin_orders_status": Readonly<{
     method: "PATCH";
     pathTemplate: "/api/v1/admin/orders/{id}/status";
@@ -1264,6 +1498,23 @@ export interface GatewayOperationMap {
     bodyRequired: false;
     requiresAccessToken: true;
     requiresIdempotencyKey: false;
+    responseKind: "json";
+    response: GatewayCollectionEnvelopeDto & Readonly<{
+  readonly "data"?: ReadonlyArray<GatewayGalleryImageDto>;
+}>;
+  }>;
+  readonly "admin_products_gallery_metadata_update": Readonly<{
+    method: "PATCH";
+    pathTemplate: "/api/v1/admin/products/{id}/gallery/{imageId}/metadata";
+    path: Readonly<{
+  readonly "id": string;
+  readonly "imageId": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayGalleryMetadataDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
     responseKind: "json";
     response: GatewayCollectionEnvelopeDto & Readonly<{
   readonly "data"?: ReadonlyArray<GatewayGalleryImageDto>;
@@ -1705,7 +1956,7 @@ export interface GatewayOperationMap {
   readonly "id": string;
 }>;
     query: Readonly<{
-  readonly "variant"?: "web";
+  readonly "variant"?: "web" | "thumbnail" | "card" | "detail" | "mobile";
 }>;
     body: never;
     bodyRequired: false;
@@ -1788,6 +2039,22 @@ export interface GatewayOperationMap {
   readonly "data"?: GatewayOrderDto;
 }>;
   }>;
+  readonly "orders_demo_payment_start": Readonly<{
+    method: "POST";
+    pathTemplate: "/api/v1/orders/{id}/demo-payment-attempts";
+    path: Readonly<{
+  readonly "id": string;
+}>;
+    query: Readonly<Record<never, never>>;
+    body: GatewayDemoPaymentStartDto;
+    bodyRequired: true;
+    requiresAccessToken: true;
+    requiresIdempotencyKey: true;
+    responseKind: "json";
+    response: GatewayItemEnvelopeDto & Readonly<{
+  readonly "data"?: GatewayDemoPaymentReplyDto;
+}>;
+  }>;
   readonly "orders_get": Readonly<{
     method: "GET";
     pathTemplate: "/api/v1/orders/{id}";
@@ -1809,7 +2076,7 @@ export interface GatewayOperationMap {
     pathTemplate: "/api/v1/orders";
     path: Readonly<Record<never, never>>;
     query: Readonly<{
-  readonly "status"?: "PENDING" | "PAID" | "FULFILLED" | "CANCELLED";
+  readonly "status"?: "PENDING" | "PAYMENT_PROCESSING" | "PAID" | "FULFILLED" | "CANCELLED";
 }>;
     body: never;
     bodyRequired: false;
@@ -2014,12 +2281,36 @@ export const gatewayOperations = {
     requiresIdempotencyKey: true,
     responseKind: "json",
   },
+  "admin_media_derivatives_get": {
+    method: "GET",
+    pathTemplate: "/api/v1/admin/media/{id}/derivatives",
+    bodyRequired: false,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: false,
+    responseKind: "json",
+  },
+  "admin_media_derivatives_regenerate": {
+    method: "POST",
+    pathTemplate: "/api/v1/admin/media/{id}/derivatives",
+    bodyRequired: true,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
+    responseKind: "json",
+  },
   "admin_media_get": {
     method: "GET",
     pathTemplate: "/api/v1/admin/media/{id}",
     bodyRequired: false,
     requiresAccessToken: true,
     requiresIdempotencyKey: false,
+    responseKind: "json",
+  },
+  "admin_media_metadata_update": {
+    method: "PATCH",
+    pathTemplate: "/api/v1/admin/media/{id}/metadata",
+    bodyRequired: true,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
     responseKind: "json",
   },
   "admin_media_protected_delete": {
@@ -2150,6 +2441,30 @@ export const gatewayOperations = {
     requiresIdempotencyKey: true,
     responseKind: "json",
   },
+  "admin_orders_demo_payment_outcome": {
+    method: "POST",
+    pathTemplate: "/api/v1/admin/orders/{id}/demo-payment-attempts/{attemptId}/outcome",
+    bodyRequired: true,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
+    responseKind: "json",
+  },
+  "admin_orders_get": {
+    method: "GET",
+    pathTemplate: "/api/v1/admin/orders/{id}",
+    bodyRequired: false,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: false,
+    responseKind: "json",
+  },
+  "admin_orders_list": {
+    method: "GET",
+    pathTemplate: "/api/v1/admin/orders",
+    bodyRequired: false,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: false,
+    responseKind: "json",
+  },
   "admin_orders_status": {
     method: "PATCH",
     pathTemplate: "/api/v1/admin/orders/{id}/status",
@@ -2220,6 +2535,14 @@ export const gatewayOperations = {
     bodyRequired: false,
     requiresAccessToken: true,
     requiresIdempotencyKey: false,
+    responseKind: "json",
+  },
+  "admin_products_gallery_metadata_update": {
+    method: "PATCH",
+    pathTemplate: "/api/v1/admin/products/{id}/gallery/{imageId}/metadata",
+    bodyRequired: true,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
     responseKind: "json",
   },
   "admin_products_gallery_order": {
@@ -2466,6 +2789,14 @@ export const gatewayOperations = {
     method: "POST",
     pathTemplate: "/api/v1/orders/checkout",
     bodyRequired: false,
+    requiresAccessToken: true,
+    requiresIdempotencyKey: true,
+    responseKind: "json",
+  },
+  "orders_demo_payment_start": {
+    method: "POST",
+    pathTemplate: "/api/v1/orders/{id}/demo-payment-attempts",
+    bodyRequired: true,
     requiresAccessToken: true,
     requiresIdempotencyKey: true,
     responseKind: "json",

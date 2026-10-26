@@ -24,6 +24,15 @@ export class HealthController extends StandardHealthController {
         },
       },
       {
+        name: "metadataSchema",
+        check: async () => {
+          await this.prisma
+            .$queryRaw`SELECT "thumbnailTitle", "thumbnailAlt" FROM "Product" LIMIT 0`;
+          await this.prisma
+            .$queryRaw`SELECT "title", "metadataVersion" FROM "ProductGalleryImage" LIMIT 0`;
+        },
+      },
+      {
         name: "s2sReplay",
         check: () => this.replayStore.checkReadiness(),
       },

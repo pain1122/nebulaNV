@@ -1,6 +1,7 @@
 // apps/order-service/test/grpc/order.e2e.spec.ts
 import * as grpc from "@grpc/grpc-js";
 import * as jwt from "jsonwebtoken";
+import { randomUUID } from "node:crypto";
 import { call, loadClient, mdBearer, mdS2S, mergeMd } from "./helpers";
 import { httpJson } from "../utils/http";
 
@@ -27,6 +28,10 @@ type OrderClient = grpc.Client & {
   GetOrder: GrpcUnary;
   ListOrders: GrpcUnary;
   UpdateOrderStatus: GrpcUnary;
+  AdminGetOrder: GrpcUnary;
+  AdminListOrders: GrpcUnary;
+  StartDemoPayment: GrpcUnary;
+  ResolveDemoPayment: GrpcUnary;
 };
 
 describe("OrderService gRPC (cart + checkout + orders)", () => {
@@ -37,6 +42,8 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
   let cartItemId: string;
   let productId: string;
   let adminToken: string;
+  const checkoutKey = `grpc-checkout-${randomUUID()}`;
+  let checkoutResponse: unknown;
 
   beforeAll(async () => {
     client = loadClient<OrderClient>(
@@ -96,6 +103,9 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     expect(res.data).toBeTruthy();
     expect(res.data.userId).toBe(userId);
     expect(Array.isArray(res.data.items)).toBe(true);
+    expect(res.data.subtotal).toMatch(/^\d+\.\d{2}$/);
+    expect(res.data.total).toBe(res.data.subtotal);
+    expect(res.data.expiresAt).toMatch(/^\d{4}-/);
   });
 
   it("AddToCart returns NOT_FOUND for a missing product", async () => {
@@ -129,6 +139,10 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     const item = res.data.items[0];
     expect(item.productId).toBe(productId);
     expect(item.quantity).toBe(2);
+    expect(item.unitPrice).toBe("99.99");
+    expect(item.lineTotal).toBe("199.98");
+    expect(item.selectedOptions).toEqual({});
+    expect(item.variantId).toBeUndefined();
     cartItemId = item.id;
   });
 
@@ -149,7 +163,11 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     const res = await call<any>(
       client,
       "Checkout",
-      { userId, note: "gRPC checkout" },
+      {
+        userId,
+        note: "gRPC checkout",
+        idempotencyKey: checkoutKey,
+      },
       mergeMd(mdS2S(userToken), mdBearer(userToken)),
     );
 
@@ -157,8 +175,25 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     expect(res.data.id).toBeTruthy();
     expect(res.data.userId).toBe(userId);
     expect(res.data.items.length).toBeGreaterThan(0);
+    const snapshot = res as {
+      data: {
+        checkoutMode: string;
+        items: { selectedOptions: Record<string, string>; unitPrice: string }[];
+      };
+    };
+    expect(snapshot.data.checkoutMode).toBe("DEMO_NO_PAYMENT");
+    expect(snapshot.data.items[0].selectedOptions).toEqual({});
+    expect(snapshot.data.items[0].unitPrice).toMatch(/^\d+\.\d{2}$/);
 
     orderId = res.data.id;
+    checkoutResponse = (res as { data: unknown }).data;
+    const replay = await call<{ data: unknown }>(
+      client,
+      "Checkout",
+      { userId, note: "gRPC checkout", idempotencyKey: checkoutKey },
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
+    );
+    expect(replay.data).toEqual(checkoutResponse);
 
     // cart should be empty now
     const cart = await call<any>(
@@ -196,11 +231,56 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     expect(res.data.items.length).toBeGreaterThan(0);
   });
 
+  it("admin signed reads are paginated and deny ordinary users and invalid bounds", async () => {
+    const metadata = mergeMd(mdS2S(adminToken), mdBearer(adminToken));
+    const detail = await call<{ data: { id: string; userId: string } }>(
+      client,
+      "AdminGetOrder",
+      { id: orderId },
+      metadata,
+    );
+    expect(detail.data).toMatchObject({ id: orderId, userId });
+    const list = await call<{
+      data: { id: string }[];
+      page: number;
+      limit: number;
+      total: number;
+    }>(
+      client,
+      "AdminListOrders",
+      { userId, status: "PENDING", page: 1, limit: 100 },
+      metadata,
+    );
+    expect(list).toMatchObject({ page: 1, limit: 100 });
+    expect(list.data.some((row) => row.id === orderId)).toBe(true);
+    expect(list.total).toBeGreaterThanOrEqual(list.data.length);
+    for (const method of ["AdminGetOrder", "AdminListOrders"])
+      await expect(
+        call(
+          client,
+          method,
+          { id: orderId },
+          mergeMd(mdS2S(userToken), mdBearer(userToken)),
+        ),
+      ).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    await expect(
+      call(client, "AdminListOrders", { limit: 0 }, metadata),
+    ).rejects.toMatchObject({ code: grpc.status.INVALID_ARGUMENT });
+    await expect(
+      call(client, "AdminGetOrder", { id: MISSING_ID }, metadata),
+    ).rejects.toMatchObject({ code: grpc.status.NOT_FOUND });
+  });
+
   it("UpdateOrderStatus changes status to PAID (admin S2S)", async () => {
     const res = await call<any>(
       client,
       "UpdateOrderStatus",
-      { id: orderId, status: "PAID" },
+      {
+        id: orderId,
+        status: "PAID",
+        expectedVersion: 1,
+        idempotencyKey: `grpc-status-${randomUUID()}`,
+      },
       mergeMd(mdS2S(adminToken), mdBearer(adminToken)),
     );
 
@@ -208,17 +288,79 @@ describe("OrderService gRPC (cart + checkout + orders)", () => {
     expect(res.data.status).toBe("PAID");
   });
 
+  it("demo RPCs enforce actor roles and command validation at Order", async () => {
+    const userMd = mergeMd(mdS2S(userToken), mdBearer(userToken));
+    const adminMd = mergeMd(mdS2S(adminToken), mdBearer(adminToken));
+    const start = {
+      id: MISSING_ID,
+      expectedVersion: 1,
+      idempotencyKey: `grpc-demo-start-${randomUUID()}`,
+    };
+    const outcome = { ...start, attemptId: MISSING_ID, outcome: "FAILED" };
+    await expect(
+      call(client, "StartDemoPayment", start, adminMd),
+    ).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    await expect(
+      call(client, "ResolveDemoPayment", outcome, userMd),
+    ).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    await expect(
+      call(
+        client,
+        "StartDemoPayment",
+        { ...start, expectedVersion: 2147483646 },
+        userMd,
+      ),
+    ).rejects.toMatchObject({ code: grpc.status.INVALID_ARGUMENT });
+    await expect(
+      call(
+        client,
+        "StartDemoPayment",
+        { ...start, expectedVersion: undefined },
+        userMd,
+      ),
+    ).rejects.toMatchObject({ code: grpc.status.INVALID_ARGUMENT });
+    await expect(
+      call(
+        client,
+        "ResolveDemoPayment",
+        { ...outcome, outcome: "PAID" },
+        adminMd,
+      ),
+    ).rejects.toMatchObject({ code: grpc.status.INVALID_ARGUMENT });
+    await expect(
+      call(client, "StartDemoPayment", start, userMd),
+    ).rejects.toMatchObject({ code: grpc.status.NOT_FOUND });
+    await expect(
+      call(client, "ResolveDemoPayment", outcome, adminMd),
+    ).rejects.toMatchObject({ code: grpc.status.NOT_FOUND });
+  });
+
   it("UpdateOrderStatus returns NOT_FOUND for a missing order", async () => {
     await expect(
       call<any>(
         client,
         "UpdateOrderStatus",
-        { id: MISSING_ID, status: "PAID" },
+        {
+          id: MISSING_ID,
+          status: "PAID",
+          expectedVersion: 1,
+          idempotencyKey: `grpc-status-missing-${randomUUID()}`,
+        },
         mergeMd(mdS2S(adminToken), mdBearer(adminToken)),
       ),
     ).rejects.toMatchObject({
       code: grpc.status.NOT_FOUND,
       details: "order_not_found",
     });
+  });
+
+  it("Checkout replay retains its original response after admin status changes", async () => {
+    const replay = await call<{ data: unknown }>(
+      client,
+      "Checkout",
+      { userId, note: "gRPC checkout", idempotencyKey: checkoutKey },
+      mergeMd(mdS2S(userToken), mdBearer(userToken)),
+    );
+    expect(replay.data).toEqual(checkoutResponse);
   });
 });

@@ -12,6 +12,12 @@ import { HealthController } from "./health.controller";
 import { MediaService } from "./media.service";
 import { PrismaService } from "./prisma.service";
 import { envSchema } from "./config/env.validation";
+import { MediaProcessingStore } from "./processing/media-processing.store";
+import { MediaProcessingStorage } from "./processing/media-processing.storage";
+import { MediaProcessingWorker } from "./processing/media-processing.worker";
+import { ClamavScanner } from "./processing/clamav-scanner";
+import { MediaDerivativeStore } from "./processing/media-derivative.store";
+import { MediaDerivativeWorker } from "./processing/media-derivative.worker";
 import { createServiceLifecycleProvider } from "@packages/config";
 
 import { GRPC_SECURITY_PROVIDERS, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
@@ -57,6 +63,12 @@ export const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
     createServiceLifecycleProvider("media-service"),
     PrismaService,
     MediaService,
+    MediaProcessingStore,
+    MediaProcessingStorage,
+    MediaProcessingWorker,
+    ClamavScanner,
+    MediaDerivativeStore,
+    MediaDerivativeWorker,
     ...GRPC_SECURITY_PROVIDERS,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useExisting: GrpcTokenAuthGuard },

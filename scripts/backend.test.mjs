@@ -1,18 +1,21 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { collectImageIdentities } from "./docker/record-image-identities.mjs";
+import { releaseArchiveImages } from "./docker/release-image-inventory.mjs";
 import {
   BACKUP_MANIFEST,
   DEMO_BLOG_POST,
-  DEMO_PRODUCT,
   PRISMA_OPERATIONS,
   RESTORE_CONFIRMATION,
   TRIVY_DB_REPOSITORIES,
@@ -20,6 +23,7 @@ import {
   backupLocalDatabases,
   buildBackendQualityArgs,
   buildBackendImages,
+  parseBackendBuildOptions,
   buildDevCommands,
   buildPrismaArgs,
   buildTrivyImageArgs,
@@ -47,13 +51,19 @@ import {
   runBackendQualityTask,
   runBackendSourceScan,
   runPrismaOperation,
+  runLocalDatabaseMigration,
+  main,
   sanitizeOutput,
   seedBackendDemo,
+  verifyD1CommerceUpgrade,
+  assertD1UpgradeMigrationWindow,
   summarizeTrivyImageVulnerabilities,
   restoreLocalDatabases,
   validateBackupManifest,
   validateRenderedComposeBoundary,
   verifyCleanMigrations,
+  verifyMediaProcessingUpgrade,
+  verifyProductMetadataUpgrade,
   verifyDatabaseRecovery,
   verifyF4Batch3RoleSeeds,
   verifyF4R2DefaultActors,
@@ -69,12 +79,40 @@ function source(relativePath) {
   return readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 }
 
+test("D1 upgrade keeps exact historical targets while permitting a later D2 migration", () => {
+  const targets = ["20260901000100_one", "20260902000100_two"];
+  assert.doesNotThrow(() =>
+    assertD1UpgradeMigrationWindow(
+      [
+        "20260101000100_baseline",
+        ...targets,
+        "20261013000100_cart_selections_and_money",
+      ],
+      targets,
+      "order",
+    ),
+  );
+  assert.throws(
+    () => assertD1UpgradeMigrationWindow([targets[0]], targets, "order"),
+    /d1_upgrade_migration_set_changed_order/,
+  );
+  assert.throws(
+    () =>
+      assertD1UpgradeMigrationWindow(
+        [targets[0], "20260901000200_unexpected", targets[1]],
+        targets,
+        "order",
+      ),
+    /d1_upgrade_migration_set_changed_order/,
+  );
+});
+
 function serviceBlock(contents, serviceName) {
   const marker = new RegExp(`^  ${serviceName}:\\s*$`, "m");
   const match = marker.exec(contents);
   assert.notEqual(match, null, `${serviceName} is missing`);
   const tail = contents.slice(match.index + match[0].length);
-  const next = tail.search(/\r?\n  [A-Za-z0-9][A-Za-z0-9_-]*:\s*(?:\r?\n|$)/);
+  const next = tail.search(/\r?\n {2}[A-Za-z0-9][A-Za-z0-9_-]*:\s*(?:\r?\n|$)/);
   return next === -1 ? tail : tail.slice(0, next);
 }
 
@@ -91,12 +129,12 @@ function serviceDependencies(contents, serviceName) {
   const block = serviceBlock(contents, serviceName);
   const dependencies =
     block.match(
-      /\r?\n    depends_on:\s*\r?\n([\s\S]*?)(?=\r?\n    [a-z_][A-Za-z0-9_-]*:|$)/,
+      /\r?\n {4}depends_on:\s*\r?\n([\s\S]*?)(?=\r?\n {4}[a-z_][A-Za-z0-9_-]*:|$)/,
     )?.[1] ?? "";
   return Object.fromEntries(
     [
       ...dependencies.matchAll(
-        /^      ([A-Za-z0-9_-]+):\s*\r?\n        condition: ([a-z_]+)$/gm,
+        /^ {6}([A-Za-z0-9_-]+):\s*\r?\n {8}condition: ([a-z_]+)$/gm,
       ),
     ].map((match) => [match[1], match[2]]),
   );
@@ -369,7 +407,7 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
   );
   assert.match(
     dockerfile,
-    /packages\/protos\/tenant_authority\.proto \/packages\/protos\/tenant_authority\.proto/,
+    /COPY --from=build \/app\/\.runtime-packages \/packages/,
   );
   assert.match(
     dockerfile,
@@ -384,6 +422,21 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     /pnpm install --frozen-lockfile[\s\S]*?--child-concurrency=1[\s\S]*?--filter=@nebula\/protos\.\.\./,
     "build dependency lifecycle scripts must run serially",
   );
+  const graphInstall = dockerfile
+    .split("FROM graph-fetch AS graph-deps")[1]
+    ?.split("FROM graph-deps AS graph-prisma")[0];
+  assert.match(
+    graphInstall,
+    /pnpm install --offline --frozen-lockfile --child-concurrency=1/,
+  );
+  assert.doesNotMatch(graphInstall, /--ignore-scripts/);
+  assert.match(dockerfile, /FROM \$\{BACKEND_BUILD_PIPELINE\}-build AS build/);
+  for (const name of backendServices.map((service) => service.name)) {
+    assert.match(
+      serviceBlock(localCompose, name),
+      /BACKEND_BUILD_PIPELINE: graph/,
+    );
+  }
   assert.match(
     dockerfile,
     /cp -a "\/production-packages\/\$directory\/node_modules" "\/workspace\/packages\/\$directory\/node_modules"/,
@@ -484,16 +537,21 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
 
     const localBlock = serviceBlock(localCompose, service.dockerService);
     const releaseBlock = serviceBlock(releaseCompose, service.dockerService);
+    assert.match(
+      localBlock,
+      new RegExp(`BACKEND_BUILD_SERVICE: ${service.name}\\s`),
+      `${service.name} must select its own application compilation`,
+    );
     assert.match(localBlock, new RegExp(`-${service.dockerService}:`));
     assert.match(releaseBlock, new RegExp(`-${service.dockerService}:`));
     assert.match(localBlock, new RegExp(`:${service.httpPort}["']`));
     if (service.grpcPort !== undefined) {
       assert.match(localBlock, new RegExp(`:${service.grpcPort}["']`));
-      assert.doesNotMatch(releaseBlock, /^    ports:/m);
+      assert.doesNotMatch(releaseBlock, /^ {4}ports:/m);
     } else if (service.name === "gateway") {
       assert.match(releaseBlock, /GATEWAY_HOST_PORT:-3002}:3002/);
     } else {
-      assert.doesNotMatch(releaseBlock, /^    ports:/m);
+      assert.doesNotMatch(releaseBlock, /^ {4}ports:/m);
     }
 
     const localDependencies = serviceDependencies(
@@ -535,7 +593,20 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
       ],
       "service_completed_successfully",
     );
-    assert.doesNotMatch(compose, /condition:\s*service_started/);
+    assert.equal(
+      serviceDependencies(compose, "media-service")["media-scanner"],
+      "service_started",
+      "scanner outage must pause processing without blocking approved delivery startup",
+    );
+    const mediaBlock = serviceBlock(compose, "media-service");
+    const withoutScannerStartup = compose.replace(
+      mediaBlock,
+      mediaBlock.replace(
+        / {6}media-scanner:\r?\n {8}condition: service_started\r?\n/,
+        "",
+      ),
+    );
+    assert.doesNotMatch(withoutScannerStartup, /condition:\s*service_started/);
   }
 
   const authorityProvisioner = source(
@@ -633,7 +704,7 @@ test("existing scripts and wiring tests consume the package inventory", () => {
   );
   assert.match(
     source("scripts/docker/save-release-images.ps1"),
-    /\$repoRoot\s*=\s*Resolve-Path[\s\S]*Join-Path \$repoRoot "scripts\\backend\.mjs"/,
+    /\$repoRoot\s*=\s*Resolve-Path[\s\S]*Join-Path \$repoRoot "scripts\\docker\\release-image-inventory\.mjs"/,
   );
   assert.match(
     source("scripts/docker/save-release-images.ps1"),
@@ -707,6 +778,7 @@ test("root command names point at the consolidated backend tool", () => {
       push: manifest.scripts["db:push"],
       verifyMigrations: manifest.scripts["db:verify:migrations"],
       verifyProduct: manifest.scripts["db:verify:product"],
+      verifyOrder: manifest.scripts["db:verify:order"],
       verifyTenantAuthority: manifest.scripts["db:verify:tenant-authority"],
       backup: manifest.scripts["db:backup"],
       restore: manifest.scripts["db:restore"],
@@ -744,6 +816,8 @@ test("root command names point at the consolidated backend tool", () => {
       verifyMigrations: "node ./scripts/backend.mjs database verify-migrations",
       verifyProduct:
         "node ./scripts/backend.mjs database verify-migrations product",
+      verifyOrder:
+        "node ./scripts/backend.mjs database verify-migrations order",
       verifyTenantAuthority:
         "node ./scripts/backend.mjs database verify-migrations tenant-authority",
       backup: "node ./scripts/backend.mjs database backup",
@@ -809,6 +883,7 @@ test("R4 staged administrator proof stays on the consolidated backend tool", () 
 test("CI retains only allowlisted backend evidence for fourteen days", () => {
   const workflow = source(".github/workflows/ci.yml");
   assert.match(workflow, /run: pnpm test:shared:backend/);
+  assert.match(workflow, /run: pnpm test:backend-tooling/);
   assert.match(workflow, /run: pnpm test:gateway:backend/);
   assert.match(workflow, /run: pnpm test:tenant-authority:backend/);
   assert.match(workflow, /run: pnpm test:external-client/);
@@ -830,7 +905,7 @@ test("CI retains only allowlisted backend evidence for fourteen days", () => {
   assert.doesNotMatch(workflow, /run:\s*docker compose logs/);
 
   const retainedPaths = [
-    ...workflow.matchAll(/          path: \|\r?\n((?:            .+\r?\n)+)/g),
+    ...workflow.matchAll(/ {10}path: \|\r?\n((?: {12}.+\r?\n)+)/g),
   ]
     .flatMap((match) => match[1].trim().split(/\r?\n/))
     .map((entry) => entry.trim());
@@ -840,9 +915,239 @@ test("CI retains only allowlisted backend evidence for fourteen days", () => {
     ".ci-evidence/compose-local.yaml",
     ".ci-evidence/compose-release.yaml",
     ".security-reports/nebulanv-main-*.json",
+    ".ci-evidence/backend-tested-images.json",
     ".ci-evidence/compose-state.jsonl",
     ".ci-evidence/compose-logs.txt",
   ]);
+});
+
+test("CI caches preserve quality gates, bounded writers and isolated image scopes", () => {
+  const require = createRequire(import.meta.url);
+  const eslintRequire = createRequire(require.resolve("eslint/package.json"));
+  const workflow = eslintRequire("js-yaml").load(
+    source(".github/workflows/ci.yml"),
+  );
+  assert.deepEqual(Object.keys(workflow.on).sort(), ["pull_request", "push"]);
+  const quality = workflow.jobs.quality;
+  const live = workflow.jobs["live-e2e"];
+  assert.equal(live.needs, "quality");
+  const cacheSha = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
+  for (const job of [quality, live]) {
+    const restore = job.steps.find((step) => step.id === "host-turbo");
+    assert.equal(restore.uses, `actions/cache/restore@${cacheSha}`);
+    assert.equal(restore.with.path, ".turbo/cache");
+    assert.match(restore.with.key, /runner\.os/);
+    assert.match(restore.with.key, /runner\.arch/);
+    assert.match(
+      restore.with.key,
+      /hashFiles\('pnpm-lock\.yaml', 'turbo\.json'\)/,
+    );
+    assert.match(restore.with.key, /github\.sha/);
+    assert.ok(!restore.with["restore-keys"].includes("github.sha"));
+  }
+  const budget = quality.steps.find((step) => step.id === "turbo-budget");
+  assert.match(budget.if, /github\.event_name == 'push'/);
+  assert.match(budget.if, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(budget.if, /cache-hit != 'true'/);
+  assert.match(budget.run, /-le 1073741824/);
+  assert.match(budget.run, /du -sb \.turbo\/cache/);
+  const save = quality.steps.find(
+    (step) => step.uses === `actions/cache/save@${cacheSha}`,
+  );
+  assert.equal(save.with.path, ".turbo/cache");
+  assert.match(save.if, /success\(\)/);
+  assert.match(save.if, /turbo-budget\.outputs\.save == 'true'/);
+  const indexOf = (job, name) =>
+    job.steps.findIndex((step) => step.name === name);
+  assert.ok(
+    indexOf(quality, "Verify checks leave tracked files unchanged") <
+      quality.steps.indexOf(save),
+  );
+  assert.equal(
+    live.steps.some((step) => step.uses === save.uses),
+    false,
+  );
+  assert.equal(quality.env?.BUILDX_BAKE_FILE, undefined);
+  assert.equal(
+    live.env.BUILDX_BAKE_FILE,
+    "docker-compose.yml:docker-bake.hcl:.github/backend-cache.hcl",
+  );
+  assert.match(
+    live.env.NEBULA_CI_CACHE_WRITE,
+    /github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/,
+  );
+  const builder = live.steps.find((step) =>
+    step.uses?.startsWith("docker/setup-buildx-action@"),
+  );
+  assert.equal(
+    builder.uses,
+    "docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e",
+  );
+  assert.equal(builder.with.driver, "docker-container");
+  assert.equal(builder.with.version, "v0.28.0");
+  assert.equal(builder.with.cleanup, true);
+  assert.match(
+    builder.with["driver-opts"],
+    /moby\/buildkit:v0\.24\.0@sha256:[a-f0-9]{64}$/,
+  );
+  const runtime = live.steps.find((step) =>
+    step.uses?.startsWith("actions/github-script@"),
+  );
+  assert.equal(
+    runtime.uses,
+    "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd",
+  );
+  assert.match(
+    runtime.with.script,
+    /\['ACTIONS_RUNTIME_TOKEN', 'ACTIONS_RESULTS_URL'\]/,
+  );
+  assert.match(runtime.with.script, /core\.setSecret\(value\)/);
+  assert.doesNotMatch(runtime.with.script, /console\.|core\.(info|debug)/);
+  const exposed = [];
+  const masked = [];
+  new Function("core", "process", runtime.with.script)(
+    {
+      setSecret: (value) => masked.push(value),
+      exportVariable: (name, value) => exposed.push([name, value]),
+    },
+    {
+      env: {
+        ACTIONS_RUNTIME_TOKEN: "cache-token-fixture",
+        ACTIONS_RESULTS_URL: "https://cache.example/",
+        UNRELATED_SECRET: "excluded",
+      },
+    },
+  );
+  assert.deepEqual(masked, ["cache-token-fixture"]);
+  assert.deepEqual(exposed, [
+    ["ACTIONS_RUNTIME_TOKEN", "cache-token-fixture"],
+    ["ACTIONS_RESULTS_URL", "https://cache.example/"],
+  ]);
+  assert.throws(
+    () => new Function("core", "process", runtime.with.script)({}, { env: {} }),
+    /Missing cache runtime field/,
+  );
+  assert.ok(
+    live.steps.indexOf(builder) <
+      indexOf(live, "Provision live integration services"),
+  );
+  assert.ok(
+    live.steps.indexOf(runtime) <
+      indexOf(live, "Provision live integration services"),
+  );
+  assert.ok(
+    indexOf(live, "Scan the tested backend images") <
+      indexOf(live, "Record tested backend image identities"),
+  );
+  const roundtrip = live.steps.find(
+    (step) =>
+      step.name ===
+      "Verify complete release archive round trip without a temporary tar",
+  );
+  assert.equal(roundtrip.shell, "bash");
+  assert.match(roundtrip.run, /set -euo pipefail/);
+  assert.match(
+    roundtrip.run,
+    /docker image save "\$\{release_images\[@\]\}" \| docker image load/,
+  );
+  assert.match(
+    roundtrip.run,
+    /cmp .*release-image-ids-before\.txt.*release-image-ids-after\.txt/,
+  );
+  assert.ok(
+    indexOf(live, "Scan the tested backend images") <
+      live.steps.indexOf(roundtrip),
+  );
+  assert.ok(
+    live.steps.indexOf(roundtrip) <
+      indexOf(live, "Record tested backend image identities"),
+  );
+  assert.equal(
+    live.steps.find(
+      (step) =>
+        step.name ===
+        "Verify historical Product metadata upgrade with current migration tails",
+    ).run,
+    "pnpm db:verify:product:metadata:upgrade",
+  );
+  assert.equal(
+    live.steps.find(
+      (step) => step.name === "Record tested backend image identities",
+    ).run,
+    "node scripts/docker/record-image-identities.mjs",
+  );
+  const overlay = source(".github/backend-cache.hcl");
+  assert.deepEqual(
+    [...overlay.matchAll(/^target "([\w-]+)"/gm)].map((match) => match[1]),
+    backendServices.map((service) => service.dockerService),
+  );
+  assert.match(overlay, /default = false/);
+  assert.match(overlay, /NEBULA_CI_CACHE_WRITE \?/);
+  assert.match(overlay, /scope=nebula-backend-graph-v1-\$\{service\}/);
+  assert.match(overlay, /version=2/);
+  assert.match(overlay, /mode=max/);
+  assert.match(overlay, /ignore-error=true/);
+  assert.doesNotMatch(overlay, /token=|url_v2=|secret|\bargs\s*=/);
+});
+
+test("tested-image evidence records the complete inventory without inspect secrets", () => {
+  const calls = [];
+  const evidence = collectImageIdentities({
+    commit: "a".repeat(40),
+    inspect(reference) {
+      calls.push(reference);
+      return {
+        Id: `sha256:${"b".repeat(64)}`,
+        RepoDigests: [],
+        Config: {
+          Env: ["SECRET=must-not-retain"],
+          Labels: { secret: "must-not-retain" },
+        },
+      };
+    },
+  });
+  assert.deepEqual(calls, releaseImages());
+  assert.equal(evidence.schemaVersion, 1);
+  assert.equal(evidence.commit, "a".repeat(40));
+  assert.deepEqual(
+    evidence.images.map((image) => image.name),
+    backendServices.map((service) => service.name),
+  );
+  assert.deepEqual(Object.keys(evidence.images[0]).sort(), [
+    "id",
+    "name",
+    "reference",
+    "repoDigests",
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(evidence),
+    /SECRET|Config|Labels|must-not-retain/,
+  );
+  assert.throws(
+    () => collectImageIdentities({ commit: null, inspect: () => undefined }),
+    /nebulanv-main-user-service/,
+  );
+  assert.throws(
+    () =>
+      collectImageIdentities({
+        commit: null,
+        inspect: () => {
+          throw new Error("image_missing");
+        },
+      }),
+    /image_missing/,
+  );
+  assert.throws(
+    () =>
+      collectImageIdentities({
+        commit: null,
+        inspect: () => ({
+          Id: `sha256:${"b".repeat(64)}`,
+          RepoDigests: ["invalid"],
+        }),
+      }),
+    /invalid repository digests/,
+  );
 });
 
 test("backend quality tasks derive filters from the inventory and exclude web", () => {
@@ -1435,6 +1740,129 @@ test("failure evidence keeps bounded Compose diagnostics and redacts secrets", (
   }
 });
 
+test("backend build selection validates the complete request before invoking Docker", () => {
+  assert.deepEqual(parseBackendBuildOptions([]).services, backendServices);
+  const selected = parseBackendBuildOptions([
+    "order-service",
+    "gateway",
+    "--plan",
+    "--pull",
+  ]);
+  assert.deepEqual(
+    selected.services.map((service) => service.name),
+    ["order-service", "gateway"],
+  );
+  assert.equal(selected.plan, true);
+  assert.equal(selected.pull, true);
+  assert.equal(selected.clean, false);
+  assert.equal(parseBackendBuildOptions(["--clean"]).pull, true);
+  for (const args of [
+    ["unknown-service"],
+    ["order-service", "--unknown"],
+    ["order-service", "order-service"],
+    ["--plan", "--plan"],
+    [""],
+  ]) {
+    assert.throws(() => parseBackendBuildOptions(args), /backend_build_/);
+  }
+});
+
+test("backend plan performs no execution and reports only requested targets", () => {
+  const logs = [];
+  buildBackendImages({
+    ...parseBackendBuildOptions(["order-service", "gateway", "--plan"]),
+    execute() {
+      assert.fail("plan must not start Docker");
+    },
+    now() {
+      assert.fail("plan must not start build timing");
+    },
+    logger: { log: (message) => logs.push(message) },
+  });
+  assert.equal(logs.filter((line) => line.includes("plan: docker")).length, 2);
+  assert.match(
+    logs.join("\n"),
+    /order-service.args.BACKEND_BUILD_SERVICE=order-service,gateway/,
+  );
+  assert.match(
+    logs.join("\n"),
+    /gateway.args.BACKEND_BUILD_SERVICE=order-service,gateway/,
+  );
+  assert.doesNotMatch(logs.join("\n"), /bake product-service/);
+  assert.match(logs.at(-1), /no build started/);
+});
+
+test("full inventory keeps a single shared compilation scope", () => {
+  const calls = [];
+  buildBackendImages({
+    execute(command, args) {
+      calls.push(args);
+      return { status: 0 };
+    },
+    logger: { log() {} },
+  });
+  assert.equal(calls.length, backendServices.length);
+  assert.ok(
+    calls.every((args) =>
+      args.some((arg) => arg.endsWith(".args.BACKEND_BUILD_SERVICE=all")),
+    ),
+  );
+  assert.ok(
+    calls.every((args) =>
+      args.some((arg) => arg.endsWith(".args.BACKEND_BUILD_PIPELINE=graph")),
+    ),
+  );
+});
+
+test("batch compilation scope is canonical while image export order follows the request", () => {
+  const orders = [
+    ["product-service", "order-service", "gateway"],
+    ["gateway", "order-service", "product-service"],
+  ];
+  for (const order of orders) {
+    const calls = [];
+    buildBackendImages({
+      ...parseBackendBuildOptions(order),
+      execute(command, args) {
+        calls.push(args);
+        return { status: 0 };
+      },
+      logger: { log() {} },
+    });
+    assert.deepEqual(
+      calls.map((args) => args[2]),
+      order,
+    );
+    for (const args of calls) {
+      assert.ok(
+        args.includes(
+          `--set=${args[2]}.args.BACKEND_BUILD_SERVICE=product-service,order-service,gateway`,
+        ),
+      );
+      assert.ok(
+        args.includes(`--set=${args[2]}.args.BACKEND_BUILD_PIPELINE=graph`),
+      );
+    }
+  }
+});
+
+test("operator profile selects Realm Auth without compiling the full backend", () => {
+  assert.match(
+    serviceBlock(source("docker-compose.yml"), "operator-realm-auth-service"),
+    /BACKEND_BUILD_SERVICE: realm-auth-service\s/,
+  );
+  assert.match(
+    serviceBlock(source("docker-compose.yml"), "operator-realm-auth-service"),
+    /BACKEND_BUILD_PIPELINE: graph/,
+  );
+  assert.ok(
+    source("docker/backend.Dockerfile").includes(
+      'set -- "--filter=@nebula/${BACKEND_BUILD_SERVICE}";',
+    ),
+    "leaf task selection relies on ^build prerequisites without expanding root package dependencies",
+  );
+});
+
 test("backend image targets build sequentially and stop on the first failure", () => {
   const services = backendServices.slice(0, 3);
   const calls = [];
@@ -1459,6 +1887,18 @@ test("backend image targets build sequentially and stop on the first failure", (
     calls.every((call) => call.args.includes("--progress=plain")),
     true,
   );
+  for (const [index, call] of calls.entries()) {
+    assert.ok(
+      call.args.includes(
+        `--set=${services[index].dockerService}.args.BACKEND_BUILD_SERVICE=${services.map((entry) => entry.name).join(",")}`,
+      ),
+    );
+    assert.equal(call.args.includes("--no-cache"), false);
+    assert.equal(
+      call.args.some((arg) => arg.endsWith("TURBO_FORCE=1")),
+      false,
+    );
+  }
 
   const failedCalls = [];
   assert.throws(
@@ -1495,6 +1935,15 @@ test("backend image targets build sequentially and stop on the first failure", (
     ),
     true,
   );
+  const logs = [];
+  let tick = 0;
+  buildBackendImages({
+    services: services.slice(0, 1),
+    execute: () => ({ status: 0 }),
+    now: () => (tick++ === 0 ? 1000 : 3500),
+    logger: { log: (message) => logs.push(message) },
+  });
+  assert.ok(logs.some((line) => line.includes("elapsed=2.5s exit=0")));
 });
 
 test("database readiness uses the inventory and waits for missing databases", async () => {
@@ -1680,6 +2129,91 @@ test("Prisma actions run sequentially and stop at the first failure", () => {
   );
 });
 
+test("Docker migration commands pin selected Order and Product targets instead of inherited host URLs", () => {
+  const env = {
+    NODE_ENV: "development",
+    DATABASE_URL: "postgresql://ignored:wrong@localhost:5432/other",
+    SHADOW_DATABASE_URL:
+      "postgresql://ignored:wrong@localhost:5432/other_shadow",
+    KEEP_SETTING: "retained",
+  };
+  const calls = [];
+  for (const scope of ["order", "product"])
+    for (const operation of ["migrate-deploy", "migrate-status"])
+      runLocalDatabaseMigration(operation, scope, {
+        env,
+        logger: { log() {} },
+        execute(args, options) {
+          calls.push({ args, env: options.env, scope });
+          return { status: 0 };
+        },
+      });
+  assert.equal(calls.length, 4);
+  for (const call of calls) {
+    const database =
+      call.scope === "order" ? "nebula_order" : "nebula_products";
+    assert.equal(call.args[1], `@nebula/${call.scope}-service`);
+    assert.equal(
+      call.env.DATABASE_URL,
+      `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
+    );
+    assert.equal(
+      call.env.SHADOW_DATABASE_URL,
+      `postgresql://postgres:postgres@127.0.0.1:15432/postgres?schema=${database}_shadow`,
+    );
+    assert.equal(call.env.KEEP_SETTING, "retained");
+  }
+  assert.match(env.DATABASE_URL, /localhost:5432\/other$/);
+});
+
+test("Docker migration commands reject unsafe operations, missing/unknown scopes and production before execution", async () => {
+  let calls = 0;
+  const options = {
+    env: {},
+    logger: { log() {} },
+    execute() {
+      calls++;
+      return { status: 0 };
+    },
+  };
+  assert.throws(
+    () => runLocalDatabaseMigration("push", "order", options),
+    /operation_invalid/,
+  );
+  assert.throws(
+    () => runLocalDatabaseMigration("migrate-deploy", undefined, options),
+    /scope_required/,
+  );
+  assert.throws(
+    () => runLocalDatabaseMigration("migrate-deploy", "all", options),
+    /scope_invalid/,
+  );
+  assert.throws(
+    () =>
+      runLocalDatabaseMigration("migrate-deploy", "order", {
+        ...options,
+        env: { NODE_ENV: "production" },
+      }),
+    /requires_nonproduction/,
+  );
+  await assert.rejects(main(["database", "migrate-deploy"]), /scope_required/);
+  assert.equal(calls, 0);
+});
+
+test("Docker migration commands preserve first execution failure", () => {
+  assert.throws(
+    () =>
+      runLocalDatabaseMigration("migrate-deploy", "order", {
+        env: {},
+        logger: { log() {} },
+        execute() {
+          return { status: 7 };
+        },
+      }),
+    /prisma_migrate-deploy_order-service_nebula_order_failed_exit_7/,
+  );
+});
+
 test("clean migration verification uses disposable databases and always cleans up", () => {
   const dockerCalls = [];
   const prismaCalls = [];
@@ -1763,6 +2297,222 @@ test("clean migration verification uses disposable databases and always cleans u
   assert.notEqual(seedEvidence, undefined);
 });
 
+test("Media migration verification runs SQL and job proofs only in a disposable database", () => {
+  assert.deepEqual(
+    migrationVerificationServices("media").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/media-service"],
+  );
+  const services = prismaServices.filter(
+    (service) => service.packageName === "@nebula/media-service",
+  );
+  const dockerCalls = [];
+  const packageCalls = [];
+  const databases = verifyCleanMigrations({
+    services,
+    runId: "media-proof",
+    logger: { log() {} },
+    executeDocker(command, args, options = {}) {
+      dockerCalls.push({ args, input: options.input });
+      return { status: 0 };
+    },
+    executePrisma(args, options) {
+      packageCalls.push({ args, env: options.env });
+      return { status: 0 };
+    },
+  });
+  const proof = packageCalls.find(({ args }) =>
+    args.includes("test:processing:db"),
+  );
+  assert.notEqual(proof, undefined);
+  assert.equal(new URL(proof.env.DATABASE_URL).pathname, `/${databases[0]}`);
+  assert.match(databases[0], /^nebula_media_verify_[a-z0-9]{1,12}$/);
+  assert.ok(
+    dockerCalls.some(({ input }) =>
+      input?.includes("duplicate job was accepted"),
+    ),
+  );
+  assert.equal(
+    dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+    1,
+  );
+});
+
+test("Media populated upgrade baselines, deploys twice and cleans only its disposable database", () => {
+  const dockerCalls = [];
+  const prismaCalls = [];
+  const database = verifyMediaProcessingUpgrade({
+    env: {},
+    runId: "media-upgrade",
+    logger: { log() {} },
+    executeDocker(command, args, options = {}) {
+      dockerCalls.push({ args, input: options.input });
+      if (
+        options.input?.includes(
+          "RAISE EXCEPTION 'media_metadata_upgrade_rollback_fixture'",
+        )
+      )
+        return {
+          status: 1,
+          stderr: "ERROR: media_metadata_upgrade_rollback_fixture\n",
+        };
+      if (
+        options.input?.includes(
+          "RAISE EXCEPTION 'media_derivative_upgrade_rollback_fixture'",
+        )
+      )
+        return {
+          status: 1,
+          stderr: "ERROR: media_derivative_upgrade_rollback_fixture\n",
+        };
+      if (
+        options.input?.includes(
+          "RAISE EXCEPTION 'media_metadata_upgrade_rollback_fixture'",
+        )
+      )
+        return {
+          status: 1,
+          stderr: "ERROR: media_metadata_upgrade_rollback_fixture\n",
+        };
+      if (
+        options.input?.includes(
+          "RAISE EXCEPTION 'media_upgrade_rollback_fixture'",
+        )
+      )
+        return { status: 1, stderr: "ERROR: media_upgrade_rollback_fixture\n" };
+      return { status: 0 };
+    },
+    executePrisma(args, options) {
+      prismaCalls.push({ args, env: options.env });
+      return { status: 0 };
+    },
+  });
+  assert.match(database, /^nebula_media_verify_[a-z0-9]{1,12}$/);
+  const injectedSql = dockerCalls.find(({ input }) =>
+    input?.includes("RAISE EXCEPTION 'media_upgrade_rollback_fixture'"),
+  ).input;
+  assert.ok(
+    injectedSql.endsWith(
+      "DO $$ BEGIN RAISE EXCEPTION 'media_upgrade_rollback_fixture'; END $$;\nCOMMIT;",
+    ),
+    "rollback injection must preserve PostgreSQL dollar quoting",
+  );
+  assert.equal(
+    prismaCalls.filter(({ args }) => args.includes("resolve")).length,
+    6,
+  );
+  assert.equal(
+    prismaCalls.filter(({ args }) => args.includes("deploy")).length,
+    2,
+  );
+  assert.ok(
+    prismaCalls.every(
+      ({ env }) =>
+        new globalThis.URL(env.DATABASE_URL).pathname === `/${database}`,
+    ),
+  );
+  assert.equal(
+    dockerCalls.filter(({ args }) => args.includes("dropdb")).length,
+    1,
+  );
+  for (const { args } of dockerCalls) {
+    if (args.includes("--dbname"))
+      assert.equal(args[args.indexOf("--dbname") + 1], database);
+  }
+  assert.ok(
+    dockerCalls.some(({ input }) =>
+      input?.includes("media_failed_upgrade_changed_facts"),
+    ),
+  );
+});
+
+test("Media populated upgrade failure still cleans its database and refuses production callers", () => {
+  const dockerCalls = [];
+  const executeDocker = (command, args, options = {}) => {
+    dockerCalls.push(args);
+    if (
+      options.input?.includes(
+        "RAISE EXCEPTION 'media_metadata_upgrade_rollback_fixture'",
+      )
+    )
+      return {
+        status: 1,
+        stderr: "ERROR: media_metadata_upgrade_rollback_fixture\n",
+      };
+    if (
+      options.input?.includes(
+        "RAISE EXCEPTION 'media_derivative_upgrade_rollback_fixture'",
+      )
+    )
+      return {
+        status: 1,
+        stderr: "ERROR: media_derivative_upgrade_rollback_fixture\n",
+      };
+    if (
+      options.input?.includes(
+        "RAISE EXCEPTION 'media_metadata_upgrade_rollback_fixture'",
+      )
+    )
+      return {
+        status: 1,
+        stderr: "ERROR: media_metadata_upgrade_rollback_fixture\n",
+      };
+    if (
+      options.input?.includes(
+        "RAISE EXCEPTION 'media_upgrade_rollback_fixture'",
+      )
+    )
+      return { status: 1, stderr: "ERROR: media_upgrade_rollback_fixture\n" };
+    return { status: 0 };
+  };
+  assert.throws(
+    () =>
+      verifyMediaProcessingUpgrade({
+        env: {},
+        runId: "media-abort",
+        logger: { log() {} },
+        executeDocker,
+        executePrisma: (args) => ({ status: args.includes("deploy") ? 1 : 0 }),
+      }),
+    /failed_exit_1/,
+  );
+  assert.equal(dockerCalls.filter((args) => args.includes("dropdb")).length, 1);
+  const before = dockerCalls.length;
+  assert.throws(
+    () =>
+      verifyMediaProcessingUpgrade({
+        env: { NODE_ENV: "production" },
+        executeDocker,
+      }),
+    /requires_nonproduction/,
+  );
+  assert.equal(dockerCalls.length, before);
+});
+
+test("Media job proof failure still drops its disposable database", () => {
+  const dockerCalls = [];
+  assert.throws(
+    () =>
+      verifyCleanMigrations({
+        services: prismaServices.filter(
+          (service) => service.packageName === "@nebula/media-service",
+        ),
+        runId: "media-failed-proof",
+        logger: { log() {} },
+        executeDocker(command, args) {
+          dockerCalls.push(args);
+          return { status: 0 };
+        },
+        executePrisma(args) {
+          return { status: args.includes("test:processing:db") ? 1 : 0 };
+        },
+      }),
+    /test:processing:db_failed_exit_1/,
+  );
+  assert.equal(dockerCalls.filter((args) => args.includes("dropdb")).length, 1);
+});
+
 test("product migration verification executes the inventory and variant database proofs", () => {
   let invocation;
 
@@ -1807,6 +2557,12 @@ test("migration verification can select one scoped service", () => {
       (service) => service.packageName,
     ),
     ["@nebula/tenant-authority-service"],
+  );
+  assert.deepEqual(
+    migrationVerificationServices("order").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/order-service"],
   );
   assert.throws(
     () => migrationVerificationServices("unknown"),
@@ -2646,17 +3402,201 @@ test("tooling output redacts database credentials and configured secrets", () =>
   assert.match(sanitized, /\[REDACTED\]/);
 });
 
-test("demo seed creates stable records through the existing HTTP contracts", async () => {
+function d1UpgradeHarness({
+  snapshotFailure = false,
+  wrongMarker = false,
+  dropFailure = false,
+  wrongSqlMarker = false,
+  sqlUnexpectedSuccess = false,
+  sqlEarlierError = false,
+} = {}) {
+  const docker = [];
+  const prisma = [];
+  const schemas = new Set();
+  const rejected = [];
+  const sqlFaults = [];
+  const executeDocker = (_command, args, options = {}) => {
+    docker.push(args);
+    const marker = options.input?.match(/d1_upgrade_rollback_[a-z0-9_]+/u)?.[0];
+    if (marker) {
+      sqlFaults.push(options.input);
+      assert.ok(
+        options.input.indexOf(marker) < options.input.lastIndexOf("COMMIT;"),
+      );
+      return {
+        status: sqlUnexpectedSuccess ? 0 : 1,
+        stderr: sqlEarlierError
+          ? `ERROR: unrelated migration failure\nERROR: ${marker}`
+          : `ERROR: ${wrongSqlMarker ? "current transaction is aborted" : marker}`,
+      };
+    }
+    if (dropFailure && args.includes("dropdb"))
+      return { status: 1, stderr: "cleanup failure" };
+    if (
+      snapshotFailure &&
+      options.input?.includes("d1_upgrade_failed_migration_changed_schema")
+    )
+      return { status: 1, stderr: "changed schema" };
+    return { status: 0, stdout: "", stderr: "" };
+  };
+  const executePrisma = (args, options) => {
+    prisma.push(args);
+    const schema = args[args.indexOf("--schema") + 1];
+    schemas.add(schema);
+    const database = new globalThis.URL(
+      options.env.DATABASE_URL,
+    ).pathname.slice(1);
+    assert.match(database, /_verify_/u);
+    assert.notEqual(database, "nebula_products");
+    assert.notEqual(database, "nebula_order");
+    if (args.includes("deploy")) {
+      const root = path.join(path.dirname(schema), "migrations");
+      for (const name of readdirSync(root)) {
+        if (name === "migration_lock.toml") continue;
+        const sql = readFileSync(
+          path.join(root, name, "migration.sql"),
+          "utf8",
+        );
+        const marker = sql.match(/d1_upgrade_rollback_[a-z0-9_]+/u)?.[0];
+        if (marker) {
+          rejected.push(name);
+          assert.equal(name.includes("descriptive_metadata"), false);
+          return {
+            status: 1,
+            stderr: wrongMarker ? "unrelated failure" : marker,
+          };
+        }
+      }
+    }
+    return { status: 0, stdout: "", stderr: "" };
+  };
+  return {
+    docker,
+    prisma,
+    schemas,
+    rejected,
+    sqlFaults,
+    options: {
+      env: { NODE_ENV: "development" },
+      runId: "d1-upgrade-test",
+      executeDocker,
+      executePrisma,
+      logger: { log() {} },
+    },
+  };
+}
+
+test("D1 upgrade checks seven Prisma failures and explicit metadata SQL rollback, then cleans owned resources", () => {
+  const h = d1UpgradeHarness();
+  const sources = prismaServices
+    .filter((service) =>
+      ["@nebula/product-service", "@nebula/order-service"].includes(
+        service.packageName,
+      ),
+    )
+    .flatMap((service) => {
+      const root = path.join(
+        repositoryRoot,
+        service.directory,
+        "prisma",
+        "migrations",
+      );
+      return readdirSync(root)
+        .filter((name) => name !== "migration_lock.toml")
+        .map((name) => path.join(root, name, "migration.sql"));
+    });
+  const before = sources.map((file) => readFileSync(file, "utf8"));
+  const result = verifyD1CommerceUpgrade(h.options);
+  assert.equal(result.rollbackCases, 8);
+  assert.equal(result.databases.length, 2);
+  assert.equal(h.rejected.length, 7);
+  assert.equal(h.sqlFaults.length, 1);
+  assert.match(h.sqlFaults[0], /^BEGIN;/u);
+  assert.match(h.sqlFaults[0], /ADD COLUMN "thumbnailTitle"/u);
+  assert.equal(
+    h.prisma.filter((args) => args.includes("--rolled-back")).length,
+    7,
+  );
+  assert.equal(h.prisma.filter((args) => args.includes("status")).length, 4);
+  assert.equal(h.docker.filter((args) => args.includes("dropdb")).length, 2);
+  for (const schema of h.schemas)
+    assert.equal(existsSync(path.dirname(schema)), false);
+  assert.deepEqual(
+    sources.map((file) => readFileSync(file, "utf8")),
+    before,
+  );
+});
+
+test("D1 upgrade refuses production before executing tools", () => {
+  const h = d1UpgradeHarness();
+  assert.throws(
+    () =>
+      verifyD1CommerceUpgrade({
+        ...h.options,
+        env: { NODE_ENV: " Production " },
+      }),
+    /d1_upgrade_requires_nonproduction/u,
+  );
+  assert.equal(h.docker.length, 0);
+  assert.equal(h.prisma.length, 0);
+});
+
+test("D1 upgrade stops on unexpected failure or changed rollback schema and still cleans resources", () => {
+  for (const flags of [{ wrongMarker: true }, { snapshotFailure: true }]) {
+    const h = d1UpgradeHarness(flags);
+    assert.throws(() => verifyD1CommerceUpgrade(h.options));
+    assert.equal(
+      h.prisma.some((args) => args.includes("--rolled-back")),
+      false,
+    );
+    assert.equal(h.docker.filter((args) => args.includes("dropdb")).length, 1);
+    for (const schema of h.schemas)
+      assert.equal(existsSync(path.dirname(schema)), false);
+  }
+});
+
+test("D1 upgrade surfaces database cleanup failure without leaving temporary migration copies", () => {
+  const h = d1UpgradeHarness({ wrongMarker: true, dropFailure: true });
+  assert.throws(
+    () => verifyD1CommerceUpgrade(h.options),
+    /d1_upgrade_and_cleanup_failed/u,
+  );
+  for (const schema of h.schemas)
+    assert.equal(existsSync(path.dirname(schema)), false);
+});
+
+test("D1 metadata rollback requires the exact first SQL error and a failing exit status", () => {
+  for (const flags of [
+    { wrongSqlMarker: true },
+    { sqlUnexpectedSuccess: true },
+    { sqlEarlierError: true },
+  ]) {
+    const h = d1UpgradeHarness(flags);
+    assert.throws(
+      () => verifyD1CommerceUpgrade(h.options),
+      /d1_upgrade_expected_failure_missing_d1_upgrade_rollback_20261010000100_descriptive_metadata/u,
+    );
+    assert.equal(h.sqlFaults.length, 1);
+    assert.equal(
+      h.prisma.filter((args) => args.includes("--rolled-back")).length,
+      6,
+    );
+    assert.equal(h.docker.filter((args) => args.includes("dropdb")).length, 1);
+    for (const schema of h.schemas)
+      assert.equal(existsSync(path.dirname(schema)), false);
+  }
+});
+
+test("demo seed delegates Product to the proven showcase and preserves Blog creation", async () => {
   const calls = [];
   const logs = [];
+  const pnpmCalls = [];
   const fetchImpl = queuedFetch(
     [
       jsonResponse(200, {
         accessToken: "access-token-secret",
         refreshToken: "refresh-token-secret",
       }),
-      jsonResponse(200, { data: [] }),
-      jsonResponse(201, { data: { ...DEMO_PRODUCT, id: "product-id" } }),
       jsonResponse(404, { message: "post_not_found" }),
       jsonResponse(201, {
         data: { ...DEMO_BLOG_POST, id: "blog-post-id" },
@@ -2672,29 +3612,31 @@ test("demo seed creates stable records through the existing HTTP contracts", asy
       SEED_ADMIN_PASS: "seed-admin-password",
     },
     fetchImpl,
+    executePnpm: (args, options) => {
+      pnpmCalls.push({ args, env: options.env });
+      return { status: 0 };
+    },
     logger: { log: (message) => logs.push(message) },
   });
 
-  assert.deepEqual(result, { product: "created", blog: "created" });
+  assert.deepEqual(result, { product: "d1-showcase", blog: "created" });
+  assert.deepEqual(
+    pnpmCalls.map((call) => call.args),
+    [["run", "demo:d1:seed"]],
+  );
+  assert.equal(pnpmCalls[0].env.SEED_ADMIN_EMAIL, "seed-admin@example.com");
   assert.deepEqual(
     calls.map((call) => call.options.method),
-    ["POST", "GET", "POST", "GET", "POST"],
+    ["POST", "GET", "POST"],
   );
   const loginBody = JSON.parse(calls[0].options.body);
   assert.deepEqual(loginBody, {
     identifier: "seed-admin@example.com",
     password: "seed-admin-password",
   });
-  const productBody = JSON.parse(calls[2].options.body);
-  assert.equal(productBody.data.slug, DEMO_PRODUCT.slug);
-  assert.equal(productBody.data.sku, DEMO_PRODUCT.sku);
-  assert.equal("categoryId" in productBody.data, false);
+  assert.ok(calls.every((call) => !call.url.includes("/products")));
   assert.equal(
     calls[2].options.headers.authorization,
-    "Bearer access-token-secret",
-  );
-  assert.equal(
-    calls[4].options.headers.authorization,
     "Bearer access-token-secret",
   );
   assert.doesNotMatch(
@@ -2703,58 +3645,47 @@ test("demo seed creates stable records through the existing HTTP contracts", asy
   );
 });
 
-test("demo seed safely skips both matching records on repeat", async () => {
+test("demo seed reruns showcase and skips a matching Blog record", async () => {
   const calls = [];
+  let showcaseCalls = 0;
   const result = await seedBackendDemo({
     env: { NODE_ENV: "development" },
     fetchImpl: queuedFetch(
       [
         jsonResponse(200, { accessToken: "access-token" }),
-        jsonResponse(200, { data: [{ ...DEMO_PRODUCT }] }),
         jsonResponse(200, { data: { ...DEMO_BLOG_POST } }),
       ],
       calls,
     ),
+    executePnpm: () => {
+      showcaseCalls += 1;
+      return { status: 0 };
+    },
     logger: { log() {} },
   });
 
-  assert.deepEqual(result, { product: "existing", blog: "existing" });
+  assert.deepEqual(result, { product: "d1-showcase", blog: "existing" });
+  assert.equal(showcaseCalls, 1);
   assert.deepEqual(
     calls.map((call) => call.options.method),
-    ["POST", "GET", "GET"],
+    ["POST", "GET"],
   );
 });
 
-test("demo seed completes whichever stable record is missing", async () => {
-  for (const existing of ["product", "blog"]) {
-    const calls = [];
-    const responses =
-      existing === "product"
-        ? [
-            jsonResponse(200, { accessToken: "access-token" }),
-            jsonResponse(200, { data: [{ ...DEMO_PRODUCT }] }),
-            jsonResponse(404, { message: "post_not_found" }),
-            jsonResponse(201, { data: { ...DEMO_BLOG_POST } }),
-          ]
-        : [
-            jsonResponse(200, { accessToken: "access-token" }),
-            jsonResponse(200, { data: [] }),
-            jsonResponse(201, { data: { ...DEMO_PRODUCT } }),
-            jsonResponse(200, { data: { ...DEMO_BLOG_POST } }),
-          ];
-
-    const result = await seedBackendDemo({
+test("demo seed stops before Blog work when showcase fails", async () => {
+  let fetchCalls = 0;
+  await assert.rejects(
+    seedBackendDemo({
       env: { NODE_ENV: "development" },
-      fetchImpl: queuedFetch(responses, calls),
+      executePnpm: () => ({ status: 1 }),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+      },
       logger: { log() {} },
-    });
-
-    assert.equal(result[existing], "existing");
-    assert.equal(
-      result[existing === "product" ? "blog" : "product"],
-      "created",
-    );
-  }
+    }),
+    /d1_demo_seed_failed_exit_1/u,
+  );
+  assert.equal(fetchCalls, 0);
 });
 
 test("demo seed refuses production and stops on dependency failure", async () => {
@@ -2762,6 +3693,10 @@ test("demo seed refuses production and stops on dependency failure", async () =>
   await assert.rejects(
     seedBackendDemo({
       env: { NODE_ENV: "production" },
+      executePnpm: () => {
+        productionCalls += 1;
+        return { status: 0 };
+      },
       fetchImpl: async () => {
         productionCalls += 1;
       },
@@ -2775,6 +3710,7 @@ test("demo seed refuses production and stops on dependency failure", async () =>
   await assert.rejects(
     seedBackendDemo({
       env: { NODE_ENV: "development" },
+      executePnpm: () => ({ status: 0 }),
       fetchImpl: queuedFetch(
         [
           jsonResponse(200, { accessToken: "access-token" }),
@@ -2784,7 +3720,7 @@ test("demo seed refuses production and stops on dependency failure", async () =>
       ),
       logger: { log() {} },
     }),
-    /demo_seed_product_lookup_http_503/,
+    /demo_seed_blog_lookup_http_503/,
   );
   assert.equal(calls.length, 2);
 });
@@ -2809,4 +3745,187 @@ test("development and release commands derive all backend services", () => {
       (service) => `example/nebula-${service.dockerService}:test`,
     ),
   );
+});
+
+test("release archive covers both Compose image sets including scanner and custom overrides", () => {
+  const require = createRequire(import.meta.url);
+  const yaml = createRequire(require.resolve("eslint/package.json"))("js-yaml");
+  const local = yaml.load(source("docker-compose.yml")).services;
+  const release = yaml.load(source("docker-compose.release.yml")).services;
+  const expressions = (services) =>
+    Object.fromEntries(
+      Object.entries(services).map(([name, config]) => [name, config.image]),
+    );
+  assert.deepEqual(expressions(local), expressions(release));
+  const saveSource = source("scripts/docker/save-release-images.ps1");
+  const loadSource = source("scripts/docker/load-release-images.ps1");
+  assert.match(saveSource, /\[string\[\]\]\$images\s*=.*ConvertFrom-Json/);
+  assert.match(loadSource, /\[Alias\("Input"\)\]/);
+  assert.match(loadSource, /\[string\]\$ArchivePath/);
+  assert.doesNotMatch(loadSource, /\$Input\b/i);
+  const scanner = local["media-scanner"].image.match(
+    /^\$\{MEDIA_SCANNER_IMAGE:-(.+)\}$/,
+  )?.[1];
+  assert.match(scanner, /^clamav\/clamav:.+@sha256:[a-f0-9]{64}$/);
+  for (const custom of [false, true]) {
+    const prefix = custom ? "example/nebula" : "nebulanv-main";
+    const tag = custom ? "archive-proof" : "latest";
+    const scanImage = custom ? "example/scanner:custom" : scanner;
+    const expected = [
+      ...releaseImages(prefix, tag),
+      "postgres:17",
+      "redis:7-alpine",
+      "minio/minio:latest",
+      "minio/mc:latest",
+      scanImage,
+    ];
+    const images = releaseArchiveImages({
+      prefix,
+      tag,
+      envFile: "deploy/.env.production.example",
+      env: { MEDIA_SCANNER_IMAGE: scanImage },
+      execute(args, options) {
+        assert.deepEqual(args.slice(0, 3), [
+          "compose",
+          "--file",
+          "docker-compose.yml",
+        ]);
+        assert.deepEqual(args.slice(-4), [
+          "--profile",
+          "*",
+          "config",
+          "--images",
+        ]);
+        assert.ok(
+          args.includes(
+            path.join(repositoryRoot, "deploy/.env.production.example"),
+          ),
+        );
+        assert.equal(options.cwd, repositoryRoot);
+        assert.equal(options.env.NEBULA_IMAGE_PREFIX, prefix);
+        assert.equal(options.env.NEBULA_IMAGE_TAG, tag);
+        assert.equal(options.env.MEDIA_SCANNER_IMAGE, scanImage);
+        return [...expected, "postgres:17", expected[0]].join("\r\n");
+      },
+    });
+    assert.deepEqual(images, [...expected].sort());
+    assert.equal(images.length, 16);
+  }
+  assert.throws(
+    () => releaseArchiveImages({ execute: () => "postgres:17\n" }),
+    /missing backend image/,
+  );
+  assert.throws(
+    () =>
+      releaseArchiveImages({
+        execute: () => {
+          throw new Error("compose_render_failed");
+        },
+      }),
+    /compose_render_failed/,
+  );
+  assert.throws(
+    () =>
+      releaseArchiveImages({
+        prefix: "invalid prefix",
+        execute: () => assert.fail("invalid prefix must not execute Docker"),
+      }),
+    /release_image_name_invalid/,
+  );
+});
+
+test("Product metadata populated proof injects rollback, reruns deploy and cleans its disposable database", () => {
+  const calls = [];
+  const prisma = [];
+  const database = verifyProductMetadataUpgrade({
+    env: {},
+    runId: "metadataproof",
+    logger: { log() {} },
+    executeDocker(command, args, options = {}) {
+      calls.push({ args, input: options.input });
+      if (
+        options.input?.includes(
+          "RAISE EXCEPTION 'product_metadata_rollback_fixture'",
+        )
+      )
+        return {
+          status: 1,
+          stderr: "ERROR: product_metadata_rollback_fixture\n",
+        };
+      return { status: 0, stdout: "" };
+    },
+    executePrisma(args, options) {
+      prisma.push({ args, options });
+      return { status: 0, stdout: "" };
+    },
+  });
+  assert.match(database, /^nebula_products_verify_[a-z0-9]{1,12}$/);
+  const resolved = prisma
+    .filter((call) => call.args.includes("--applied"))
+    .map((call) => call.args[call.args.indexOf("--applied") + 1]);
+  assert.equal(resolved.length, 9);
+  assert.ok(
+    resolved.every((name) => name < "20261010000100_descriptive_metadata"),
+  );
+  assert.equal(
+    resolved.includes("20261014000100_checkout_stock_intents"),
+    false,
+  );
+  assert.equal(
+    resolved.includes("20261019000100_finalized_stock_restoration"),
+    false,
+  );
+  assert.equal(prisma.filter((call) => call.args.includes("deploy")).length, 2);
+  assert.equal(calls.filter((call) => call.args.includes("dropdb")).length, 1);
+  assert.ok(
+    calls.some((call) =>
+      call.input?.includes("product_metadata_rollback_retained_columns"),
+    ),
+  );
+  assert.ok(
+    calls.some((call) =>
+      call.input?.includes("product_metadata_upgrade_changed_gallery"),
+    ),
+  );
+  assert.ok(
+    prisma.every(
+      (call) =>
+        new URL(call.options.env.DATABASE_URL).pathname === `/${database}`,
+    ),
+  );
+});
+test("Product metadata proof refuses production and cleans up after failed deployment", () => {
+  assert.throws(
+    () => verifyProductMetadataUpgrade({ env: { NODE_ENV: "production" } }),
+    /requires_nonproduction/,
+  );
+  const calls = [];
+  assert.throws(
+    () =>
+      verifyProductMetadataUpgrade({
+        env: {},
+        runId: "metadatafail",
+        logger: { log() {} },
+        executeDocker(command, args, options = {}) {
+          calls.push(args);
+          if (
+            options.input?.includes(
+              "RAISE EXCEPTION 'product_metadata_rollback_fixture'",
+            )
+          )
+            return {
+              status: 1,
+              stderr: "ERROR: product_metadata_rollback_fixture\n",
+            };
+          return { status: 0, stdout: "" };
+        },
+        executePrisma(args) {
+          return args.includes("deploy")
+            ? { status: 1, stderr: "failed" }
+            : { status: 0, stdout: "" };
+        },
+      }),
+    /failed/,
+  );
+  assert.equal(calls.filter((args) => args.includes("dropdb")).length, 1);
 });

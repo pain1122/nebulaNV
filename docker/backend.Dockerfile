@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
+ARG BACKEND_BUILD_PIPELINE=graph
+
 FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS build-base
 WORKDIR /app
 
@@ -20,7 +22,7 @@ RUN set -eu; \
     done
 
 # Keep dependency resolution independent from application source changes.
-FROM build-base AS deps
+FROM build-base AS dependency-metadata
 WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
@@ -44,11 +46,13 @@ COPY packages/grpc-auth/package.json packages/grpc-auth/package.json
 COPY packages/migration-artifacts/package.json packages/migration-artifacts/package.json
 COPY packages/protos/package.json packages/protos/package.json
 
+FROM dependency-metadata AS deps
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     pnpm fetch --frozen-lockfile
 
-# Install build dependencies and compile every backend service once.
-FROM build-base AS build
+# Install build dependencies. Full backend builds share one compilation layer;
+# an incremental target may select its own application and dependency graph.
+FROM build-base AS legacy-build
 WORKDIR /app
 
 COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json /app/.npmrc ./
@@ -112,6 +116,8 @@ COPY packages/protos ./packages/protos
 # so the image never depends on host-generated output. Keep verified Docker
 # artifacts in a versioned cache namespace.
 ARG TURBO_FORCE=0
+ARG BACKEND_BUILD_SERVICE=all
+ARG BACKEND_BUILD_CONCURRENCY=1
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     --mount=type=cache,id=nebula-turbo,target=/app/.turbo,sharing=locked \
     pnpm --filter=@nebula/protos build && \
@@ -119,8 +125,8 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
     pnpm --filter=@nebula/migration-artifacts build && \
     pnpm --filter=@packages/config build && \
     pnpm --filter=@nebula/clients build && \
-    if [ "$TURBO_FORCE" = "1" ]; then \
-      pnpm turbo run build --force --cache-dir=/app/.turbo/runtime-imports-v2 \
+    if [ "$BACKEND_BUILD_SERVICE" = "all" ]; then \
+      set -- \
         --filter=@nebula/user-service... \
         --filter=@nebula/auth-service... \
         --filter=@nebula/realm-auth-service... \
@@ -133,19 +139,73 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
         --filter=@nebula/blog-service... \
         --filter=@nebula/order-service...; \
     else \
-      pnpm turbo run build --cache-dir=/app/.turbo/runtime-imports-v2 \
-        --filter=@nebula/user-service... \
-        --filter=@nebula/auth-service... \
-        --filter=@nebula/realm-auth-service... \
-        --filter=@nebula/tenant-authority-service... \
-        --filter=@nebula/gateway... \
-        --filter=@nebula/settings-service... \
-        --filter=@nebula/media-service... \
-        --filter=@nebula/taxonomy-service... \
-        --filter=@nebula/product-service... \
-        --filter=@nebula/blog-service... \
-        --filter=@nebula/order-service...; \
-    fi
+      case "$BACKEND_BUILD_SERVICE" in \
+        user-service|auth-service|realm-auth-service|tenant-authority-service|gateway|settings-service|media-service|taxonomy-service|product-service|blog-service|order-service) ;; \
+        *) echo "Unknown backend build service: $BACKEND_BUILD_SERVICE" >&2; exit 1 ;; \
+      esac; \
+      set -- "--filter=@nebula/${BACKEND_BUILD_SERVICE}"; \
+    fi && \
+    if [ "$TURBO_FORCE" = "1" ]; then set -- --force "$@"; fi && \
+    pnpm turbo run build --cache-dir=/app/.turbo/runtime-imports-v2 \
+      --concurrency="$BACKEND_BUILD_CONCURRENCY" "$@"
+
+# Selected graph: prune once, then let content-addressed copies isolate install,
+# generation and compilation inputs. Unrelated source can rerun pruning only.
+FROM build-base AS graph-pruner
+RUN pnpm add --global turbo@2.5.8
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc turbo.json tsconfig.base.json ./
+COPY apps/auth-service ./apps/auth-service
+COPY apps/realm-auth-service ./apps/realm-auth-service
+COPY apps/tenant-authority-service ./apps/tenant-authority-service
+COPY apps/blog-service ./apps/blog-service
+COPY apps/gateway ./apps/gateway
+COPY apps/media-service ./apps/media-service
+COPY apps/order-service ./apps/order-service
+COPY apps/product-service ./apps/product-service
+COPY apps/settings-service ./apps/settings-service
+COPY apps/taxonomy-service ./apps/taxonomy-service
+COPY apps/user-service ./apps/user-service
+COPY packages/clients ./packages/clients
+COPY packages/config ./packages/config
+COPY packages/grpc-auth ./packages/grpc-auth
+COPY packages/migration-artifacts ./packages/migration-artifacts
+COPY packages/protos ./packages/protos
+COPY scripts/backend.mjs ./scripts/backend.mjs
+COPY scripts/docker/backend-build-graph.mjs ./scripts/docker/backend-build-graph.mjs
+ARG BACKEND_BUILD_SERVICE=all
+RUN node scripts/docker/backend-build-graph.mjs prune "$BACKEND_BUILD_SERVICE" /pruned
+
+FROM build-base AS graph-fetch
+COPY --from=graph-pruner /pruned/fetch/ ./
+RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
+    pnpm fetch --frozen-lockfile
+
+# Inherit the fetched virtual store. Only workspace Prisma postinstall is
+# removed from generated install manifests; approved native scripts still run.
+FROM graph-fetch AS graph-deps
+COPY --from=graph-pruner /pruned/json/ ./
+RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
+    pnpm install --offline --frozen-lockfile --child-concurrency=1
+COPY scripts/backend.mjs ./scripts/backend.mjs
+COPY scripts/docker/backend-build-graph.mjs ./scripts/docker/backend-build-graph.mjs
+
+FROM graph-deps AS graph-prisma
+COPY --from=graph-pruner /pruned/schemas/ ./
+RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
+    node scripts/docker/backend-build-graph.mjs generate
+
+FROM graph-prisma AS graph-build
+COPY --from=graph-pruner /pruned/full/ ./
+ARG BACKEND_BUILD_SERVICE=all
+ARG BACKEND_BUILD_CONCURRENCY=1
+ARG TURBO_FORCE=0
+RUN --mount=type=cache,id=nebula-turbo,target=/app/.turbo,sharing=locked \
+    node scripts/docker/backend-build-graph.mjs build "$BACKEND_BUILD_SERVICE"
+
+# All targets use graph by default. The runner passes the same selected union to
+# every image in a batch; the explicit legacy override remains diagnostic only.
+FROM ${BACKEND_BUILD_PIPELINE}-build AS build
+ARG BACKEND_BUILD_SERVICE=all
 
 # A backend artifact must resolve shared workspaces through their package names.
 # Relative paths into packages/* bypass the injected production dependency graph
@@ -154,7 +214,12 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
 # the expensive Turbo build layer.
 COPY scripts/backend.mjs ./scripts/backend.mjs
 COPY scripts/docker/verify-runtime-imports.mjs ./scripts/docker/verify-runtime-imports.mjs
-RUN node ./scripts/docker/verify-runtime-imports.mjs /app
+COPY scripts/docker/backend-build-graph.mjs ./scripts/docker/backend-build-graph.mjs
+RUN node scripts/docker/backend-build-graph.mjs verify "$BACKEND_BUILD_SERVICE"
+
+# Collect only the selected graph's built runtime libraries. The external
+# production dependency layer remains stable and shared across image targets.
+RUN node scripts/docker/backend-build-graph.mjs artifacts "$BACKEND_BUILD_SERVICE"
 
 # Create one production workspace dependency graph. This stage intentionally
 # receives only dependency metadata, never compiled first-party files. The
@@ -163,14 +228,13 @@ RUN node ./scripts/docker/verify-runtime-imports.mjs /app
 FROM build-base AS prod-deps
 WORKDIR /app
 
-COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json /app/.npmrc ./
-COPY --from=deps /app/apps ./apps
-COPY --from=deps /app/packages ./packages
+COPY --from=dependency-metadata /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/package.json /app/.npmrc ./
+COPY --from=dependency-metadata /app/apps ./apps
+COPY --from=dependency-metadata /app/packages ./packages
 
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     pnpm install \
       --prod \
-      --offline \
       --ignore-scripts \
       --frozen-lockfile \
       --filter=@nebula/user-service... \
@@ -185,30 +249,8 @@ RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store
       --filter=@nebula/blog-service... \
       --filter=@nebula/order-service...
 
-# Collect the compiled first-party runtime packages in a small, independent
-# layer. Optional/licensed feature modules are deliberately not admitted here;
-# they remain separately built and licensed images.
 FROM scratch AS shared-runtime-artifacts
-
-COPY --from=deps /app/packages/clients/package.json /packages/clients/package.json
-COPY --from=deps /app/packages/config/package.json /packages/config/package.json
-COPY --from=deps /app/packages/grpc-auth/package.json /packages/grpc-auth/package.json
-COPY --from=deps /app/packages/migration-artifacts/package.json /packages/migration-artifacts/package.json
-COPY --from=deps /app/packages/protos/package.json /packages/protos/package.json
-COPY --from=build /app/packages/clients/dist /packages/clients/dist
-COPY --from=build /app/packages/config/dist /packages/config/dist
-COPY --from=build /app/packages/grpc-auth/dist /packages/grpc-auth/dist
-COPY --from=build /app/packages/migration-artifacts/dist /packages/migration-artifacts/dist
-COPY --from=build /app/packages/protos/dist /packages/protos/dist
-COPY --from=build /app/packages/protos/auth.proto /packages/protos/auth.proto
-COPY --from=build /app/packages/protos/blog.proto /packages/protos/blog.proto
-COPY --from=build /app/packages/protos/media.proto /packages/protos/media.proto
-COPY --from=build /app/packages/protos/order.proto /packages/protos/order.proto
-COPY --from=build /app/packages/protos/product.proto /packages/protos/product.proto
-COPY --from=build /app/packages/protos/settings.proto /packages/protos/settings.proto
-COPY --from=build /app/packages/protos/taxonomy.proto /packages/protos/taxonomy.proto
-COPY --from=build /app/packages/protos/tenant_authority.proto /packages/protos/tenant_authority.proto
-COPY --from=build /app/packages/protos/user.proto /packages/protos/user.proto
+COPY --from=build /app/.runtime-packages /packages
 
 # This layer is referenced by every final service image. The layer is shared in
 # a registry/local store, but is still part of each image manifest, so every
@@ -320,11 +362,13 @@ CMD ["node", "dist/main.js"]
 
 FROM runtime-base AS media-runtime
 WORKDIR /workspace/apps/media-service
+COPY --link --from=build /app/apps/media-service/assets ./assets
 COPY --link --from=prod-deps /app/apps/media-service/package.json ./package.json
 COPY --link --from=prod-deps /app/apps/media-service/node_modules ./node_modules
 COPY --link --from=build /app/apps/media-service/dist ./dist
 COPY --link --from=build /app/apps/media-service/prisma ./prisma
 RUN node -e "const d=require('./package.json').dependencies||{}; for(const p of Object.keys(d).filter(p=>p.startsWith('@nebula/')||p.startsWith('@packages/'))) require(p)"
+RUN node -e "require('sharp')({create:{width:1,height:1,channels:3,background:'#ffffff'}}).png().toBuffer().catch(()=>process.exit(1))"
 EXPOSE 3007 50058
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD node -e "fetch('http://localhost:3007/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

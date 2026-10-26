@@ -1,6 +1,21 @@
 # Gateway Service
 
-Last reviewed: 2026-08-31
+Last reviewed: 2026-10-13 (D2 checkout snapshots; new images pending).
+
+Order replies include persisted variantId/options, fixed two-decimal amounts and
+checkoutMode=DEMO_NO_PAYMENT. Gateway preserves these facts and rejects malformed
+money or missing demo mode rather than masking an older producer. New Order and
+Gateway images must be deployed together after the additive Order migration.
+Durable checkout replay and stock effects remain pending D2 Batch 2; existing
+Gateway cache alone does not certify either requirement.
+
+The replay slice forwards the validated checkout Idempotency-Key header as a
+signed Order RPC field. Order's completed receipts add durable replay while the
+existing Redis cache remains intact. Clients should repeat the same Gateway body:
+its request hash intentionally distinguishes omitted fields from explicit empty
+values, even though Order normalizes omitted/empty note for owner intent. New
+Order/Gateway images must deploy together; older Order code ignores the new wire
+field and does not provide durable replay. Stock effects are still pending.
 
 ## Purpose
 
@@ -170,6 +185,13 @@ separate data-plane destinations that clients may follow.
 
 ## Verification
 
+D2 Cart additions preserve existing routes and actor policies. Cart add accepts
+optional variantId; caller options, price, currency, totals and ownership fields
+remain rejected. Replies include authoritative selectedOptions, variantId when
+present, lineTotal and decimal-string subtotal/total. Updated Order replies are
+required; missing exact totals fail closed with an upstream contract error.
+See [Order's bounded Cart behavior](order-service.md#d2-cart-contract).
+
 ```powershell
 pnpm test:gateway:backend
 pnpm test:external-client
@@ -188,3 +210,47 @@ preserve omitted optional protobuf fields instead of manufacturing empty UUID
 or enum values; the domain service remains the validation owner. The current
 evidence map and remaining rebuilt-image lane are recorded in
 [the F3 exit proof](../reports/2026-08-22-f3-exit-proof.md).
+
+## D2 Batch 3 admin Order reads
+
+Protected GET `/api/v1/admin/orders` and `/api/v1/admin/orders/:id` use separate
+admin policies and signed Order admin RPCs; personal routes retain verified
+customer ownership. List allows status/userId/page/limit only and returns the
+existing page-limit-total envelope. Gateway checks echoed pagination, total,
+row bounds, filter facts and detail identity before returning explicit snapshots.
+Default page/limit are 1/20; limit is capped at 100. The two routes and RPCs add
+to the read-slice checkpoint inventories (79 routes, 48 profiles, 65 protected
+Gateway RPCs). The current payment additions below raise these to 81/50/67.
+The 59 R5 receivers remain preserved; the two reads and two payment operations
+join four prior post-R5 RPCs explicitly deferred from paused F4 V3.
+New-image/native/live proof remains pending in the
+[read-slice receipt](../reports/2026-10-19-d2-batch3-reads.md).
+
+Admin status PATCH now requires expectedVersion alongside status and forwards
+the validated header key in its signed RPC body. Current admin reads and status
+replies require a valid version; historical Checkout replay may omit it.
+Returned status/version must match the command outcome. The owner restricts
+manual demo writes to PENDING -> PAID -> FULFILLED and records durable replay
+and verified audit. Required cancellation/payment operations and new-image/live
+proof remain open; see the [status-control receipt](../reports/2026-10-19-d2-batch3-status-controls.md).
+
+## D2 demo payment operations (source prepared)
+
+POST `/api/v1/orders/:id/demo-payment-attempts` is customer-only for consumer
+applications. POST `/api/v1/admin/orders/:id/demo-payment-attempts/:attemptId/outcome`
+is admin/root-admin only for the admin application. Both require a version and
+header idempotency key. Outcome additionally requires one of SUCCEEDED, FAILED,
+CANCELLED or UNKNOWN. Caller actor/owner/amount/currency fields are rejected.
+
+The response item contains explicit Order and demo Attempt snapshots. Gateway
+checks verified owner on start, target/attempt identity, DEMO mode, fixed amount/
+currency, timestamps and outcome/status/version consistency. UNKNOWN retains
+PAYMENT_PROCESSING and the same version; confirmed failure/cancellation returns
+PENDING only after the owner releases its allocation. Only the payment owner
+may enter PAYMENT_PROCESSING. The signed RPCs propagate verified downstream
+context and bind the command key/targets/version/outcome. No provider is called.
+
+Current inventory is 81 routes, 50 input profiles, 67 protected RPCs; 59 R5
+receivers/eight named F4 deferrals and four private Product stock RPCs remain
+separate. Native/image/live proof is pending in the
+[transport receipt](../reports/2026-10-24-d2-demo-payment-transports.md).

@@ -56,7 +56,7 @@ function requestBase(): GatewayHttpRequest {
     ],
     requestContext,
     actor: { kind: "anonymous" },
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
 }
 
 describe("createGatewayDownstreamContext", () => {

@@ -187,6 +187,8 @@ const cases: Array<{
     create: getDormantMediaV3,
     definitions: {
       GetByIdV3: media.MediaServiceService.getByIdV3,
+      ResolveProductReferenceV3:
+        media.MediaServiceService.resolveProductReferenceV3,
       ListPublicLibraryV3: media.MediaServiceService.listPublicLibraryV3,
       ListProtectedLibraryV3: media.MediaServiceService.listProtectedLibraryV3,
       ListStrictLibraryV3: media.MediaServiceService.listStrictLibraryV3,
@@ -237,7 +239,7 @@ describe("dormant context-v3 typed service wrappers", () => {
         (total, current) => total + Object.keys(current.definitions).length,
         0,
       ),
-    ).toBe(59);
+    ).toBe(60);
   });
 
   it.each(cases)(

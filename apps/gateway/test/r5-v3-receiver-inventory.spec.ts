@@ -47,6 +47,9 @@ const serviceFiles = {
   },
 } as const;
 
+// Product/Media: approved D1/F5 Core additions; Product/Order: D2 exact price and Cart fields.
+// D2 stock: docs/reports/2026-10-14-d2-stock-execution.md. Gateway/R5 inventory is unchanged;
+// four Order-only receivers are asserted separately below.
 const legacyProtoSha256 = {
   "packages/protos/auth.proto":
     "869530a647471618ccff23dd505aac6a4f5a6b2b3fcd83ef2f12602a171ea6e7",
@@ -55,14 +58,26 @@ const legacyProtoSha256 = {
   "packages/protos/settings.proto":
     "da4e82fed896c382144717fde6a2fe550341ecdb66f08cbef2c25c54ca65d5f9",
   "packages/protos/product.proto":
-    "62e587e5c62610c1eb85cf1473e4e0eaddb267ba8389db2d3f1f34dd17a38dd2",
+    "75b20bb82fd4fd5a5195bea0d0e9e812d543cab1e2e344079719391774071db5",
   "packages/protos/blog.proto":
     "82ec00ddc5d77fa41c7615e96439e30dd4f87c4d1d6a3bb6daaaa145e8651d45",
   "packages/protos/order.proto":
-    "97ef34c45649161b3e93b52f29d883a3748edb5b38e4eab216f27373a727747a",
+    "6ec54d32a9c0a8ca6b7f635443ef206a3970d0f8ca654011a3be4e1a363f58c2",
   "packages/protos/media.proto":
-    "7a2c3833d5d8041211757d438be7c46b6a31fee52f60708273c72af655a11ed4",
+    "d8815d105e6644ecdf451b2adb6d2f539d20575f30fdc870bb5b0841f97038b2",
 } as const;
+
+// F4 is paused. Track these exact post-R5 v2 additions for its restart audit.
+const deferredV3Rpcs = [
+  "MediaService.GetDerivatives",
+  "MediaService.RegenerateDerivatives",
+  "MediaService.UpdateMetadata",
+  "OrderService.AdminGetOrder",
+  "OrderService.AdminListOrders",
+  "OrderService.ResolveDemoPayment",
+  "OrderService.StartDemoPayment",
+  "ProductService.UpdateImageMetadata",
+] as const;
 
 function source(relativePath: string): string {
   return readFileSync(path.join(repositoryRoot, relativePath), "utf8").replace(
@@ -111,10 +126,15 @@ describe("R5 dormant context-v3 receiver inventory", () => {
     ),
   ].sort();
 
-  it("declares an exact separate v3 receiver for every protected RPC", () => {
-    expect(protectedRpcs).toHaveLength(59);
+  const preservedR5Rpcs = protectedRpcs.filter(
+    (rpc) => !deferredV3Rpcs.some((deferred) => deferred === rpc),
+  );
 
-    for (const rpc of protectedRpcs) {
+  it("declares an exact separate v3 receiver for all 59 preserved R5 RPCs", () => {
+    expect(protectedRpcs).toHaveLength(67);
+    expect(preservedR5Rpcs).toHaveLength(59);
+
+    for (const rpc of preservedR5Rpcs) {
       const match = /^(\w+)\.(\w+)$/.exec(rpc);
       if (!match) throw new Error(`r5_protected_rpc_invalid:${rpc}`);
       const [, serviceName, methodName] = match;
@@ -147,6 +167,26 @@ describe("R5 dormant context-v3 receiver inventory", () => {
     }
   });
 
+  it("records exactly eight v2 additions whose v3 receivers await F4", () => {
+    expect(
+      protectedRpcs.filter((rpc) => !preservedR5Rpcs.includes(rpc)),
+    ).toEqual([...deferredV3Rpcs]);
+    for (const rpc of deferredV3Rpcs) {
+      const [serviceName, methodName] = rpc.split(".");
+      const files = serviceFiles[serviceName as keyof typeof serviceFiles];
+      const signatures = rpcSignatures(
+        serviceBlock(source(files.proto), serviceName),
+      );
+      expect(signatures.has(methodName)).toBe(true);
+      expect(signatures.has(`${methodName}V3`)).toBe(false);
+      expect(source(files.controller)).toMatch(
+        new RegExp(
+          `@GrpcMethod\\(\\s*["']${serviceName}["']\\s*,\\s*["']${methodName}["']\\s*\\)`,
+        ),
+      );
+    }
+  });
+
   it("pins the landed protobuf source except additive V3 RPC lines", () => {
     for (const [relativePath, expectedHash] of Object.entries(
       legacyProtoSha256,
@@ -159,6 +199,34 @@ describe("R5 dormant context-v3 receiver inventory", () => {
         expectedHash,
       );
     }
+  });
+
+  it("tracks exactly four Order-only stock receivers separately from Gateway and dormant F4 receivers", () => {
+    const internal = [
+      "ReserveCheckoutStock",
+      "FinalizeCheckoutStock",
+      "CancelCheckoutStock",
+      "RestoreCheckoutStock",
+    ];
+    const signatures = rpcSignatures(
+      serviceBlock(source("packages/protos/product.proto"), "ProductService"),
+    );
+    const controller = source(
+      "apps/product-service/src/product/grpc/checkout-stock-grpc.controller.ts",
+    );
+    const declared = [
+      ...controller.matchAll(/@GrpcMethod\("ProductService", "(\w+)"\)/g),
+    ].map((match) => match[1]);
+    expect(declared).toEqual(internal);
+    for (const method of internal) {
+      expect(signatures.has(method)).toBe(true);
+      expect(signatures.has(`${method}V3`)).toBe(false);
+      expect(protectedRpcs).not.toContain(`ProductService.${method}`);
+    }
+    expect([...controller.matchAll(/@InternalOnly\(\)/g)]).toHaveLength(4);
+    expect([
+      ...controller.matchAll(/@AllowedS2SCallers\("order-service"\)/g),
+    ]).toHaveLength(4);
   });
 
   it("leaves the gateway without an active v3 writer", () => {

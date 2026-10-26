@@ -2,6 +2,9 @@
 import { status } from "@grpc/grpc-js";
 import { httpJson } from "../utils/http";
 import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
+import { tinyWebp } from "../utils/image";
+
+jest.setTimeout(90_000);
 
 const MEDIA_PROTO = require.resolve("@nebula/protos/media.proto");
 const MEDIA_GRPC_URL = process.env.MEDIA_GRPC_URL || "127.0.0.1:50058";
@@ -56,14 +59,31 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
     svc: "MediaService",
   });
 
-  async function putTinyObject(uploadUrl: string, body = "hello") {
+  async function putTinyObject(uploadUrl: string) {
     const up = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "content-type": "image/webp" },
-      body: Buffer.from(body),
+      body: await tinyWebp(),
     });
 
     expect([200, 204]).toContain(up.status);
+  }
+
+  async function waitReadyClean(id: string) {
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      const { media } = await call<any>(
+        client,
+        "GetById",
+        { id },
+        mdS2S({ role: "admin" }),
+      );
+      if (media.status === "READY" && media.scanStatus === "CLEAN") return;
+      if (media.status === "BLOCKED")
+        throw new Error(`media_processing_failed_${media.quarantineReason}`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error("media_processing_readiness_timeout");
   }
 
   function finalizeFromPresign(presign: any) {
@@ -115,7 +135,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
     const up = await fetch(presign.uploadUrl, {
       method: "PUT",
       headers: { "content-type": "image/webp" },
-      body: Buffer.from("hello"),
+      body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
 
@@ -161,6 +181,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
     expect(Array.isArray(list.items)).toBe(true);
     expect(list.items.some((item: any) => item.id === id)).toBe(true);
 
+    await waitReadyClean(id);
     const lifecycleList = await call<any>(
       client,
       "List",
@@ -169,8 +190,8 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
         take: 50,
         skip: 0,
         folderPath,
-        status: "PENDING",
-        scanStatus: "QUEUED",
+        status: "READY",
+        scanStatus: "CLEAN",
       },
       mdS2S({ role: "admin" }),
     );

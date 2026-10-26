@@ -2,7 +2,8 @@
 param(
   [string]$ImagePrefix = "nebulanv-main",
   [string]$ImageTag = "latest",
-  [string]$Output = "deploy/nebula-images.tar"
+  [string]$Output = "deploy/nebula-images.tar",
+  [string]$EnvFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,20 +20,13 @@ if ($outputDir) {
   New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 }
 
-$backendImagesJson = & node (Join-Path $repoRoot "scripts\backend.mjs") images $ImagePrefix $ImageTag
+$inventoryArguments = @((Join-Path $repoRoot "scripts\docker\release-image-inventory.mjs"), $ImagePrefix, $ImageTag)
+if ($EnvFile) { $inventoryArguments += $EnvFile }
+$archiveImagesJson = & node @inventoryArguments
 if ($LASTEXITCODE -ne 0) {
-  throw "Failed to resolve backend images from the repository inventory."
+  throw "Failed to resolve the complete Compose image inventory."
 }
-$backendImages = $backendImagesJson | ConvertFrom-Json
-
-$images = @()
-$images += $backendImages
-$images += @(
-  "postgres:17",
-  "redis:7-alpine",
-  "minio/minio:latest",
-  "minio/mc:latest"
-)
+[string[]]$images = $archiveImagesJson | ConvertFrom-Json
 
 Write-Host "Saving Docker images to $outputPath"
 $images | ForEach-Object { Write-Host " - $_" }

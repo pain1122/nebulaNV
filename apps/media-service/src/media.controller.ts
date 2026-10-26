@@ -1,16 +1,20 @@
 import {
   Body,
   Controller,
+  HttpCode,
   Delete,
   Get,
   Param,
   Post,
+  Patch,
   Query,
   Req,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Roles } from "@nebula/grpc-auth";
 import { MediaService } from "./media.service";
+import { MediaMetadataDto } from "./dto/media-metadata.dto";
+import { ImageDerivativesDto } from "./dto/image-derivatives.dto";
 import {
   CreateMediaDto,
   ListMediaDto,
@@ -33,6 +37,40 @@ type AuthenticatedRequest = {
 @Controller("media")
 export class MediaController {
   constructor(private readonly svc: MediaService) {}
+
+  @Roles("admin", "root-admin")
+  @Get(":id/derivatives")
+  async derivatives(@Param() params: GetMediaDto) {
+    return { data: await this.svc.getDerivatives(params.id) };
+  }
+
+  @Roles("admin", "root-admin")
+  @Post(":id/derivatives")
+  @HttpCode(202)
+  async regenerateDerivatives(
+    @Param() params: GetMediaDto,
+    @Body() body: ImageDerivativesDto,
+  ) {
+    return {
+      data: await this.svc.regenerateDerivatives(
+        params.id,
+        body.recipes,
+        body.retryFailed,
+      ),
+    };
+  }
+
+  @Roles("admin", "root-admin")
+  @Patch(":id/metadata")
+  async updateMetadata(
+    @Param() params: GetMediaDto,
+    @Body() input: MediaMetadataDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return {
+      data: await this.svc.updateMetadata(params.id, input, request.user),
+    };
+  }
 
   private resolveOwnerId(
     req: AuthenticatedRequest,

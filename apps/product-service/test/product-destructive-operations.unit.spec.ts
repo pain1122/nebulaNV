@@ -9,7 +9,12 @@ function emptyClient(): ClientGrpc {
 
 function service(prisma: object): ProductServiceImpl {
   const client = emptyClient();
-  return new ProductServiceImpl(prisma as PrismaService, client, client);
+  return new ProductServiceImpl(
+    prisma as PrismaService,
+    client,
+    client,
+    client,
+  );
 }
 
 const missingRecord = { code: "P2025" };

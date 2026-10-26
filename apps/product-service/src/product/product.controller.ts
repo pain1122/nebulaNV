@@ -8,15 +8,44 @@ import {
   Query,
   ParseUUIDPipe,
   Req,
+  UnauthorizedException,
 } from "@nestjs/common";
+import { Metadata } from "@grpc/grpc-js";
+import { randomUUID } from "node:crypto";
+import { ImageMetadataDto } from "./dto/image-metadata.dto";
 import { ProductServiceImpl } from "./product.service";
-import { Public, Roles, type HttpRequestWithContext } from "@nebula/grpc-auth";
+import {
+  AUTHORIZATION_HEADER,
+  firstHeaderValue,
+  Public,
+  Roles,
+  type HttpRequestWithContext,
+  type VerifiedServiceDownstreamContext,
+} from "@nebula/grpc-auth";
 import { Throttle } from "@nestjs/throttler";
 import {
   CreateProductRequestDto,
   UpdateProductRequestDto,
   ListProductsRequestDto,
+  ProductStatusDto,
 } from "./dto/product-input.dto";
+
+function authenticatedHttpDownstream(
+  request: HttpRequestWithContext,
+): VerifiedServiceDownstreamContext {
+  const authorization = firstHeaderValue(
+    request.headers?.[AUTHORIZATION_HEADER],
+  );
+  if (!authorization || !request.user?.userId) {
+    throw new UnauthorizedException("verified_admin_context_missing");
+  }
+  const metadata = new Metadata();
+  metadata.set(AUTHORIZATION_HEADER, authorization);
+  return {
+    metadata,
+    signingPolicy: { requestId: request.requestId ?? randomUUID() },
+  };
+}
 
 @Controller("products")
 export class ProductController {
@@ -57,9 +86,29 @@ export class ProductController {
   }
 
   @Roles("admin", "root-admin")
+  @Patch(":id/gallery/:imageId/metadata")
+  async updateImageMetadata(
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("imageId", new ParseUUIDPipe({ version: "4" })) imageId: string,
+    @Body() input: ImageMetadataDto,
+  ) {
+    return { data: await this.svc.updateImageMetadata(id, imageId, input) };
+  }
+
+  @Roles("admin", "root-admin")
   @Post()
-  create(@Body() body: CreateProductRequestDto) {
-    return this.svc.create(body.data);
+  create(
+    @Body() body: CreateProductRequestDto,
+    @Req() request: HttpRequestWithContext,
+  ) {
+    return this.svc.create(
+      body.data,
+      body.data.thumbnailMediaId ||
+        body.data.brandId ||
+        body.data.tagIds?.length
+        ? authenticatedHttpDownstream(request)
+        : undefined,
+    );
   }
 
   @Roles("admin", "root-admin")
@@ -67,7 +116,18 @@ export class ProductController {
   update(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @Body() body: UpdateProductRequestDto,
+    @Req() request: HttpRequestWithContext,
   ) {
-    return this.svc.update(id, body.patch, body.expectedVersion);
+    return this.svc.update(
+      id,
+      body.patch,
+      body.expectedVersion,
+      body.patch?.status === ProductStatusDto.ACTIVE ||
+        body.patch?.thumbnailMediaId ||
+        body.patch?.brandId ||
+        body.patch?.tagIds?.length
+        ? authenticatedHttpDownstream(request)
+        : undefined,
+    );
   }
 }

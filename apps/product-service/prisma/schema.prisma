@@ -21,7 +21,12 @@ model Product {
   price            Decimal               @db.Decimal(18, 2)
   currency         String
   thumbnailUrl     String?
+  thumbnailMediaId String?               @db.Uuid
+  thumbnailTitle   String?
+  thumbnailAlt     String?
   categoryId       String                @map("category_id") @db.Uuid
+  brandId          String?               @db.Uuid
+  tagIds           String[]              @default([]) @db.Uuid
   discountType     DiscountType?
   discountValue    Decimal?              @db.Decimal(18, 2)
   discountActive   Boolean               @default(false)
@@ -60,28 +65,32 @@ model Product {
   vrHotspots       ProductVrHotspot[]
   variants         ProductVariant[]
   skuReservation   CatalogSku?
+  heldStockLines   CheckoutStockLine[]   @relation("HeldProduct")
 
   @@index([categoryId])
+  @@index([brandId])
+  @@index([thumbnailMediaId])
   @@index([status])
   @@index([deletedAt])
   @@index([isFeatured, featureSort])
 }
 
 model ProductVariant {
-  id             String      @id @default(uuid())
+  id             String              @id @default(uuid())
   productId      String
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku            String      @unique
+  product        Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String              @unique
   options        Json
   optionKey      String
-  priceOverride  Decimal?    @db.Decimal(18, 2)
-  stockQuantity  Int         @default(0)
-  active         Boolean     @default(true)
-  sortOrder      Int         @default(0)
+  priceOverride  Decimal?            @db.Decimal(18, 2)
+  stockQuantity  Int                 @default(0)
+  active         Boolean             @default(true)
+  sortOrder      Int                 @default(0)
   deletedAt      DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
   skuReservation CatalogSku?
+  heldStockLines CheckoutStockLine[] @relation("HeldVariant")
 
   @@unique([productId, optionKey])
   @@index([productId, active, sortOrder])
@@ -96,17 +105,21 @@ model CatalogSku {
 }
 
 model ProductGalleryImage {
-  id        String    @id @default(uuid())
-  productId String
-  url       String
-  alt       String?
-  sortOrder Int       @default(0)
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  product   Product   @relation(fields: [productId], references: [id])
+  id              String    @id @default(uuid())
+  productId       String
+  url             String
+  mediaId         String?   @db.Uuid
+  alt             String?
+  title           String?
+  metadataVersion Int       @default(1)
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  product         Product   @relation(fields: [productId], references: [id])
 
   @@index([productId, sortOrder])
+  @@index([mediaId])
   @@index([deletedAt])
 }
 
@@ -213,4 +226,45 @@ enum CommentStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum CheckoutStockState {
+  HELD
+  FINALIZED
+  CANCELLED
+}
+
+model CheckoutStockIntent {
+  id          String              @id @db.Uuid
+  payloadHash String              @db.Char(64)
+  state       CheckoutStockState
+  createdAt   DateTime            @default(now()) @db.Timestamp(3)
+  updatedAt   DateTime            @updatedAt @db.Timestamp(3)
+  lines       CheckoutStockLine[]
+  restoration CheckoutStockRestoration?
+}
+
+model CheckoutStockRestoration {
+  intentId  String              @id @db.Uuid
+  intent    CheckoutStockIntent @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  createdAt DateTime            @default(now()) @db.Timestamp(3)
+}
+
+model CheckoutStockLine {
+  id            String              @id @default(uuid()) @db.Uuid
+  intentId      String              @db.Uuid
+  intent        CheckoutStockIntent @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  productId     String
+  variantId     String?
+  selectionKey  String
+  quantity      Int
+  tracked       Boolean
+  heldProductId String?
+  heldProduct   Product?            @relation("HeldProduct", fields: [heldProductId], references: [id], onDelete: Restrict)
+  heldVariantId String?
+  heldVariant   ProductVariant?     @relation("HeldVariant", fields: [heldVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([intentId, selectionKey])
+  @@index([heldProductId])
+  @@index([heldVariantId])
 }

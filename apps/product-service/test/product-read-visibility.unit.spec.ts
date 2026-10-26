@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { NotFoundException } from "@nestjs/common";
+import { status } from "@grpc/grpc-js";
 import type { ClientGrpc } from "@nestjs/microservices";
+import { of, throwError } from "rxjs";
 import { IS_PUBLIC_KEY, ROLES_KEY } from "@nebula/grpc-auth";
 import type { PrismaService } from "../src/prisma.service";
 import { ProductStatus, ProductSelectionMode } from "../prisma/generated";
@@ -13,9 +15,34 @@ function emptyClient(): ClientGrpc {
   return { getService: jest.fn().mockReturnValue({}) } as unknown as ClientGrpc;
 }
 
-function productService(prisma: object) {
-  const client = emptyClient();
-  return new ProductServiceImpl(prisma as PrismaService, client, client);
+function referenceClient(method: string, handler: jest.Mock): ClientGrpc {
+  return {
+    getService: jest.fn().mockReturnValue(
+      new Proxy(
+        {},
+        {
+          get: (_target, key) => (key === method ? handler : jest.fn()),
+        },
+      ),
+    ),
+  } as unknown as ClientGrpc;
+}
+
+function productService(
+  prisma: object,
+  taxonomy = emptyClient(),
+  media = emptyClient(),
+  settings = referenceClient(
+    "GetString",
+    jest.fn().mockReturnValue(of({ found: true, value: "USD" })),
+  ),
+) {
+  return new ProductServiceImpl(
+    prisma as PrismaService,
+    taxonomy,
+    settings,
+    media,
+  );
 }
 
 const availabilityWhere = {
@@ -143,12 +170,41 @@ describe("Product public/admin read separation", () => {
   });
 
   it("checks public product visibility before returning non-deleted gallery rows", async () => {
-    const findFirst = jest.fn().mockResolvedValue({ id: "product-1" });
+    const findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: "product-1", currency: "USD" });
+    const categoryId = "11111111-1111-4111-8111-111111111111";
     const galleryFindMany = jest.fn().mockResolvedValue([]);
-    const service = productService({
-      product: { findFirst },
-      productGalleryImage: { findMany: galleryFindMany },
-    });
+    const service = productService(
+      {
+        product: {
+          findFirst,
+          findUnique: jest.fn().mockResolvedValue({
+            categoryId,
+            currency: "USD",
+            brandId: null,
+            tagIds: [],
+            tags: [],
+            thumbnailUrl: null,
+            thumbnailMediaId: null,
+          }),
+        },
+        productGalleryImage: { findMany: galleryFindMany },
+      },
+      referenceClient(
+        "GetTaxonomy",
+        jest.fn().mockReturnValue(
+          of({
+            data: {
+              id: categoryId,
+              scope: "product",
+              kind: "category.default",
+              isHidden: false,
+            },
+          }),
+        ),
+      ),
+    );
 
     await expect(service.listPublicGallery("product-1")).resolves.toEqual([]);
     expect(findFirst).toHaveBeenCalledWith({
@@ -158,13 +214,162 @@ describe("Product public/admin read separation", () => {
         deletedAt: null,
         ...availabilityWhere,
       },
-      select: { id: true },
+      select: { id: true, currency: true },
     });
     expect(galleryFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { productId: "product-1", deletedAt: null },
+        where: {
+          productId: "product-1",
+          deletedAt: null,
+          mediaId: { not: null },
+        },
       }),
     );
+  });
+
+  it("fails closed when a linked Taxonomy record becomes hidden", async () => {
+    const categoryId = "11111111-1111-4111-8111-111111111111";
+    const service = productService(
+      {
+        product: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: "product-1", currency: "USD" }),
+          findUnique: jest.fn().mockResolvedValue({
+            categoryId,
+            currency: "USD",
+            brandId: null,
+            tagIds: [],
+            tags: [],
+            thumbnailUrl: null,
+            thumbnailMediaId: null,
+          }),
+        },
+      },
+      referenceClient(
+        "GetTaxonomy",
+        jest.fn().mockReturnValue(
+          of({
+            data: {
+              id: categoryId,
+              scope: "product",
+              kind: "category.default",
+              isHidden: true,
+            },
+          }),
+        ),
+      ),
+    );
+
+    await expect(service.getPublic("product-1")).rejects.toMatchObject({
+      status: 503,
+    });
+  });
+
+  it("does not return a partial catalogue page when a linked record is invalid", async () => {
+    const categoryId = "11111111-1111-4111-8111-111111111111";
+    const service = productService(
+      {
+        product: {
+          findMany: jest.fn(),
+          count: jest.fn(),
+          findUnique: jest.fn().mockResolvedValue({
+            categoryId,
+            currency: "USD",
+            brandId: null,
+            tagIds: [],
+            tags: [],
+            thumbnailUrl: null,
+            thumbnailMediaId: null,
+          }),
+        },
+        $transaction: jest
+          .fn()
+          .mockResolvedValue([[{ id: "product-1", currency: "USD" }], 1]),
+      },
+      referenceClient(
+        "GetTaxonomy",
+        jest
+          .fn()
+          .mockReturnValue(
+            of({ data: { id: categoryId, scope: "product", kind: "tag" } }),
+          ),
+      ),
+    );
+
+    await expect(service.listPublic({})).rejects.toMatchObject({ status: 503 });
+  });
+
+  it("fails closed when a linked thumbnail becomes blocked", async () => {
+    const categoryId = "11111111-1111-4111-8111-111111111111";
+    const mediaId = "dd90a288-ecdd-4b1b-91b7-b57773425019";
+    const service = productService(
+      {
+        product: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: "product-1", currency: "USD" }),
+          findUnique: jest.fn().mockResolvedValue({
+            categoryId,
+            currency: "USD",
+            brandId: null,
+            tagIds: [],
+            tags: [],
+            thumbnailUrl: null,
+            thumbnailMediaId: mediaId,
+          }),
+        },
+      },
+      referenceClient(
+        "GetTaxonomy",
+        jest.fn().mockReturnValue(
+          of({
+            data: {
+              id: categoryId,
+              scope: "product",
+              kind: "category.default",
+              isHidden: false,
+            },
+          }),
+        ),
+      ),
+      referenceClient(
+        "ResolveProductReference",
+        jest.fn().mockReturnValue(
+          throwError(() => ({
+            code: status.PERMISSION_DENIED,
+            details: "media_not_eligible",
+          })),
+        ),
+      ),
+    );
+
+    await expect(service.getPublic("product-1")).rejects.toMatchObject({
+      status: 503,
+    });
+  });
+
+  it("does not advertise a Product after the shop currency changes", async () => {
+    const service = productService(
+      {
+        product: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: "product-1",
+            currency: "USD",
+          }),
+        },
+      },
+      emptyClient(),
+      emptyClient(),
+      referenceClient(
+        "GetString",
+        jest.fn().mockReturnValue(of({ found: true, value: "EUR" })),
+      ),
+    );
+
+    await expect(service.getPublic("product-1")).rejects.toMatchObject({
+      status: 503,
+    });
   });
 
   it("does not query gallery rows when the public product is invisible", async () => {

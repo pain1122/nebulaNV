@@ -10,6 +10,7 @@ import {
 } from "../prisma/generated";
 import { DiscountTypeDto } from "../src/product/dto/product-input.dto";
 import { ProductServiceImpl } from "../src/product/product.service";
+import { productv1 } from "@nebula/protos";
 
 function emptyClient(): ClientGrpc {
   return { getService: jest.fn().mockReturnValue({}) } as unknown as ClientGrpc;
@@ -28,7 +29,12 @@ function product(overrides: Partial<Product> = {}): Product {
     price: new Prisma.Decimal("100.00"),
     currency: "USD",
     thumbnailUrl: null,
+    thumbnailMediaId: null,
+    thumbnailTitle: null,
+    thumbnailAlt: null,
     categoryId: "category-1",
+    brandId: null,
+    tagIds: [],
     discountType: null,
     discountValue: null,
     discountActive: false,
@@ -66,10 +72,74 @@ function product(overrides: Partial<Product> = {}): Product {
 
 function service(prisma: object): ProductServiceImpl {
   const client = emptyClient();
-  return new ProductServiceImpl(prisma as PrismaService, client, client);
+  return new ProductServiceImpl(
+    prisma as PrismaService,
+    client,
+    client,
+    client,
+  );
 }
 
 describe("product discount contract", () => {
+  it("keeps variant override cents before the actual wire conversion", async () => {
+    const value = {
+      ...product({ selectionMode: ProductSelectionMode.VARIANT }),
+      variants: [
+        {
+          id: "variant-1",
+          productId: "product-1",
+          sku: "VARIANT",
+          options: { Color: "Blue" },
+          priceOverride: new Prisma.Decimal("90071992547409.91"),
+          active: true,
+          deletedAt: null,
+          stockQuantity: 2,
+          sortOrder: 0,
+        },
+      ],
+    };
+    const svc = service({
+      product: { findUnique: jest.fn().mockResolvedValue(value) },
+    });
+    const result = await svc.getAdmin("product-1");
+    const variant = result.data.variants[0];
+    const dto = productv1.ProductVariant.create({
+      effectivePrice: variant.effectivePrice,
+      effectivePriceAmount: variant.effectivePriceAmount,
+    });
+    expect(
+      productv1.ProductVariant.decode(
+        productv1.ProductVariant.encode(dto).finish(),
+      ).effectivePriceAmount,
+    ).toBe("90071992547409.91");
+  });
+  it("emits the exact amount before double conversion, including zero and discounts", async () => {
+    for (const [price, discount, expected] of [
+      ["90071992547409.91", null, "90071992547409.91"],
+      ["0.00", null, "0.00"],
+      ["0.30", "0.10", "0.20"],
+    ] as const) {
+      const value = product({
+        price: new Prisma.Decimal(price),
+        discountType: discount ? DiscountType.FIXED : null,
+        discountActive: !!discount,
+        discountValue: discount ? new Prisma.Decimal(discount) : null,
+      });
+      const svc = service({
+        product: { findUnique: jest.fn().mockResolvedValue(value) },
+      });
+      const result = await svc.getAdmin("product-1");
+      const dto = productv1.Product.create({
+        effectivePrice: result.data.effectivePrice,
+        effectivePriceAmount: result.data.effectivePriceAmount,
+      });
+      const decoded = productv1.Product.decode(
+        productv1.Product.encode(dto).finish(),
+      );
+      expect(decoded.effectivePriceAmount).toBe(expected);
+      expect(typeof decoded.effectivePrice).toBe("number");
+    }
+  });
   it("returns numeric prices and the explicit NONE state without a discount", async () => {
     const svc = service({
       product: {

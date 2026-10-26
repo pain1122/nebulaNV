@@ -7,6 +7,7 @@ import { envSchema } from "./config/env.validation";
 import { ProductModule } from "./product/product.module";
 import { TaxonomyModule } from "./taxonomy/taxonomy.module";
 import { SettingsClientModule } from "./settings-client.module";
+import { MediaClientModule } from "./media-client.module";
 import { TaxonomyClientModule } from "./taxonomy-client.module";
 import { AuthClientModule } from "./auth-client.module";
 import { GRPC_SECURITY_PROVIDERS, GrpcTokenAuthGuard } from "@nebula/grpc-auth";
@@ -33,6 +34,7 @@ export const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto");
     ProductModule,
     TaxonomyModule,
     SettingsClientModule,
+    MediaClientModule,
     AuthClientModule,
     TaxonomyClientModule,
   ],

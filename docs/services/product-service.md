@@ -1,6 +1,6 @@
 # Product Service
 
-Last reviewed: 2026-09-26
+Last reviewed: 2026-10-24 (Batch 2 closed; restoration locally proved, Order binding source prepared, deployment pending).
 
 ## Purpose
 
@@ -11,7 +11,74 @@ variant has one to three option values, its own globally reserved SKU, optional
 price override, stock, active flag, and deterministic sort order. The parent
 Product still owns status, currency, discount policy, and inventory tracking.
 
-Product-service does not own media storage. It currently stores media-related URLs as strings.
+Product-service does not own media storage. D1 binds Media IDs and validates
+renderable references through Media contracts. Product denies legacy URL inputs;
+Gateway omits legacy URL response fields. Completed D1 evidence is in the
+2026-10-12 exit report.
+
+## D2 checkout stock intent
+
+Apply application migrations with `pnpm db:migrate:product`, then check
+`pnpm db:status:product`. These root scripts supply the required pnpm execution
+context and pin the Docker database at port 15432. Disposable verification does
+not migrate the application database; direct `node scripts/backend.mjs` migration
+invocation lacks the required pnpm context.
+
+`ReserveCheckoutStock`, `FinalizeCheckoutStock`, `CancelCheckoutStock` and the
+new `RestoreCheckoutStock` are
+internal signed RPCs restricted to Order service. They do not expose an admin
+or customer stock mutation route. An intent UUID and canonical payload hash
+identify currency and exact selection/quantity/version/SKU/options/price facts.
+Reserve atomically claims Product versions and consumes tracked base/variant
+stock once. Same identity replays the durable state; changed facts conflict.
+Finalize confirms the existing decrement; cancel restores held stock once.
+Cancelling an unseen intent records a tombstone that blocks a delayed reserve.
+Unmanaged inventory stays unmanaged.
+
+Held rows block absolute quantity/tracking/mode replacement and physical row
+deletion. Soft deletion remains recoverable. Terminal operations detach the
+protective references while retaining intent identity and original line facts.
+The price check uses the same Decimal discount calculation as catalogue replies.
+No remote call runs inside the short Product transaction; remote publication
+eligibility is checked before locking. There is no independent automatic hold
+expiry that could refund a committed Order.
+
+The owner SQL/Prisma proof passes with publication dependencies stubbed. Salar
+reports native Product migration verification passed. Order checkout source now
+invokes stock RPCs through its durable coordinator; the two-database owner proof
+passes. Salar reports native Order verification passed. Product application
+deployment/rerun/status pass after correcting the pnpm migration handoff;
+Salar reports corrected Checkout, Cart and F3 live passed, followed by the
+corrected deliberate outage/cache-loss/Order-restart and Cart live proofs. See
+`docs/reports/2026-10-14-d2-checkout-coordination.md`.
+Run `pnpm db:verify:d2:stock` for the owned disposable database proof; native
+Prisma deployment/status is separately verified by `pnpm db:verify:product`.
+
+### Finalized restoration primitive
+
+`RestoreCheckoutStock` accepts the recorded intent ID/hash from the Order
+service. It requires FINALIZED and credits only the recorded originally tracked
+base/variant quantities. A separate `CheckoutStockRestoration` receipt commits
+with the credits and makes repeats return RESTORED, including after later
+catalogue deletion. The original intent remains FINALIZED; ordinary HELD cancel
+still cannot reverse it. No new Gateway or native HTTP mutation is exposed.
+
+Sorted parent locks preserve counter/version concurrency. Inactive/soft-deleted
+original rows can receive their stock; publication is unchanged. Missing tracked
+rows, wrong original parent/selection mode and integer-capacity overflow reject
+the whole restoration. Replacement rows sharing a SKU never receive its credit.
+Originally unmanaged lines are not credited when tracking later changes.
+Version-ceiling handling matches existing held compensation.
+
+Migration `20261019000100_finalized_stock_restoration` and the owner primitive
+have actual populated/rollback/race/atomicity proof in
+`pnpm db:verify:d2:restoration`; remote publication is stubbed in this owner-only
+proof. Salar's original-stock regression also passed on Oct 24. Application
+migration/private RPC/image proof remains separate. Order's durable cancellation
+binding is prepared in source, with SQL/native evidence still pending. See the
+[restoration receipt](../reports/2026-10-19-d2-stock-restoration.md) and
+[Order binding receipt](../reports/2026-10-24-d2-order-cancellation.md).
+Detailed consumer trace: `docs/reports/2026-10-14-d2-stock-execution.md`.
 
 ## Main Responsibilities
 
@@ -136,10 +203,12 @@ Product read policy:
 ## Current DB Shape
 
 The root Prisma commands include this service after taxonomy-service. Its base
-seed intentionally performs no writes. `pnpm backend:seed` creates the stable
-development product through this service's HTTP API and omits `categoryId`, so
-the service-owned default-taxonomy initializer remains authoritative and
-separate from blog-service. See
+seed intentionally performs no writes. `pnpm backend:seed` delegates Product
+content to `pnpm demo:d1:seed`, the gateway-only showcase runner. It manages
+journalled taxonomy/Media relationships, variants and commercial examples;
+limits fixtures are available explicitly through `pnpm demo:d1:seed limits`.
+The service-owned default-taxonomy initializer remains authoritative and
+separate from blog-service. Existing legacy records are not deleted. See
 [Local Development And Docker Boot](../architecture/local-dev-and-docker-boot.md)
 for the shared commands and complete database order.
 
@@ -243,20 +312,26 @@ Mapping rule:
 
 ## Media And Presentation Fields
 
-Product stores these as string/metadata fields:
+Thumbnail and gallery writes require Media IDs. Product asks Media to validate
+existence and eligibility for the requested role, and rechecks references
+before public Product detail, catalogue, and gallery reads. Broken references
+or unavailable owners cause a 503 response without partial public output.
 
-- `thumbnailUrl`
-- `model3dUrl`
-- `model3dFormat`
-- `model3dPosterUrl`
-- `vrPlanImageUrl`
-- gallery image URLs
-- SEO metadata
-- promo metadata
+External Product responses expose `thumbnailMediaId` and gallery `mediaId`.
+They omit `thumbnailUrl`, gallery `url`, `model3dUrl`, `model3dPosterUrl`, and
+`vrPlanImageUrl`. Clients render images using the existing Gateway Media render
+operation and the Media ID. This approved response change requires older
+clients that read those URL fields to adapt.
 
-Important note:
-
-Product-service does not currently validate these URLs against media-service. Media-service integration is future contract work.
+Stored legacy URL columns remain for SQL audit and reconciliation. Product
+responses suppress their provider values; existing internal protobuf fields
+remain for compatibility and return only derived Media render paths or empty
+values. The deferred `model3dUrl`, `model3dPosterUrl`, and `vrPlanImageUrl`
+write inputs are disabled on create and patch: Gateway/internal HTTP returns
+400 and gRPC returns `INVALID_ARGUMENT`. Product never assigns those columns
+through ordinary mutations; old values remain for audit. Internal protobuf
+input slots are retained so old callers are rejected explicitly. This does
+not activate 3D/VR. SEO and promo metadata are unchanged.
 
 ## Taxonomy Rules
 
@@ -393,7 +468,11 @@ Tests:
 - `apps/product-service/test/setup/wait-for-services.ts`
 - `apps/product-service/test/jest.env.ts`
 
-## Known Gaps
+## D1 entry gaps (historical)
+
+The following list records the earlier entry audit, not current missing work.
+D1 is closed; use the 2026-10-12 D1 exit report and current-focus for present
+scope. D2 Batch 3 cancellation/payment integration remains open as described above.
 
 - Product stock, availability, variants, selected options, and lost-update
   protection are not modeled yet.

@@ -317,6 +317,8 @@ services:
         condition: service_healthy
       taxonomy-service:
         condition: service_healthy
+      media-service:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
@@ -380,10 +382,34 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/nebula_order?schema=public"
       SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_order_shadow"
 
+  media-scanner:
+    image: ${MEDIA_SCANNER_IMAGE:-clamav/clamav:1.4@sha256:57deb108fc4c72778aa83eafbca7bb7153e28c3f57c005afd38d31f16da86f23}
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: 1.0
+    environment:
+      CLAMD_CONF_StreamMaxLength: 20M
+      CLAMD_CONF_MaxFileSize: 20M
+      CLAMD_CONF_MaxScanSize: 40M
+      CLAMD_CONF_MaxScanTime: 30000
+      CLAMD_CONF_MaxThreads: 2
+      CLAMD_CONF_MaxQueue: 8
+      CLAMD_CONF_AlertExceedsMax: "yes"
+    volumes:
+      - media-scanner-data:/var/lib/clamav
+    healthcheck:
+      start_period: 180s
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
   media-service:
     image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-media-service:${NEBULA_IMAGE_TAG:-latest}
+    stop_grace_period: 240s
     restart: unless-stopped
     depends_on:
+      media-scanner:
+        condition: service_started
       postgres:
         condition: service_healthy
       auth-service:
@@ -422,6 +448,9 @@ services:
       MEDIA_SYNC_DELETE_MAX_FILES: ${MEDIA_SYNC_DELETE_MAX_FILES:-500}
       MEDIA_PUBLIC_FOLDER: ${MEDIA_PUBLIC_FOLDER:-uploads}
       MEDIA_PRIVATE_FOLDER: ${MEDIA_PRIVATE_FOLDER:-private/objects}
+      MEDIA_PROCESSING_ENABLED: ${MEDIA_PROCESSING_ENABLED:-true}
+      MEDIA_SCANNER_HOST: media-scanner
+      MEDIA_SCANNER_PORT: 3310
 
   gateway:
     image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-gateway:${NEBULA_IMAGE_TAG:-latest}
@@ -463,3 +492,4 @@ services:
 volumes:
   pgdata:
   minio-data:
+  media-scanner-data:

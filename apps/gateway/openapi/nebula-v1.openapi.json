@@ -1,6 +1,37 @@
 {
   "components": {
     "schemas": {
+      "GatewayAdminOrderListQueryDto": {
+        "properties": {
+          "limit": {
+            "default": 20,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "number"
+          },
+          "page": {
+            "default": 1,
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "PAYMENT_PROCESSING",
+              "PAID",
+              "FULFILLED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GatewayAdminProductListQueryDto": {
         "properties": {
           "categoryId": {
@@ -381,8 +412,13 @@
             "type": "string"
           },
           "quantity": {
+            "maximum": 2147483647,
             "minimum": 1,
             "type": "number"
+          },
+          "variantId": {
+            "format": "uuid",
+            "type": "string"
           }
         },
         "required": [
@@ -410,6 +446,12 @@
             },
             "type": "array"
           },
+          "subtotal": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
           "userId": {
             "type": "string"
           }
@@ -419,7 +461,9 @@
           "userId",
           "currency",
           "expiresAt",
-          "items"
+          "items",
+          "subtotal",
+          "total"
         ],
         "type": "object"
       },
@@ -427,6 +471,9 @@
         "properties": {
           "id": {
             "format": "uuid",
+            "type": "string"
+          },
+          "lineTotal": {
             "type": "string"
           },
           "meta": {
@@ -442,10 +489,20 @@
           "quantity": {
             "type": "number"
           },
+          "selectedOptions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "sku": {
             "type": "string"
           },
           "unitPrice": {
+            "type": "string"
+          },
+          "variantId": {
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -456,13 +513,16 @@
           "name",
           "quantity",
           "unitPrice",
-          "meta"
+          "meta",
+          "selectedOptions",
+          "lineTotal"
         ],
         "type": "object"
       },
       "GatewayCartUpdateDto": {
         "properties": {
           "quantity": {
+            "maximum": 2147483647,
             "minimum": 0,
             "type": "number"
           }
@@ -525,6 +585,117 @@
         },
         "required": [
           "pagination"
+        ],
+        "type": "object"
+      },
+      "GatewayDemoPaymentAttemptDto": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "failureCode": {
+            "enum": [
+              "",
+              "SELECTION_CHANGED"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "DEMO"
+            ],
+            "type": "string"
+          },
+          "orderId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "PROCESSING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "state",
+          "mode",
+          "amount",
+          "currency",
+          "failureCode",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "GatewayDemoPaymentOutcomeDto": {
+        "properties": {
+          "expectedVersion": {
+            "maximum": 2147483646,
+            "minimum": 1,
+            "type": "number"
+          },
+          "outcome": {
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "UNKNOWN"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      "GatewayDemoPaymentReplyDto": {
+        "properties": {
+          "attempt": {
+            "$ref": "#/components/schemas/GatewayDemoPaymentAttemptDto"
+          },
+          "order": {
+            "$ref": "#/components/schemas/GatewayOrderDto"
+          }
+        },
+        "required": [
+          "order",
+          "attempt"
+        ],
+        "type": "object"
+      },
+      "GatewayDemoPaymentStartDto": {
+        "properties": {
+          "expectedVersion": {
+            "maximum": 2147483645,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [
+          "expectedVersion"
         ],
         "type": "object"
       },
@@ -616,6 +787,10 @@
           "alt": {
             "type": "string"
           },
+          "altOverride": {
+            "nullable": true,
+            "type": "string"
+          },
           "deletedAt": {
             "type": "string"
           },
@@ -623,17 +798,30 @@
             "format": "uuid",
             "type": "string"
           },
+          "mediaId": {
+            "type": "string"
+          },
+          "metadataVersion": {
+            "minimum": 1,
+            "type": "number"
+          },
           "sort": {
             "type": "number"
           },
-          "url": {
+          "title": {
+            "type": "string"
+          },
+          "titleOverride": {
+            "nullable": true,
             "type": "string"
           }
         },
         "required": [
           "id",
-          "url",
+          "mediaId",
           "alt",
+          "title",
+          "metadataVersion",
           "sort",
           "deletedAt"
         ],
@@ -643,6 +831,10 @@
         "properties": {
           "alt": {
             "maxLength": 180,
+            "type": "object"
+          },
+          "mediaId": {
+            "format": "uuid",
             "type": "string"
           },
           "sort": {
@@ -650,13 +842,42 @@
             "minimum": 0,
             "type": "number"
           },
+          "title": {
+            "maxLength": 200,
+            "nullable": true,
+            "type": "string"
+          },
           "url": {
+            "deprecated": true,
             "maxLength": 1024,
             "type": "string"
           }
         },
         "required": [
-          "url"
+          "mediaId"
+        ],
+        "type": "object"
+      },
+      "GatewayGalleryMetadataDto": {
+        "properties": {
+          "alt": {
+            "maxLength": 180,
+            "nullable": true,
+            "type": "string"
+          },
+          "expectedVersion": {
+            "maximum": 2147483646,
+            "minimum": 1,
+            "type": "number"
+          },
+          "title": {
+            "maxLength": 200,
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion"
         ],
         "type": "object"
       },
@@ -696,6 +917,70 @@
       "GatewayGalleryRemoveQueryDto": {
         "properties": {
           "hardDelete": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "GatewayImageDerivativesDto": {
+        "properties": {
+          "approvedGenerationId": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "desiredGenerationId": {
+            "type": "string"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "mediaId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/GatewaySavedImageSizeDto"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "NONE",
+              "QUEUED",
+              "PROCESSING",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mediaId",
+          "desiredGenerationId",
+          "approvedGenerationId",
+          "status",
+          "lastError",
+          "attempts",
+          "outputs"
+        ],
+        "type": "object"
+      },
+      "GatewayImageRegenerationDto": {
+        "properties": {
+          "recipes": {
+            "items": {
+              "$ref": "#/components/schemas/ImageRecipeDto"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "type": "array"
+          },
+          "retryFailed": {
+            "default": false,
             "type": "boolean"
           }
         },
@@ -1058,6 +1343,10 @@
           "createdAt": {
             "type": "string"
           },
+          "defaultAlt": {
+            "nullable": true,
+            "type": "string"
+          },
           "displayName": {
             "type": "string"
           },
@@ -1085,6 +1374,10 @@
           "id": {
             "format": "uuid",
             "type": "string"
+          },
+          "metadataVersion": {
+            "minimum": 1,
+            "type": "number"
           },
           "mimeType": {
             "type": "string"
@@ -1122,6 +1415,10 @@
           "storage": {
             "type": "string"
           },
+          "title": {
+            "nullable": true,
+            "type": "string"
+          },
           "updatedAt": {
             "type": "string"
           },
@@ -1137,6 +1434,9 @@
           }
         },
         "required": [
+          "title",
+          "defaultAlt",
+          "metadataVersion",
           "id",
           "storage",
           "bucket",
@@ -1300,6 +1600,29 @@
             "type": "number"
           }
         },
+        "type": "object"
+      },
+      "GatewayMediaMetadataDto": {
+        "properties": {
+          "defaultAlt": {
+            "maxLength": 180,
+            "nullable": true,
+            "type": "string"
+          },
+          "expectedVersion": {
+            "maximum": 2147483646,
+            "minimum": 1,
+            "type": "number"
+          },
+          "title": {
+            "maxLength": 200,
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
         "type": "object"
       },
       "GatewayMediaOwnedReadUrlQueryDto": {
@@ -1470,7 +1793,11 @@
         "properties": {
           "variant": {
             "enum": [
-              "web"
+              "web",
+              "thumbnail",
+              "card",
+              "detail",
+              "mobile"
             ],
             "type": "string"
           }
@@ -1480,6 +1807,12 @@
       "GatewayOrderDto": {
         "properties": {
           "billingAddress": {
+            "type": "string"
+          },
+          "checkoutMode": {
+            "enum": [
+              "DEMO_NO_PAYMENT"
+            ],
             "type": "string"
           },
           "createdAt": {
@@ -1514,6 +1847,7 @@
           "status": {
             "enum": [
               "PENDING",
+              "PAYMENT_PROCESSING",
               "PAID",
               "FULFILLED",
               "CANCELLED"
@@ -1535,9 +1869,16 @@
           },
           "userId": {
             "type": "string"
+          },
+          "version": {
+            "description": "Current Order version; absent only on historical immutable Checkout replay.",
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "number"
           }
         },
         "required": [
+          "checkoutMode",
           "id",
           "orderNumber",
           "userId",
@@ -1578,14 +1919,25 @@
           "quantity": {
             "type": "number"
           },
+          "selectedOptions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "sku": {
             "type": "string"
           },
           "unitPrice": {
             "type": "string"
+          },
+          "variantId": {
+            "format": "uuid",
+            "type": "string"
           }
         },
         "required": [
+          "selectedOptions",
           "id",
           "productId",
           "sku",
@@ -1602,6 +1954,7 @@
           "status": {
             "enum": [
               "PENDING",
+              "PAYMENT_PROCESSING",
               "PAID",
               "FULFILLED",
               "CANCELLED"
@@ -1613,9 +1966,15 @@
       },
       "GatewayOrderStatusUpdateDto": {
         "properties": {
+          "expectedVersion": {
+            "maximum": 2147483646,
+            "minimum": 1,
+            "type": "number"
+          },
           "status": {
             "enum": [
               "PENDING",
+              "PAYMENT_PROCESSING",
               "PAID",
               "FULFILLED",
               "CANCELLED"
@@ -1624,7 +1983,8 @@
           }
         },
         "required": [
-          "status"
+          "status",
+          "expectedVersion"
         ],
         "type": "object"
       },
@@ -1687,6 +2047,9 @@
               "AVAILABLE",
               "OUT_OF_STOCK"
             ],
+            "type": "string"
+          },
+          "brandId": {
             "type": "string"
           },
           "categoryId": {
@@ -1766,12 +2129,6 @@
           "model3dLiveView": {
             "type": "boolean"
           },
-          "model3dPosterUrl": {
-            "type": "string"
-          },
-          "model3dUrl": {
-            "type": "string"
-          },
           "noindex": {
             "type": "boolean"
           },
@@ -1812,13 +2169,33 @@
             "minimum": 0,
             "type": "number"
           },
+          "tagIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "tags": {
             "items": {
               "type": "string"
             },
             "type": "array"
           },
-          "thumbnailUrl": {
+          "thumbnailAlt": {
+            "type": "string"
+          },
+          "thumbnailAltOverride": {
+            "nullable": true,
+            "type": "string"
+          },
+          "thumbnailMediaId": {
+            "type": "string"
+          },
+          "thumbnailTitle": {
+            "type": "string"
+          },
+          "thumbnailTitleOverride": {
+            "nullable": true,
             "type": "string"
           },
           "title": {
@@ -1843,9 +2220,6 @@
           },
           "vrEnabled": {
             "type": "boolean"
-          },
-          "vrPlanImageUrl": {
-            "type": "string"
           }
         },
         "required": [
@@ -1859,13 +2233,14 @@
           "price",
           "currency",
           "categoryId",
-          "thumbnailUrl",
-          "model3dUrl",
+          "brandId",
+          "tagIds",
+          "thumbnailMediaId",
+          "thumbnailTitle",
+          "thumbnailAlt",
           "model3dFormat",
           "model3dLiveView",
-          "model3dPosterUrl",
           "vrEnabled",
-          "vrPlanImageUrl",
           "metaTitle",
           "metaDescription",
           "metaKeywords",
@@ -1919,9 +2294,19 @@
       },
       "GatewayProductPatchDto": {
         "properties": {
+          "brandId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "categoryId": {
             "format": "uuid",
             "type": "string"
+          },
+          "clearBrand": {
+            "type": "boolean"
+          },
+          "clearThumbnailMedia": {
+            "type": "boolean"
           },
           "complementaryIds": {
             "items": {
@@ -1990,6 +2375,7 @@
           },
           "metaTitle": {
             "maxLength": 180,
+            "nullable": true,
             "type": "string"
           },
           "model3dFormat": {
@@ -1998,14 +2384,6 @@
           },
           "model3dLiveView": {
             "type": "boolean"
-          },
-          "model3dPosterUrl": {
-            "maxLength": 1024,
-            "type": "string"
-          },
-          "model3dUrl": {
-            "maxLength": 1024,
-            "type": "string"
           },
           "noindex": {
             "type": "boolean"
@@ -2053,6 +2431,14 @@
             "minimum": 0,
             "type": "number"
           },
+          "tagIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -2060,8 +2446,18 @@
             "maxItems": 64,
             "type": "array"
           },
-          "thumbnailUrl": {
-            "maxLength": 1024,
+          "thumbnailAlt": {
+            "maxLength": 180,
+            "nullable": true,
+            "type": "string"
+          },
+          "thumbnailMediaId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "thumbnailTitle": {
+            "maxLength": 200,
+            "nullable": true,
             "type": "string"
           },
           "title": {
@@ -2074,10 +2470,6 @@
           },
           "vrEnabled": {
             "type": "boolean"
-          },
-          "vrPlanImageUrl": {
-            "maxLength": 1024,
-            "type": "string"
           }
         },
         "required": [
@@ -2118,7 +2510,7 @@
           },
           "priceOverride": {
             "nullable": true,
-            "type": "object"
+            "type": "number"
           },
           "productId": {
             "format": "uuid",
@@ -2142,6 +2534,7 @@
           "sku",
           "options",
           "price",
+          "priceOverride",
           "effectivePrice",
           "stockQuantity",
           "availability",
@@ -2153,6 +2546,10 @@
       },
       "GatewayProductWriteDto": {
         "properties": {
+          "brandId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "categoryId": {
             "format": "uuid",
             "type": "string"
@@ -2220,6 +2617,7 @@
           },
           "metaTitle": {
             "maxLength": 180,
+            "nullable": true,
             "type": "string"
           },
           "model3dFormat": {
@@ -2228,14 +2626,6 @@
           },
           "model3dLiveView": {
             "type": "boolean"
-          },
-          "model3dPosterUrl": {
-            "maxLength": 1024,
-            "type": "string"
-          },
-          "model3dUrl": {
-            "maxLength": 1024,
-            "type": "string"
           },
           "noindex": {
             "type": "boolean"
@@ -2283,6 +2673,14 @@
             "minimum": 0,
             "type": "number"
           },
+          "tagIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -2290,8 +2688,18 @@
             "maxItems": 64,
             "type": "array"
           },
-          "thumbnailUrl": {
-            "maxLength": 1024,
+          "thumbnailAlt": {
+            "maxLength": 180,
+            "nullable": true,
+            "type": "string"
+          },
+          "thumbnailMediaId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "thumbnailTitle": {
+            "maxLength": 200,
+            "nullable": true,
             "type": "string"
           },
           "title": {
@@ -2304,15 +2712,61 @@
           },
           "vrEnabled": {
             "type": "boolean"
-          },
-          "vrPlanImageUrl": {
-            "maxLength": 1024,
-            "type": "string"
           }
         },
         "required": [
           "title",
           "price"
+        ],
+        "type": "object"
+      },
+      "GatewaySavedImageSizeDto": {
+        "properties": {
+          "generationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "height": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "recipeHash": {
+            "type": "string"
+          },
+          "renderPath": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "view": {
+            "enum": [
+              "thumbnail",
+              "card",
+              "detail",
+              "mobile"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "view",
+          "generationId",
+          "recipeHash",
+          "sha256",
+          "mimeType",
+          "width",
+          "height",
+          "sizeBytes",
+          "renderPath"
         ],
         "type": "object"
       },
@@ -2730,6 +3184,139 @@
           "sku",
           "options",
           "expectedVersion"
+        ],
+        "type": "object"
+      },
+      "ImageCropDto": {
+        "properties": {
+          "height": {
+            "type": "number"
+          },
+          "left": {
+            "type": "number"
+          },
+          "top": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "left",
+          "top",
+          "width",
+          "height"
+        ],
+        "type": "object"
+      },
+      "ImageFocalPointDto": {
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ],
+        "type": "object"
+      },
+      "ImageRecipeDto": {
+        "properties": {
+          "crop": {
+            "$ref": "#/components/schemas/ImageCropDto"
+          },
+          "fit": {
+            "enum": [
+              "inside",
+              "cover"
+            ],
+            "type": "string"
+          },
+          "focalPoint": {
+            "$ref": "#/components/schemas/ImageFocalPointDto"
+          },
+          "format": {
+            "enum": [
+              "webp",
+              "png",
+              "jpeg"
+            ],
+            "type": "string"
+          },
+          "height": {
+            "type": "number"
+          },
+          "quality": {
+            "type": "number"
+          },
+          "view": {
+            "enum": [
+              "thumbnail",
+              "card",
+              "detail",
+              "mobile"
+            ],
+            "type": "string"
+          },
+          "watermark": {
+            "$ref": "#/components/schemas/ImageWatermarkDto"
+          },
+          "width": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "view",
+          "width",
+          "height"
+        ],
+        "type": "object"
+      },
+      "ImageWatermarkDto": {
+        "properties": {
+          "height": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "image"
+            ],
+            "type": "string"
+          },
+          "margin": {
+            "type": "number"
+          },
+          "mediaId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "opacity": {
+            "type": "number"
+          },
+          "position": {
+            "enum": [
+              "top-left",
+              "top-right",
+              "bottom-left",
+              "bottom-right"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind"
         ],
         "type": "object"
       },
@@ -4002,6 +4589,513 @@
           }
         ],
         "summary": "admin.media.get",
+        "tags": [
+          "Media - Administration"
+        ]
+      }
+    },
+    "/api/v1/admin/media/{id}/derivatives": {
+      "get": {
+        "operationId": "admin_media_derivatives_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayImageDerivativesDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.media.derivatives.get",
+        "tags": [
+          "Media - Administration"
+        ]
+      },
+      "post": {
+        "operationId": "admin_media_derivatives_regenerate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayImageRegenerationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayImageDerivativesDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.media.derivatives.regenerate",
+        "tags": [
+          "Media - Administration"
+        ]
+      }
+    },
+    "/api/v1/admin/media/{id}/metadata": {
+      "patch": {
+        "operationId": "admin_media_metadata_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayMediaMetadataDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayMediaDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.media.metadata.update",
         "tags": [
           "Media - Administration"
         ]
@@ -7127,6 +8221,545 @@
         ]
       }
     },
+    "/api/v1/admin/orders": {
+      "get": {
+        "operationId": "admin_orders_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "PENDING",
+                "PAYMENT_PROCESSING",
+                "PAID",
+                "FULFILLED",
+                "CANCELLED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayCollectionEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "items": {
+                            "$ref": "#/components/schemas/GatewayOrderDto"
+                          },
+                          "type": "array"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.orders.list",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/v1/admin/orders/{id}": {
+      "get": {
+        "operationId": "admin_orders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayOrderDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.orders.get",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/v1/admin/orders/{id}/demo-payment-attempts/{attemptId}/outcome": {
+      "post": {
+        "operationId": "admin_orders_demo_payment_outcome",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attemptId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayDemoPaymentOutcomeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayDemoPaymentReplyDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.orders.demo-payment.outcome",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
     "/api/v1/admin/orders/{id}/status": {
       "patch": {
         "operationId": "admin_orders_status",
@@ -9204,6 +10837,194 @@
           }
         ],
         "summary": "admin.products.gallery.remove",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/v1/admin/products/{id}/gallery/{imageId}/metadata": {
+      "patch": {
+        "operationId": "admin_products_gallery_metadata_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "imageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayGalleryMetadataDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayCollectionEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "items": {
+                            "$ref": "#/components/schemas/GatewayGalleryImageDto"
+                          },
+                          "type": "array"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "admin.products.gallery.metadata.update",
         "tags": [
           "Products"
         ]
@@ -13108,7 +14929,11 @@
             "required": false,
             "schema": {
               "enum": [
-                "web"
+                "web",
+                "thumbnail",
+                "card",
+                "detail",
+                "mobile"
               ],
               "type": "string"
             }
@@ -13253,6 +15078,7 @@
             "schema": {
               "enum": [
                 "PENDING",
+                "PAYMENT_PROCESSING",
                 "PAID",
                 "FULFILLED",
                 "CANCELLED"
@@ -13559,6 +15385,182 @@
           }
         ],
         "summary": "orders.get",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/demo-payment-attempts": {
+      "post": {
+        "operationId": "orders_demo_payment_start",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Registered public client identifier; not an authentication secret.",
+            "in": "header",
+            "name": "X-Nebula-Client-ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "16-128 character high-entropy request key.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayDemoPaymentStartDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GatewayItemEnvelopeDto"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GatewayDemoPaymentReplyDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "orders.demo-payment.start",
         "tags": [
           "Orders"
         ]

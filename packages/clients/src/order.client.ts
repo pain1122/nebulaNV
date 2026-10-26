@@ -9,6 +9,22 @@ import {
 } from "./s2s-metadata";
 
 type Raw = {
+  StartDemoPayment: RawGrpcUnary<
+    orderv1.StartDemoPaymentRequest,
+    orderv1.DemoPaymentResponse
+  >;
+  ResolveDemoPayment: RawGrpcUnary<
+    orderv1.ResolveDemoPaymentRequest,
+    orderv1.DemoPaymentResponse
+  >;
+  AdminGetOrder: RawGrpcUnary<
+    orderv1.AdminGetOrderRequest,
+    orderv1.OrderResponse
+  >;
+  AdminListOrders: RawGrpcUnary<
+    orderv1.AdminListOrdersRequest,
+    orderv1.AdminListOrdersResponse
+  >;
   GetCart: RawGrpcUnary<orderv1.GetCartRequest, orderv1.CartResponse>;
   AddToCart: RawGrpcUnary<orderv1.AddToCartRequest, orderv1.CartResponse>;
   UpdateCartItem: RawGrpcUnary<
@@ -32,6 +48,22 @@ type Raw = {
 };
 
 export interface OrderProxy {
+  StartDemoPayment: SignedGrpcUnary<
+    orderv1.StartDemoPaymentRequest,
+    orderv1.DemoPaymentResponse
+  >;
+  ResolveDemoPayment: SignedGrpcUnary<
+    orderv1.ResolveDemoPaymentRequest,
+    orderv1.DemoPaymentResponse
+  >;
+  AdminGetOrder: SignedGrpcUnary<
+    orderv1.AdminGetOrderRequest,
+    orderv1.OrderResponse
+  >;
+  AdminListOrders: SignedGrpcUnary<
+    orderv1.AdminListOrdersRequest,
+    orderv1.AdminListOrdersResponse
+  >;
   GetCart: SignedGrpcUnary<orderv1.GetCartRequest, orderv1.CartResponse>;
   AddToCart: SignedGrpcUnary<orderv1.AddToCartRequest, orderv1.CartResponse>;
   UpdateCartItem: SignedGrpcUnary<
@@ -61,6 +93,26 @@ export function getOrder(
   const raw = client.getService<Raw>("OrderService");
   const common = { policy: signingPolicy, target: ORDER_SERVICE_TARGET };
   return {
+    StartDemoPayment: createSignedGrpcUnary({
+      ...common,
+      method: raw.StartDemoPayment.bind(raw),
+      definition: orderv1.OrderServiceService.startDemoPayment,
+    }),
+    ResolveDemoPayment: createSignedGrpcUnary({
+      ...common,
+      method: raw.ResolveDemoPayment.bind(raw),
+      definition: orderv1.OrderServiceService.resolveDemoPayment,
+    }),
+    AdminGetOrder: createSignedGrpcUnary({
+      ...common,
+      method: raw.AdminGetOrder.bind(raw),
+      definition: orderv1.OrderServiceService.adminGetOrder,
+    }),
+    AdminListOrders: createSignedGrpcUnary({
+      ...common,
+      method: raw.AdminListOrders.bind(raw),
+      definition: orderv1.OrderServiceService.adminListOrders,
+    }),
     GetCart: createSignedGrpcUnary({
       ...common,
       method: raw.GetCart.bind(raw),

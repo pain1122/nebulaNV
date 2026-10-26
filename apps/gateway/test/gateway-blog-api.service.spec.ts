@@ -28,7 +28,7 @@ function gatewayRequest(): GatewayHttpRequest {
     },
     user: { userId: "admin-1", role: "admin", sessionRef: "session-1" },
     accessToken: "admin-token",
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
 }
 
 function post(overrides: Partial<blogv1.Post> = {}) {
@@ -45,7 +45,11 @@ function post(overrides: Partial<blogv1.Post> = {}) {
 }
 
 function harness(overrides: Record<string, jest.Mock>) {
-  const unused = jest.fn(() => of({}));
+  const unused = jest.fn((_request: unknown, _metadata?: unknown) => {
+    void _request;
+    void _metadata;
+    return of({});
+  });
   const raw = {
     ListPosts: overrides.ListPosts ?? unused,
     GetPost: overrides.GetPost ?? unused,
@@ -53,7 +57,13 @@ function harness(overrides: Record<string, jest.Mock>) {
     UpdatePost: overrides.UpdatePost ?? unused,
     DeletePost: overrides.DeletePost ?? unused,
   };
-  const client = { getService: jest.fn(() => raw) } as unknown as ClientGrpc;
+  const client = {
+    getService: jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return raw;
+    }),
+  } as unknown as ClientGrpc;
   return { service: new GatewayBlogApiService(client), raw };
 }
 
@@ -62,7 +72,10 @@ describe("GatewayBlogApiService", () => {
 
   beforeEach(() => {
     process.env.GATEWAY_OUTBOUND_KEYS = JSON.stringify({
-      "blog-service": { id: "gateway-blog-v1", secret: "gateway-blog-api-test-secret-000000001" },
+      "blog-service": {
+        id: "gateway-blog-v1",
+        secret: "gateway-blog-api-test-secret-000000001",
+      },
     });
   });
 
@@ -73,15 +86,33 @@ describe("GatewayBlogApiService", () => {
 
   it("rejects a non-published row from the public list", async () => {
     const { service } = harness({
-      ListPosts: jest.fn(() => of({ data: [post({ status: "DRAFT" })], page: 1, limit: 20, total: 1 })),
+      ListPosts: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
+          data: [post({ status: "DRAFT" })],
+          page: 1,
+          limit: 20,
+          total: 1,
+        });
+      }),
     });
-    await expect(service.list(gatewayRequest(), {})).rejects.toMatchObject({ status: 502 });
+    await expect(service.list(gatewayRequest(), {})).rejects.toMatchObject({
+      status: 502,
+    });
   });
 
   it("keeps updates sparse and never invents an admin read contract", async () => {
-    const updatePost = jest.fn(() => of({ data: post() }));
+    const updatePost = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: post() });
+    });
     const { service, raw } = harness({ UpdatePost: updatePost });
-    await service.update(gatewayRequest(), POST_ID, { title: "Renamed", tags: [] });
+    await service.update(gatewayRequest(), POST_ID, {
+      title: "Renamed",
+      tags: [],
+    });
     expect(updatePost.mock.calls[0]?.[0]).toEqual({
       id: POST_ID,
       patch: { title: "Renamed", tags: [] },

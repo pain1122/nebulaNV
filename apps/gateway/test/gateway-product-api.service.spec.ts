@@ -1,8 +1,8 @@
-import { Metadata } from "@grpc/grpc-js";
+import { Metadata, status } from "@grpc/grpc-js";
 import type { ClientGrpc } from "@nestjs/microservices";
 import { productv1 } from "@nebula/protos";
 import { AUTHORIZATION_HEADER, X_REQUEST_ID_HEADER } from "@nebula/grpc-auth";
-import { of } from "rxjs";
+import { of, throwError } from "rxjs";
 import type { GatewayRequestContext } from "../src/application/application.contracts";
 import type { GatewayHttpRequest } from "../src/http/public-client-boundary";
 import { GatewayProductApiService } from "../src/product/gateway-product-api.service";
@@ -35,7 +35,7 @@ function gatewayRequest(authenticated: boolean): GatewayHttpRequest {
     rawHeaders: [],
     requestContext,
     actor: { kind: "anonymous" },
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
   if (authenticated) {
     request.actor = {
       kind: "authenticated",
@@ -69,8 +69,17 @@ function product(
 }
 
 function createHarness(overrides: Record<string, jest.Mock>) {
-  const unused = jest.fn(() => of({}));
+  const unused = jest.fn((_request: unknown, _metadata?: unknown) => {
+    void _request;
+    void _metadata;
+    return of({});
+  });
   const raw = {
+    UpdateImageMetadata: overrides.UpdateImageMetadata ?? unused,
+    ReserveCheckoutStock: overrides.ReserveCheckoutStock ?? unused,
+    FinalizeCheckoutStock: overrides.FinalizeCheckoutStock ?? unused,
+    CancelCheckoutStock: overrides.CancelCheckoutStock ?? unused,
+    RestoreCheckoutStock: overrides.RestoreCheckoutStock ?? unused,
     CreateProduct: overrides.CreateProduct ?? unused,
     UpdateProduct: overrides.UpdateProduct ?? unused,
     GetProduct: overrides.GetProduct ?? unused,
@@ -90,7 +99,13 @@ function createHarness(overrides: Record<string, jest.Mock>) {
     ReorderImages: overrides.ReorderImages ?? unused,
     RemoveImage: overrides.RemoveImage ?? unused,
   };
-  const client = { getService: jest.fn(() => raw) } as unknown as ClientGrpc;
+  const client = {
+    getService: jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return raw;
+    }),
+  } as unknown as ClientGrpc;
   return { service: new GatewayProductApiService(client), raw };
 }
 
@@ -109,7 +124,11 @@ describe("GatewayProductApiService", () => {
   });
 
   it("uses only the public read RPC and rejects a widened lifecycle response", async () => {
-    const listProducts = jest.fn(() => of({ data: [product()], total: 1 }));
+    const listProducts = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: [product()], total: 1 });
+    });
     const adminListProducts = jest.fn();
     const { service } = createHarness({
       ListProducts: listProducts,
@@ -140,20 +159,24 @@ describe("GatewayProductApiService", () => {
     expect(adminListProducts).not.toHaveBeenCalled();
 
     const widened = createHarness({
-      ListProducts: jest.fn(() =>
-        of({
+      ListProducts: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
           data: [product({ status: GatewayProductStatus.DRAFT })],
           total: 1,
-        }),
-      ),
+        });
+      }),
     });
     await expect(
       widened.service.listPublic(gatewayRequest(false), {}),
     ).rejects.toMatchObject({ status: 502 });
 
     const depleted = createHarness({
-      ListProducts: jest.fn(() =>
-        of({
+      ListProducts: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
           data: [
             product({
               trackInventory: true,
@@ -162,8 +185,8 @@ describe("GatewayProductApiService", () => {
             }),
           ],
           total: 1,
-        }),
-      ),
+        });
+      }),
     });
     await expect(
       depleted.service.listPublic(gatewayRequest(false), {}),
@@ -171,8 +194,18 @@ describe("GatewayProductApiService", () => {
   });
 
   it("preserves omission for optional public and admin list fields", async () => {
-    const listProducts = jest.fn(() => of({ data: [], total: 0 }));
-    const adminListProducts = jest.fn(() => of({ data: [], total: 0 }));
+    const listProducts = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: [], total: 0 });
+    });
+    const adminListProducts = jest.fn(
+      (_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data: [], total: 0 });
+      },
+    );
     const { service } = createHarness({
       ListProducts: listProducts,
       AdminListProducts: adminListProducts,
@@ -185,9 +218,48 @@ describe("GatewayProductApiService", () => {
     expect(adminListProducts.mock.calls[0]?.[0]).toEqual({});
   });
 
+  it("maps a Product read outage and a stale write to distinct HTTP failures", async () => {
+    const { service } = createHarness({
+      ListProducts: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return throwError(() => ({
+          code: status.UNAVAILABLE,
+          details: "offline",
+        }));
+      }),
+      UpdateProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return throwError(() => ({
+          code: status.ABORTED,
+          details: "stale_version",
+        }));
+      }),
+    });
+
+    await expect(
+      service.listPublic(gatewayRequest(false), {}),
+    ).rejects.toMatchObject({ status: 503 });
+    await expect(
+      service.update(gatewayRequest(true), PRODUCT_ID, {
+        title: "Revised desk",
+        expectedVersion: 1,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
   it("maps external content and preserves a sparse update patch", async () => {
-    const createProduct = jest.fn(() => of({ data: product() }));
-    const updateProduct = jest.fn(() => of({ data: product() }));
+    const createProduct = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: product() });
+    });
+    const updateProduct = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: product() });
+    });
     const { service } = createHarness({
       CreateProduct: createProduct,
       UpdateProduct: updateProduct,
@@ -233,18 +305,187 @@ describe("GatewayProductApiService", () => {
     ]);
   });
 
+  it("forwards thumbnail Media IDs and an explicit thumbnail clear", async () => {
+    const mediaId = "dd90a288-ecdd-4b1b-91b7-b57773425019";
+    const createProduct = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: product() });
+    });
+    const updateProduct = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: product() });
+    });
+    const { service } = createHarness({
+      CreateProduct: createProduct,
+      UpdateProduct: updateProduct,
+    });
+
+    await service.create(gatewayRequest(true), {
+      title: "Desk",
+      price: 100,
+      thumbnailMediaId: mediaId,
+    });
+    expect(createProduct.mock.calls[0]?.[0]).toEqual({
+      data: { title: "Desk", price: 100, thumbnailMediaId: mediaId },
+    });
+
+    await service.update(gatewayRequest(true), PRODUCT_ID, {
+      clearThumbnailMedia: true,
+      expectedVersion: 1,
+    });
+    expect(updateProduct.mock.calls[0]?.[0]).toEqual({
+      id: PRODUCT_ID,
+      data: { clearThumbnailMedia: true },
+      expectedVersion: 1,
+    });
+  });
+
+  it("rejects an unverified public thumbnail URL from Product", async () => {
+    const legacy = createHarness({
+      GetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
+          data: product({ thumbnailUrl: "https://unknown.test/image.png" }),
+        });
+      }),
+    });
+    await expect(
+      legacy.service.getPublic(gatewayRequest(false), PRODUCT_ID),
+    ).rejects.toMatchObject({ status: 502 });
+
+    const mediaId = "dd90a288-ecdd-4b1b-91b7-b57773425019";
+    const verified = createHarness({
+      GetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
+          data: product({
+            thumbnailMediaId: mediaId,
+            thumbnailUrl: `/api/v1/media/render/${mediaId}`,
+          }),
+        });
+      }),
+    });
+    await expect(
+      verified.service.getPublic(gatewayRequest(false), PRODUCT_ID),
+    ).resolves.toMatchObject({ thumbnailMediaId: mediaId });
+  });
+
+  it("omits legacy URL fields from public, admin, list, and write responses", async () => {
+    const mediaId = "dd90a288-ecdd-4b1b-91b7-b57773425019";
+    const data = product({
+      thumbnailMediaId: mediaId,
+      thumbnailUrl: `/api/v1/media/render/${mediaId}`,
+      model3dUrl: "https://provider.test/model.glb",
+      model3dPosterUrl: "https://provider.test/poster.jpg",
+      vrPlanImageUrl: "https://provider.test/plan.jpg",
+    });
+    const { service } = createHarness({
+      GetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data });
+      }),
+      AdminGetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data });
+      }),
+      ListProducts: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data: [data], total: 1 });
+      }),
+      AdminListProducts: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data: [data], total: 1 });
+      }),
+      CreateProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data });
+      }),
+    });
+    const responses = [
+      await service.getPublic(gatewayRequest(false), PRODUCT_ID),
+      await service.getAdmin(gatewayRequest(true), PRODUCT_ID),
+      ...(await service.listPublic(gatewayRequest(false), {})).data,
+      ...(await service.listAdmin(gatewayRequest(true), {})).data,
+      await service.create(gatewayRequest(true), { title: "Desk", price: 100 }),
+    ];
+    for (const response of responses) {
+      expect(response.thumbnailMediaId).toBe(mediaId);
+      for (const field of [
+        "thumbnailUrl",
+        "model3dUrl",
+        "model3dPosterUrl",
+        "vrPlanImageUrl",
+      ]) {
+        expect(response).not.toHaveProperty(field);
+      }
+    }
+  });
+
+  it("omits gallery URLs while retaining legacy row IDs for admin repair", async () => {
+    const images = [
+      {
+        id: "legacy-image",
+        mediaId: "",
+        url: "https://provider.test/legacy.jpg",
+        alt: "legacy",
+        sort: 0,
+        deletedAt: "",
+      },
+      {
+        id: "empty-legacy-image",
+        mediaId: "",
+        url: "",
+        alt: "",
+        sort: 1,
+        deletedAt: "",
+      },
+    ];
+    const { service } = createHarness({
+      AdminListGallery: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ productId: PRODUCT_ID, images });
+      }),
+    });
+    const response = await service.listGallery(
+      gatewayRequest(true),
+      PRODUCT_ID,
+      false,
+    );
+    expect(response.map((image) => image.id)).toEqual([
+      "legacy-image",
+      "empty-legacy-image",
+    ]);
+    response.forEach((image) => expect(image).not.toHaveProperty("url"));
+  });
+
   it("normalizes the legacy empty discount response and rejects unknown values", async () => {
     const compatible = createHarness({
-      GetProduct: jest.fn(() => of({ data: product({ discountType: "" }) })),
+      GetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data: product({ discountType: "" }) });
+      }),
     });
     await expect(
       compatible.service.getPublic(gatewayRequest(false), PRODUCT_ID),
     ).resolves.toMatchObject({ discountType: GatewayDiscountType.NONE });
 
     const invalid = createHarness({
-      GetProduct: jest.fn(() =>
-        of({ data: product({ discountType: "SURPRISE" }) }),
-      ),
+      GetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ data: product({ discountType: "SURPRISE" }) });
+      }),
     });
     await expect(
       invalid.service.getPublic(gatewayRequest(false), PRODUCT_ID),
@@ -252,7 +493,13 @@ describe("GatewayProductApiService", () => {
   });
 
   it("preserves omission in a partial bulk discount request", async () => {
-    const applyDiscountBulk = jest.fn(() => of({ updated: 2 }));
+    const applyDiscountBulk = jest.fn(
+      (_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ updated: 2 });
+      },
+    );
     const { service } = createHarness({ ApplyDiscountBulk: applyDiscountBulk });
 
     await expect(
@@ -266,29 +513,43 @@ describe("GatewayProductApiService", () => {
   });
 
   it("preserves omitted gallery sort while retaining explicit zero", async () => {
-    const addImages = jest.fn(() => of({ productId: PRODUCT_ID, images: [] }));
+    const addImages = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ productId: PRODUCT_ID, images: [] });
+    });
     const { service } = createHarness({ AddImages: addImages });
+    const firstMediaId = "dd90a288-ecdd-4b1b-91b7-b57773425019";
+    const secondMediaId = "0e84b76b-ad9c-40d8-84f2-f93024ee840d";
 
     await service.addImages(gatewayRequest(true), PRODUCT_ID, {
-      images: [
-        { url: "https://cdn.example/append.jpg" },
-        { url: "https://cdn.example/first.jpg", sort: 0 },
-      ],
+      images: [{ mediaId: firstMediaId }, { mediaId: secondMediaId, sort: 0 }],
     });
 
     expect(addImages.mock.calls[0]?.[0]).toEqual({
       productId: PRODUCT_ID,
       images: [
-        { url: "https://cdn.example/append.jpg", alt: "" },
-        { url: "https://cdn.example/first.jpg", alt: "", sort: 0 },
+        { url: "", mediaId: firstMediaId },
+        { url: "", mediaId: secondMediaId, sort: 0 },
       ],
     });
+
+    await expect(
+      service.addImages(gatewayRequest(true), PRODUCT_ID, {
+        images: [
+          { mediaId: firstMediaId, url: "https://cdn.example/unsafe.jpg" },
+        ],
+      }),
+    ).rejects.toThrow("gallery_media_id_required");
+    expect(addImages).toHaveBeenCalledTimes(1);
   });
 
   it("rejects deleted public gallery rows and mismatched product IDs", async () => {
     const deleted = createHarness({
-      ListGallery: jest.fn(() =>
-        of({
+      ListGallery: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
           productId: PRODUCT_ID,
           images: [
             {
@@ -299,26 +560,184 @@ describe("GatewayProductApiService", () => {
               deletedAt: "2026-08-15T00:00:00.000Z",
             },
           ],
-        }),
-      ),
+        });
+      }),
     });
     await expect(
       deleted.service.listGallery(gatewayRequest(false), PRODUCT_ID, true),
     ).rejects.toMatchObject({ status: 502 });
 
     const mismatch = createHarness({
-      AdminListGallery: jest.fn(() =>
-        of({ productId: "another-product", images: [] }),
-      ),
+      AdminListGallery: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({ productId: "another-product", images: [] });
+      }),
     });
     await expect(
       mismatch.service.listGallery(gatewayRequest(true), PRODUCT_ID, false),
     ).rejects.toMatchObject({ status: 502 });
   });
 
+  it("requires Media-backed URLs on public gallery responses", async () => {
+    const mediaId = "dd90a288-ecdd-4b1b-91b7-b57773425019";
+    const valid = createHarness({
+      ListGallery: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
+          productId: PRODUCT_ID,
+          images: [
+            {
+              id: "image-1",
+              mediaId,
+              url: `/api/v1/media/render/${mediaId}`,
+              alt: "",
+              sort: 0,
+              deletedAt: "",
+            },
+          ],
+        });
+      }),
+    });
+    await expect(
+      valid.service.listGallery(gatewayRequest(false), PRODUCT_ID, true),
+    ).resolves.toMatchObject([{ mediaId }]);
+
+    const legacy = createHarness({
+      ListGallery: jest.fn((_request: unknown, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
+          productId: PRODUCT_ID,
+          images: [
+            {
+              id: "image-1",
+              mediaId: "",
+              url: "https://legacy.test/image.png",
+              alt: "",
+              sort: 0,
+              deletedAt: "",
+            },
+          ],
+        });
+      }),
+    });
+    await expect(
+      legacy.service.listGallery(gatewayRequest(false), PRODUCT_ID, true),
+    ).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("preserves sparse variant patches and explicit zero/false override values", async () => {
+    const updateVariant = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: product() });
+    });
+    const deleteVariant = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({ data: product() });
+    });
+    const { service } = createHarness({
+      UpdateVariant: updateVariant,
+      DeleteVariant: deleteVariant,
+    });
+    await service.updateVariant(gatewayRequest(true), PRODUCT_ID, "variant-1", {
+      expectedVersion: 3,
+      stockQuantity: 0,
+      active: false,
+      priceOverride: 0,
+      sortOrder: 0,
+    });
+    expect(updateVariant.mock.calls[0]?.[0]).toEqual({
+      productId: PRODUCT_ID,
+      variantId: "variant-1",
+      expectedVersion: 3,
+      data: {
+        options: {},
+        replaceOptions: false,
+        clearPriceOverride: false,
+        stockQuantity: 0,
+        active: false,
+        priceOverride: 0,
+        sortOrder: 0,
+      },
+    });
+    await service.updateVariant(gatewayRequest(true), PRODUCT_ID, "variant-1", {
+      expectedVersion: 4,
+      clearPriceOverride: true,
+      options: { Color: "Red" },
+    });
+    expect(updateVariant.mock.calls[1]?.[0]).toEqual({
+      productId: PRODUCT_ID,
+      variantId: "variant-1",
+      expectedVersion: 4,
+      data: {
+        options: { Color: "Red" },
+        replaceOptions: true,
+        clearPriceOverride: true,
+      },
+    });
+    await service.deleteVariant(
+      gatewayRequest(true),
+      PRODUCT_ID,
+      "variant-1",
+      5,
+    );
+    expect(deleteVariant.mock.calls[0]?.[0]).toEqual({
+      productId: PRODUCT_ID,
+      variantId: "variant-1",
+      expectedVersion: 5,
+    });
+  });
+
+  it.each([undefined, 0, 30])(
+    "returns numeric/null variant overrides for public and admin reads: %s",
+    async (priceOverride) => {
+      const data = product({
+        variants: [
+          productv1.ProductVariant.create({
+            id: "variant-1",
+            productId: PRODUCT_ID,
+            sku: "DESK-BLUE",
+            options: { Color: "Blue" },
+            price: priceOverride ?? 100,
+            priceOverride,
+            effectivePrice: priceOverride ?? 100,
+            stockQuantity: 1,
+            active: true,
+            availability: "AVAILABLE",
+          }),
+        ],
+      });
+      const { service } = createHarness({
+        GetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+          void _request;
+          void _metadata;
+          return of({ data });
+        }),
+        AdminGetProduct: jest.fn((_request: unknown, _metadata?: unknown) => {
+          void _request;
+          void _metadata;
+          return of({ data });
+        }),
+      });
+      for (const response of [
+        await service.getPublic(gatewayRequest(false), PRODUCT_ID),
+        await service.getAdmin(gatewayRequest(true), PRODUCT_ID),
+      ]) {
+        expect(response.variants[0].priceOverride).toBe(priceOverride ?? null);
+        expect(response.variants[0]).toHaveProperty("priceOverride");
+      }
+    },
+  );
+
   it("passes versioned variant creation and maps its public commercial fields", async () => {
-    const createVariant = jest.fn(() =>
-      of({
+    const createVariant = jest.fn((_request: unknown, _metadata?: unknown) => {
+      void _request;
+      void _metadata;
+      return of({
         data: product({
           selectionMode: "VARIANT",
           variants: [
@@ -337,8 +756,8 @@ describe("GatewayProductApiService", () => {
             }),
           ],
         }),
-      }),
-    );
+      });
+    });
     const { service } = createHarness({ CreateVariant: createVariant });
     const result = await service.createVariant(
       gatewayRequest(true),
@@ -368,5 +787,47 @@ describe("GatewayProductApiService", () => {
       price: 120,
       priceOverride: 120,
     });
+  });
+
+  it("preserves omission versus decorative alt when adding gallery images", async () => {
+    const add = jest.fn(
+      (_request: productv1.AddImagesRequest, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of(productv1.GalleryResponse.create({ productId: PRODUCT_ID }));
+      },
+    );
+    const { service } = createHarness({ AddImages: add });
+    await service.addImages(gatewayRequest(true), PRODUCT_ID, {
+      images: [{ mediaId: PRODUCT_ID }, { mediaId: PRODUCT_ID, alt: "" }],
+    });
+    expect(add.mock.calls[0]?.[0].images[0]).not.toHaveProperty("alt");
+    expect(add.mock.calls[0]?.[0].images[1].alt).toBe("");
+  });
+  it("encodes thumbnail reset without materializing omitted text", async () => {
+    const update = jest.fn(
+      (_request: productv1.UpdateProductRequest, _metadata?: unknown) => {
+        void _request;
+        void _metadata;
+        return of({
+          data: product({
+            thumbnailTitle: "Inherited",
+            thumbnailAlt: "",
+            version: 2,
+          }),
+        });
+      },
+    );
+    const { service } = createHarness({ UpdateProduct: update });
+    await service.update(gatewayRequest(true), PRODUCT_ID, {
+      expectedVersion: 1,
+      thumbnailTitle: null,
+      thumbnailAlt: "",
+    });
+    expect(update.mock.calls[0]?.[0].data).toMatchObject({
+      clearThumbnailTitle: true,
+      thumbnailAlt: "",
+    });
+    expect(update.mock.calls[0]?.[0].data).not.toHaveProperty("thumbnailTitle");
   });
 });

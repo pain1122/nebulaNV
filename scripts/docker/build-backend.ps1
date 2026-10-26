@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
   [switch]$Clean,
-  [switch]$Pull
+  [switch]$Pull,
+  [string[]]$Services = @(),
+  [switch]$Plan
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,12 +12,16 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Push-Location $repoRoot
 
 try {
-  docker compose config --quiet
-  if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose configuration validation failed."
+  if (-not $Plan) {
+    docker compose config --quiet
+    if ($LASTEXITCODE -ne 0) {
+      throw "Docker Compose configuration validation failed."
+    }
   }
 
   $arguments = @(".\scripts\backend.mjs", "build-images")
+  $arguments += $Services
+  if ($Plan) { $arguments += "--plan" }
   if ($Clean) {
     $arguments += "--clean"
   } elseif ($Pull) {

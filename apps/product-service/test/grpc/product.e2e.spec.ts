@@ -2,13 +2,39 @@
 import { status } from "@grpc/grpc-js";
 import { loadClient, call, mdS2S, setS2STestActorToken } from "./helpers";
 import { getDefaultProductCategoryGrpc } from "../utils/settings";
+import { httpJson } from "../utils/http";
+import { randomUUID } from "node:crypto";
 
 const PRODUCT_PROTO = require.resolve("@nebula/protos/product.proto");
 const URL = process.env.PRODUCT_GRPC_URL || "127.0.0.1:50053";
 const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
+const MEDIA_HTTP = process.env.MEDIA_HTTP_URL ?? "http://127.0.0.1:3007";
 const MISSING_ID = "11111111-1111-4111-8111-111111111111";
+// Valid 8x6 PNG; the fixture goes through the normal scanner/approval pipeline.
+const GALLERY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAIAAABxZ0isAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWNQSluFFTEMpAQAtyY5YUeDlrAAAAAASUVORK5CYII=",
+  "base64",
+);
 
 type LoginResp = { accessToken: string };
+type GalleryMediaPresign = {
+  uploadUrl: string;
+  storage: string;
+  bucket: string;
+  path: string;
+  filename: string;
+  mimeType: string;
+  folderPath: string;
+  displayName: string;
+  originalFilename: string;
+  scope: string;
+};
+type GalleryMediaState = {
+  id: string;
+  status: string;
+  scanStatus: string;
+  scanError?: string;
+};
 
 describe("ProductService gRPC (admin required on writes)", () => {
   const client = loadClient<any>({
@@ -24,6 +50,95 @@ describe("ProductService gRPC (admin required on writes)", () => {
   let userAccess = "";
   let sku = "";
   let version = 1;
+  let adminAccess = "";
+  let galleryMediaId = "";
+
+  async function uploadGalleryMedia() {
+    const headers = { authorization: `Bearer ${adminAccess}` };
+    const filename = `product-gallery-${randomUUID()}.png`;
+    const { data: presign } = await httpJson<{ data: GalleryMediaPresign }>(
+      "POST",
+      `${MEDIA_HTTP}/media/public-library/presign`,
+      {
+        filename,
+        mimeType: "image/png",
+        folderPath: "/product-grpc-proof",
+        displayName: filename,
+        scope: "panel",
+      },
+      headers,
+    );
+    const uploaded = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": "image/png" },
+      body: GALLERY_PNG,
+      signal: AbortSignal.timeout(20_000),
+    });
+    expect([200, 204]).toContain(uploaded.status);
+    const { data: media } = await httpJson<{ data: GalleryMediaState }>(
+      "POST",
+      `${MEDIA_HTTP}/media/public-library/finalize`,
+      {
+        storage: presign.storage,
+        bucket: presign.bucket,
+        path: presign.path,
+        filename: presign.filename,
+        mimeType: presign.mimeType,
+        folderPath: presign.folderPath,
+        displayName: presign.displayName,
+        originalFilename: presign.originalFilename,
+        scope: presign.scope,
+      },
+      headers,
+    );
+    galleryMediaId = media.id;
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      const { data } = await httpJson<{ data: GalleryMediaState }>(
+        "GET",
+        `${MEDIA_HTTP}/media/${galleryMediaId}`,
+        undefined,
+        headers,
+      );
+      if (data.status === "READY" && data.scanStatus === "CLEAN") return;
+      if (data.status === "BLOCKED")
+        throw new Error(`gallery_fixture_blocked_${data.scanError}`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error("gallery_fixture_approval_timeout");
+  }
+
+  afterAll(async () => {
+    try {
+      if (draftId) {
+        const gallery = await call<{ images: Array<{ id: string }> }>(
+          client,
+          "AdminListGallery",
+          { productId: draftId, includeDeleted: true },
+          mdS2S({ role: "admin" }),
+        );
+        for (const image of gallery.images) {
+          await call(
+            client,
+            "RemoveImage",
+            { productId: draftId, imageId: image.id, hardDelete: true },
+            mdS2S({ role: "admin" }),
+          );
+        }
+        await call(client, "HardDeleteProduct", { id: draftId }, mdS2S());
+      }
+      if (galleryMediaId) {
+        await httpJson(
+          "DELETE",
+          `${MEDIA_HTTP}/media/public-library/${galleryMediaId}`,
+          undefined,
+          { authorization: `Bearer ${adminAccess}` },
+        );
+      }
+    } finally {
+      client.close();
+    }
+  }, 30_000);
 
   beforeAll(async () => {
     // (Optional) login admin – not strictly needed for S2S, but handy to ensure auth-service is alive
@@ -35,7 +150,8 @@ describe("ProductService gRPC (admin required on writes)", () => {
         password: process.env.SEED_ADMIN_PASS ?? "Admin123!",
       }),
     }).then((r) => r.json() as Promise<LoginResp>);
-    setS2STestActorToken(login.accessToken);
+    adminAccess = login.accessToken;
+    setS2STestActorToken(adminAccess);
 
     const userLogin = await fetch(`${AUTH_HTTP}/auth/login`, {
       method: "POST",
@@ -198,25 +314,44 @@ describe("ProductService gRPC (admin required on writes)", () => {
   });
 
   it("separates public and admin gallery visibility", async () => {
+    await expect(
+      call(
+        client,
+        "AddImages",
+        {
+          productId: draftId,
+          images: [{ url: "https://example.test/draft.jpg", alt: "draft" }],
+        },
+        mdS2S({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({
+      code: status.INVALID_ARGUMENT,
+      details: "gallery_media_id_required",
+    });
+    await uploadGalleryMedia();
     const added = await call<any>(
       client,
       "AddImages",
       {
         productId: draftId,
         images: [
-          { url: "https://example.test/draft.jpg", alt: "draft" },
-          { url: "https://example.test/draft-2.jpg", alt: "draft 2" },
+          { mediaId: galleryMediaId, alt: "draft" },
+          { mediaId: galleryMediaId, alt: "draft 2" },
         ],
       },
       mdS2S({ role: "admin" }),
     );
     expect(added.images).toEqual([
       expect.objectContaining({
-        url: "https://example.test/draft.jpg",
+        mediaId: galleryMediaId,
+        url: `/api/v1/media/render/${galleryMediaId}`,
+        alt: "draft",
         sort: 0,
       }),
       expect.objectContaining({
-        url: "https://example.test/draft-2.jpg",
+        mediaId: galleryMediaId,
+        url: `/api/v1/media/render/${galleryMediaId}`,
+        alt: "draft 2",
         sort: 1,
       }),
     ]);
@@ -243,7 +378,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
         deletedAt: "",
       }),
     ]);
-  });
+  }, 90_000);
 
   it("returns NOT_FOUND when an admin gallery read names a missing Product", async () => {
     await expect(

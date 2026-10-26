@@ -40,6 +40,9 @@ const REQUEST_METHOD: Readonly<Record<GatewayHttpMethod, RequestMethod>> = {
 const UUID_PATH_INPUTS = new Set([
   "uuid-id",
   "product-patch",
+  "variant-write",
+  "variant-patch",
+  "variant-delete",
   "gallery-admin-list",
   "gallery-add",
   "gallery-order",
@@ -48,9 +51,14 @@ const UUID_PATH_INPUTS = new Set([
   "taxonomy-patch",
   "cart-update",
   "order-status",
+  "demo-payment-start",
+  "demo-payment-outcome",
   "media-read-url",
   "media-owned-read-url",
   "media-render",
+  "media-derivatives",
+  "media-metadata",
+  "gallery-metadata",
 ]);
 
 function runtimePath(policy: GatewayRoutePolicy): string {
@@ -189,7 +197,9 @@ export function GatewayApiRoute(
   if (documentation.queryType) {
     decorators.push(ApiQuery({ type: documentation.queryType }));
   }
-  for (const match of runtimePath(policy).matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g)) {
+  for (const match of runtimePath(policy).matchAll(
+    /:([A-Za-z][A-Za-z0-9_]*)/g,
+  )) {
     const name = match[1];
     decorators.push(
       ApiParam({

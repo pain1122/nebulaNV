@@ -1,4 +1,5 @@
 import * as Joi from "joi";
+import { imagePresets } from "../processing/image-recipes";
 import { s2sEnvSchema } from "@nebula/grpc-auth";
 import {
   grpcTargetEnvSchema,
@@ -87,7 +88,86 @@ export const envSchema = Joi.object({
     .default(500),
   MEDIA_PUBLIC_FOLDER: folderRoot.default("uploads"),
   MEDIA_PRIVATE_FOLDER: folderRoot.default("private/objects"),
+  MEDIA_PROCESSING_ENABLED: Joi.boolean()
+    .truthy("true")
+    .falsy("false")
+    .default(true),
+  MEDIA_DERIVATIVES_ENABLED: Joi.boolean()
+    .truthy("true")
+    .falsy("false")
+    .default(true),
+  MEDIA_IMAGE_PRESETS: Joi.string()
+    .max(16384)
+    .custom((value: string, helpers) => {
+      try {
+        imagePresets(value);
+        return value;
+      } catch {
+        return helpers.error("any.custom", {
+          message:
+            "MEDIA_IMAGE_PRESETS must contain one to four valid image recipes",
+        });
+      }
+    }),
+  MEDIA_PROCESSING_POLL_MS: Joi.number()
+    .integer()
+    .min(100)
+    .max(60_000)
+    .default(2000),
+  MEDIA_PROCESSING_MAX_BYTES: Joi.number()
+    .integer()
+    .min(1)
+    .max(20 * 1024 * 1024)
+    .default(20 * 1024 * 1024),
+  MEDIA_PROCESSING_MAX_PIXELS: Joi.number()
+    .integer()
+    .min(1)
+    .max(16_000_000)
+    .default(16_000_000),
+  MEDIA_PROCESSING_IO_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(100)
+    .max(60_000)
+    .default(20_000),
+  MEDIA_PROCESSING_IMAGE_TIMEOUT_SECONDS: Joi.number()
+    .integer()
+    .min(1)
+    .max(30)
+    .default(15),
+  MEDIA_PROCESSING_LEASE_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(600_000)
+    .default(180_000),
+  MEDIA_PROCESSING_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .min(1)
+    .max(20)
+    .default(5),
+  MEDIA_PROCESSING_RETRY_MS: Joi.number()
+    .integer()
+    .min(100)
+    .max(300_000)
+    .default(10_000),
+  MEDIA_SCANNER_HOST: Joi.string().hostname().default("127.0.0.1"),
+  MEDIA_SCANNER_PORT: Joi.number().port().default(3310),
+  MEDIA_SCANNER_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(100)
+    .max(60_000)
+    .default(30_000),
 }).custom((env: Record<string, unknown>, helpers) => {
+  const budget =
+    Number(env.MEDIA_PROCESSING_IO_TIMEOUT_MS) * 2 +
+    Number(env.MEDIA_SCANNER_TIMEOUT_MS) * 2 +
+    Number(env.MEDIA_PROCESSING_IMAGE_TIMEOUT_SECONDS) * 1000 +
+    30_000;
+  if (Number(env.MEDIA_PROCESSING_LEASE_MS) <= budget) {
+    return helpers.error("any.custom", {
+      message:
+        "MEDIA_PROCESSING_LEASE_MS must exceed the bounded processing budget",
+    });
+  }
   if (
     env.MEDIA_STORAGE_DRIVER === "s3" &&
     !env.MEDIA_S3_ENDPOINT &&

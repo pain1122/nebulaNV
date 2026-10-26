@@ -29,7 +29,16 @@ describe("service health and shutdown wiring", () => {
       const main = source(`apps/${name}/src/main.ts`);
 
       expect(health).toContain("extends StandardHealthController");
-      expect(health).toContain("@OperationalHealth()");
+      if (name === "realm-auth-service") {
+        const module = source(`apps/${name}/src/app.module.ts`);
+        expect(module).not.toContain("APP_GUARD");
+        expect(module).not.toContain("useGlobalGuards");
+        expect(main).not.toContain("useGlobalGuards");
+        expect(health).toContain("this.boundary.checkReadiness()");
+        expect(health).toContain("this.redis.checkReadiness()");
+      } else {
+        expect(health).toContain("@OperationalHealth()");
+      }
       expect(health).not.toContain("@Public()");
       expect(health).not.toContain("new PrismaClient");
       expect(main).toContain("app.enableShutdownHooks()");
@@ -48,7 +57,20 @@ describe("service health and shutdown wiring", () => {
     const dockerfile = source("docker/backend.Dockerfile");
     const provision = source("scripts/backend.mjs");
 
-    expect(dockerfile.match(/\/health\/ready/g)).toHaveLength(services.length);
+    const runtimeStages = dockerfile
+      .split(/(?=^FROM )/m)
+      .filter((stage) => stage.startsWith("FROM runtime-base AS "));
+    expect(runtimeStages).toHaveLength(services.length);
+    for (const { name } of services) {
+      const target = `${name.replace(/-service$/, "")}-runtime`;
+      const stage = runtimeStages.find(
+        (value) =>
+          value.split(/\r?\n/, 1)[0] === `FROM runtime-base AS ${target}`,
+      );
+      expect(stage).toBeDefined();
+      expect(stage?.match(/^HEALTHCHECK\b/gm)).toHaveLength(1);
+      expect(stage).toContain("/health/ready");
+    }
     expect(provision).toContain("composeServices.map");
     expect(provision).toContain("/health/ready");
     expect(dockerfile).not.toMatch(/localhost:\d+\/health['"]/);

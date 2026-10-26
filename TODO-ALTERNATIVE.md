@@ -1,10 +1,26 @@
 # TODO Alternative: NebulaNV Product And AI Roadmap
 
 Status: adopted after F3 closure on 2026-08-24 and corrected to the
-backend-ecommerce-first order on 2026-09-14. `TODO.md` remains the original
+backend-ecommerce-first order on 2026-09-14, with the bounded Media core slice
+brought forward on 2026-10-05. `TODO.md` remains the original
 roadmap and safe comparison; this file owns the selected future phase order.
 
 Created: 2026-08-22
+
+Immediate engineering interruption (2026-10-24):
+[ASAP build cleanup](docs/ASAP-BUILD-CLEANUP.md). Selection/shared-dependency
+corrections and Product/Order graph acceptance are complete as of 2026-10-26:
+native images, warm reruns, packaged imports and all ten isolation cases pass.
+Segment 3 all-target graph/batch build and all eleven offline packaged-image
+closures now pass: initial batch 665.4s, shared/application compilation once.
+Unchanged warm full batch passes at 111.1s (all eleven images). CI cache
+persistence is implemented with local checks; hosted validation and remaining
+integration/release gates stay open.
+D2 evidence and the phase order below are preserved; relevant application/live
+proofs remain separate from image packaging acceptance.
+
+Current execution: D2 Batches 0, 1 and 2 are closed as of 2026-10-19; Batch 3 Orders is active. Salar reports corrected Checkout recovery and affected Cart live passed, completing the stock/replay/recovery feature gates alongside the recorded native/owner SQL/focused/contract evidence. Post-proof checks confirm all sixteen containers healthy, eleven backend health probes passed, no active checkout attempts and no temporary fault trigger. Preserve existing passes; no repeat build or migration without a relevant change. PAYMENT_PROCESSING vocabulary and the approved failure-to-PENDING payment policy remain recorded for Batch 3 transition/concurrency/audit work. D2/B0 exit and Batch 4 fixture/parity gates remain open. D1 and F5 Core are closed as of 2026-10-12;
+remaining F5 consumer integration stays in its adopted later position.
 
 ## Purpose
 
@@ -63,6 +79,11 @@ claim becomes available only after resumed F4 exits.
 - A checked item means implementation, tests, configuration, and applicable
   documentation agree. Code existence alone is insufficient.
 - Planned behavior must never be presented as implemented behavior.
+- Before implementation and broad verification handoff, complete the
+  [mandatory test preparation checklist](docs/testing/pre-suite-checklist.md):
+  exact consumer impact review, applicable cheap checks and a recorded handoff
+  receipt. Known preparation failures block broad handoff; heavy proofs are
+  explicitly pending until actually run.
 - Every new finding must be classified as a confirmed defect, stale
   implementation/documentation, optional hardening, or future scaling
   consideration.
@@ -141,6 +162,7 @@ AI/cloud guidance to recheck when the applicable phase starts:
 
 Decision records:
 
+- [2026-10-05 Media Core Execution Plan](docs/reports/2026-10-05-media-core-execution-plan.md)
 - [2026-09-14 Backend Ecommerce Roadmap Correction](docs/reports/2026-09-14-backend-ecommerce-roadmap-correction.md)
 - [2026-09-14 Demo-First Roadmap Rebaseline](docs/reports/2026-09-14-demo-first-roadmap-rebaseline.md), partially superseded
 
@@ -148,15 +170,19 @@ Committed active path:
 
 1. Preserve completed F0-F3 and their regression gates.
 2. Preserve completed F4 R0-R5 and pause F4 at the audited dormant boundary.
-3. Execute `D1 -> D2` and close the frontend-independent B0 Backend Ecommerce
-   Release through gateway APIs and live integration evidence.
+3. Preserve closed D1 Batches 0-4 and the early F5 Core Media slice, then
+   complete D2. Close the frontend-independent B0 Backend Ecommerce
+   Release through gateway APIs and live integration evidence. Media core adds
+   actual validation/scan/promotion, resize/crop, saved view sizes, watermarking,
+   and alt/title metadata; it does not implement cloud/CDN or a file-manager UI.
 4. When the user-supplied Vite admin is ready, execute `F7 -> D3` and close the
    P0 Admin-Validated Ecommerce Demo. Do not build or convert an admin now.
 5. Treat D4 as a non-gating client-delivery track after B0. Start it only after
    concrete storefront requirements exist; its framework, origin, routes, and
    deployment shape remain unselected until then.
-6. Execute `M2 -> F5 -> M5 -> M3S` with only consumer-driven media, storage,
-   and worker compatibility.
+6. Execute `M2 -> remaining F5 -> M5 -> M3S` with only consumer-driven media,
+   storage, and worker compatibility. Reuse proven Media core; cloud/CDN
+   integration and provider topology remain F9 deployment work.
 7. Execute `F8 -> F6 -> D5` and close the full commerce portfolio release.
 8. Execute `AI0 -> M7` against the proven default-site product without making
    a tenant-isolation claim.
@@ -182,29 +208,29 @@ Deferred, not deleted:
 
 ### Original Roadmap Disposition
 
-| Original scope | Alternative disposition                                                      |
-| -------------- | ---------------------------------------------------------------------------- |
-| F0-F2          | Completed mechanisms preserved; regression gates remain active               |
-| F3             | Complete; exit proof preserved and regression gates remain active            |
-| F4             | R0-R5 preserved; R6.1 onward resumes after F9                                |
-| F5             | Retained after M2 with current-provider compatibility and bounded media jobs |
-| F6             | Moved after F8 so the module contract follows proven web/mobile consumers    |
-| F7             | Runs after B0 when Vite source exists; integrates admin without conversion   |
-| F8             | Moved after the web showroom/media sequence and before F6/D5                 |
-| F9             | Moved before resumed F4; supplies actual cloud/storage operating evidence    |
-| D1-D2          | Next active phases; close the backend ecommerce release before frontend work |
-| D3             | Runs with F7 after B0 to prove the supplied Vite admin against stable APIs   |
-| D4             | Client-driven storefront work after concrete requirements are available      |
-| D5             | Retained after F8/F6; closes the full commerce portfolio release             |
-| M1             | Deferred until real merchant/payment scope exists                            |
-| M2             | Retained after backend/admin commerce proof; UI breadth follows real needs   |
-| M3             | Narrowed to M3S; storage remains a compatibility feature until cloud proof   |
-| M4             | Deferred in full                                                             |
-| M5             | Retained as a bounded web-first showroom using only proven processing needs  |
-| M6             | General platform deferred; owning phases may add bounded local jobs/adapters |
-| M7             | Retained after AI0, before cloud and resumed tenant implementation           |
-| M8             | Deferred; required F8/D5 mobile core and M5 mobile 3D remain committed       |
-| S1-S5          | Deferred while F4/F6/F9 remain productization-ready                          |
+| Original scope | Alternative disposition                                                                |
+| -------------- | -------------------------------------------------------------------------------------- |
+| F0-F2          | Completed mechanisms preserved; regression gates remain active                         |
+| F3             | Complete; exit proof preserved and regression gates remain active                      |
+| F4             | R0-R5 preserved; R6.1 onward resumes after F9                                          |
+| F5             | Core image processing before D1 Batch 4; remaining consumers after M2; cloud/CDN in F9 |
+| F6             | Moved after F8 so the module contract follows proven web/mobile consumers              |
+| F7             | Runs after B0 when Vite source exists; integrates admin without conversion             |
+| F8             | Moved after the web showroom/media sequence and before F6/D5                           |
+| F9             | Moved before resumed F4; supplies actual cloud/storage operating evidence              |
+| D1-D2          | Next active phases; close the backend ecommerce release before frontend work           |
+| D3             | Runs with F7 after B0 to prove the supplied Vite admin against stable APIs             |
+| D4             | Client-driven storefront work after concrete requirements are available                |
+| D5             | Retained after F8/F6; closes the full commerce portfolio release                       |
+| M1             | Deferred until real merchant/payment scope exists                                      |
+| M2             | Retained after backend/admin commerce proof; UI breadth follows real needs             |
+| M3             | Narrowed to M3S; storage remains a compatibility feature until cloud proof             |
+| M4             | Deferred in full                                                                       |
+| M5             | Retained as a bounded web-first showroom using only proven processing needs            |
+| M6             | General platform deferred; owning phases may add bounded local jobs/adapters           |
+| M7             | Retained after AI0, before cloud and resumed tenant implementation                     |
+| M8             | Deferred; required F8/D5 mobile core and M5 mobile 3D remain committed                 |
+| S1-S5          | Deferred while F4/F6/F9 remain productization-ready                                    |
 
 ## Dependency And Release Map
 
@@ -214,15 +240,17 @@ EA0 Repository Agent Lab (parallel, read-only first, non-gating)
 F0-F2 complete
 -> F3 gateway
 -> F4 R0-R5 dormant checkpoint (complete and audited)
--> D1 product/catalog backend
--> D2 cart/checkout/order backend
+-> D1 product/catalog Batches 0-3 (closed)
+-> F5 Core validation, image processing, and descriptive metadata (closed)
+-> D1 Batch 4 deterministic fixtures and exit proof (closed)
+-> D2 cart/checkout/order backend (current)
 -> Backend Ecommerce Release B0 (gateway-only, frontend-independent)
 -> wait for supplied Vite admin source
 -> F7 admin integration foundation
 -> D3 admin workflow proof
 -> Admin-Validated Ecommerce Demo / Release P0
 -> M2 content/composition
--> F5 bounded media lifecycle/CDN
+-> remaining F5 consumer integration and media governance
 -> M5 bounded web-first 3D showroom
 -> M3S media/storage compatibility
 -> F8 mobile foundation
@@ -256,33 +284,36 @@ Release definitions:
   Only this release may claim tenant/realm isolation. General M6 and commercial
   SaaS breadth remain separate future work.
 
-The phase specifications below are physically arranged in execution order.
+The early F5 Core checkpoint below is part of D1 completion; the full F5
+specification remains with later consumer integration to avoid duplicating it.
+Otherwise the phase specifications below are physically arranged in execution order.
 Completed checkpoints appear first, the active backend-first sequence follows, and
 parallel or deferred work is kept after the active sequence.
 
 ## Phase Entry Gates
 
-| Phase | May start implementation when                                            | Unlocks                                    |
-| ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| EA0   | Any timeboxed window that does not delay the active product phase        | Internal retrieval/agent learning only     |
-| F3    | F2 remains green                                                         | One controlled external boundary           |
-| F4    | F9 and all earlier active phases pass; resume from audited R5 checkpoint | Tenant/realm isolation and scoped domains  |
-| F5    | M2 supplies concrete media consumers; current media policy remains green | Governed bounded media lifecycle           |
-| F6    | F8 and M5 expose concrete capability/module needs                        | Evidence-backed independent module pattern |
-| F7    | B0 passes and the user supplies the Vite admin source                    | Integrated admin foundation                |
-| F8    | M3S and M5 define proven media/showroom needs                            | Default-site mobile core                   |
-| F9    | Web/mobile/media/AI runtime shapes are implemented and measurable        | Primary-cloud operating evidence           |
-| D1    | F3 and current single-site gateway contracts pass                        | Complete default-site catalog backend      |
-| D2    | D1 product invariants are stable                                         | Demo cart/order flow                       |
-| D3    | B0 passes, F7 passes, and the supplied Vite admin exists                 | P0 admin-validated ecommerce demo          |
-| D4    | B0 passes and concrete client storefront requirements are documented     | Client-specific public commerce flow       |
-| M2    | B0/P0 supplies stable backend and admin content operations               | Governed CMS/composition corpus            |
-| M5    | F5 baseline assets and the storefront/admin consumers pass               | Bounded web-first showroom                 |
-| M3S   | F5 and M5 reveal exact compatibility needs                               | Portable media/storage seams               |
-| D5    | F8, F6, and D1/D2 contracts pass                                         | P1 mobile commerce                         |
-| AI0   | P1 is stable and default-site authorization is explicit                  | Bounded product RAG and read-only agency   |
-| M7    | AI0 plus implemented product/content/showroom data is available          | Evaluated default-site intelligence        |
-| M6    | Deferred until multiple measured consumers justify a shared platform     | Future generalized infrastructure          |
+| Phase        | May start implementation when                                              | Unlocks                                    |
+| ------------ | -------------------------------------------------------------------------- | ------------------------------------------ |
+| EA0          | Any timeboxed window that does not delay the active product phase          | Internal retrieval/agent learning only     |
+| F3           | F2 remains green                                                           | One controlled external boundary           |
+| F4           | F9 and all earlier active phases pass; resume from audited R5 checkpoint   | Tenant/realm isolation and scoped domains  |
+| F5 Core      | D1 references pass; ordinary upload promotion and image tools are required | Usable Media processing before demo seeds  |
+| F5 remaining | M2 supplies further consumers; Media core and access policy pass           | Extended content/media governance          |
+| F6           | F8 and M5 expose concrete capability/module needs                          | Evidence-backed independent module pattern |
+| F7           | B0 passes and the user supplies the Vite admin source                      | Integrated admin foundation                |
+| F8           | M3S and M5 define proven media/showroom needs                              | Default-site mobile core                   |
+| F9           | Web/mobile/media/AI runtime shapes are implemented and measurable          | Primary-cloud operating evidence           |
+| D1           | F3 and current single-site gateway contracts pass                          | Complete default-site catalog backend      |
+| D2           | D1 product invariants are stable                                           | Demo cart/order flow                       |
+| D3           | B0 passes, F7 passes, and the supplied Vite admin exists                   | P0 admin-validated ecommerce demo          |
+| D4           | B0 passes and concrete client storefront requirements are documented       | Client-specific public commerce flow       |
+| M2           | B0/P0 supplies stable backend and admin content operations                 | Governed CMS/composition corpus            |
+| M5           | F5 baseline assets and the storefront/admin consumers pass                 | Bounded web-first showroom                 |
+| M3S          | F5 and M5 reveal exact compatibility needs                                 | Portable media/storage seams               |
+| D5           | F8, F6, and D1/D2 contracts pass                                           | P1 mobile commerce                         |
+| AI0          | P1 is stable and default-site authorization is explicit                    | Bounded product RAG and read-only agency   |
+| M7           | AI0 plus implemented product/content/showroom data is available            | Evaluated default-site intelligence        |
+| M6           | Deferred until multiple measured consumers justify a shared platform       | Future generalized infrastructure          |
 
 Architecture/discovery spikes may occur before an entry gate only when they are
 timeboxed, non-production, and needed to remove a decision blocker. A spike may
@@ -413,84 +444,188 @@ F4 work.
 
 ### Product Model And Lifecycle
 
-- [ ] Audit and finalize title, slug, excerpt, description, base SKU, price,
+- [x] Audit and finalize title, slug, excerpt, description, base SKU, price,
       currency, stock, availability, and `DRAFT | ACTIVE | ARCHIVED` lifecycle.
-- [ ] Preserve deterministic current global slug/SKU uniqueness and record the
+- [x] Preserve deterministic current global slug/SKU uniqueness and record the
       later F4 scoped-uniqueness migration requirement.
 - [x] Add bounded product variants with option values, per-variant SKU,
       price/stock overrides, active/deleted state, and deterministic ordering.
 - [x] Define explicit concurrency behavior for product and variant mutations.
       D1-V evidence: `docs/reports/2026-09-26-d1-variants-checkpoint.md`.
-- [ ] Preserve authoritative public reads that cannot expose draft, archived,
+- [x] Preserve authoritative public reads that cannot expose draft, archived,
       deleted, unavailable, or invalid records through query flags.
-- [ ] Keep advanced comments, sets, VR, showroom, recommendation, and premium
+- [x] Keep advanced comments, sets, VR, showroom, recommendation, and premium
       fields outside the basic ecommerce contract unless current evidence makes
       one necessary.
 
+Completion reconciled 2026-10-12 against closed Batches 0-3 in the
+[archived D1 execution checklist](docs/reports/2026-10-12-d1-completed-focus.md#preserved-d1-checklist).
+
 ### Taxonomy, Media, And Currency
 
-- [ ] Support the minimum category, tag, and brand relationships through
+- [x] Support the minimum category, tag, and brand relationships through
       authoritative Taxonomy contracts.
-- [ ] Replace product-facing raw URL authority with validated Media IDs and
+- [x] Replace product-facing raw URL authority with validated Media IDs and
       semantic thumbnail/gallery roles, including migration compatibility for
       existing rows.
-- [ ] Validate Media records through a versioned service contract; do not read
+- [x] Validate Media records through a versioned service contract; do not read
       the Media database or require a file-manager UI.
-- [ ] Define one settings-backed shop-currency invariant shared with D2 and
+- [x] Define one settings-backed shop-currency invariant shared with D2 and
       remove disagreement between code fallbacks and database defaults.
-- [ ] Define deterministic downstream failure behavior so Taxonomy, Media, or
+- [x] Define deterministic downstream failure behavior so Taxonomy, Media, or
       Settings failures cannot create partially valid product state.
+
+Closed 2026-10-03: [D1 Batch 2 exit proof](docs/reports/2026-09-30-d1-batch2-exit-check.md).
+External responses use Media IDs; legacy URL response fields and the three
+deferred 3D/VR URL inputs are removed or rejected. Stored legacy data remains
+for Batch 4 reconciliation.
 
 ### Contracts And Evidence
 
-- [ ] Complete HTTP/gRPC/gateway/OpenAPI/generated-client parity for the
+- [x] Complete HTTP/gRPC/gateway/OpenAPI/generated-client parity for the
       selected public and administrative Product operations.
-- [ ] Keep external DTOs separate from service inputs, proto types, and Prisma.
-- [ ] Add lifecycle, variant, taxonomy, media-reference, currency, concurrency,
+- [x] Keep external DTOs separate from service inputs, proto types, and Prisma.
+- [x] Add lifecycle, variant, taxonomy, media-reference, currency, concurrency,
       actor-policy, denial, dependency-failure, and rollback tests.
-- [ ] Add deterministic base/variant seed products exercising active, draft,
+- [x] Add deterministic base/variant seed products exercising active, draft,
       archived, Media, and Taxonomy relationships.
-- [ ] Prove clean migration, populated upgrade, rerun, malformed-data denial,
+      Showcase seed/reset/recreation/verify/rerun and limits seed/verify passed
+      on 2026-10-12; legacy entrypoint integration and final D1 exit also passed.
+      See the
+      [seeder audit](docs/reports/2026-10-12-d1-seeder-contract-audit.md).
+- [x] Prove clean migration, populated upgrade, rerun, malformed-data denial,
       transactional rollback, and gateway-only live behavior.
+      Populated Product/Order upgrade proof passed on 2026-10-12
+      (operator-reported). See the
+      [upgrade checkpoint](docs/reports/2026-10-12-d1-upgrade-exit-proof.md).
+- [x] Complete final scoped quality/generated-contract/live regressions and
+      consolidate D1 exit evidence before activating D2.
 
 ### D1 Exit Gate
 
-- [ ] Authorized API clients can manage complete default-site products and
+Closed 2026-10-12 after final Product/Gateway/client and D1/F3 live passes.
+Evidence: [D1 exit report](docs/reports/2026-10-12-d1-exit-report.md).
+
+- [x] Authorized API clients can manage complete default-site products and
       anonymous clients see only valid public catalogue records.
-- [ ] Required operations work through the gateway and generated client without
+- [x] Required operations work through the gateway and generated client without
       direct service, database, storage, or frontend coupling.
-- [ ] Product and variant commercial invariants are stable enough for D2.
-- [ ] No route accepts a caller-selected tenant/site override; general
+- [x] Product and variant commercial invariants are stable enough for D2.
+- [x] No route accepts a caller-selected tenant/site override; general
       cross-tenant isolation remains explicitly unclaimed until F4.
 
+## F5 Core - Early Media Processing Checkpoint
+
+Approved 2026-10-05: execute before completing D1 Batch 4. Detailed batches and
+current progress belong to `docs/current-focus.md` and the
+[Media core execution plan](docs/reports/2026-10-05-media-core-execution-plan.md).
+This checkpoint is a subset of F5, not a new general platform or full F5 exit.
+
+- [x] Ordinary uploads pass actual type/size/checksum validation and malware
+      scanning, recover safely after failure/restart, and become renderable
+      without manual database promotion.
+- [x] Immutable source images produce saved, versioned view presets through
+      bounded resize/crop and optional text/approved-image watermark recipes.
+- [x] Media title/default alt and contextual Product text have explicit update
+      and inheritance semantics, preserving existing gallery alt behavior.
+- [x] Gateway/client contracts, migration compatibility, derivative cleanup,
+      blocked-source denial, and Product binding/rendering pass.
+- [x] D1 showcase/limits seeders use this real lifecycle before D1 exit.
+
+Cloud/CDN, provider migration/topology, frontend editing UI, and general
+tenant/site activation remain deferred. Preserve local MinIO and required S3
+compatibility. Later F5 work extends this checkpoint rather than rebuilding it.
+
 ## D2 - Cart, Checkout, And Order
+
+Active 2026-10-12 after D1 sign-off. Begin with the existing implementation audit
+in [current-focus](docs/current-focus.md#d2-entry-audit); unchecked items remain
+planned behavior, not certified functionality.
+
+Batch 0 completed 2026-10-13. The four Batch 1 items now have a
+[main-file/consumer trace and execution plan](docs/reports/2026-10-13-d2-batch1-file-trace-and-plan.md);
+tracing, the four Cart feature proofs and shared regression sign-off are complete.
+
+Batch 1 source and generated contracts are implemented. The disposable populated
+SQL/rollback/constraint and actual Prisma-backed owner concurrency proofs pass
+with stubbed Product/Settings authority. Salar reports the three affected image
+builds passed. The first Cart live read exposed an unpinned host/Docker database
+target; corrected root commands pin Docker port 15432. Salar now reports actual
+Docker deployment/rerun/status, health and Cart live proof passed. Local checks
+confirm four applied migrations, the new fields, up-to-date native status and
+16 healthy containers. Salar reports full shared suites and affected D1/F3
+regressions all green; exact broad counts/skips were not supplied. Batch 1 is
+closed. [Batch 2 Checkout trace and plan](docs/reports/2026-10-13-d2-batch2-file-trace-and-plan.md)
+is prepared. [Batch 2 first-slice evidence](docs/reports/2026-10-13-d2-batch2-execution.md)
+records implemented current selection revalidation, immutable base/variant Order
+snapshots and explicit demo replies. Local focused/codec/SQL/Prisma concurrency
+checks pass. Salar reports native deployment/rerun/status, rebuilt health and full
+Order/Gateway plus Cart/F3 proofs passed; broad counts/skips were not supplied.
+The three first-slice gates close. Batch 2's durable replay, remote stock and
+recovery subsequently passed their final live gates on 2026-10-19; Batch 3 Orders
+is now active. [Closure and evidence](docs/reports/2026-10-14-d2-checkout-coordination.md#batch-2-closure-2026-10-19).
+A corrected Cart fault-injection proof passes; Order's build now
+uses its existing bounded service selector rather than compiling every app.
+See [execution evidence and handoff receipt](docs/reports/2026-10-13-d2-batch1-execution.md).
 
 Purpose: complete and prove the backend commerce transaction without pretending
 to collect or reconcile production payment.
 
 ### Cart And Checkout
 
-- [ ] Finalize the default-site cart and items with verified user ownership.
-- [ ] Support base and variant selections and snapshot selected options.
-- [ ] Validate lifecycle, availability, configured currency, price, and basic
+- [x] Finalize the default-site cart and items with verified user ownership.
+- [x] Support base and variant selections and snapshot selected options in Cart.
+- [x] Validate lifecycle, availability, configured currency, price, and basic
       stock at every authoritative boundary.
-- [ ] Define quantity/update/remove behavior and deterministic totals.
-- [ ] Implement idempotent checkout with bounded replay and conflict behavior.
-- [ ] Define stock decrement/reservation behavior suitable for the demo and
+      Cart add/update and current checkout revalidation pass. Product-owned stock
+      intent, single consumption and recovery gates closed with Batch 2.
+- [x] Define quantity/update/remove behavior and deterministic Cart totals.
+- [x] Implement idempotent checkout with bounded replay and conflict behavior.
+      [Replay receipt slice](docs/reports/2026-10-13-d2-checkout-replay.md) passed
+      native deployment/new-image integration (operator-reported broad results).
+      Stock-effect replay/recovery passed the final operator-reported live run.
+- [x] Define stock decrement/reservation behavior suitable for the demo and
       prove failure rollback; broader inventory remains M1.
-- [ ] Snapshot product/variant identity, SKU, title, options, unit price,
+      Owner SQL rollback/concurrency and live cache-loss/Product-outage/Order-
+      restart evidence are recorded in the Batch 2 closure.
+- [x] Snapshot product/variant identity, SKU, title, options, unit price,
       currency, and quantity so catalogue edits cannot rewrite orders.
-- [ ] Clearly label checkout as demo/no-production-payment and never collect
+- [x] Clearly label checkout as demo/no-production-payment and never collect
       real payment credentials or fabricate a settled provider transaction.
 
 ### Orders
 
-- [ ] Preserve user order list/detail restricted to the verified owner.
+Batch 3 approach and exact affected consumers:
+[2026-10-19 trace and plan](docs/reports/2026-10-19-d2-batch3-file-trace-and-plan.md).
+Order: protected reads -> transition/version/replay/audit -> approved stock and
+demo attempt effects -> grouped integration. Unpaid demo Order cancellation
+restores deducted stock exactly once (user approved); payment-attempt failure
+returns Order to PENDING after releasing its reservation. Real providers and
+paid refunds remain outside this approval. The separate admin read slice is now
+implemented and locally checked. Manual demo status controls now also have
+version/replay/audit and owned PostgreSQL proof. Compatibility/native/new-image
+proof and stock/payment effects remain pending.
+Checkout/coordination compatibility has since passed (operator-reported).
+Product's finalized-stock restoration primitive and original-stock regression
+have SQL proof. Order cancellation/recovery source is prepared; Salar reports
+cancellation/status SQL proofs passed. Native deployment remains pending.
+Backed demo payment owner/recovery passed its complete two-owner SQL proof
+(Salar-supplied output, two disposable databases cleaned). Customer/admin signed
+HTTP/RPC/Gateway/SDK operations are prepared; grouped native deployment/live proof
+remains pending. Real payment providers remain deferred.
+[Payment transport preparation](docs/reports/2026-10-24-d2-demo-payment-transports.md).
+[Read evidence](docs/reports/2026-10-19-d2-batch3-reads.md),
+[status-control evidence](docs/reports/2026-10-19-d2-batch3-status-controls.md),
+[restoration evidence](docs/reports/2026-10-19-d2-stock-restoration.md),
+[cancellation evidence](docs/reports/2026-10-24-d2-order-cancellation.md).
+[Demo payment owner trace and proof status](docs/reports/2026-10-24-d2-demo-payment-plan.md).
+
+- [x] Preserve user order list/detail restricted to the verified owner.
 - [ ] Complete admin order list/detail and authorized status changes through the
       gateway.
 - [ ] Define permitted status transitions, concurrency behavior, idempotency,
       and audit facts.
-- [ ] Replace Prisma-shaped external results with explicit service and gateway
+- [x] Replace Prisma-shaped external results with explicit service and gateway
       response mapping.
 - [ ] Prevent client-supplied user, price, currency, totals, status, application,
       or site authority.
@@ -651,7 +786,8 @@ or hosting topology into the backend roadmap.
 
 # RELEASE P1 - COMMERCE PORTFOLIO
 
-Execution order: `M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5`.
+Execution order: `M2 -> remaining F5 -> M5 -> M3S -> F8 -> F6 -> D5`.
+F5 Core is brought forward before D1 Batch 4; cloud/CDN deployment stays in F9.
 
 ## M2 - Blog, CMS, And Composition
 
@@ -730,11 +866,15 @@ AI without turning the editor into arbitrary executable code.
 - [ ] AI retrieval respects revision lifecycle and current role/application
       permissions.
 
-## F5 - Media Processing And CDN Foundation
+## F5 - Media Processing And Content Integration
 
 Purpose: turn the existing upload/finalize policy into a bounded, auditable
 media lifecycle for the implemented content and showroom consumers while
 preserving the current storage provider through the compatibility contract.
+The early F5 Core slice supplies validation, scanning, image tools, and text
+metadata before D1 demo seed completion. Remaining consumer integration follows
+M2. Cloud/CDN implementation is deferred to F9; no full F5 completion is implied
+by the early checkpoint.
 
 ### Upload And Immutable Facts
 
@@ -776,22 +916,29 @@ preserving the current storage provider through the compatibility contract.
 - [ ] Prevent public delivery of raw originals unless an explicit policy permits
       that exact media/access class/operation.
 - [ ] Support regeneration and rollback without mutating the original.
+- [x] Support bounded resize/crop and optional text/approved-image watermark
+      recipes; persist named view sizes and serve approved saved derivatives.
+- [x] Add Media title/default alt and explicit per-use description overrides,
+      preserving existing Product gallery alt and omission/empty semantics.
 
-### Content And CDN Integration
+### Content And Application Delivery
 
 - [ ] Replace product thumbnail/gallery and blog cover URLs with media IDs.
 - [ ] Define page/settings media references and semantic roles, ordering, alt
       text, captions, locale, and channel overrides in the owning content domain.
 - [ ] Validate content/media ownership inside the current default-site boundary.
-- [ ] Freeze compatibility-safe media/CDN routes, cache-control, ETag,
-      replacement, invalidation, deletion, and revocation behavior.
+- [ ] Freeze compatibility-safe application render routes, conservative
+      cache-control, ETag, replacement, deletion, and revocation behavior.
+      Cloud CDN routes, immutable edge caches, and vendor invalidation wait
+      for F9 deployment evidence.
 - [ ] Add a narrow default-site public-media rename endpoint. Rename changes
       only `displayName` and its descriptive storage key, preserves the Media
       ID, original bytes, checksum, and existing content references, rejects
       destination collisions, and records recoverable/audited move state. Do
       not overload rename with image editing or mutate an immutable original.
-- [ ] Keep media-service as CDN origin policy authority and ensure storage/CDN
-      configuration cannot bypass status, scan, site, channel, or access class.
+- [ ] Keep media-service as delivery policy authority; current storage and
+      render configuration cannot bypass status, scan, or access class. F9
+      preserves this boundary when introducing CDN delivery.
 - [ ] Implement final CORS/preflight behavior for verified storefront/admin
       origins and preserve the rule that CORS is not mobile/server authorization.
 
@@ -824,7 +971,7 @@ preserving the current storage provider through the compatibility contract.
       provenance while originals remain immutable.
 - [ ] Products/blogs/pages use validated Media IDs rather than provider URLs;
       resumed F4 later proves same-site enforcement.
-- [ ] Public/protected/strict delivery and denial tests pass after worker/CDN
+- [ ] Public/protected/strict delivery and denial tests pass after worker/render
       changes.
 - [ ] Orphans, drift, failed processing, and oversized deletion are detectable
       and recoverable.
@@ -1481,6 +1628,10 @@ finish tenant isolation.
 
 ### Networking And Delivery
 
+- [ ] Implement deferred Media CDN integration only against the chosen cloud:
+      origin authorization, approved derived URLs, cache identity, replacement,
+      invalidation, deletion/revocation, and public/protected/strict denial
+      proof. Reuse F5 processing and keep raw originals inaccessible by policy.
 - [ ] Expose only the gateway and approved storage/CDN origins.
 - [ ] Keep internal gRPC, databases, Redis, admin storage console, metrics, and
       management endpoints private.
@@ -1579,6 +1730,12 @@ that documentation completion.
       or entitlement.
 
 ### Authentication, Sessions, Membership, Roles, And Context
+
+- [ ] On F4 restart, audit and add dormant v3 receiver coverage for the four
+      post-R5 D1/F5 RPCs: Media GetDerivatives, RegenerateDerivatives,
+      UpdateMetadata and Product UpdateImageMetadata. Their current guarded v2
+      paths remain active; the original 59 R5 receivers remain preserved.
+      See the [D1 exit audit](docs/reports/2026-10-12-d1-exit-report.md).
 
 - [ ] Migrate the current platform-global User/Auth population into a stable
       default realm. Identity/profile is realm-scoped; tenant membership and
@@ -1989,17 +2146,18 @@ not a claim that commercial SaaS productization exists.
 1. Preserve F0-F3 and the audited F4 R0-R5 checkpoint. Do not continue R6.1,
    activate dormant Realm Auth/context v3/Tenant Authority consumers, or alter
    the completed F4 evidence during the backend-first phases.
-2. Execute D1 from `docs/current-focus.md`: audit and close the Product,
-   variant, Taxonomy, Media-reference, currency, gateway, migration, seed, and
-   live-proof gaps without changing frontend source.
-3. Complete D2 and close B0 through a deterministic gateway-only Product,
+2. Preserve completed D1 Batches 0-4 and F5 Core Media; final suites/live gates
+   and the D1 exit report passed on 2026-10-12. Do not repeat these proofs or
+   rebuild/reset without a new relevant change or failure.
+3. Start D2 with the evidence-first audit in `docs/current-focus.md`, then
+   complete D2 and close B0 through a deterministic gateway-only Product,
    cart, idempotent demo-checkout, Order, denial, replay, and rollback proof.
 4. When Salar supplies the Vite admin, execute `F7 -> D3` and close P0. Keep
    client origins, proxy paths, domains, and deployment endpoints configurable.
    D4 is a separate non-gating track that begins only after concrete storefront
    requirements are documented.
 5. Continue later work in the adopted order:
-   `M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`.
+   `M2 -> remaining F5 -> M5 -> M3S -> F8 -> F6 -> D5 -> AI0 -> M7 -> F9 -> F4`.
    General M6 remains deferred; each owning phase may implement only its bounded
    proven jobs, indexes, or cache behavior.
 6. Treat M3S storage as compatibility work. Retain media-service policy and

@@ -1,4 +1,8 @@
-import { type INestApplication } from "@nestjs/common";
+import {
+  ConflictException,
+  ServiceUnavailableException,
+  type INestApplication,
+} from "@nestjs/common";
 import { APP_GUARD, APP_INTERCEPTOR, Reflector } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import type { StructuredLogger } from "@packages/config";
@@ -58,6 +62,7 @@ describe("gateway Product HTTP routes", () => {
       mutateById: jest.fn().mockResolvedValue(product()),
       applyDiscount: jest.fn().mockResolvedValue({ updated: 2 }),
       listGallery: jest.fn().mockResolvedValue([]),
+      updateImageMetadata: jest.fn().mockResolvedValue([]),
       addImages: jest.fn().mockResolvedValue([]),
       reorderImages: jest.fn().mockResolvedValue([]),
       removeImage: jest.fn().mockResolvedValue([]),
@@ -161,6 +166,31 @@ describe("gateway Product HTTP routes", () => {
     expect(products.listAdmin).toHaveBeenCalledTimes(1);
   });
 
+  it("returns stable envelopes for Product outage and version conflict", async () => {
+    products.listPublic.mockRejectedValueOnce(
+      new ServiceUnavailableException(),
+    );
+    const unavailable = await request(app.getHttpServer())
+      .get("/api/v1/products")
+      .set({ "X-Nebula-Client-ID": "mobile-local" })
+      .expect(503);
+    expect(unavailable.body.error.code).toBe("UPSTREAM_UNAVAILABLE");
+    expect(unavailable.body.requestId).toBe(
+      unavailable.headers["x-request-id"],
+    );
+
+    products.update.mockRejectedValueOnce(new ConflictException());
+    const conflict = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/products/${PRODUCT_ID}`)
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-conflict`)
+      .send({ title: "Revised desk", expectedVersion: 1 })
+      .expect(409);
+    expect(conflict.body.error.code).toBe("CONFLICT");
+    expect(conflict.body.requestId).toBe(conflict.headers["x-request-id"]);
+  });
+
   it("requires price, accepts external content, and rejects an empty patch", async () => {
     await request(app.getHttpServer())
       .post("/api/v1/admin/products")
@@ -197,6 +227,51 @@ describe("gateway Product HTTP routes", () => {
     expect(products.update).not.toHaveBeenCalled();
   });
 
+  it("rejects caller-selected Product identity and site fields before service calls", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/admin/products")
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-caller-site`)
+      .send({
+        title: "Desk",
+        price: 100,
+        actorUserId: "caller-selected-user",
+        siteId: "caller-selected-site",
+      })
+      .expect(400);
+    expect(products.create).not.toHaveBeenCalled();
+  });
+
+  it.each(["model3dUrl", "model3dPosterUrl", "vrPlanImageUrl"])(
+    "rejects disabled %s before forwarding create or patch",
+    async (field) => {
+      const headers = {
+        ...TEST_ADMIN_IDENTITY_HEADERS,
+        Authorization: "Bearer admin-token",
+        "Idempotency-Key": `${IDEMPOTENCY_KEY}-${field}`,
+      };
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/admin/products")
+        .set(headers)
+        .send({
+          title: "Desk",
+          price: 100,
+          [field]: "https://provider.test/asset",
+        })
+        .expect(400);
+      expect(created.body.error.code).toBe("VALIDATION_FAILED");
+      const patched = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/products/${PRODUCT_ID}`)
+        .set(headers)
+        .send({ expectedVersion: 1, [field]: "https://provider.test/asset" })
+        .expect(400);
+      expect(patched.body.error.code).toBe("VALIDATION_FAILED");
+      expect(products.create).not.toHaveBeenCalled();
+      expect(products.update).not.toHaveBeenCalled();
+    },
+  );
+
   it("enforces gallery bounds and fixed action identifiers", async () => {
     await request(app.getHttpServer())
       .post(`/api/v1/admin/products/${PRODUCT_ID}/gallery`)
@@ -225,6 +300,69 @@ describe("gateway Product HTTP routes", () => {
       IMAGE_ID,
       true,
     );
+  });
+
+  it("rejects caller authority in variant create, patch, and delete", async () => {
+    const headers = {
+      ...TEST_ADMIN_IDENTITY_HEADERS,
+      Authorization: "Bearer admin-token",
+      "Idempotency-Key": `${IDEMPOTENCY_KEY}-variant-authority`,
+    };
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/products/${PRODUCT_ID}/variants`)
+      .set(headers)
+      .send({
+        sku: "DESK-BLUE",
+        options: { Color: "Blue" },
+        expectedVersion: 1,
+        actorUserId: "caller",
+        tenantId: "caller",
+        siteId: "caller",
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/products/${PRODUCT_ID}/variants/${IMAGE_ID}`)
+      .set(headers)
+      .send({ stockQuantity: 0, expectedVersion: 1, siteId: "caller" })
+      .expect(400);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/admin/products/${PRODUCT_ID}/variants/${IMAGE_ID}`)
+      .set(headers)
+      .query({ expectedVersion: 1, actorUserId: "caller" })
+      .expect(400);
+    expect(products.createVariant).not.toHaveBeenCalled();
+    expect(products.updateVariant).not.toHaveBeenCalled();
+    expect(products.deleteVariant).not.toHaveBeenCalled();
+  });
+
+  it("rejects storage and authority fields inside gallery items before forwarding", async () => {
+    const headers = {
+      ...TEST_ADMIN_IDENTITY_HEADERS,
+      Authorization: "Bearer admin-token",
+      "Idempotency-Key": `${IDEMPOTENCY_KEY}-gallery-forgery`,
+    };
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/products/${PRODUCT_ID}/gallery`)
+      .set(headers)
+      .send({
+        images: [
+          {
+            mediaId: IMAGE_ID,
+            storageKey: "provider/key",
+            bucket: "private",
+            readUrl: "https://provider.test/asset",
+            actorUserId: "caller",
+          },
+        ],
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .put(`/api/v1/admin/products/${PRODUCT_ID}/gallery/order`)
+      .set(headers)
+      .send({ orders: [{ id: IMAGE_ID, sort: 0, siteId: "caller" }] })
+      .expect(400);
+    expect(products.addImages).not.toHaveBeenCalled();
+    expect(products.reorderImages).not.toHaveBeenCalled();
   });
 
   it("requires versioned admin variant writes and validates their path", async () => {
@@ -271,5 +409,30 @@ describe("gateway Product HTTP routes", () => {
       IMAGE_ID,
       2,
     );
+  });
+
+  it("preserves null/empty gallery metadata and validates the entry UUID", async () => {
+    await request(app.getHttpServer())
+      .patch(
+        `/api/v1/admin/products/${PRODUCT_ID}/gallery/${IMAGE_ID}/metadata`,
+      )
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", IDEMPOTENCY_KEY)
+      .send({ expectedVersion: 1, title: null, alt: "" })
+      .expect(200);
+    expect(products.updateImageMetadata).toHaveBeenCalledWith(
+      expect.any(Object),
+      PRODUCT_ID,
+      IMAGE_ID,
+      expect.objectContaining({ expectedVersion: 1, title: null, alt: "" }),
+    );
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/products/${PRODUCT_ID}/gallery/not-a-uuid/metadata`)
+      .set(TEST_ADMIN_IDENTITY_HEADERS)
+      .set("Authorization", "Bearer admin-token")
+      .set("Idempotency-Key", `${IDEMPOTENCY_KEY}-invalid`)
+      .send({ expectedVersion: 1, alt: null })
+      .expect(400);
   });
 });

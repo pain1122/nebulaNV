@@ -30,6 +30,7 @@ function harness(overrides: Record<string, unknown> = {}) {
   const create = jest.fn().mockResolvedValue({});
   const updateMany = jest.fn().mockResolvedValue({ count: 1 });
   const tx = {
+    checkoutStockLine: { count: jest.fn().mockResolvedValue(0) },
     product: {
       findUnique: jest.fn().mockResolvedValue(product),
       updateMany,
@@ -52,7 +53,7 @@ function harness(overrides: Record<string, unknown> = {}) {
     getService: jest.fn().mockReturnValue({}),
   } as unknown as ClientGrpc;
   return {
-    service: new ProductServiceImpl(prisma, client, client),
+    service: new ProductServiceImpl(prisma, client, client, client),
     tx,
     create,
     updateMany,
@@ -60,6 +61,20 @@ function harness(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Product variants", () => {
+  it("denies absolute stock replacement while checkout holds the variant", async () => {
+    const { service, tx } = harness();
+    tx.productVariant.findFirst.mockResolvedValue({
+      id: "variant-1",
+      productId: "product-1",
+      sku: "SHIRT-BLUE-M",
+      optionKey: '[["color","blue"]]',
+    });
+    tx.checkoutStockLine.count.mockResolvedValue(1);
+    await expect(
+      service.updateVariant("product-1", "variant-1", { stockQuantity: 20 }, 1),
+    ).rejects.toEqual(new ConflictException("checkout_stock_held"));
+    expect(tx.productVariant.update).not.toHaveBeenCalled();
+  });
   it.each([1.234, 10_000_000_000_000_000])(
     "rejects a variant price override that cannot fit Decimal(18,2): %s",
     async (priceOverride) => {

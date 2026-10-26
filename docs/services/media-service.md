@@ -1,6 +1,6 @@
 # Media Service
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-10-10
 
 ## Purpose
 
@@ -54,6 +54,113 @@ Current behavior:
 - `finalizeUpload()` rejects public metadata when `path`, `folderPath`, and `displayName` describe different objects.
 - `presignUpload()` auto-renames duplicate public file names with numeric suffixes, such as `hero-(1).webp`.
 - `finalizeUpload()` rejects an exact already-taken public-library `(scope, folderPath, displayName)` so duplicate DB rows are not created for the same public object.
+
+## Media Processing Foundation (2026-10-05)
+
+Status: implemented, migrated and rebuilt. Salar reports the disposable
+database proof, complete actual scanner/processing live proof, D1 ready-media
+references and all six F3 regressions passed. Containers were healthy at the
+last inspection. Populated upgrade passed on 2026-10-06, including unchanged
+legacy facts, selective backfill, failure rollback and rerun. Live recovery now
+passes scanner outage, controlled expired-lease recovery after worker restart,
+missing-source denial and cleanup. The 2026-10-07 integration run passed gRPC
+and 101 tests, but HTTP stopped at its first setup login on a closed socket.
+After the documented test correction, the full rerun passed eleven suites and
+124 tests. Six PostgreSQL job tests are intentionally isolated under
+`pnpm db:verify:media`, not counted as passed in test:e2e. Batch A integration
+sign-off is complete; saved image recipes remain next. See the
+[processing checkpoint](../reports/2026-10-05-media-processing-foundation.md).
+
+- Finalize verifies stored size/type declarations/ETag and atomically creates
+  a PENDING/QUEUED Media row plus its durable Media-owned job. The worker checks
+  actual bytes, matching MIME/extension, checksum, safe dimensions, and full
+  pixel decoding. Maximum upload size is 20 MiB and decoded size is 16 million
+  pixels. New checksums live in `MediaVerifiedSource`, not the legacy globally
+  unique client-claimed `Media.sha256` column.
+- Presign binds upload metadata to the verified actor, owner, lane, context,
+  MIME and filename using the existing Media signing key. Finalize and the
+  worker verify that binding. The opaque proof uses the signed upload query;
+  clients need no extra header. Upload URLs issued before this deployment
+  must be replaced. Old pending jobs without a binding become BLOCKED/FAILED
+  (`upload_authorization_unverified`); old approved rows retain compatibility
+  reads. Signing-key rotation invalidates outstanding authorizations.
+- ClamAV scans before image decoding. Missing/unavailable/timed-out/error or
+  limit-exceeded scans never become CLEAN. The worker pauses claiming while
+  the scanner is unavailable, then resumes; failures after a claim have bounded
+  retries, backoff, leases, and terminal BLOCKED/FAILED or BLOCKED/INFECTED state.
+- New approvals read an isolated verified copy outside upload keys. Reusing an
+  upload URL cannot replace that copy. Publication requires the current lease
+  and a PENDING record; a deleted/blocked/reclaimed upload cannot be resurrected.
+- PNG/JPEG/WebP and single-frame GIF validation is implemented. Animated
+  images remain unapproved with `image_animation_not_supported`; animation,
+  SVG, video, PDF, and 3D processing are outside this checkpoint.
+- Legacy local metadata creation is PENDING/NONE with
+  `local_media_not_verified`. It does not establish scan evidence. Existing
+  pre-pipeline READY/CLEAN records retain their compatibility read behavior;
+  migration does not relabel them as newly scanned. Existing unapproved S3
+  NONE/QUEUED/SCANNING uploads receive jobs. New processed records must have a
+  verified source to render or resolve a Product reference.
+- Deletion revokes reads/completion before object cleanup, handles uploaded and
+  verified objects, and retains DELETED records on cleanup failure. Copy cleanup
+  intents survive a crash or Media deletion and are retried by the worker.
+- Readiness checks processing tables separately from scanner availability, so
+  an unavailable scanner does not itself disable approved-media delivery. The
+  scanner has independent container health, no published host port, a persisted
+  signature volume, and a 4 GiB memory limit. Media startup starts it; shutdown
+  allows an in-flight bounded job to drain.
+- This checkpoint has no resizing/cropping/saved-size/watermark derivatives,
+  title/alt changes, or new external API operations yet. `variant=web` remains
+  the approved render object; those image tools are the next Media batch.
+
+## Saved Image Sizes (2026-10-07)
+
+Implemented locally; additive migration, updated containers and live sign-off
+are pending. The [saved-size checkpoint](../reports/2026-10-07-media-image-recipes.md)
+contains the operator commands and exact verification evidence.
+
+Media owns generation recipes, immutable output facts and separate desired
+and approved generation pointers. Jobs have bounded attempts, backoff and a
+20-minute recovery lease covering the maximum four-output processing budget.
+Only the current leased desired generation can publish. Every output is
+written under a unique private key; cleanup is registered before PUT.
+Publication changes the approved set in one transaction, retires its previous
+generation and schedules old objects for deletion after 60 seconds.
+Queued/failed replacements preserve previous approved outputs. Identical
+requests deduplicate; retrying a terminal failure requires `retryFailed=true`.
+Source/watermark eligibility and checksums are rechecked at publication and
+on public origin requests. Existing cache policy remains unchanged.
+
+Defaults are thumbnail 240x240 cover, card 640x480 cover, detail 1600x1600
+inside and mobile 800x1000 inside. `MEDIA_IMAGE_PRESETS` configures one to four
+distinct named recipes; `MEDIA_DERIVATIVES_ENABLED=false` pauses new jobs.
+Cover crops to the frame, inside preserves the image aspect ratio, and neither
+enlarges or stretches. Recipes support oriented rectangle/focal crops and
+optional text or approved-Media-ID watermarks. PNG remains lossless; JPEG/WebP
+quality is bounded. Recipes cannot contain remote URLs or font paths.
+The Media image bundles checksum-pinned Vazirmatn with its SIL OFL license.
+
+External administration uses:
+
+- `GET /api/v1/admin/media/:id/derivatives`: desired job status and approved
+  sizes, actual geometry/type/size, recipe/output checksums and Gateway paths.
+- `POST /api/v1/admin/media/:id/derivatives`: admin Bearer and idempotency key;
+  optional `recipes` and `retryFailed`, returning 202. An empty JSON object
+  selects configured defaults. Invalid recipes are rejected by Media; execution
+  failures are visible through job status without replacing the approved set.
+- `GET /api/v1/media/render/:id?variant=thumbnail|card|detail|mobile`:
+  saved approved PUBLIC/public/panel images only. Protected/strict images,
+  revoked sources/watermarks, unavailable sizes and arbitrary transforms are
+  denied. Private saved-size delivery remains a later consumer integration.
+
+`web` retains the existing approved-source compatibility path. Legacy READY
+records without a verified immutable source do not acquire fabricated sizes.
+Deletion cancels pending generations and preserves durable cleanup intents
+after Media/output records are removed. Product requires no contract change.
+Title/default-alt metadata remains Batch C.
+
+`pnpm db:verify:media` runs six upload-job and five derivative-generation tests
+in its disposable PostgreSQL database, plus database constraint fixtures.
+These eleven tests are intentionally skipped in ordinary `test:e2e`.
 
 ## Lane-Aware Admin Filemanager Vision
 
@@ -156,14 +263,14 @@ Frozen launch contract:
 - Public render only serves S3-backed `PUBLIC` media under the configured public library root.
 - Public render requires `status=READY` and `scanStatus=CLEAN`.
 - Public render returns inline response headers, conservative public cache headers, `X-Content-Type-Options: nosniff`, and never returns storage credentials.
-- Public render accepts only `variant=web` for launch. `variant=web` is the public optimized-variant contract; `original`, `raw`, `download`, and other variant names are rejected.
+- Public render accepts `web` plus the implemented saved thumbnail/card/detail/mobile presets after the Batch B deployment. `web` retains approved-source compatibility; `original`, `raw`, `download` and arbitrary transforms are rejected.
 - Protected and strict media are not renderable through the public website endpoint.
 - Public, protected, and strict signed read URLs use `inline` by default with `private, no-store`.
 - Signed read URLs use `attachment` only when the caller explicitly requests a download.
 - Protected previews use short-lived read URLs with owner/admin policy checks and `MEDIA_SIGNED_READ_TTL_SECONDS`.
 - Strict previews use short-lived read URLs with owner/admin policy checks and `MEDIA_STRICT_READ_TTL_SECONDS`.
 - Long immutable CDN caching is deferred until generated variant URLs are versioned, content-addressed, or otherwise safe to cache independently from approval/deletion/scan state changes.
-- Actual generated derivatives are deferred to the media worker phase. Until that exists, `variant=web` means the approved public render object, not a promise that thumbnails or immutable originals already exist.
+- Actual generated derivatives are the next Media core batch. Until they exist, `variant=web` means the approved public render object. The processing foundation adds isolated verified source copies, not generated thumbnails or view sizes.
 
 ## CORS And Origin Policy
 
@@ -491,7 +598,7 @@ HTTP:
 - Public-library presign -> PUT -> finalize -> get -> list -> folder-filter -> pending read-url blocked -> delete works for admin.
 - Public render streams ready/clean public S3 media without admin credentials.
 - Public render blocks pending and non-public media.
-- Public render rejects original/raw variants; launch only accepts `variant=web`.
+- Public render rejects original/raw variants; saved thumbnail/card/detail/mobile presets join `web` after the Batch B deployment and require an eligible approved generation.
 - Public-library read-url/delete wrappers reject non-public media.
 - Public-library delete preview/confirm handles bulk selected file deletes and recursive folder-path deletes.
 - `GET /media/browse` returns Supabase-style folders/files and supports search.
@@ -580,7 +687,8 @@ Tests:
 - Focused protected/strict HTTP and gRPC e2e validation passes against Docker after applying the media context migration.
 - Supabase integration needs provider config and operational tests.
 - Move/copy/rename/edit filemanager actions are future work.
-- Malware/scan lifecycle exists in DB shape but worker pipeline is future work.
+- The scan/promotion worker foundation is locally implemented; rebuilt-image,
+  real ClamAV and restart proof remain pending. Generated image tools follow it.
 
 ## Latest Verification
 
@@ -591,3 +699,22 @@ Tests:
 - The HTTP e2e suite now includes a strict-media public-render denial assertion; its updated live run is queued for the later Docker-backed verification step.
 - `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand` last passed its prior 9-test form on 2026-07-01. The suite now contains 11 scenarios; the two additive F3 scenarios are compiled but await the later service-stack run.
 - `pnpm --filter @nebula/media-service lint` is intentionally left for the later `lint:fix` cleanup pass and currently fails on Prettier formatting in modified media files.
+
+## Descriptive metadata (Batch C deployment checkpoint)
+
+Salar reports demo migrations, updated containers, health and metadata live proof
+passed. Media/Product integration and D1/F3 regressions also passed; Batch C is
+closed. See the checkpoint for supplied counts and separately gated DB tests.
+Media owns nullable title (200 characters), defaultAlt (180) and a metadata-only
+revision. Admin PATCH `/api/v1/admin/media/:id/metadata` requires expectedVersion,
+at least one text field and the existing idempotency/actor boundary. Omission
+preserves text, null clears it, empty string is intentional. Unicode plain text
+is supported; control characters are rejected. Stale writes return 409; deleted
+records cannot be edited. Text edits do not rename files or regenerate images.
+
+Product owns thumbnail/gallery overrides. Missing overrides inherit current
+eligible Media defaults; explicit empty alt stays decorative. Gallery alt is
+preserved in migration. Defaults reach Product through the signed reference
+resolver, never a cross-service DB read. Saved sizes share the Media defaults.
+See [Batch C checkpoint](../reports/2026-10-10-media-descriptive-metadata.md) for
+the field/transport rules, local evidence and operator commands.

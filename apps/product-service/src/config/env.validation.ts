@@ -15,6 +15,7 @@ export const envSchema = Joi.object({
     "AUTH_GRPC_URL",
     "SETTINGS_GRPC_URL",
     "TAXONOMY_GRPC_URL",
+    "MEDIA_GRPC_URL",
   ),
   ...httpPolicyEnvSchema,
   ...s2sEnvSchema("product-service"),

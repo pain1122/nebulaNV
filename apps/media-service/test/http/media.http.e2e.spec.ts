@@ -1,13 +1,10 @@
 // apps/media-service/test/http/media.http.e2e.spec.ts
 import { httpJson } from "../utils/http";
-import { MediaStatus, PrismaClient, ScanStatus } from "../../prisma/generated";
+import { tinyWebp } from "../utils/image";
 
 const MEDIA_HTTP = process.env.MEDIA_HTTP_URL ?? "http://127.0.0.1:3007";
 const AUTH_HTTP = process.env.AUTH_HTTP_URL ?? "http://127.0.0.1:3001";
-const mediaDatabaseUrl =
-  process.env.E2E_MEDIA_DATABASE_URL ??
-  "postgresql://postgres:postgres@127.0.0.1:15432/nebula_media?schema=public";
-const prisma = new PrismaClient({ datasourceUrl: mediaDatabaseUrl });
+jest.setTimeout(90_000);
 
 type LoginResp = { accessToken: string; refreshToken: string };
 
@@ -33,19 +30,23 @@ describe("media-service HTTP (admin-only)", () => {
     adminId = subFromJwt(adminAccess);
   });
 
-  afterAll(async () => {
-    await prisma.$disconnect();
-  });
-
-  async function markReadyClean(id: string) {
-    await prisma.media.update({
-      where: { id },
-      data: {
-        status: MediaStatus.READY,
-        scanStatus: ScanStatus.CLEAN,
-        promotedAt: new Date(),
-      },
-    });
+  async function waitReadyClean(id: string) {
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      const { data } = await httpJson<any>(
+        "GET",
+        `${MEDIA_HTTP}/media/${id}`,
+        undefined,
+        { authorization: `Bearer ${adminAccess}` },
+      );
+      if (data.status === "READY" && data.scanStatus === "CLEAN") return;
+      if (data.status === "BLOCKED")
+        throw new Error(
+          `media_processing_failed_${data.scanError ?? data.quarantineReason}`,
+        );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error("media_processing_readiness_timeout");
   }
 
   async function uploadPublicMedia(folderPath: string, displayName: string) {
@@ -66,7 +67,7 @@ describe("media-service HTTP (admin-only)", () => {
     const up = await fetch(presign.data.uploadUrl, {
       method: "PUT",
       headers: { "content-type": "image/webp" },
-      body: Buffer.from("hello"),
+      body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
 
@@ -117,7 +118,7 @@ describe("media-service HTTP (admin-only)", () => {
     const up = await fetch(presign.data.uploadUrl, {
       method: "PUT",
       headers: { "content-type": "image/webp" },
-      body: Buffer.from("hello"),
+      body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
 
@@ -222,7 +223,7 @@ describe("media-service HTTP (admin-only)", () => {
     try {
       const media = await uploadPublicMedia(folderPath, "render.webp");
       id = media.id;
-      await markReadyClean(id);
+      await waitReadyClean(id);
 
       const res = await fetch(`${MEDIA_HTTP}/media/render/${id}?variant=web`);
 
@@ -233,7 +234,7 @@ describe("media-service HTTP (admin-only)", () => {
       expect(res.headers.get("cross-origin-resource-policy")).toBe(
         "cross-origin",
       );
-      expect(await res.text()).toBe("hello");
+      expect(Buffer.from(await res.arrayBuffer())).toEqual(await tinyWebp());
     } finally {
       if (id) {
         await httpJson<any>("DELETE", `${MEDIA_HTTP}/media/${id}`, undefined, {
@@ -250,7 +251,7 @@ describe("media-service HTTP (admin-only)", () => {
     try {
       const media = await uploadPublicMedia(folderPath, "variant.webp");
       id = media.id;
-      await markReadyClean(id);
+      await waitReadyClean(id);
 
       const res = await fetch(
         `${MEDIA_HTTP}/media/render/${id}?variant=original`,
@@ -367,7 +368,7 @@ describe("media-service HTTP (admin-only)", () => {
     const up = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "content-type": "image/webp" },
-      body: Buffer.from("hello"),
+      body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
 
@@ -995,8 +996,8 @@ describe("media-service HTTP (admin-only)", () => {
       const otherOwner = await uploadProtectedMedia(adminId, entityId);
       ids.push(own.id, otherOwner.id);
 
-      await markReadyClean(own.id);
-      await markReadyClean(otherOwner.id);
+      await waitReadyClean(own.id);
+      await waitReadyClean(otherOwner.id);
 
       const browse = await httpJson<any>(
         "GET",

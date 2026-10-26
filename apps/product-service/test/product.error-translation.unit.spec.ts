@@ -80,7 +80,12 @@ describe("product taxonomy error translation", () => {
       code: status.NOT_FOUND,
       details: "taxonomy_not_found",
     });
-    const service = new ProductServiceImpl(prisma, client, settingsClient);
+    const service = new ProductServiceImpl(
+      prisma,
+      client,
+      settingsClient,
+      client,
+    );
 
     await expect(
       service.create({
@@ -111,7 +116,12 @@ describe("product taxonomy error translation", () => {
     const emptyClient = {
       getService: jest.fn().mockReturnValue({}),
     } as unknown as ClientGrpc;
-    const service = new ProductServiceImpl(prisma, emptyClient, emptyClient);
+    const service = new ProductServiceImpl(
+      prisma,
+      emptyClient,
+      emptyClient,
+      emptyClient,
+    );
 
     await expect(
       service.update(MISSING_ID, { title: "Missing product" }, 1),

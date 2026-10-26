@@ -9,7 +9,17 @@ import {
 } from "./s2s-metadata";
 
 type Raw = {
+  UpdateMetadata: RawGrpcUnary<media.UpdateMetadataReq, media.MediaRes>;
+  GetDerivatives: RawGrpcUnary<media.GetByIdReq, media.ImageDerivativesRes>;
+  RegenerateDerivatives: RawGrpcUnary<
+    media.ImageDerivativesReq,
+    media.ImageDerivativesRes
+  >;
   GetById: RawGrpcUnary<media.GetByIdReq, media.MediaRes>;
+  ResolveProductReference: RawGrpcUnary<
+    media.ResolveProductReferenceReq,
+    media.ResolveProductReferenceRes
+  >;
   ListPublicLibrary: RawGrpcUnary<media.ListReq, media.ListRes>;
   ListProtectedLibrary: RawGrpcUnary<media.ListReq, media.ListRes>;
   ListStrictLibrary: RawGrpcUnary<media.ListReq, media.ListRes>;
@@ -67,7 +77,17 @@ type Raw = {
 };
 
 export interface MediaProxy {
+  UpdateMetadata: SignedGrpcUnary<media.UpdateMetadataReq, media.MediaRes>;
+  GetDerivatives: SignedGrpcUnary<media.GetByIdReq, media.ImageDerivativesRes>;
+  RegenerateDerivatives: SignedGrpcUnary<
+    media.ImageDerivativesReq,
+    media.ImageDerivativesRes
+  >;
   GetById: SignedGrpcUnary<media.GetByIdReq, media.MediaRes>;
+  ResolveProductReference: SignedGrpcUnary<
+    media.ResolveProductReferenceReq,
+    media.ResolveProductReferenceRes
+  >;
   ListPublicLibrary: SignedGrpcUnary<media.ListReq, media.ListRes>;
   ListProtectedLibrary: SignedGrpcUnary<media.ListReq, media.ListRes>;
   ListStrictLibrary: SignedGrpcUnary<media.ListReq, media.ListRes>;
@@ -140,10 +160,30 @@ export function getMedia(
   const raw = client.getService<Raw>("MediaService");
   const common = { policy: signingPolicy, target: MEDIA_SERVICE_TARGET };
   return {
+    UpdateMetadata: createSignedGrpcUnary({
+      ...common,
+      method: raw.UpdateMetadata.bind(raw),
+      definition: media.MediaServiceService.updateMetadata,
+    }),
+    GetDerivatives: createSignedGrpcUnary({
+      ...common,
+      method: raw.GetDerivatives.bind(raw),
+      definition: media.MediaServiceService.getDerivatives,
+    }),
+    RegenerateDerivatives: createSignedGrpcUnary({
+      ...common,
+      method: raw.RegenerateDerivatives.bind(raw),
+      definition: media.MediaServiceService.regenerateDerivatives,
+    }),
     GetById: createSignedGrpcUnary({
       ...common,
       method: raw.GetById.bind(raw),
       definition: media.MediaServiceService.getById,
+    }),
+    ResolveProductReference: createSignedGrpcUnary({
+      ...common,
+      method: raw.ResolveProductReference.bind(raw),
+      definition: media.MediaServiceService.resolveProductReference,
     }),
     ListPublicLibrary: createSignedGrpcUnary({
       ...common,

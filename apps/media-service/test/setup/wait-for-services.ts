@@ -23,7 +23,14 @@ async function waitHttpOk(baseUrl: string, timeoutMs: number) {
 
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(url, { method: "GET" });
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { connection: "close" },
+        signal: AbortSignal.timeout(
+          Math.min(5000, Math.max(1, timeoutMs - (Date.now() - start))),
+        ),
+      });
+      await res.arrayBuffer();
       if (res.ok) return;
     } catch (err) {
       lastError = err;

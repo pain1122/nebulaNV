@@ -19,6 +19,24 @@ const MEDIA_LIST_FIELDS = Object.freeze([
 ] as const);
 
 export const MEDIA_INPUT_PROFILES = Object.freeze({
+  "media-metadata": profile({
+    params: ["id"],
+    requiredParams: ["id"],
+    body: ["title", "defaultAlt", "expectedVersion"],
+    requiredBody: ["expectedVersion"],
+    rules: [
+      {
+        kind: "at-least-one",
+        location: "body",
+        fields: ["title", "defaultAlt"],
+      },
+    ],
+  }),
+  "media-derivatives": profile({
+    params: ["id"],
+    requiredParams: ["id"],
+    body: ["recipes", "retryFailed"],
+  }),
   "media-public-list": profile({ query: MEDIA_LIST_FIELDS }),
   "media-admin-list": profile({ query: [...MEDIA_LIST_FIELDS, "ownerId"] }),
   "media-owned-list": profile({ query: MEDIA_LIST_FIELDS }),

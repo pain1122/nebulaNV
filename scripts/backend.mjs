@@ -213,12 +213,6 @@ export const TRIVY_SOURCE_SKIP_FILES = Object.freeze([
   "deploy/.env.production",
 ]);
 
-export const DEMO_PRODUCT = Object.freeze({
-  slug: "nebula-demo-product",
-  sku: "NEBULA-DEMO-001",
-  title: "Nebula Demo Product",
-});
-
 export const DEMO_BLOG_POST = Object.freeze({
   slug: "welcome-to-nebulanv",
   title: "Welcome to NebulaNV",
@@ -346,14 +340,11 @@ async function requestDemoJson(
   }
 }
 
-function isRecordWithData(value) {
-  return isRecord(value) && Array.isArray(value.data);
-}
-
 export async function seedBackendDemo({
   env = process.env,
   fetchImpl = globalThis.fetch,
   logger = console,
+  executePnpm = runPnpm,
 } = {}) {
   if (
     String(env.NODE_ENV ?? "development")
@@ -367,10 +358,15 @@ export async function seedBackendDemo({
   }
 
   const authUrl = demoServiceUrl("auth-service", "AUTH_HTTP_URL", env);
-  const productUrl = demoServiceUrl("product-service", "PRODUCT_HTTP_URL", env);
   const blogUrl = demoServiceUrl("blog-service", "BLOG_HTTP_URL", env);
   const identifier = env.SEED_ADMIN_EMAIL ?? "admin@example.com";
   const password = env.SEED_ADMIN_PASS ?? "Admin123!";
+
+  const showcase = executePnpm(["run", "demo:d1:seed"], { env });
+  if (showcase.status !== 0) {
+    throw new Error(`d1_demo_seed_failed_exit_${showcase.status ?? "unknown"}`);
+  }
+  logger.log("[backend] demo seed: product=d1-showcase");
 
   const login = await requestDemoJson("auth_login", `${authUrl}/auth/login`, {
     method: "POST",
@@ -382,47 +378,6 @@ export async function seedBackendDemo({
   if (typeof accessToken !== "string" || !accessToken) {
     throw new Error("demo_seed_auth_login_invalid_response");
   }
-
-  const productQuery = new URL(`${productUrl}/products`);
-  productQuery.searchParams.set("q", DEMO_PRODUCT.sku);
-  productQuery.searchParams.set("limit", "100");
-  const productList = await requestDemoJson(
-    "product_lookup",
-    productQuery.toString(),
-    { acceptedStatuses: [200], fetchImpl },
-  );
-  if (!isRecordWithData(productList.data)) {
-    throw new Error("demo_seed_product_lookup_invalid_response");
-  }
-  const existingProduct = productList.data.data.some(
-    (entry) =>
-      isRecord(entry) &&
-      (entry.sku === DEMO_PRODUCT.sku || entry.slug === DEMO_PRODUCT.slug),
-  );
-
-  if (!existingProduct) {
-    await requestDemoJson("product_create", `${productUrl}/products`, {
-      method: "POST",
-      accessToken,
-      body: {
-        data: {
-          slug: DEMO_PRODUCT.slug,
-          sku: DEMO_PRODUCT.sku,
-          title: DEMO_PRODUCT.title,
-          description: "Development product created through product-service.",
-          excerpt: "Stable local development product.",
-          price: 99,
-          status: "ACTIVE",
-          tags: ["demo"],
-        },
-      },
-      acceptedStatuses: [201],
-      fetchImpl,
-    });
-  }
-  logger.log(
-    `[backend] demo seed: product=${existingProduct ? "existing" : "created"}`,
-  );
 
   const blogLookup = await requestDemoJson(
     "blog_lookup",
@@ -455,7 +410,7 @@ export async function seedBackendDemo({
   );
 
   return {
-    product: existingProduct ? "existing" : "created",
+    product: "d1-showcase",
     blog: existingBlogPost ? "existing" : "created",
   };
 }
@@ -699,6 +654,8 @@ export function migrationVerificationServices(scope) {
   const scopedPackages = {
     "tenant-authority": "@nebula/tenant-authority-service",
     product: "@nebula/product-service",
+    order: "@nebula/order-service",
+    media: "@nebula/media-service",
   };
   const packageName = scopedPackages[scope];
   if (packageName) {
@@ -707,6 +664,35 @@ export function migrationVerificationServices(scope) {
     );
   }
   throw new Error(`migration_verification_scope_invalid_${scope}`);
+}
+
+export function runLocalDatabaseMigration(
+  operation,
+  scope,
+  { env = process.env, execute = runPnpm, logger = console } = {},
+) {
+  if (!["migrate-deploy", "migrate-status"].includes(operation)) {
+    throw new Error(`local_database_migration_operation_invalid_${operation}`);
+  }
+  if (!scope) throw new Error("local_database_migration_scope_required");
+  if (
+    String(env.NODE_ENV ?? "")
+      .trim()
+      .toLowerCase() === "production"
+  ) {
+    throw new Error("local_database_migration_requires_nonproduction");
+  }
+  const services = migrationVerificationServices(scope);
+  if (services.length !== 1)
+    throw new Error("local_database_migration_service_missing");
+  // Package .env and inherited host URLs must not redirect Docker deployment.
+  runPrismaOperation(operation, {
+    services,
+    env,
+    execute,
+    logger,
+    environmentFor: (service) => databaseEnv(service.database, env),
+  });
 }
 
 export function verifyTenantAuthorityRegistrationRecords(
@@ -797,6 +783,15 @@ export function verifyProductInventoryContract(
     ),
     "utf8",
   );
+  const referencesSql = readFileSync(
+    path.join(
+      repositoryRoot,
+      "scripts",
+      "db",
+      "verify-d1-product-references.sql",
+    ),
+    "utf8",
+  );
   runPostgresTool(
     [
       "psql",
@@ -811,10 +806,47 @@ export function verifyProductInventoryContract(
       label: `product_inventory_${database}`,
       env,
       execute: executeDocker,
-      input: `${inventorySql}\n${variantsSql}`,
+      input: `${inventorySql}\n${variantsSql}\n${referencesSql}`,
       platform,
     },
   );
+}
+
+export function auditD1ProductReferences({
+  database = "nebula_products",
+  env = process.env,
+  executeDocker = run,
+  logger = console,
+  platform = process.platform,
+} = {}) {
+  const sql = readFileSync(
+    path.join(
+      repositoryRoot,
+      "scripts",
+      "db",
+      "audit-d1-product-references.sql",
+    ),
+    "utf8",
+  );
+  runPostgresTool(
+    [
+      "psql",
+      "--username",
+      "postgres",
+      "--dbname",
+      assertDatabaseName(database),
+      "--set=ON_ERROR_STOP=1",
+      "--file=-",
+    ],
+    {
+      label: `d1_reference_audit_${database}`,
+      env,
+      execute: executeDocker,
+      input: sql,
+      platform,
+    },
+  );
+  logger.log("[backend] D1 legacy reference audit complete; sample limit=100");
 }
 
 function runPackageScript(
@@ -2599,6 +2631,630 @@ $verify$;`,
   return [authorityDatabase, operatorDatabase];
 }
 
+export function verifyMediaProcessingUpgrade({
+  env = process.env,
+  executeDocker = run,
+  executePrisma = runPnpm,
+  logger = globalThis.console,
+  platform = process.platform,
+  runId = randomUUID(),
+} = {}) {
+  if (env.NODE_ENV === "production")
+    throw new Error("media_upgrade_proof_requires_nonproduction");
+  const original = prismaServices.find(
+    (service) => service.name === "media-service",
+  );
+  const service = disposableMigrationServices([original], runId)[0];
+  const migrationRoot = path.join(
+    repositoryRoot,
+    original.directory,
+    "prisma",
+    "migrations",
+  );
+  const names = readdirSync(migrationRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const foundation = "20261005000100_media_processing_foundation";
+  const before = [
+    "20251220074224_init_media",
+    "20260225135328_add_access_class",
+    "20260610000100_add_public_library_metadata",
+    "20260629000100_add_media_context_metadata",
+    "20260905000100_default_actor_backfill",
+  ];
+  const derivatives = "20261007000100_saved_image_derivatives";
+  const metadata = "20261010000100_descriptive_metadata";
+  if (
+    JSON.stringify(names) !==
+    JSON.stringify([...before, foundation, derivatives, metadata])
+  )
+    throw new Error("media_upgrade_migration_set_changed");
+  const options = { env, execute: executeDocker, platform };
+  const serviceEnv = databaseEnv(service.database, env);
+  let created = false;
+  let failure;
+  try {
+    createLocalDatabase(service.database, options);
+    created = true;
+    applySqlMigrations(
+      service.database,
+      before.map((name) => path.join(migrationRoot, name, "migration.sql")),
+      options,
+    );
+    executeSqlFile(
+      service.database,
+      "scripts/db/media-processing-upgrade-fixture.sql",
+      options,
+    );
+    const migration = readFileSync(
+      path.join(migrationRoot, foundation, "migration.sql"),
+      "utf8",
+    );
+    if (!/COMMIT;\s*$/.test(migration))
+      throw new Error("media_upgrade_transaction_boundary_changed");
+    expectSqlTextFailure(
+      service.database,
+      migration.replace(
+        /COMMIT;\s*$/,
+        () =>
+          "DO $$ BEGIN RAISE EXCEPTION 'media_upgrade_rollback_fixture'; END $$;\nCOMMIT;",
+      ),
+      "media_upgrade_rollback_fixture",
+      { ...options, failureLabel: "media_upgrade" },
+    );
+    executeSqlText(
+      service.database,
+      `DO $$ BEGIN
+      IF to_regclass('public."MediaProcessingJob"') IS NOT NULL OR
+         to_regclass('public."MediaVerifiedSource"') IS NOT NULL OR
+         to_regclass('public."MediaObjectCleanup"') IS NOT NULL OR
+         to_regtype('public."MediaJobStatus"') IS NOT NULL THEN
+        RAISE EXCEPTION 'media_failed_upgrade_retained_schema'; END IF;
+      IF (SELECT count(*) FROM "Media") <> 8 OR EXISTS (
+        SELECT 1 FROM "_media_processing_upgrade_snapshot" s
+        FULL JOIN "Media" m ON m."id"=s."id"
+        WHERE s."id" IS NULL OR m."id" IS NULL OR to_jsonb(m) IS DISTINCT FROM s.facts
+      ) THEN RAISE EXCEPTION 'media_failed_upgrade_changed_facts'; END IF;
+    END $$;`,
+      options,
+    );
+    // Establish the exact applied SQL baseline in Prisma's migration history.
+    applySqlMigrations(
+      service.database,
+      [path.join(migrationRoot, foundation, "migration.sql")],
+      options,
+    );
+    executeSqlFile(
+      service.database,
+      "scripts/db/verify-media-processing-upgrade.sql",
+      options,
+    );
+    executeSqlFile(
+      service.database,
+      "scripts/db/media-derivatives-upgrade-fixture.sql",
+      options,
+    );
+    const savedMigration = readFileSync(
+      path.join(migrationRoot, derivatives, "migration.sql"),
+      "utf8",
+    );
+    if (!/COMMIT;\s*$/.test(savedMigration))
+      throw new Error("media_derivative_upgrade_transaction_boundary_changed");
+    expectSqlTextFailure(
+      service.database,
+      savedMigration.replace(
+        /COMMIT;\s*$/,
+        () =>
+          "DO $$ BEGIN RAISE EXCEPTION 'media_derivative_upgrade_rollback_fixture'; END $$;\nCOMMIT;",
+      ),
+      "media_derivative_upgrade_rollback_fixture",
+      { ...options, failureLabel: "media_derivative_upgrade" },
+    );
+    executeSqlText(
+      service.database,
+      `DO $$ BEGIN
+      IF to_regclass('public."MediaDerivativeGeneration"') IS NOT NULL OR
+         to_regclass('public."MediaDerivativeState"') IS NOT NULL OR
+         to_regclass('public."MediaDerivative"') IS NOT NULL THEN
+        RAISE EXCEPTION 'media_derivative_failed_upgrade_retained_schema'; END IF;
+    END $$;`,
+      options,
+    );
+    executeSqlFile(
+      service.database,
+      "scripts/db/verify-media-derivatives-upgrade.sql",
+      options,
+    );
+    const metadataMigration = readFileSync(
+      path.join(migrationRoot, metadata, "migration.sql"),
+      "utf8",
+    );
+    if (!/COMMIT;\s*$/.test(metadataMigration))
+      throw new Error("media_metadata_transaction_boundary_changed");
+    expectSqlTextFailure(
+      service.database,
+      metadataMigration.replace(
+        /COMMIT;\s*$/,
+        () =>
+          "DO $$ BEGIN RAISE EXCEPTION 'media_metadata_upgrade_rollback_fixture'; END $$;\nCOMMIT;",
+      ),
+      "media_metadata_upgrade_rollback_fixture",
+      { ...options, failureLabel: "media_metadata_upgrade" },
+    );
+    executeSqlText(
+      service.database,
+      `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Media' AND column_name IN ('title','defaultAlt','metadataVersion')) THEN
+        RAISE EXCEPTION 'media_metadata_failed_upgrade_retained_columns'; END IF;
+    END $$;`,
+      options,
+    );
+    for (const name of [...before, foundation]) {
+      const result = executePrisma(
+        [
+          "--filter",
+          service.packageName,
+          "exec",
+          "prisma",
+          "migrate",
+          "resolve",
+          "--applied",
+          name,
+          "--schema",
+          "./prisma/schema.prisma",
+        ],
+        { env: serviceEnv, capture: true },
+      );
+      if (result.status !== 0)
+        throw new Error(`media_upgrade_baseline_resolve_failed_${name}`);
+    }
+    for (let rerun = 0; rerun < 2; rerun++) {
+      runPrismaOperation("migrate-deploy", {
+        services: [service],
+        env: serviceEnv,
+        execute: executePrisma,
+        logger,
+      });
+      executeSqlFile(
+        service.database,
+        "scripts/db/verify-media-derivatives-upgrade.sql",
+        options,
+      );
+      executeSqlText(
+        service.database,
+        `DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM "Media" WHERE "title" IS NOT NULL OR "defaultAlt" IS NOT NULL OR "metadataVersion" <> 1) THEN
+          RAISE EXCEPTION 'media_metadata_upgrade_changed_defaults'; END IF;
+        IF (SELECT count(*) FROM "MediaDerivativeGeneration") <> 0 OR
+           (SELECT count(*) FROM "MediaDerivativeState") <> 0 OR
+           (SELECT count(*) FROM "MediaDerivative") <> 0 THEN
+          RAISE EXCEPTION 'media_derivative_upgrade_fabricated_outputs'; END IF;
+      END $$;`,
+        options,
+      );
+    }
+    runPrismaOperation("migrate-status", {
+      services: [service],
+      env: serviceEnv,
+      execute: executePrisma,
+      logger,
+    });
+  } catch (error) {
+    failure = error;
+  }
+  let cleanupFailure;
+  if (created) {
+    try {
+      dropDisposableDatabase(service.database, options);
+    } catch (error) {
+      cleanupFailure = error;
+    }
+  }
+  if (failure && cleanupFailure)
+    throw new AggregateError(
+      [failure, cleanupFailure],
+      "media_upgrade_and_cleanup_failed",
+    );
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  logger.log(
+    "[backend] Media populated upgrade verified: preserved=8 backfilled=3 verified-source=1 orphan-cleanup=1 processing-rollback=ok derivatives-rollback=ok metadata-rollback=ok no-fabricated-sizes=ok deploy-rerun=ok; cleaned 1 disposable database",
+  );
+  return service.database;
+}
+
+export function verifyProductMetadataUpgrade({
+  env = process.env,
+  executeDocker = run,
+  executePrisma = runPnpm,
+  logger = globalThis.console,
+  runId = randomUUID(),
+  platform = process.platform,
+} = {}) {
+  if (env.NODE_ENV === "production")
+    throw new Error("product_metadata_upgrade_proof_requires_nonproduction");
+  const original = prismaServices.find(
+    (service) => service.packageName === "@nebula/product-service",
+  );
+  if (!original) throw new Error("product_metadata_service_missing");
+  const service = disposableMigrationServices([original], runId)[0];
+  const migrationRoot = path.join(
+    repositoryRoot,
+    original.directory,
+    "prisma",
+    "migrations",
+  );
+  const names = readdirSync(migrationRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const metadata = "20261010000100_descriptive_metadata";
+  const metadataIndex = names.indexOf(metadata);
+  if (metadataIndex === -1)
+    throw new Error("product_metadata_upgrade_migration_set_changed");
+  // This is a historical populated upgrade, not an assertion that development
+  // stopped at metadata. Later migrations must deploy after its fixture/rollback.
+  const before = names.slice(0, metadataIndex);
+  const options = { env, execute: executeDocker, platform };
+  const serviceEnv = databaseEnv(service.database, env);
+  let created = false;
+  let failure;
+  try {
+    createLocalDatabase(service.database, options);
+    created = true;
+    applySqlMigrations(
+      service.database,
+      before.map((name) => path.join(migrationRoot, name, "migration.sql")),
+      options,
+    );
+    executeSqlFile(
+      service.database,
+      "scripts/db/product-metadata-upgrade-fixture.sql",
+      options,
+    );
+    const migration = readFileSync(
+      path.join(migrationRoot, metadata, "migration.sql"),
+      "utf8",
+    );
+    if (!/COMMIT;\s*$/.test(migration))
+      throw new Error("product_metadata_transaction_boundary_changed");
+    expectSqlTextFailure(
+      service.database,
+      migration.replace(
+        /COMMIT;\s*$/,
+        () =>
+          "DO $$ BEGIN RAISE EXCEPTION 'product_metadata_rollback_fixture'; END $$;\nCOMMIT;",
+      ),
+      "product_metadata_rollback_fixture",
+      { ...options, failureLabel: "product_metadata_upgrade" },
+    );
+    executeSqlText(
+      service.database,
+      `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND ((table_name='Product' AND column_name IN ('thumbnailTitle','thumbnailAlt')) OR (table_name='ProductGalleryImage' AND column_name IN ('title','metadataVersion')))) THEN RAISE EXCEPTION 'product_metadata_rollback_retained_columns'; END IF;
+    END $$;`,
+      options,
+    );
+    executeSqlFile(
+      service.database,
+      "scripts/db/verify-product-metadata-upgrade.sql",
+      options,
+    );
+    for (const name of before) {
+      const result = executePrisma(
+        [
+          "--filter",
+          service.packageName,
+          "exec",
+          "prisma",
+          "migrate",
+          "resolve",
+          "--applied",
+          name,
+          "--schema",
+          "./prisma/schema.prisma",
+        ],
+        { env: serviceEnv, capture: true },
+      );
+      if (result.status !== 0)
+        throw new Error(`product_metadata_baseline_resolve_failed_${name}`);
+    }
+    for (let rerun = 0; rerun < 2; rerun++) {
+      runPrismaOperation("migrate-deploy", {
+        services: [service],
+        env: serviceEnv,
+        execute: executePrisma,
+        logger,
+      });
+      executeSqlFile(
+        service.database,
+        "scripts/db/verify-product-metadata-upgrade.sql",
+        options,
+      );
+      executeSqlText(
+        service.database,
+        `DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM "Product" WHERE "thumbnailTitle" IS NOT NULL OR "thumbnailAlt" IS NOT NULL) OR EXISTS (SELECT 1 FROM "ProductGalleryImage" WHERE "title" IS NOT NULL OR "metadataVersion"<>1) THEN RAISE EXCEPTION 'product_metadata_upgrade_changed_defaults'; END IF;
+      END $$;`,
+        options,
+      );
+    }
+    runPrismaOperation("migrate-status", {
+      services: [service],
+      env: serviceEnv,
+      execute: executePrisma,
+      logger,
+    });
+  } catch (error) {
+    failure = error;
+  }
+  let cleanupFailure;
+  if (created) {
+    try {
+      dropDisposableDatabase(service.database, options);
+    } catch (error) {
+      cleanupFailure = error;
+    }
+  }
+  if (failure && cleanupFailure)
+    throw new AggregateError(
+      [failure, cleanupFailure],
+      "product_metadata_upgrade_and_cleanup_failed",
+    );
+  if (failure) throw failure;
+  if (cleanupFailure) throw cleanupFailure;
+  logger.log(
+    "[backend] Product metadata populated upgrade verified: product=1 gallery=3 null-empty-Unicode-preserved=ok failed-upgrade-rollback=ok deploy-rerun=ok; cleaned 1 disposable database",
+  );
+  return service.database;
+}
+
+const D1_UPGRADE_TARGETS = Object.freeze({
+  product: [
+    "20260919000100_shop_currency_authority",
+    "20260922000100_product_inventory_concurrency",
+    "20260926000100_product_variants",
+    "20260928000100_product_thumbnail_media_reference",
+    "20260928000200_product_gallery_media_reference",
+    "20260928000300_product_taxonomy_references",
+    "20261010000100_descriptive_metadata",
+  ],
+  order: ["20260930000100_shop_currency_authority"],
+});
+
+export function assertD1UpgradeMigrationWindow(names, targets, kind) {
+  // D1 proves its exact historical interval. Later D2 work has its own proofs.
+  if (
+    JSON.stringify(
+      names.filter((name) => name >= targets[0] && name <= targets.at(-1)),
+    ) !== JSON.stringify(targets)
+  ) {
+    throw new Error(`d1_upgrade_migration_set_changed_${kind}`);
+  }
+}
+
+export function verifyD1CommerceUpgrade({
+  env = process.env,
+  executeDocker = run,
+  executePrisma = runPnpm,
+  logger = globalThis.console,
+  runId = randomUUID(),
+  platform = process.platform,
+} = {}) {
+  if (
+    String(env.NODE_ENV ?? "")
+      .trim()
+      .toLowerCase() === "production"
+  )
+    throw new Error("d1_upgrade_requires_nonproduction");
+  const prefix = "nebula-d1-commerce-upgrade-";
+  const temporary = mkdtempSync(path.join(tmpdir(), prefix));
+  const created = [];
+  const proofDocker = (command, args, options) => {
+    const result = executeDocker(command, args, options);
+    if (result.status !== 0)
+      throw new Error(
+        `d1_upgrade_postgres_tool_failed_${sanitizeOutput(`${result.stdout ?? ""}\n${result.stderr ?? ""}`, env)}`,
+      );
+    return result;
+  };
+  const options = { env, execute: proofDocker, platform };
+  let rollbackCases = 0;
+  let failure;
+  try {
+    for (const [kind, targets] of Object.entries(D1_UPGRADE_TARGETS)) {
+      const original = prismaServices.find(
+        (s) => s.packageName === `@nebula/${kind}-service`,
+      );
+      if (!original) throw new Error(`d1_upgrade_service_missing_${kind}`);
+      const service = disposableMigrationServices([original], runId)[0];
+      const source = path.join(repositoryRoot, original.directory, "prisma");
+      const migrationRoot = path.join(source, "migrations");
+      const names = readdirSync(migrationRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort();
+      assertD1UpgradeMigrationWindow(names, targets, kind);
+      const staged = path.join(temporary, kind);
+      mkdirSync(path.join(staged, "migrations"), { recursive: true });
+      const schema = path.join(staged, "schema.prisma");
+      copyFileSync(path.join(source, "schema.prisma"), schema);
+      copyFileSync(
+        path.join(migrationRoot, "migration_lock.toml"),
+        path.join(staged, "migrations", "migration_lock.toml"),
+      );
+      const copyMigration = (name, sql) => {
+        const directory = path.join(staged, "migrations", name);
+        mkdirSync(directory, { recursive: true });
+        writeFileSync(
+          path.join(directory, "migration.sql"),
+          sql ??
+            readFileSync(
+              path.join(migrationRoot, name, "migration.sql"),
+              "utf8",
+            ),
+        );
+      };
+      const serviceEnv = databaseEnv(service.database, env);
+      const prisma = (operation, extra = [], expectedFailure) => {
+        const result = executePrisma(
+          [
+            "--filter",
+            service.packageName,
+            "exec",
+            "prisma",
+            "migrate",
+            operation,
+            ...extra,
+            "--schema",
+            schema,
+          ],
+          { env: serviceEnv, capture: true, emitCaptured: false },
+        );
+        if (expectedFailure) {
+          if (
+            result.status === 0 ||
+            !`${result.stdout ?? ""}\n${result.stderr ?? ""}`.includes(
+              expectedFailure,
+            )
+          )
+            throw new Error(
+              `d1_upgrade_expected_failure_missing_${expectedFailure}_${sanitizeOutput(`${result.stdout ?? ""}\n${result.stderr ?? ""}`, serviceEnv)}`,
+            );
+        } else if (result.status !== 0) {
+          throw new Error(
+            `d1_upgrade_prisma_${kind}_${operation}_failed_${sanitizeOutput(`${result.stdout ?? ""}\n${result.stderr ?? ""}`, serviceEnv)}`,
+          );
+        }
+      };
+      for (const name of names.filter((name) => name < targets[0]))
+        copyMigration(name);
+      createLocalDatabase(service.database, options);
+      created.push(service.database);
+      prisma("deploy");
+      executeSqlFile(
+        service.database,
+        `scripts/db/d1-${kind}-upgrade-fixture.sql`,
+        options,
+      );
+      executeSqlFile(
+        service.database,
+        "scripts/db/d1-upgrade-snapshots.sql",
+        options,
+      );
+      for (const name of targets) {
+        executeSqlText(
+          service.database,
+          'TRUNCATE "_d1_upgrade_schema"; INSERT INTO "_d1_upgrade_schema" SELECT "_d1_upgrade_schema_facts"();',
+          options,
+        );
+        const originalSql = readFileSync(
+          path.join(migrationRoot, name, "migration.sql"),
+          "utf8",
+        );
+        const marker = `d1_upgrade_rollback_${name}`;
+        const fault = `DO $$ BEGIN RAISE EXCEPTION '${marker}'; END $$;`;
+        const explicitTransaction =
+          /^\s*BEGIN;/u.test(originalSql) && /COMMIT;\s*$/u.test(originalSql);
+        const faulty = /COMMIT;\s*$/u.test(originalSql)
+          ? originalSql.replace(/COMMIT;\s*$/u, () => `${fault}\nCOMMIT;\n`)
+          : `${originalSql}\n${fault}\n`;
+        if (explicitTransaction) {
+          // Prisma can replace the first SQL error inside BEGIN/COMMIT with
+          // an aborted-transaction error. Require the original marker via psql.
+          expectSqlTextFailure(service.database, faulty, marker, {
+            env,
+            execute: executeDocker,
+            platform,
+            failureLabel: "d1_upgrade",
+          });
+        } else {
+          copyMigration(name, faulty);
+          prisma("deploy", [], marker);
+        }
+        executeSqlText(
+          service.database,
+          `SELECT "_d1_upgrade_check_legacy"();
+DO $$ BEGIN IF "_d1_upgrade_schema_facts"() IS DISTINCT FROM (SELECT "facts" FROM "_d1_upgrade_schema") THEN RAISE EXCEPTION 'd1_upgrade_failed_migration_changed_schema'; END IF; END $$;`,
+          options,
+        );
+        rollbackCases += 1;
+        if (!explicitTransaction) prisma("resolve", ["--rolled-back", name]);
+        copyMigration(name, originalSql);
+        prisma("deploy");
+        executeSqlText(
+          service.database,
+          'SELECT "_d1_upgrade_check_legacy"();',
+          options,
+        );
+        logger.log(`[backend] D1 upgrade/rollback: ${kind} ${name}=ok`);
+      }
+      executeSqlFile(
+        service.database,
+        `scripts/db/verify-d1-${kind}-upgrade.sql`,
+        options,
+      );
+      if (kind === "product")
+        verifyProductInventoryContract(service.database, {
+          env,
+          executeDocker: proofDocker,
+          platform,
+        });
+      executeSqlText(
+        service.database,
+        'TRUNCATE "_d1_upgrade_schema"; INSERT INTO "_d1_upgrade_schema" SELECT "_d1_upgrade_schema_facts"();',
+        options,
+      );
+      for (let rerun = 0; rerun < 2; rerun++) {
+        prisma("deploy");
+        prisma("status");
+        executeSqlFile(
+          service.database,
+          `scripts/db/verify-d1-${kind}-upgrade.sql`,
+          options,
+        );
+        executeSqlText(
+          service.database,
+          `DO $$ BEGIN IF "_d1_upgrade_schema_facts"() IS DISTINCT FROM (SELECT "facts" FROM "_d1_upgrade_schema") THEN RAISE EXCEPTION 'd1_upgrade_rerun_changed_schema'; END IF; END $$;`,
+          options,
+        );
+      }
+    }
+  } catch (error) {
+    failure = error;
+  }
+  const cleanup = [];
+  for (const database of created.reverse()) {
+    try {
+      dropDisposableDatabase(database, options);
+    } catch (error) {
+      cleanup.push(error);
+    }
+  }
+  try {
+    const resolved = path.resolve(temporary);
+    if (
+      path.dirname(resolved) !== path.resolve(tmpdir()) ||
+      !path.basename(resolved).startsWith(prefix)
+    )
+      throw new Error("d1_upgrade_temporary_cleanup_path_invalid");
+    rmSync(resolved, { recursive: true, force: true });
+  } catch (error) {
+    cleanup.push(error);
+  }
+  if (cleanup.length)
+    throw new AggregateError(
+      [...(failure ? [failure] : []), ...cleanup],
+      "d1_upgrade_and_cleanup_failed",
+    );
+  if (failure) throw failure;
+  logger.log(
+    `[backend] D1 populated upgrade verified: services=2 migrations=8 rollback=${rollbackCases} legacy-preserved=ok deploy-rerun=ok; cleaned ${created.length} disposable databases`,
+  );
+  return { databases: created, rollbackCases };
+}
+
 export function verifyCleanMigrations({
   services = prismaServices,
   env = process.env,
@@ -2653,12 +3309,68 @@ export function verifyCleanMigrations({
         logger,
       });
       if (service.packageName === "@nebula/product-service") {
+        executeSqlFile(
+          service.database,
+          "scripts/db/verify-product-metadata.sql",
+          { env, execute: executeDocker },
+        );
         verifyProductInventoryContract(service.database, {
           env,
           executeDocker,
         });
         logger.log(
           `[backend] Product inventory and variant database contracts verified: ${service.name}`,
+        );
+      }
+      if (service.packageName === "@nebula/media-service") {
+        const sql = readFileSync(
+          path.join(
+            repositoryRoot,
+            "scripts",
+            "db",
+            "verify-media-processing.sql",
+          ),
+          "utf8",
+        );
+        runPostgresTool(
+          [
+            "psql",
+            "--username",
+            "postgres",
+            "--dbname",
+            service.database,
+            "--set=ON_ERROR_STOP=1",
+            "--file=-",
+          ],
+          {
+            label: `media_processing_${service.database}`,
+            env,
+            execute: executeDocker,
+            input: sql,
+          },
+        );
+        logger.log(
+          `[backend] Media processing database contracts verified: ${service.name}`,
+        );
+        executeSqlFile(
+          service.database,
+          "scripts/db/verify-media-derivatives.sql",
+          { env, execute: executeDocker },
+        );
+        logger.log(
+          `[backend] Saved derivative database constraints verified: ${service.name}`,
+        );
+        executeSqlFile(
+          service.database,
+          "scripts/db/verify-media-metadata.sql",
+          { env, execute: executeDocker },
+        );
+        runPackageScript(service.packageName, "test:processing:db", {
+          env: serviceEnv,
+          execute: executePrisma,
+        });
+        logger.log(
+          `[backend] Media processing and saved derivative claim, lease, atomic replacement, retry, deletion and watermark proofs passed: ${service.name}`,
         );
       }
       if (service.packageName === "@nebula/tenant-authority-service") {
@@ -3803,7 +4515,7 @@ export async function provisionBackend({
       waitForHealth(service, deadline, { fetchImpl, now, sleep }),
     ),
   );
-  await seedDemo({ env, fetchImpl, logger });
+  await seedDemo({ env, executePnpm, fetchImpl, logger });
   logger.log("[backend] boot complete; all backend services are ready");
 }
 
@@ -4688,15 +5400,61 @@ export function releaseImages(prefix = "nebulanv-main", tag = "latest") {
   );
 }
 
+export function parseBackendBuildOptions(args, inventory = backendServices) {
+  const flags = new Set();
+  const selected = [];
+  const seen = new Set();
+  for (const argument of args) {
+    if (["--clean", "--pull", "--plan"].includes(argument)) {
+      if (flags.has(argument)) {
+        throw new Error(`backend_build_duplicate_flag_${argument}`);
+      }
+      flags.add(argument);
+      continue;
+    }
+    const service = inventory.find((entry) => entry.dockerService === argument);
+    if (!service)
+      throw new Error(`backend_build_unknown_selection_${argument}`);
+    if (seen.has(argument)) {
+      throw new Error(`backend_build_duplicate_service_${argument}`);
+    }
+    seen.add(argument);
+    selected.push(service);
+  }
+  return {
+    clean: flags.has("--clean"),
+    pull: flags.has("--clean") || flags.has("--pull"),
+    plan: flags.has("--plan"),
+    services: selected.length > 0 ? selected : inventory,
+  };
+}
+
 export function buildBackendImages({
   clean = false,
   env = process.env,
   execute = run,
   logger = console,
+  now = () => performance.now(),
+  plan = false,
   platform = process.platform,
   pull = clean,
   services = backendServices,
 } = {}) {
+  // Every export in a batch uses identical producer inputs. Canonical inventory
+  // order preserves cache keys even when callers request a different export order.
+  const fullInventory =
+    services.length === backendServices.length &&
+    backendServices.every((entry) =>
+      services.some((selected) => selected.name === entry.name),
+    );
+  const selection = fullInventory
+    ? "all"
+    : backendServices
+        .filter((entry) =>
+          services.some((selected) => selected.name === entry.name),
+        )
+        .map((entry) => entry.name)
+        .join(",");
   for (const [index, service] of services.entries()) {
     logger.log(
       `[backend] image build ${index + 1}/${services.length}: ${service.dockerService}`,
@@ -4707,6 +5465,8 @@ export function buildBackendImages({
       service.dockerService,
       "--load",
       "--progress=plain",
+      `--set=${service.dockerService}.args.BACKEND_BUILD_SERVICE=${selection}`,
+      `--set=${service.dockerService}.args.BACKEND_BUILD_PIPELINE=graph`,
     ];
     if (pull && index === 0) args.push("--pull");
     if (clean) {
@@ -4714,14 +5474,26 @@ export function buildBackendImages({
       if (index === 0) args.push("--no-cache");
     }
 
+    if (plan) {
+      logger.log(`[backend] plan: docker ${args.join(" ")}`);
+      continue;
+    }
+    const started = now();
     const result = execute(dockerExecutable(platform), args, { env });
+    logger.log(
+      `[backend] image ${service.dockerService}: elapsed=${((now() - started) / 1000).toFixed(1)}s exit=${result.status ?? "unknown"}`,
+    );
     if (result.status !== 0) {
       throw new Error(
         `backend_image_${service.dockerService}_failed_exit_${result.status ?? "unknown"}`,
       );
     }
   }
-  logger.log("[backend] all backend images built sequentially");
+  logger.log(
+    plan
+      ? "[backend] plan only; no build started. Selected images share one graph compilation scope and export sequentially."
+      : "[backend] selected backend images built sequentially",
+  );
 }
 
 function usage() {
@@ -4735,10 +5507,16 @@ function usage() {
     "  node scripts/backend.mjs quality <lint|check-types|build>",
     "  node scripts/backend.mjs security <dependencies|source|images>",
     "  node scripts/backend.mjs evidence <compose|failure>",
-    "  node scripts/backend.mjs build-images [--pull|--clean]",
+    "  node scripts/backend.mjs build-images [service ...] [--pull|--clean] [--plan]",
     "  node scripts/backend.mjs prisma <generate|migrate-dev|migrate-deploy|migrate-status|push|seed>",
     "  node scripts/backend.mjs seed",
-    "  node scripts/backend.mjs database verify-migrations [tenant-authority|product]",
+    "  node scripts/backend.mjs database verify-migrations [tenant-authority|product|order|media]",
+    "  node scripts/backend.mjs database migrate-deploy <tenant-authority|product|order|media>",
+    "  node scripts/backend.mjs database migrate-status <tenant-authority|product|order|media>",
+    "  node scripts/backend.mjs database verify-media-processing-upgrade",
+    "  node scripts/backend.mjs database verify-product-metadata-upgrade",
+    "  node scripts/backend.mjs database verify-d1-commerce-upgrade",
+    "  node scripts/backend.mjs database audit-d1-product-references",
     "  node scripts/backend.mjs database verify-f4-batch3-role-seeds",
     "  node scripts/backend.mjs database verify-f4-r2-default-actors",
     "  node scripts/backend.mjs database verify-f4-r3-realm-auth-foundation",
@@ -4796,19 +5574,9 @@ export async function main(args = process.argv.slice(2)) {
     captureComposeFailureEvidence();
     return;
   }
-  if (command === "build-images" && !confirmationArg && !unexpected) {
-    const flags = [operation, extra].filter(Boolean);
-    if (
-      flags.every((flag) => flag === "--pull" || flag === "--clean") &&
-      new Set(flags).size === flags.length
-    ) {
-      const clean = flags.includes("--clean");
-      buildBackendImages({
-        clean,
-        pull: clean || flags.includes("--pull"),
-      });
-      return;
-    }
+  if (command === "build-images") {
+    buildBackendImages(parseBackendBuildOptions(args.slice(1)));
+    return;
   }
   if (command === "prisma" && operation && !extra) {
     runPrismaOperation(operation);
@@ -4825,6 +5593,47 @@ export async function main(args = process.argv.slice(2)) {
     !unexpected
   ) {
     verifyCleanMigrations({ services: migrationVerificationServices(extra) });
+    return;
+  }
+  if (
+    command === "database" &&
+    ["migrate-deploy", "migrate-status"].includes(operation) &&
+    !confirmationArg &&
+    !unexpected
+  ) {
+    runLocalDatabaseMigration(operation, extra);
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-media-processing-upgrade" &&
+    !extra
+  ) {
+    verifyMediaProcessingUpgrade();
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-product-metadata-upgrade" &&
+    !extra
+  ) {
+    verifyProductMetadataUpgrade();
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "verify-d1-commerce-upgrade" &&
+    !extra
+  ) {
+    verifyD1CommerceUpgrade();
+    return;
+  }
+  if (
+    command === "database" &&
+    operation === "audit-d1-product-references" &&
+    !extra
+  ) {
+    auditD1ProductReferences();
     return;
   }
   if (

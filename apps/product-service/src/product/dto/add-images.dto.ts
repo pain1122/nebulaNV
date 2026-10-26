@@ -13,8 +13,10 @@ import {
 } from "class-validator";
 
 class NewImageDto {
-  @IsString() @MaxLength(1024) url!: string;
-  @IsOptional() @IsString() @MaxLength(180) alt?: string;
+  @IsOptional() @IsString() @MaxLength(1024) url?: string;
+  @IsOptional() @IsUUID("4") mediaId?: string;
+  @IsOptional() @IsString() @MaxLength(180) alt?: string | null;
+  @IsOptional() @IsString() @MaxLength(200) title?: string | null;
   @IsOptional() @IsInt() @Min(0) @Max(1_000_000) sort?: number;
 }
 

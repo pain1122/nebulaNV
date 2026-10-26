@@ -15,7 +15,12 @@ function emptyClient(): ClientGrpc {
 
 function service(prisma: object): ProductServiceImpl {
   const client = emptyClient();
-  return new ProductServiceImpl(prisma as PrismaService, client, client);
+  return new ProductServiceImpl(
+    prisma as PrismaService,
+    client,
+    client,
+    client,
+  );
 }
 
 function product(overrides: Partial<Product> = {}): Product {
@@ -31,7 +36,12 @@ function product(overrides: Partial<Product> = {}): Product {
     price: new Prisma.Decimal(100),
     currency: "USD",
     categoryId: "11111111-1111-4111-8111-111111111111",
+    brandId: null,
+    tagIds: [],
     thumbnailUrl: null,
+    thumbnailMediaId: null,
+    thumbnailTitle: null,
+    thumbnailAlt: null,
     discountType: null,
     discountValue: null,
     discountActive: false,
@@ -117,7 +127,11 @@ describe("product inventory and optimistic concurrency", () => {
     });
     expect(update).toHaveBeenCalledTimes(1);
     const updateCall = update.mock.calls[0]?.[0];
-    expect(updateCall?.where).toEqual({ id: "product-1", version: 1 });
+    expect(updateCall?.where).toEqual({
+      id: "product-1",
+      version: 1,
+      heldStockLines: { none: {} },
+    });
     expect(updateCall?.data).toMatchObject({
       trackInventory: true,
       stockQuantity: 5,

@@ -1,10 +1,7 @@
 import { Metadata, status } from "@grpc/grpc-js";
 import { HttpException } from "@nestjs/common";
 import type { ClientGrpc } from "@nestjs/microservices";
-import {
-  AUTHORIZATION_HEADER,
-  X_REQUEST_ID_HEADER,
-} from "@nebula/grpc-auth";
+import { AUTHORIZATION_HEADER, X_REQUEST_ID_HEADER } from "@nebula/grpc-auth";
 import { of, throwError } from "rxjs";
 import type { GatewayRequestContext } from "../src/application/application.contracts";
 import {
@@ -35,7 +32,7 @@ function gatewayRequest(authenticated: boolean): GatewayHttpRequest {
     rawHeaders: [],
     requestContext,
     actor: { kind: "anonymous" },
-  } as GatewayHttpRequest;
+  } as unknown as GatewayHttpRequest;
   if (authenticated) {
     request.actor = {
       kind: "authenticated",
@@ -112,12 +109,7 @@ describe("GatewaySettingsApiService", () => {
     const { service } = createHarness({ SetString: setString });
 
     await expect(
-      service.set(
-        gatewayRequest(true),
-        "order",
-        "cart_ttl_minutes",
-        "60",
-      ),
+      service.set(gatewayRequest(true), "order", "cart_ttl_minutes", "60"),
     ).resolves.toEqual({ value: "60" });
     const metadata = setString.mock.calls[0]?.[1] as Metadata;
     expect(metadata.get(AUTHORIZATION_HEADER)).toEqual([
@@ -133,11 +125,7 @@ describe("GatewaySettingsApiService", () => {
       DeleteString: jest.fn(() => of({ deleted: "yes" })),
     });
     await expect(
-      invalid.service.delete(
-        gatewayRequest(true),
-        "order",
-        "cart_ttl_minutes",
-      ),
+      invalid.service.delete(gatewayRequest(true), "order", "cart_ttl_minutes"),
     ).rejects.toMatchObject({ status: 502 });
 
     const unavailable = createHarness({

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { URL } from "node:url";
 import { createGatewayClient, gatewayOperations } from "../dist/index.js";
 
 function headers(values = {}) {
@@ -19,8 +20,74 @@ function jsonResponse(status, body, responseHeaders = {}) {
   };
 }
 
+test("Cart requests preserve variant identity and decimal-string selection replies", async () => {
+  let body;
+  const cart = {
+    id: "cart",
+    userId: "owner",
+    currency: "USD",
+    expiresAt: "2026-10-13T12:00:00Z",
+    subtotal: "0.30",
+    total: "0.30",
+    items: [
+      {
+        id: "item",
+        productId: "product",
+        variantId: "variant",
+        sku: "BLUE",
+        name: "Desk",
+        quantity: 3,
+        unitPrice: "0.10",
+        lineTotal: "0.30",
+        selectedOptions: { Color: "Blue" },
+        meta: "",
+      },
+    ],
+  };
+  const client = createGatewayClient({
+    baseUrl: "http://gateway:3002",
+    publicClientId: "mobile-local",
+    fetch: async (_, init) => {
+      body = JSON.parse(init.body);
+      return jsonResponse(201, { data: cart });
+    },
+  });
+  const result = await client.request("orders_cart_add", {
+    accessToken: "token",
+    idempotencyKey: "cart-selection-0001",
+    body: { productId: "product", variantId: "variant", quantity: 3 },
+  });
+  assert.deepEqual(body, {
+    productId: "product",
+    variantId: "variant",
+    quantity: 3,
+  });
+  assert.deepEqual(result.data.data, cart);
+});
+
 test("generated inventory contains the complete gateway operation surface", () => {
-  assert.equal(Object.keys(gatewayOperations).length, 73);
+  assert.equal(Object.keys(gatewayOperations).length, 81);
+  for (const operation of [
+    "orders_demo_payment_start",
+    "admin_orders_demo_payment_outcome",
+  ]) {
+    assert.equal(gatewayOperations[operation].requiresAccessToken, true);
+    assert.equal(gatewayOperations[operation].requiresIdempotencyKey, true);
+    assert.equal(gatewayOperations[operation].method, "POST");
+  }
+  for (const operation of ["admin_orders_list", "admin_orders_get"]) {
+    assert.equal(gatewayOperations[operation].requiresAccessToken, true);
+    assert.equal(gatewayOperations[operation].requiresIdempotencyKey, false);
+    assert.equal(gatewayOperations[operation].method, "GET");
+  }
+  assert.equal(
+    gatewayOperations.admin_media_derivatives_regenerate.requiresIdempotencyKey,
+    true,
+  );
+  assert.equal(
+    gatewayOperations.admin_media_derivatives_get.pathTemplate,
+    "/api/v1/admin/media/{id}/derivatives",
+  );
   assert.equal(
     gatewayOperations.products_list.pathTemplate,
     "/api/v1/products",
@@ -33,6 +100,107 @@ test("generated inventory contains the complete gateway operation surface", () =
     gatewayOperations.admin_products_variants_create.pathTemplate,
     "/api/v1/admin/products/{id}/variants",
   );
+});
+
+test("demo payment calls preserve target, attempt, version, outcome and protected headers", async () => {
+  const calls = [];
+  const reply = {
+    order: { id: "order-1", total: "2.70" },
+    attempt: { id: "attempt-1", mode: "DEMO" },
+  };
+  const client = createGatewayClient({
+    baseUrl: "http://gateway:3002",
+    publicClientId: "admin-web-local",
+    applicationOrigin: "http://localhost:3000",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse(200, { data: reply });
+    },
+  });
+  for (const [operation, path, body] of [
+    ["orders_demo_payment_start", { id: "order-1" }, { expectedVersion: 1 }],
+    [
+      "admin_orders_demo_payment_outcome",
+      { id: "order-1", attemptId: "attempt-1" },
+      { expectedVersion: 2, outcome: "UNKNOWN" },
+    ],
+  ]) {
+    const result = await client.request(operation, {
+      accessToken: "verified-token",
+      idempotencyKey: "demo-client-command-key",
+      path,
+      body,
+    });
+    assert.deepEqual(result.data.data, reply);
+    const sent = calls.at(-1);
+    assert.equal(sent.init.method, "POST");
+    assert.equal(sent.init.headers.Authorization, "Bearer verified-token");
+    assert.equal(
+      sent.init.headers["Idempotency-Key"],
+      "demo-client-command-key",
+    );
+    assert.deepEqual(JSON.parse(sent.init.body), body);
+  }
+  assert.equal(
+    new URL(calls[0].url).pathname,
+    "/api/v1/orders/order-1/demo-payment-attempts",
+  );
+  assert.equal(
+    new URL(calls[1].url).pathname,
+    "/api/v1/admin/orders/order-1/demo-payment-attempts/attempt-1/outcome",
+  );
+  await assert.rejects(
+    () =>
+      client.request("orders_demo_payment_start", {
+        accessToken: "token",
+        path: { id: "order-1" },
+        body: { expectedVersion: 1 },
+      }),
+    /gateway_idempotency_key_required/,
+  );
+});
+
+test("admin Order reads use separate paths and preserve pagination and filters", async () => {
+  const urls = [];
+  const client = createGatewayClient({
+    baseUrl: "https://gateway.example.test",
+    publicClientId: "admin-web-local",
+    applicationOrigin: "http://localhost:3000",
+    fetch: async (url, init) => {
+      urls.push(String(url));
+      assert.equal(init.headers.Authorization, "Bearer admin-token");
+      return jsonResponse(200, {
+        data: [],
+        meta: {
+          pagination: {
+            profile: "page-limit-total",
+            page: 2,
+            limit: 5,
+            total: 7,
+          },
+        },
+      });
+    },
+  });
+  const result = await client.request("admin_orders_list", {
+    accessToken: "admin-token",
+    query: { userId: "customer", status: "PENDING", page: 2, limit: 5 },
+  });
+  const query = new URL(urls[0]);
+  assert.equal(query.pathname, "/api/v1/admin/orders");
+  assert.equal(query.searchParams.get("userId"), "customer");
+  assert.equal(query.searchParams.get("page"), "2");
+  assert.deepEqual(result.data.meta.pagination, {
+    profile: "page-limit-total",
+    page: 2,
+    limit: 5,
+    total: 7,
+  });
+  await client.request("admin_orders_get", {
+    accessToken: "admin-token",
+    path: { id: "order-1" },
+  });
+  assert.equal(new URL(urls[1]).pathname, "/api/v1/admin/orders/order-1");
 });
 
 test("public calls use only the gateway base, client ID, and typed query", async () => {

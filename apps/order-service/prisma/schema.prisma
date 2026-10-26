@@ -12,6 +12,7 @@ datasource db {
 
 enum OrderStatus {
   PENDING
+  PAYMENT_PROCESSING
   PAID
   FULFILLED
   CANCELLED
@@ -24,9 +25,10 @@ model Order {
   identityRealmId String?     @db.Uuid
   subjectId       String?     @db.Uuid
   status          OrderStatus @default(PENDING)
+  version         Int         @default(1)
 
-  // align with Product.currency default
-  currency String @default("EUR")
+  currency     String
+  checkoutMode String @default("DEMO_NO_PAYMENT")
 
   // use same precision as Product.price
   subtotal      Decimal @db.Decimal(18, 2)
@@ -38,12 +40,161 @@ model Order {
   billingAddress  Json?
   meta            Json?
 
-  items OrderItem[]
+  items           OrderItem[]
+  checkoutReceipt CheckoutReceipt?
+  checkoutAttempt CheckoutAttempt?
+  statusChanges   OrderStatusChange[]
+  cancellation    OrderCancellation?
+  demoPayments    DemoPaymentAttempt[]
+  paymentCommands DemoPaymentCommand[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([identityRealmId, subjectId])
+}
+
+model OrderStatusChange {
+  id              String      @id @default(uuid()) @db.Uuid
+  orderId         String      @db.Uuid
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actorId         String      @db.Uuid
+  actorRole       String
+  keyHash         String      @db.Char(64)
+  intentHash      String      @db.Char(64)
+  previousStatus  OrderStatus
+  status          OrderStatus
+  expectedVersion Int
+  version         Int
+  requestId       String
+  response        Json
+  createdAt       DateTime    @default(now())
+
+  @@unique([actorId, keyHash])
+  @@unique([orderId, version])
+}
+
+model OrderCancellation {
+  orderId           String          @id @db.Uuid
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  checkoutAttemptId String          @unique @db.Uuid
+  checkoutAttempt   CheckoutAttempt @relation(fields: [checkoutAttemptId], references: [id], onDelete: Restrict)
+  stockHash         String          @db.Char(64)
+  actorId           String          @db.Uuid
+  actorRole         String
+  keyHash           String          @db.Char(64)
+  intentHash        String          @db.Char(64)
+  expectedVersion   Int
+  requestId         String
+  leaseToken        String?         @db.Uuid
+  leaseUntil        DateTime?       @db.Timestamp(3)
+  nextRetryAt       DateTime        @default(now()) @db.Timestamp(3)
+  failures          Int             @default(0)
+  completedAt       DateTime?       @db.Timestamp(3)
+  createdAt         DateTime        @default(now()) @db.Timestamp(3)
+
+  @@unique([actorId, keyHash])
+  @@index([completedAt, nextRetryAt])
+}
+
+enum DemoPaymentState {
+  PREPARING
+  PROCESSING
+  RESOLVING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model DemoPaymentAttempt {
+  id             String               @id @default(uuid()) @db.Uuid
+  orderId        String               @db.Uuid
+  order          Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  state          DemoPaymentState     @default(PREPARING)
+  stockSource    String
+  stockIntentId  String               @unique @db.Uuid
+  stockHash      String               @db.Char(64)
+  stockFacts     Json?
+  abortRequested Boolean              @default(false)
+  leaseToken     String?              @db.Uuid
+  leaseUntil     DateTime?            @db.Timestamp(3)
+  nextRetryAt    DateTime             @default(now()) @db.Timestamp(3)
+  failures       Int                  @default(0)
+  createdAt      DateTime             @default(now()) @db.Timestamp(3)
+  updatedAt      DateTime             @updatedAt @db.Timestamp(3)
+  commands       DemoPaymentCommand[]
+
+  @@index([state, nextRetryAt])
+}
+
+model DemoPaymentCommand {
+  id              String             @id @default(uuid()) @db.Uuid
+  orderId         String             @db.Uuid
+  order           Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  attemptId       String             @db.Uuid
+  attempt         DemoPaymentAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  kind            String
+  outcome         String?
+  actorId         String             @db.Uuid
+  actorRole       String
+  keyHash         String             @db.Char(64)
+  intentHash      String             @db.Char(64)
+  expectedVersion Int
+  requestId       String
+  response        Json?
+  createdAt       DateTime           @default(now()) @db.Timestamp(3)
+
+  @@unique([actorId, keyHash])
+  @@index([attemptId, createdAt])
+}
+
+model CheckoutReceipt {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  keyHash         String   @db.Char(64)
+  intentHash      String   @db.Char(64)
+  cartFingerprint String   @db.Char(64)
+  orderId         String   @unique @db.Uuid
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  response        Json?
+  replayUntil     DateTime
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, keyHash])
+  @@index([replayUntil])
+}
+
+enum CheckoutAttemptState {
+  PREPARED
+  ORDER_COMMITTED
+  COMPLETED
+  CANCELLING
+  CANCELLED
+}
+
+model CheckoutAttempt {
+  id              String               @id @db.Uuid
+  userId          String               @db.Uuid
+  keyHash         String               @db.Char(64)
+  intentHash      String               @db.Char(64)
+  stockHash       String               @db.Char(64)
+  cartId          String               @db.Uuid
+  cartFingerprint String               @db.Char(64)
+  state           CheckoutAttemptState @default(PREPARED)
+  payload         Json?
+  orderId         String?              @unique @db.Uuid
+  order           Order?               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  leaseToken      String?              @db.Uuid
+  leaseUntil      DateTime?            @db.Timestamp(3)
+  nextRetryAt     DateTime             @default(now()) @db.Timestamp(3)
+  failures        Int                  @default(0)
+  createdAt       DateTime             @default(now()) @db.Timestamp(3)
+  updatedAt       DateTime             @updatedAt @db.Timestamp(3)
+  cancellation    OrderCancellation?
+  // One active owner attempt is enforced by the migration's partial unique index.
+
+  @@unique([userId, keyHash])
+  @@index([state, nextRetryAt])
 }
 
 model Cart {
@@ -52,8 +203,7 @@ model Cart {
   identityRealmId String? @db.Uuid
   subjectId       String? @db.Uuid
 
-  // align default with product currency
-  currency String @default("EUR")
+  currency String
 
   items     CartItem[]
   expiresAt DateTime?
@@ -70,10 +220,12 @@ model OrderItem {
   orderId String @db.Uuid
   order   Order  @relation(fields: [orderId], references: [id])
 
-  productId String  @db.Uuid
-  sku       String?
-  name      String
-  quantity  Int
+  productId       String  @db.Uuid
+  variantId       String? @db.Uuid
+  selectedOptions Json    @default("{}")
+  sku             String?
+  name            String
+  quantity        Int
 
   // same precision as Product.price
   unitPrice Decimal @db.Decimal(18, 2)
@@ -92,10 +244,13 @@ model CartItem {
   cartId String @db.Uuid
   cart   Cart   @relation(fields: [cartId], references: [id])
 
-  productId String  @db.Uuid
-  sku       String?
-  name      String
-  quantity  Int
+  productId       String  @db.Uuid
+  variantId       String? @db.Uuid
+  selectionKey    String
+  selectedOptions Json    @default("{}")
+  sku             String?
+  name            String
+  quantity        Int
 
   // same precision as Product.price
   unitPrice Decimal @db.Decimal(18, 2)
@@ -105,5 +260,6 @@ model CartItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([cartId, selectionKey])
   @@index([cartId])
 }

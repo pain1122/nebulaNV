@@ -346,12 +346,54 @@ the two HTTP-only Realm Auth shadow and gateway targets:
 - `order-service`
 - `gateway`
 
-`docker-bake.hcl` defines the official eleven-target set. Normal tooling invokes those
-targets sequentially in backend-inventory order. The first target commits the
-shared build, dependency, and runtime-base layers; later targets can reuse those
-completed layers instead of competing to materialize identical pnpm installs
-and large copies. Do not use the grouped `docker buildx bake backend --load`
-command for normal Docker Desktop builds.
+`docker-bake.hcl` defines the official eleven-target set. Without service names,
+normal tooling invokes that full inventory sequentially using one shared `all`
+compilation scope. A partial request keeps the supplied order and stops on the
+first failure:
+
+```powershell
+pnpm docker:build:backend order-service gateway --plan
+pnpm docker:build:backend order-service gateway
+.\scripts\docker\build-backend.ps1 -Services order-service,gateway -Plan
+```
+
+`--plan` / `-Plan` prints commands without contacting Docker or building images.
+Every Compose target selects its own graph, including the operator Realm Auth
+profile sharing its image. The inventory-backed runner gives every image in a
+batch the same canonical selected union; a full request uses `all`. The first
+image builds that union, and later sequential exports reuse identical compilation
+and shared runtime inputs. Requested export order is preserved. Standalone
+`docker compose build <service>` remains a leaf build.
+
+Turbo pruning separates lockfile/policy fetch, frozen selected install, explicit
+owner Prisma generation and source compilation. Only selected database owners
+generate clients; Gateway and Auth have no owner schema. Restored shared outputs
+refresh injected copies before dependent builds. Root tooling still declares
+clients/grpc-auth/protos, so prune retains those source packages as well as the
+app closure; this does not add sibling application compilation. The shared
+production dependency layer remains unchanged. No real env enters build inputs.
+
+Product/Order image, warm and isolation acceptance passed. The other services
+and batch packaging now pass native build and offline image closure; unchanged
+warm full batch passes at 111.1s (1m51.1s). CI cache persistence is implemented,
+with hosted validation pending; see the [Segment 3 receipt](../reports/2026-10-26-build-cleanup-segment3.md).
+Actual builds report elapsed seconds and preserve caches unless explicitly asked
+for a clean build. Keep automatic cache cleanup enabled; a cache target is not a
+hard cap on total image/volume storage.
+
+If a graph image fails, preserve its log before using the explicit legacy
+fallback; do not disable frozen installs, runtime checks or add `--no-cache`:
+
+```powershell
+docker buildx bake product-service --load --set=product-service.args.BACKEND_BUILD_PIPELINE=legacy
+```
+
+No container recreation is necessary just to build/compare an image. Existing
+running containers are unchanged until a separate deployment command is run.
+
+Shared layers can be reused when their inputs and build arguments match. Do not
+use the grouped `docker buildx bake backend --load` command for normal Docker
+Desktop builds: parallel solves can compete to materialize large dependency trees.
 
 The resulting images still share an identical, stable production-dependency
 layer. Compiled universal internal packages are added afterward as small
@@ -394,13 +436,18 @@ admin and normal-user records, settings-service owns its defaults, and media,
 taxonomy, product, blog, and order currently own no base rows. The user seed
 refuses to run when `NODE_ENV=production`.
 
-After all services are ready, `pnpm backend:seed` logs in as the ordinary seeded
-admin and creates one stable product and one published blog post through the
-existing HTTP APIs. It omits the product category so product-service resolves
-its initializer-owned default. Matching records are reported as existing and
-are never updated. The command refuses production and never logs credentials or
-tokens. Custom seed credentials must be supplied through `SEED_ADMIN_EMAIL` and
-`SEED_ADMIN_PASS` in the invoking environment.
+After all services are ready, `pnpm backend:seed` runs `pnpm demo:d1:seed` for
+the Product showcase through Gateway, then preserves the existing minimal Blog
+lookup/create through its internal HTTP compatibility API. The Product runner
+uses its ownership journal to resume/verify fixtures, refuses drift and handles
+Gateway rate limits with bounded waits. It keeps existing limits fixtures if
+already loaded. Run `pnpm demo:d1:seed limits` explicitly for capacity examples.
+The old minimal Product generator is retired; existing legacy rows are not
+deleted. Base/setup seeds and service-owned taxonomy initialization remain
+separate. Both demo paths refuse production; Product also requires a local
+Gateway target. Custom seed credentials use `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASS`
+in the invoking environment. Seeding can pause for scanner/derivative processing
+or Gateway quotas; no additional Docker build is performed by this seed command.
 
 When adding a service with Prisma, check:
 

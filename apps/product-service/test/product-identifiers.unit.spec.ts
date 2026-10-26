@@ -33,7 +33,12 @@ function product(overrides: Partial<Product> = {}): Product {
     price: new Prisma.Decimal(100),
     currency: "USD",
     thumbnailUrl: null,
+    thumbnailMediaId: null,
+    thumbnailTitle: null,
+    thumbnailAlt: null,
     categoryId: CATEGORY_ID,
+    brandId: null,
+    tagIds: [],
     discountType: null,
     discountValue: null,
     discountActive: false,
@@ -86,6 +91,7 @@ function service(create: jest.Mock, update = jest.fn()): ProductServiceImpl {
     client({
       GetString: jest.fn().mockReturnValue(of({ value: "USD", found: true })),
     }),
+    client({}),
   );
 }
 

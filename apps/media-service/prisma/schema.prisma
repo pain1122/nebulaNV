@@ -32,6 +32,14 @@ enum ScanStatus {
   FAILED
 }
 
+enum MediaJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 model Media {
   id String @id @default(uuid()) @db.Uuid
 
@@ -41,6 +49,9 @@ model Media {
   filename         String
   folderPath       String  @default("/")
   displayName      String  @default("")
+  title            String?
+  defaultAlt       String?
+  metadataVersion  Int     @default(1)
   originalFilename String?
   mimeType         String
   sizeBytes        Int
@@ -75,6 +86,12 @@ model Media {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  processingJob         MediaProcessingJob?
+  verifiedSource        MediaVerifiedSource?
+  derivativeGenerations MediaDerivativeGeneration[]
+  derivativeState       MediaDerivativeState?
+  derivatives           MediaDerivative[]
+
   @@index([ownerId])
   @@index([identityRealmId, subjectId])
   @@index([accessClass])
@@ -89,4 +106,128 @@ model Media {
   @@index([status])
   @@index([scanStatus])
   @@index([promotedAt])
+}
+
+model MediaProcessingJob {
+  id                    String         @id @default(uuid()) @db.Uuid
+  mediaId               String         @unique @db.Uuid
+  media                 Media          @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  status                MediaJobStatus @default(QUEUED)
+  attempts              Int            @default(0)
+  maxAttempts           Int            @default(5)
+  availableAt           DateTime       @default(now())
+  leaseToken            String?        @db.Uuid
+  leaseUntil            DateTime?
+  expectedSha256        String?
+  expectedUploadBinding String?
+  lastError             String?
+  completedAt           DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([status, availableAt])
+  @@index([status, leaseUntil])
+}
+
+// The checksum is not globally unique: identical bytes can have distinct owners.
+// New uploads never use the legacy client-claimed Media.sha256 as verified fact.
+model MediaVerifiedSource {
+  mediaId   String   @id @db.Uuid
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  bucket    String
+  path      String   @unique
+  sha256    String
+  mimeType  String
+  sizeBytes Int
+  width     Int
+  height    Int
+  scanner   String
+  scannedAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([sha256])
+}
+
+// Register a copy before PUT. A lost claim, crash, or deletion leaves a durable
+// cleanup record; successful publication removes it in the same transaction.
+model MediaObjectCleanup {
+  id          String   @id @default(uuid()) @db.Uuid
+  bucket      String
+  path        String
+  availableAt DateTime
+  attempts    Int      @default(0)
+  lastError   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([bucket, path])
+  @@index([availableAt])
+}
+
+model MediaDerivativeGeneration {
+  id           String                 @id @default(uuid()) @db.Uuid
+  mediaId      String                 @db.Uuid
+  media        Media                  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  requestHash  String
+  sourceSha256 String
+  recipes      Json
+  watermarks   Json
+  fontSha256   String?
+  status       MediaJobStatus         @default(QUEUED)
+  attempts     Int                    @default(0)
+  maxAttempts  Int                    @default(5)
+  availableAt  DateTime               @default(now())
+  leaseToken   String?                @db.Uuid
+  leaseUntil   DateTime?
+  lastError    String?
+  completedAt  DateTime?
+  retiredAt    DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  outputs      MediaDerivative[]
+  desiredFor   MediaDerivativeState[] @relation("DesiredDerivativeGeneration")
+  approvedFor  MediaDerivativeState[] @relation("ApprovedDerivativeGeneration")
+
+  @@unique([id, mediaId])
+  @@index([mediaId, createdAt])
+  @@index([status, availableAt])
+  @@index([status, leaseUntil])
+}
+
+model MediaDerivativeState {
+  mediaId              String                     @id @db.Uuid
+  media                Media                      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  desiredGenerationId  String?                    @db.Uuid
+  desiredGeneration    MediaDerivativeGeneration? @relation("DesiredDerivativeGeneration", fields: [desiredGenerationId, mediaId], references: [id, mediaId], onDelete: NoAction)
+  approvedGenerationId String?                    @db.Uuid
+  approvedGeneration   MediaDerivativeGeneration? @relation("ApprovedDerivativeGeneration", fields: [approvedGenerationId, mediaId], references: [id, mediaId], onDelete: NoAction)
+  updatedAt            DateTime                   @updatedAt
+}
+
+model MediaDerivative {
+  id               String                    @id @default(uuid()) @db.Uuid
+  mediaId          String                    @db.Uuid
+  media            Media                     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  generationId     String                    @db.Uuid
+  generation       MediaDerivativeGeneration @relation(fields: [generationId, mediaId], references: [id, mediaId], onDelete: Cascade)
+  view             String
+  recipe           Json
+  recipeHash       String
+  processorVersion String
+  sourceSha256     String
+  watermarkMediaId String?                   @db.Uuid
+  watermarkSha256  String?
+  fontSha256       String?
+  fontFamily       String?
+  bucket           String
+  path             String                    @unique
+  sha256           String
+  mimeType         String
+  width            Int
+  height           Int
+  sizeBytes        Int
+  createdAt        DateTime                  @default(now())
+
+  @@unique([generationId, view])
+  @@index([mediaId])
+  @@index([watermarkMediaId])
 }

@@ -67,6 +67,14 @@ message Product {
   int32  version = 42;
   string selectionMode = 43; // BASE|VARIANT
   repeated ProductVariant variants = 44;
+  string thumbnailMediaId = 45;
+  string brandId = 46;
+  repeated string tagIds = 47;
+  string thumbnailTitle = 48;
+  string thumbnailAlt = 49;
+  optional string thumbnailTitleOverride = 50;
+  optional string thumbnailAltOverride = 51;
+  string effectivePriceAmount = 52; // exact two-decimal internal commerce amount
 }
 
 message ProductVariant {
@@ -82,6 +90,7 @@ message ProductVariant {
   bool active = 10;
   int32 sortOrder = 11;
   string deletedAt = 12;
+  string effectivePriceAmount = 13; // exact amount after parent discounts
 }
 
 // -----------------------------------------
@@ -135,6 +144,11 @@ message ProductInput {
   bool   trackInventory = 82;
   int32  stockQuantity = 83;
   string selectionMode = 84;
+  string thumbnailMediaId = 85;
+  string brandId = 87;
+  repeated string tagIds = 88;
+  optional string thumbnailTitle = 91;
+  optional string thumbnailAlt = 92;
 }
 
 message ProductPatch {
@@ -182,6 +196,16 @@ message ProductPatch {
   bool   trackInventory = 82;
   int32  stockQuantity = 83;
   string selectionMode = 84;
+  string thumbnailMediaId = 85;
+  bool clearThumbnailMedia = 86;
+  string brandId = 87;
+  repeated string tagIds = 88;
+  optional string thumbnailTitle = 91;
+  optional string thumbnailAlt = 92;
+  bool clearBrand = 89;
+  bool replaceTagIds = 90;
+  bool clearThumbnailTitle = 93;
+  bool clearThumbnailAlt = 94;
 }
 
 // -----------------------------------------
@@ -265,12 +289,29 @@ message GalleryImage {
   string alt  = 3;
   int32  sort = 4; // maps to sortOrder
   string deletedAt = 5; // ISO-8601 string; always empty on public reads
+  string mediaId = 6;
+  string title = 7;
+  optional string altOverride = 8;
+  optional string titleOverride = 9;
+  int32 metadataVersion = 10;
 }
 
 message NewImage {
   string url  = 1;
-  string alt  = 2;
+  optional string alt  = 2;
   optional int32 sort = 3; // if absent, Product appends after current active images
+  string mediaId = 4;
+  optional string title = 5;
+}
+
+message UpdateImageMetadataRequest {
+  string productId = 1;
+  string imageId = 2;
+  int32 expectedVersion = 3;
+  optional string title = 4;
+  optional string alt = 5;
+  bool clearTitle = 6;
+  bool clearAlt = 7;
 }
 
 message AddImagesRequest {
@@ -312,7 +353,38 @@ message GalleryResponse {
 // -----------------------------------------
 // Service
 // -----------------------------------------
+// Internal checkout ownership: only signed Order service may call these methods.
+message CheckoutStockLine {
+  string productId = 1;
+  string variantId = 2; // empty for a base selection
+  int32 quantity = 3;
+  int32 expectedVersion = 4;
+  string sku = 5;
+  string unitPrice = 6; // exact Decimal(18,2) amount, including discount
+  map<string, string> selectedOptions = 7;
+}
+message ReserveCheckoutStockRequest {
+  string intentId = 1;
+  string payloadHash = 2;
+  string currency = 3;
+  repeated CheckoutStockLine lines = 4;
+}
+message CheckoutStockIdentity {
+  string intentId = 1;
+  string payloadHash = 2;
+}
+message CheckoutStockResponse {
+  string intentId = 1;
+  string payloadHash = 2;
+  string state = 3; // HELD | FINALIZED | CANCELLED; RESTORED only for RestoreCheckoutStock
+}
+
 service ProductService {
+  rpc ReserveCheckoutStock(ReserveCheckoutStockRequest) returns (CheckoutStockResponse);
+  rpc FinalizeCheckoutStock(CheckoutStockIdentity) returns (CheckoutStockResponse);
+  rpc CancelCheckoutStock(CheckoutStockIdentity) returns (CheckoutStockResponse);
+  rpc RestoreCheckoutStock(CheckoutStockIdentity) returns (CheckoutStockResponse);
+  rpc UpdateImageMetadata(UpdateImageMetadataRequest) returns (GalleryResponse);
   rpc CreateProduct (CreateProductRequest) returns (ProductResponse);
   rpc CreateProductV3 (CreateProductRequest) returns (ProductResponse);
   rpc UpdateProduct (UpdateProductRequest) returns (ProductResponse);

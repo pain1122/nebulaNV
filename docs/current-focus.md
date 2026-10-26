@@ -1,266 +1,431 @@
-# Current Focus
+# Current Focus - D2: Cart, Checkout, And Order
 
-Last updated: 2026-09-28
+Last updated: 2026-10-26.
+Status: active Batch 3 - Orders. Batches 0, 1 and 2 are closed.
+Immediate priority: [ASAP build cleanup](ASAP-BUILD-CLEANUP.md), Segment 3:
+finish hosted integration, CI cache and release archive acceptance. All services
+already use the accepted shared graph. Segments 1 and 2 are closed; D2 feature
+work and its pending deployment/live gates remain preserved. This is build-cleanup
+Segment 3, not a D2 feature implementation slice.
 
-Status: active backend execution checklist.
+Product/Order acceptance is complete. Paired graph image builds passed at
+Product 198.2s / Order 240.4s; unchanged warm image builds passed at 11.2s / 9.4s.
+Both packaged images load their own application/shared dependencies without a
+sibling application checkout. All ten native modified-input cases now pass:
+owner source edits compile only their owner, schema edits regenerate only their
+owner, unrelated Media edits preserve downstream layers, and shared contract edits
+compile each producer once with no sibling application compilation. The agent
+verified all ten raw logs against summary run
+`7b74b201-02d4-4e31-b9d3-5af5f79d6cc6`; evidence is archived. No new production
+image was exported by those cache-only cases. Earlier cache-pressure and repeated
+benchmark-marker failures remain documented; neither was silently waived.
 
-## Active Slice
+Docker currently has seven CPUs/about 13.10GiB usable RAM and an approved active
+40GiB build-cache retention target with automatic cleanup enabled. Config backups
+are preserved. One retired setup container was removed without deleting volumes.
+Resource/cache settings differ from the original slow build baseline, so timings
+are not a controlled single-cause speedup measurement. Application readiness is
+separate; the build proofs do not certify stopped applications or pending D2 SQL.
+[Resource/recovery receipt](reports/2026-10-26-docker-resource-budget.md).
 
-D1 - Default-Site Commerce Domain, backend implementation and proof only.
+All eleven graph images now build/export successfully. The first image compiled
+all five shared packages and eleven applications once (82.0s compilation RUN);
+the following ten reused fetch/install/generation/compilation. Full initial batch
+image elapsed is 665.4s (11m05.4s), including first per-image packaging/export.
+All eleven offline/read-only/no-network image closures pass against exact native
+export digests, including nine native Prisma engines, Gateway/Auth without own
+Prisma, Realm Auth's smaller runtime closure, and Media Sharp/font/license checks.
+Media emits a nonblocking default Fontconfig configuration warning; explicit
+bundled-font rendering succeeds. No application containers were recreated.
 
-The adopted backend-first sequence is:
+Unchanged warm all-image acceptance now passes: 111.1s (1m51.1s), eleven exit0,
+every RUN cached, zero compilation misses, application/config digests unchanged.
+The local all-service optimization is accepted. No repeat local build is needed.
+[Native/warm receipt](reports/2026-10-26-build-cleanup-segment3.md).
 
-```text
-D1 product/catalog backend
--> D2 cart/checkout/order backend
--> B0 Backend Ecommerce Release
--> wait for the user-supplied Vite admin
--> F7 admin integration foundation
--> D3 admin workflow proof
--> P0 Admin-Validated Ecommerce Demo
--> M2 -> F5 -> M5 -> M3S -> F8 -> F6 -> D5
--> AI0 -> M7 -> F9 -> resume F4 at R6.1
-```
+CI host Turbo/layer-cache persistence and exact tested-image identity evidence
+are implemented with focused YAML/policy/Bake/Bash/redaction checks. All existing
+quality/live/scan gates remain. Hosted cache upload/restore and pipeline acceptance
+are now moving into the hosted workflow following Salar's explicit authorization
+to push the current project snapshot to main; no hosted pass is claimed yet. Docker cache mounts remain ephemeral; host task cache and exported layers
+are separate. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
-D4 client-driven storefront delivery is a separate non-gating track after B0.
-It begins only when concrete client requirements exist.
+Final release tooling fixes include the previously omitted scanner (sixteen unique
+images), Windows JSON array handling and -Input path handling. All 79 tooling
+checks pass; the hosted workflow will exercise native metadata upgrade, F3/e2e/
+scan gates and a streamed archive round trip without leaving a large tar.
 
-`TODO-ALTERNATIVE.md` owns this order. F4 R0-R5 remains preserved at commit
-`3285c00` and paused. Its implementation and restart state remain recorded in
-the F4 depth audit and paused execution checklist.
+Remaining [Segment 3 gates](ASAP-BUILD-CLEANUP.md#3-generalize-and-align-integrationrelease):
+hosted CI proof and integration/release/D2 deployment/live evidence. Earlier
+9 graph / 12 tooling / 22 health checks and native closures remain valid; CI-only
+files do not change production build inputs. Heavy execution remains with Salar;
+do not restart new images before the pending D2 deployment gate.
+Optional packaging/env/watch/package splits remain separate decisions.
 
-Unchecked items in this file are planned work. They do not claim that the
-behavior exists.
+Evidence: [native acceptance](reports/2026-10-26-build-graph-native-proof.md),
+[Segment 2 trace](reports/2026-10-24-build-cleanup-segment2.md),
+[initial audit](reports/2026-10-24-backend-build-audit.md), and
+[selection/dependency receipt](reports/2026-10-24-build-cleanup-execution.md).
 
-## Current Goal
+Salar reports corrected Checkout recovery and Cart live passed. Earlier normal
+Checkout/F3, native migrations/deployment, owner SQL proofs, 94 Order unit tests,
+36 client/recovery checks and 21 preflight checks remain recorded.
+The Oct 19 post-proof inspection recorded all sixteen containers healthy, eleven backend
+health checks passed, no active checkout attempts and no temporary fault trigger.
+No repeat build, migration or passing proof is needed without a relevant change.
+Oct 24 recovery: Salar reports cold Docker/WSL recovery succeeded. Supplied
+output confirms all ten configured backend checks pass and the complete
+`db:verify:d2:stock` regression passes, including owned database cleanup.
+Batch 3 read slice: protected admin list/detail source and focused checks are
+implemented; image/native/Gateway live proof remains pending. Evidence:
+[read-slice receipt](reports/2026-10-19-d2-batch3-reads.md).
+Status controls now have local contract and PostgreSQL evidence: version checks,
+durable replay and atomic verified-actor audit for manual demo paid/fulfilled
+transitions. [Status-control receipt](reports/2026-10-19-d2-batch3-status-controls.md).
+Salar reports Checkout/coordination compatibility proofs passed without errors.
+Product's separate finalized-stock restoration primitive now has local checks
+and real PostgreSQL proof. [Restoration receipt](reports/2026-10-19-d2-stock-restoration.md).
+Order cancellation/recovery source is prepared. Salar reports its cancellation
+and status SQL proofs passed; grouped native deployment remains pending.
+[Cancellation trace](reports/2026-10-24-d2-order-cancellation.md).
+Backed demo attempts follow, preserving the approved failure-to-PENDING policy.
+[Before-edit payment approach and consumer trace](reports/2026-10-24-d2-demo-payment-plan.md).
+Salar selected customer initiation with admin demo outcome simulation. First
+verify the Order-owned attempt/stock lifecycle; explicit signed/Gateway routes
+follow. The owner lifecycle is implemented and Salar supplied a complete passing
+`db:verify:d2:demo-payment` result: upgrade/rollback, exact constraints, release/
+retry/recovery, competing outcomes and original status/cancellation regressions.
+Two owned disposable databases were cleaned. Both owners/SQL are real; transport
+and publication dependencies were stubbed. Explicit customer/admin HTTP/RPC/Gateway/SDK transports are prepared; grouped
+native deployment remains pending.
+[Transport evidence](reports/2026-10-24-d2-demo-payment-transports.md). No real provider is added.
+Unchecked items are not completion claims.
 
-Finish and harden the backend path from the existing core services through a
-coherent default-site ecommerce workflow. Prove that workflow through the
-public gateway, generated external client, integration tests, deterministic
-fixtures, and live database evidence before depending on a frontend.
+## Goal and boundaries
 
-The current milestone does not build a storefront, import or modify the Vite
-admin, implement a file-manager UI, select production client origins, or resume
-tenant/realm work. When the Vite admin is supplied, it becomes a consumer of
-the proven backend rather than a prerequisite for defining it.
+Complete a default-site customer cart, one durable idempotent demo checkout,
+and user/admin order workflows through the Gateway and generated client.
+D1 and F5 Core are closed: [D1 exit report](reports/2026-10-12-d1-exit-report.md).
+Their detailed checklist is [archived](reports/2026-10-12-d1-completed-focus.md).
 
-Client IDs, origins, domains, proxy paths, and deployment addresses remain
-environment/registry configuration. Local examples may exercise the contracts,
-but they are not permanent production topology decisions.
+The adopted order remains D2 -> Backend Ecommerce Release B0 -> supplied Vite
+admin/F7/D3. Production payments, broader inventory, frontend work, file-manager,
+cloud/CDN and tenant/realm activation remain deferred. Keep demo/no-production-
+payment labeling explicit and never collect real payment credentials.
 
-## Repository Truth At Entry
+Existing Order code already has cart operations, Product/Settings calls, user
+order filtering and a local checkout transaction. Preserve working mechanisms;
+the entry audit establishes what actually needs correction.
 
-| Area               | Current implementation                                                                                                                          | D1 consequence                                                                                               |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Gateway            | F3 exposes generated, gateway-only external Auth, User, Settings, Media, Taxonomy, Product, Blog, and Order APIs                                | Preserve this boundary and close only proven Product contract gaps                                           |
-| Product lifecycle  | `DRAFT`, `ACTIVE`, and `ARCHIVED` exist; public reads force active/non-deleted visibility and admin reads are separate                          | Keep the mechanism and extend it without weakening visibility                                                |
-| Product model      | Product owns bounded base stock, derived availability, mutation version, and bounded variants alongside its existing commercial fields          | Preserve the verified Batch 1 contract while completing taxonomy, Media references, and D1 exit proof        |
-| Variants           | Bounded ProductVariant, shared SKU reservation, versioned mutation, and Gateway/client contracts passed Docker migration and live Gateway proof | Preserve this slice while completing D1-R and D1-X                                                           |
-| Taxonomy           | Product-scoped taxonomy facade and default-category initialization exist                                                                        | Preserve ownership; prove category/tag/brand needs against current taxonomy contracts                        |
-| Media              | Media-service owns media policy, while Product currently stores URL strings and does not validate Media records                                 | Replace product-facing URL authority with the minimum validated Media-reference contract; no file-manager UI |
-| Currency           | Product validates writes against the Settings shop currency; Order still has a separate cart default                                            | Align Order during D2 without reopening Product's completed write authority                                  |
-| Product operations | Internal HTTP is limited, but the gateway already exposes all current gRPC management operations and generates client methods                   | Preserve the route boundary and repair its commercial data and response contracts                            |
-| Orders             | Cart, checkout, order snapshots, ownership checks, and admin status mutation already exist                                                      | D2 will harden idempotency, stock, currency, transitions, rollback, and response mapping                     |
-| Frontends          | `apps/web` remains the compatibility client; the intended admin is an external Vite project and no storefront is required now                   | Do not change frontend source during D1/D2                                                                   |
-| Tenant work        | F4 R0-R5 is dormant and the paused R6.1 experiment is preserved in a named path-scoped stash                                                    | Preserve that stash untouched and make no tenant-isolation claim                                             |
+## Working rules
 
-## Finding Classification
+Before each change, follow the
+[mandatory test preparation checklist](testing/pre-suite-checklist.md).
+Record exact consumer paths and findings in the slice report, update consumers
+after editing, run applicable cheap gates and write the handoff receipt before
+broad tests/builds. Contract changes require `pnpm test:preflight`.
+A mock pass is not SQL/runtime evidence; heavy proofs stay explicitly pending.
 
-| Finding                                                                      | Classification                  | Treatment                                                                         |
-| ---------------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------- |
-| Public/admin Product visibility separation exists and has focused tests      | Confirmed working mechanism     | Preserve and expand regression coverage only where behavior changes               |
-| Product variants were absent                                                 | Confirmed implementation gap    | Bounded variant slice implemented and locally verified                            |
-| Product media is represented by unchecked URLs                               | Confirmed implementation gap    | Introduce validated Media references and semantic roles through service contracts |
-| Product and Order currency sources can drift                                 | Confirmed implementation gap    | Define one settings-backed shop-currency invariant across D1/D2                   |
-| Some management operations lack gateway parity                               | Confirmed implementation gap    | Expose only the operations required by the admin ecommerce workflow               |
-| A new storefront is needed before backend work                               | Stale roadmap assumption        | Remove it from the D1/D2 entry and B0 exit gates                                  |
-| The Vite admin must be converted or finalized now                            | Stale roadmap assumption        | Wait for its source, then integrate it during F7/D3                               |
-| Fixed production origins or BFF topology can be chosen now                   | Future deployment consideration | Keep them configurable and decide from client/deployment requirements             |
-| Full storage-provider abstraction or file manager is required by D1          | Optional/deferred breadth       | Keep Media correctness; defer file-manager UI and M3S breadth                     |
-| General tenant/site scoping is required for the default-site backend release | Deferred F4 work                | Preserve migration seams and state the single-site limitation                     |
+Run fast inspections/focused checks directly. Salar runs heavy builds, broad
+integration/live suites and Compose work. Reuse passing evidence unless a
+relevant change/failure invalidates it. Preserve unrelated work and the paused
+R6.1 stash. No cross-service database reads or caller-supplied authority.
 
-## Execution Contract
+Salar confirms project demo databases/data are disposable and may be recreated
+when needed. Preserving today's demo rows is not a development objective. Keep
+contract/ownership/replay/rollback checks, but group build/deployment cycles and
+avoid repeating production-style maintenance steps for each additive demo change.
+No database is erased by this policy update. Current reusable seeders cover
+accounts/settings and D1 catalogue (18 Products, two Media, seven taxonomies;
+limits profile optional). Cart/Order/receipt fixtures are not yet a complete
+reusable ecommerce template: Order's Prisma seed is empty. Complete that existing
+Batch 4 fixture task through real contracts. Full recreation must also renew
+the demo journal and relevant cache state so old IDs/results are not reused.
 
-Each D1 batch must:
+## D2 Entry Audit
 
-1. inspect current schema, migrations, service code, transports, gateway DTOs,
-   generated client output, seeds, and tests before changing a contract;
-2. preserve working Auth, actor-policy, gateway envelope, S2S, taxonomy, media,
-   and public-visibility mechanisms;
-3. use the narrowest correction for a confirmed ecommerce gap;
-4. keep external access gateway-only and service databases private;
-5. make schema changes migration-safe and provide populated upgrade, rerun,
-   rollback, and failure evidence when applicable;
-6. keep the default-site/default-realm limitation explicit and avoid dormant
-   F4 context-v3 activation;
-7. leave broad Compose, full live suites, image builds, and other timeout-prone
-   commands to Salar while running fast focused checks locally.
+Batch 0; complete before implementing Batch 1.
 
-## Batch 0 - Product Contract And Data Audit
+- [x] Trace schemas/migrations, Order DTOs/service/HTTP/gRPC, Product/Settings
+      calls, Gateway mappings/policies, generated client, fixtures and tests.
+      Record the consumer impact table before implementation.
+- [x] Classify confirmed gaps and existing working mechanisms for ownership,
+      variants, totals/currency/stock, checkout replay/rollback, snapshots and
+      status changes. Separate stale documentation, optional hardening and
+      future scaling; keep the following batches bounded to the adopted D2 scope.
 
-- [x] Build a field-by-field matrix across Prisma, HTTP DTOs, gRPC proto,
-      gateway DTOs, OpenAPI, generated client types, seeds, and documentation.
-- [x] Trace create, update, public read, admin read, archive/delete/restore,
-      taxonomy, gallery, pricing, stock, and availability behavior end to end.
-- [x] Record current uniqueness, concurrency, transaction, error translation,
-      and authorization behavior with exact source/test evidence.
-- [x] Confirm which existing advanced fields are dormant compatibility data and
-      keep them outside the basic ecommerce contract.
-- [x] Run focused Product, Taxonomy, Media, Settings, gateway, external-client,
-      migration-status, and relevant live baselines.
-      Product (24), Taxonomy (8), Media (30), Settings (12), and focused gateway
-      Product (8) tests plus `pnpm api:check` pass. Product e2e passed 9 suites
-      and 52 tests; F3 live passed all six flows; all nine Prisma services passed
-      clean migration verification with zero disposable databases remaining;
-      the final backend boot and all eleven readiness checks passed. Four
-      baseline incidents and their narrow corrections are recorded in the D1
-      audit.
-- [x] Produce a dated D1 implementation matrix with confirmed defects separated
-      from stale documentation, optional hardening, and future scaling work.
-      See [D1 Batch 0 Product Contract And Data Audit](reports/2026-09-15-d1-batch0-product-contract-data-audit.md).
+Evidence: [D2 entry audit](reports/2026-10-13-d2-entry-audit.md). All 11 backend
+health checks and 16 container health states pass after restoring the existing
+DEFAULT shadow Realm Auth container. Order's 3 unit suites/15 tests pass after
+repairing its stale Product client mock; four nonblocking lint warnings remain.
 
-### Batch 0 Exit
+## Batch 1 - Cart and selections
 
-- [x] Every D1 field and operation has one authoritative owner and an explicit
-      external/internal exposure decision.
-- [x] No schema or transport change is based only on a future frontend guess.
-- [x] Existing passing behavior and rollback points are recorded.
+- [x] Trace all four items' main files and affected callers/contracts/tests/
+      fixtures/tooling; record changed-versus-preserved scope and execution order.
+      [Batch 1 file trace and plan](reports/2026-10-13-d2-batch1-file-trace-and-plan.md).
+      Tracing and the Cart feature/regression gates are complete.
 
-## Batch 1 - Product Core, Lifecycle, And Variants
+Implementation checkpoint: [Batch 1 execution and handoff receipt](reports/2026-10-13-d2-batch1-execution.md).
+Cart selections, exact amounts, ownership/expiry, stock validation and serialized
+mutations are implemented; generated contracts are updated. Disposable SQL and
+actual Prisma-backed owner concurrency pass with stubbed remote authority.
+Salar reports the corrected Docker deploy/rerun/status, Order restart, backend
+health and Cart live proof all passed. Local inspection confirms all four Order
+migrations applied, all three new CartItem fields present, native Prisma status
+up to date at port 15432, and 16 healthy containers. The corrected root commands
+pin the Docker target and have five focused command checks. The earlier target
+failure and fix remain recorded in the execution report. No rebuild or repeated
+Cart/migration proof is needed without a relevant change. Salar reports the
+complete shared regression block all green; exact broad counts/skips were not
+supplied. Batch 1 is closed. Batch 2 snapshot and local replay integration also
+passed. Remote stock coordination and recovery remain incomplete.
 
-- [x] Repair the audited `effectivePrice`, discount-state/wire, create-price,
-      and create/bulk omission defects across Product, gRPC, gateway, OpenAPI,
-      generated client, focused tests, container-backed Product tests, and
-      preserved F3 live flows.
-- [x] Finalize required product fields: title, slug, excerpt, description, base
-      SKU, lifecycle, availability, price, currency, and basic stock.
-- [x] Preserve deterministic global slug/SKU uniqueness for the current
-      single-site release and record the later F4 scoped-uniqueness migration.
-- [x] Define and implement bounded variants with option values, variant SKU,
-      price/stock overrides, active/deleted state, and deterministic ordering.
-- [x] Reject invalid price, currency, stock, option, SKU, lifecycle, and
-      availability combinations at the owning service boundary.
-- [x] Define optimistic concurrency or another explicit lost-update behavior
-      for admin mutations.
-- [x] Keep public reads restricted to purchasable visible state and ensure
-      hidden records cannot be revealed by caller-supplied filters.
+- [x] Finalize cart/item operations using verified user ownership; deny supplied
+      user, price, currency, totals, status, application or site authority.
+      Trace B1-01: Order service/controllers/DTOs -> Gateway input/owner mapping
+      -> authorization/transport tests, expiry/FK fixtures and unit configuration.
+      [File map and approach](reports/2026-10-13-d2-batch1-file-trace-and-plan.md#b1-01-ownership-and-cart-lifetime).
+- [x] Support base and variant selection with selected option facts.
+      Trace B1-02: CartItem schema/service -> Order proto/signed and dormant
+      wrappers -> Gateway/SDK -> codec mocks, migrations and build consumers.
+      [File map and approach](reports/2026-10-13-d2-batch1-file-trace-and-plan.md#b1-02-base-and-variant-selections).
+- [x] Validate Product lifecycle, availability, configured currency, authoritative
+      price and basic stock when adding/updating selections.
+      Trace B1-03: existing Product/Settings authority -> Order effective-price/
+      Decimal validation -> selected response/quote tests and money SQL proofs.
+      [File map and approach](reports/2026-10-13-d2-batch1-file-trace-and-plan.md#b1-03-current-commercial-validation).
+- [x] Define bounded quantity/update/remove behavior and deterministic totals.
+      Trace B1-04: Order mutation/expiry/selection uniqueness -> Cart reply
+      contracts -> unit/real DB concurrency, generated client and legacy proofs.
+      [File map and approach](reports/2026-10-13-d2-batch1-file-trace-and-plan.md#b1-04-quantity-mutations-and-deterministic-totals).
 
-### Batch 1 Exit
+- [x] Complete the already-planned shared regression sign-off: full Order,
+      Product and Gateway suites, affected D1 Product/variant/reference proofs,
+      and F3 live compatibility. Salar reports the sequential block all green;
+      exact broad counts/skips/warnings were not supplied. Earlier locally
+      observed focused counts remain recorded separately. No repeat run is needed
+      without a relevant change or failure.
 
-- [x] Base and variant products have deterministic validated commercial state.
-- [x] Public/admin visibility, uniqueness, and concurrent mutation behavior are
-      covered by focused service tests.
-- [x] Product core contains no payment, showroom, recommendation, tenant, or
-      storage-provider policy.
+## Batch 2 - Checkout (closed)
 
-Batch 1 evidence: the
-[inventory/concurrency checkpoint](reports/2026-09-22-d1-inventory-concurrency-checkpoint.md),
-[shop-currency checkpoint](reports/2026-09-19-d1-shop-currency-authority-checkpoint.md),
-and [variant checkpoint](reports/2026-09-26-d1-variants-checkpoint.md) record
-schema, transport, migration, and live behavior. The 2026-09-28 closure review
-confirmed service/DTO validation for lifecycle, selection mode, stock, options,
-SKU, and currency; added a price-scale/range check matching `Decimal(18,2)` for
-base prices and variant overrides; and passed Product unit tests (12 suites,
-76 tests) and Product type checking. D1-wide populated-upgrade and cross-service
-exit proof remain in Batch 4.
+Closed 2026-10-19: Salar reports corrected recovery and Cart live passed.
+[Final closure and evidence](reports/2026-10-14-d2-checkout-coordination.md#batch-2-closure-2026-10-19).
+Earlier checkpoints below retain their original pending decisions as historical
+execution notes; the closure supersedes their commands and completion status.
 
-## Batch 2 - Taxonomy, Media References, And Shop Currency
+Replay slice: [pinned behavior, consumer trace and preparation](reports/2026-10-13-d2-checkout-replay.md).
+Order-owned completed receipts, required header/RPC key forwarding, original
+response replay, seven-day window and permanent compact key records are
+implemented. Real PostgreSQL replay/concurrency/restart-instance/expiry/compaction
+proof passes with stubbed remote authority. Salar reports native clean migration
+proof and both builds passed, then the shortened demo deploy/recreate block
+completed. Local checks confirm all six migrations, the receipt table, both
+current images and 16 healthy containers. Salar reports the restart/readiness,
+full Order/Gateway suites and Cart/F3 compatibility all passed; broad counts/skips
+were not supplied. Completed local purchase replay is closed. Native rerun/status
+is deferred to consolidated D2 exit. Product stock/recovery now follows; no stock
+effects or remote recovery are claimed by the completed receipt.
 
-- [ ] Confirm the minimum category, tag, and brand relationships required for
-      the ecommerce release and use authoritative Taxonomy records.
-- [ ] Replace public product URL authority with validated Media IDs and semantic
-      thumbnail/gallery roles while preserving a bounded migration path for
-      existing rows.
-- [ ] Validate Media existence and permitted use through versioned service
-      contracts; do not read the Media database or require a file-manager UI.
-- [ ] Define one settings-backed shop currency, normalize its representation,
-      and align Product defaults/validation with the D2 Order contract.
-      Product write authority is complete in the
-      [shop-currency checkpoint](reports/2026-09-19-d1-shop-currency-authority-checkpoint.md);
-      Order alignment remains open for D2.
-- [ ] Define dependency failure behavior for Taxonomy, Media, and Settings so a
-      degraded dependency cannot produce partially valid product state.
-- [ ] Add migration, compatibility, denial, ordering, missing-reference, and
-      dependency-failure tests.
+Stock checkpoint: [Product stock trace, behavior and preparation](reports/2026-10-14-d2-stock-execution.md).
+Product-owned reserve/finalize/cancel and inventory overwrite protection are
+implemented. Actual disposable PostgreSQL proves same-key replay, competing
+reservations, multi-item rollback, cancellation tombstones, variant refunds,
+unmanaged stock and physical deletion protection. Remote publication eligibility
+is stubbed in this owner proof. Salar reports native Product verification passed.
 
-### Batch 2 Exit
+Coordination checkpoint: [Order trace, rules and preparation](reports/2026-10-14-d2-checkout-coordination.md).
+Checkout source now persists a versioned attempt before reserving, freezes Cart
+mutations while active, commits Order/receipt/Cart removal together and finalizes
+before returning success. Leased recovery cancels abandoned pre-commit work and
+finalizes committed work; uncertain commit decisions never trigger blind refunds.
+Order's 8 unit suites/89 tests, the updated Cart/receipt SQL proofs and the new
+actual two-database Prisma proof pass. Remote publication/transport is stubbed
+in that proof. PAYMENT_PROCESSING is added across owner/Gateway/OpenAPI/SDK.
+Salar reports native Order verification passed. After image deployment, direct
+inspection confirmed Product's stock migration was absent: the bare Node
+handoff lacked pnpm context. `pnpm db:migrate:product` now applies it; native
+rerun/status pass. Signed recovery cancelled the stranded attempt and its stock
+intent; the traced native gRPC fixture item was removed through Gateway and
+the seeded customer Cart was emptied for the corrected proof. Subsequent
+Checkout/Cart/F3 live proofs are operator-reported passed. Batch 2 stays open
+for the separate outage/cache-loss proof; do not repeat completed regressions.
 
-- [ ] Published products reference valid taxonomy and Media records.
-- [ ] Product price/currency state cannot contradict the configured shop
-      currency accepted by Order.
-- [ ] No storage credentials, provider URLs, or cross-service database reads
-      enter Product contracts.
+Latest Checkout checkpoint: exact base/variant/free totals and stock-once passed.
+The admin-to-personal-route ownership probe expected 404 but correctly got 403.
+Fixture correction keeps 403 and adds a reusable ordinary other customer for
+the ownership 404; both focused live probes pass and their sessions were revoked.
+Salar reports `pnpm test:d2:checkout:live` ran without errors after the fixture
+correction. Full Checkout live is now operator-reported passed; exact stdout was
+not supplied. Salar subsequently reports Cart and F3 passed too. Preserve those
+results; separate outage/cache-loss execution remains pending.
 
-## Batch 3 - Gateway And External Contract Completion
+Recovery checkpoint (2026-10-19): optional `--recovery` mode is prepared in the
+existing owned Checkout fixture. It evicts only its exact Gateway cache entry,
+stops/restores Product, checks a failed fresh checkout preserves Cart/stock,
+and injects a temporary finalization fault limited to its owned Product. It
+then restarts Order and checks the worker finalizes the committed intent once.
+No production owner/contract/image changes. Eleven focused orchestration checks
+pass; the scoped SQL fixture passed actual disposable PostgreSQL, and exact
+cache eviction plus SQL readers pass against the running local stack. The
+deliberate outage/restart proof remains operator-owned and pending:
+`pnpm test:d2:checkout:recovery:live`. Do not mark Batch 2 complete before it passes.
+The 2026-10-19 startup check confirms 16 healthy containers, all 11 backend
+health probes passing, Gateway readiness 200 and an empty seeded customer Cart.
+Scoped lint/types, 27 client/recovery checks and 21 preflight checks pass.
 
-- [ ] Define the minimum public catalogue and admin management operations for
-      B0 and later Vite-admin integration.
-- [ ] Complete HTTP/gRPC/gateway/OpenAPI/generated-client parity for those
-      operations, including variants, media roles, lifecycle, and concurrency.
-- [ ] Keep external DTOs separate from Prisma and internal proto shapes.
-- [ ] Preserve request IDs, gateway error envelopes, idempotency headers where
-      applicable, actor-derived authority, and exact public/admin route policy.
-- [ ] Add negative coverage for caller-selected identity/site fields, hidden
-      lifecycle access, role denial, invalid related records, conflicts, and
-      degraded downstream services.
-- [ ] Prove browser and native TypeScript consumers compile against the
-      generated client without fixing a production origin or deployment path.
+Recovery result: cache eviction plus completed owner replay passed during the
+real Product outage. Fresh checkout then hit the fixture's 60-second HTTP abort;
+the quote Product/Settings RPCs had no deadline. Existing stock writes were
+already bounded. Order now gives its three read paths a native ten-second
+deadline and cancelling Observable timeout, maps deadline exhaustion to 503 and
+keeps the intentional TTL fallback. All eight Order unit suites/94 tests pass,
+with the existing four error-fixture lint warnings unchanged. All sixteen
+containers were restored healthy; no active attempt or temporary trigger remains.
+Next: cached Order-only build/restart, backend health, recovery live and Cart
+live. Do not rebuild Product/Gateway or rerun migrations for this correction.
 
-### Batch 3 Exit
+Latest checkpoint: Order build succeeded and active image/tag match; runtime
+contains bounded reads. Recovery then failed on a closed HTTP socket before its
+fresh-outage assertion. The runner now reads the exact completed owner attempt
+and permits at most three original-key/body replays only for UND_ERR_SOCKET.
+Fresh checkout writes are never retried; HTTP errors and wrong responses remain
+strict failures. Twenty D2 recovery tests (including a real local HTTP socket
+closure), 36 combined client/recovery checks and 21 preflight checks pass.
+All sixteen containers are healthy, all eleven backend health checks pass and
+there are no active attempts or temporary fault triggers. No rebuild is needed:
+rerun `pnpm test:d2:checkout:recovery:live`, then affected Cart live if successful.
 
-- [ ] Every required catalogue operation is usable through the gateway and
-      generated external client.
-- [ ] No external contract exposes Prisma, internal service addresses, S2S
-      credentials, storage credentials, or trusted-context construction.
-- [ ] OpenAPI and generated client stale checks pass.
+First-slice checkpoint: [execution and preparation evidence](reports/2026-10-13-d2-batch2-execution.md).
+Current price/SKU/options/currency/stock/lifecycle are revalidated; Cart edits
+during quoting conflict. Base/variant Order facts and explicit demo replies are
+implemented. Local unit/codec, typed consumers, actual PostgreSQL populated
+preservation/constraints/fault rollback and Prisma-backed owner concurrency pass.
+The first-slice feature gates are now closed after migration/image integration.
+Salar reports the native clean migration proof and both image builds successful.
+Salar also reports populated deployment/rerun/status, recreation and health passed.
+Local checks confirm all five migrations applied, three snapshot columns present,
+current Order/Gateway images and 16 healthy containers. Salar reports full
+Order/Gateway suites plus Cart and F3 Gateway compatibility all passed; exact
+broad counts/skips were not supplied. Durable replay/stock/recovery follows.
+The existing Cart fault-injection check was corrected and its real proof rerun;
+Order's Compose build now selects only Order and its dependencies.
 
-## Batch 4 - Deterministic Data And D1 Live Proof
+- [x] Inspect current checkout/cache/stock/authorization mechanisms and trace
+      main files and affected consumers before implementation.
+      [Batch 2 trace and execution plan](reports/2026-10-13-d2-batch2-file-trace-and-plan.md).
 
-- [ ] Add deterministic active, draft, archived, base, and variant products
-      covering taxonomy and Media relationships.
-- [ ] Make seed/reset behavior safe to rerun and clearly non-production.
-- [ ] Prove clean migration, populated upgrade, unchanged legacy facts,
-      idempotent rerun, malformed-data denial, and transactional rollback for
-      every new D1 migration.
-- [ ] Run gateway-only live create/update/publish/archive/read scenarios and
-      prove anonymous visibility and admin denial boundaries.
-- [ ] Rerun focused backend quality, generated-contract, and relevant live
-      regression gates.
-- [ ] Record exact commands, results, limitations, deferred behavior, and D2
-      handoff in a dated D1 exit report.
+Begin with revalidation and complete immutable Order snapshots, then wire the
+existing key into durable owner replay and implement Product-owned stock intent/
+recovery. Preserve working Cart locks, signed clients and Gateway cache. No
+customer-to-admin privilege change, cross-service SQL, real payment, generic
+workflow platform or frontend work is part of this batch. Pin concrete replay,
+reservation/cancellation and recovery rules before the corresponding edits.
 
-## D1 Exit
+- [x] Revalidate the cart's current commercial state at checkout and define
+      deterministic handling of changed/unavailable base or variant selections.
+- [x] Implement bounded idempotent replay and conflict behavior, including
+      concurrent attempts that must not create duplicate orders or stock effects.
+- [x] Define the minimum demo stock decrement/reservation behavior and prove
+      failure rollback across the affected service boundaries.
+- [x] Store product/variant identity, SKU, title, options, unit price, currency
+      and quantity as order snapshots that later catalogue edits cannot rewrite.
+- [x] Keep checkout explicitly demo/no-production-payment; do not fabricate a
+      settled payment-provider transaction.
 
-- [ ] Admin-authorized API clients can manage a complete default-site product,
-      variants, taxonomy, commercial state, and governed Media references
-      entirely through the gateway.
-- [ ] Anonymous API clients see only valid public products and cannot widen
-      lifecycle, deletion, identity, application, or site scope.
-- [ ] The shop-currency contract is stable for D2.
-- [ ] Seeds, migrations, denial cases, dependency failures, and gateway-only
-      live behavior pass.
-- [ ] No storefront, admin UI, file manager, production endpoint, payment,
-      tenant, showroom, or AI completion is claimed.
-- [ ] D2 becomes the next active phase.
+## Batch 3 - Orders
 
-## Guardrails
+Current execution: [Batch 3 findings, exact consumer trace and execution order](reports/2026-10-19-d2-batch3-file-trace-and-plan.md)
+are recorded. Personal ownership/unfinished-Checkout filtering and admin guards
+already work. Confirmed gaps are separate admin reads, permitted transitions,
+mutation concurrency, owner replay/audit and binding required stock/payment
+effects. Read and manual status-control slices are implemented and locally
+checked; runtime/compatibility proofs and required stock/payment effects are
+still open. Cancellation now dispatches through a durable stock-backed operation
+in source; SQL/native proof is pending. Processing transitions remain rejected
+until backed demo attempts are implemented; no deployed side effect is implied.
 
-- Do not create `apps/storefront` during D1/D2.
-- Do not import, modify, convert, or scaffold the Vite admin until its source is
-  supplied and B0 has passed.
-- Preserve current `apps/web` and its F3 compatibility tests until D3 parity.
-- Do not implement a file-manager UI or broad S3/provider abstraction.
-- Do not activate Realm Auth, context v3, Tenant Authority, or general
-  tenant/site scoping.
-- Do not apply, edit, or drop the named R6.1 Realm Auth experiment stash.
-- Preserve unrelated dirty work.
+Execution order: protected reads first; transition/version/replay/audit controls
+second; approved cancellation restoration and minimum demo attempt effects third;
+then one grouped contract/SQL/image/live handoff. Preserve existing mechanisms
+and defer production providers. Agent handles preparation/focused checks; Salar
+handles long builds/native/broad/live commands after their prerequisites pass.
 
-## Next Action
+- [x] Preserve user list/detail restricted to the verified order owner.
+- [ ] Complete authorized admin list/detail and status changes through Gateway.
+- [ ] Define permitted transitions, concurrency, idempotency and audit facts;
+      prevent caller-supplied authority at these boundaries.
+      Approved payment policy: confirmed failed/customer-cancelled payment
+      releases its hold and returns Order to PENDING; retry revalidates and
+      reserves again. Uncertain results stay PAYMENT_PROCESSING for
+      reconciliation. Explicit Order cancellation is CANCELLED. Implement the
+      payment-attempt binding and permitted transitions under this item; an admin
+      status patch is not a provider event. Current checkout is DEMO_NO_PAYMENT.
+      Newly approved: cancelling an unpaid demo Order restores its already
+      deducted stock exactly once. Checkout's FINALIZED deduction needs a
+      distinct Product-owned restoration; do not misuse HELD cancellation or
+      silently introduce paid refunds/fulfilled-order reversal.
+- [x] Use explicit service and Gateway response mapping, with stable envelopes
+      and commercial values, instead of exposing Prisma-shaped results.
 
-Batch 1 is closed. Execute D1-R, the Batch 2 taxonomy, validated Media-reference,
-and shop-currency slice, following the
-[D1-D2 backend ecommerce acceleration plan](reports/2026-09-26-d1-d2-acceleration-plan.md).
-Preserve the Product currency authority already established; align Order's
-currency and cart transitions during D2. After D1-R, complete Batch 3 contracts
-and Batch 4 migration, fixture, rollback, and gateway-only live proof before
-declaring D1 complete.
+## Batch 4 - Contracts and exit proof
+
+- [ ] Confirm parity across affected DTOs, protobufs, shared clients, Gateway
+      policies/input profiles, OpenAPI and generated client. Consumer updates
+      happen within each earlier batch; this is the final parity check.
+- [ ] Prove replay/concurrency, stale Product/variant state, ownership/role denial,
+      invalid transitions, dependency failure and complete rollback with focused
+      and integration tests.
+- [ ] Provide applicable clean/populated migration, rerun/rollback and precise
+      demo fixture/reset evidence using the real affected contracts.
+      Extend the existing template with Cart/Order/receipt cases after the D2
+      behavior stabilizes; keep full-demo recreation repeatable with journal/
+      cache synchronization. Disposable data does not replace correctness proofs.
+- [ ] Run final scoped quality/preflight and Gateway-only live cart/checkout/
+      order proofs; rerun D1/F3 paths affected by D2 changes.
+- [ ] Record exact results, evidence sources and remaining limitations, then
+      close the D2 gates in the adopted TODO.
+
+## D2 exit and B0 handoff
+
+- [ ] A customer creates a cart and one durable idempotent demo order entirely
+      through Gateway and the generated client.
+- [ ] Orders preserve immutable commercial snapshots and correct ownership.
+- [ ] User/admin reads and transitions enforce their distinct policies.
+- [ ] Currency, totals, stock behavior, error envelopes and rollback have
+      deterministic focused and live evidence.
+- [ ] Hand off to B0's integrated proof: admin publishes a product, customer
+      edits a cart/checks out/reads the order, and admin makes a permitted
+      transition, with denial/replay/rollback and deterministic setup evidence.
+      D2 sign-off alone does not declare B0 complete.
+
+## Files to inspect and update when affected
+
+| Area                            | Primary paths                                                                                                                                                                                                                      |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Order owner                     | `apps/order-service/prisma/`, `apps/order-service/src/order/`, `apps/order-service/test/`                                                                                                                                          |
+| Product/Settings consumers      | `apps/order-service/src/product-client.module.ts`, `apps/order-service/src/settings-client.module.ts`, `apps/product-service/src/product/`                                                                                         |
+| Gateway Order                   | `apps/gateway/src/order/`, `apps/gateway/src/contracts/routes/order.routes.ts`, `apps/gateway/src/contracts/inputs/order.inputs.ts`, `apps/gateway/test/order-http.spec.ts`, `apps/gateway/test/gateway-order-api.service.spec.ts` |
+| Protocol/shared clients         | `packages/protos/order.proto`, affected Product/Settings protos, `packages/clients/src/order.client.ts` and affected shared consumers                                                                                              |
+| Generated contracts/inventories | Gateway OpenAPI, `packages/api-client/src/generated.ts`, focused preflight inventories and API-client tests                                                                                                                        |
+| Fixtures/tooling/docs           | `scripts/demo/`, affected `scripts/db/` proofs, `scripts/backend.mjs`, package commands, `docs/services/order-service.md`                                                                                                          |
+
+These are starting locations, not a substitute for exact caller/consumer
+searches for each change. [Focus plan and inspected evidence](reports/2026-10-12-d2-focus-plan.md).
+
+## Next action
+
+Salar's supplied `pnpm db:verify:d2:stock` output confirms held compensation,
+finalization and destructive-operation protections against the current migration
+tail, including cleanup. The separate Product restoration primitive and owned
+SQL proof pass. Salar reports both unpaid cancellation and status-control SQL
+proofs passed. Salar supplied the complete passing demo payment SQL/recovery/race
+proof, including cleanup. Its owner logic is preserved. Explicit customer start
+and admin outcome bindings, generated contracts and focused checks are prepared.
+Immediate next action is the reusable build path and paired Product/Order
+acceptance in the [ASAP cleanup](ASAP-BUILD-CLEANUP.md). Defer the following D2
+image cycle until its build preparation is ready. Then apply the pending
+Product/Order migrations and build Product, Order and Gateway, following the
+[transport handoff receipt](reports/2026-10-24-d2-demo-payment-transports.md).
+After recreation/readiness, run the scoped native Order and Gateway payment
+proofs. Batch 3 runtime sign-off and Batch 4/D2/B0 gates remain open.

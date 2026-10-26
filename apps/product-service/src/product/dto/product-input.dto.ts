@@ -25,8 +25,8 @@ import { ValidateNested } from "class-validator";
 const toBool = (value: unknown): boolean =>
   value === true || value === "true" || value === "1" || value === 1;
 
-const toBoolTransform = ({ value }: TransformFnParams): boolean =>
-  toBool(value);
+const toBoolTransform = ({ value }: TransformFnParams): boolean | undefined =>
+  value === undefined ? undefined : toBool(value);
 
 const toStrictBoolTransform = ({ value }: TransformFnParams): unknown => {
   if (value === true || value === "true" || value === "1" || value === 1) {
@@ -89,17 +89,31 @@ export class ProductInputDto {
   @IsUUID("4")
   categoryId?: string;
 
+  @Expose({ name: "brandId" })
+  @IsOptional()
+  @IsUUID("4")
+  brandId?: string;
+
+  @Expose({ name: "tagIds" })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(64)
+  @IsUUID("4", { each: true })
+  tagIds?: string[];
+
   @Expose({ name: "thumbnailUrl" })
   @IsOptional()
   @IsString()
   @MaxLength(1024)
   thumbnailUrl?: string;
 
-  @Expose({ name: "model3dUrl" })
+  @Expose({ name: "thumbnailMediaId" })
   @IsOptional()
-  @IsString()
-  @MaxLength(1024)
-  model3dUrl?: string;
+  @IsUUID("4")
+  thumbnailMediaId?: string;
+
+  @IsOptional() @IsString() @MaxLength(200) thumbnailTitle?: string | null;
+  @IsOptional() @IsString() @MaxLength(180) thumbnailAlt?: string | null;
 
   @Expose({ name: "model3dFormat" })
   @IsOptional()
@@ -113,23 +127,11 @@ export class ProductInputDto {
   @IsBoolean()
   model3dLiveView?: boolean;
 
-  @Expose({ name: "model3dPosterUrl" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(1024)
-  model3dPosterUrl?: string;
-
   @Expose({ name: "vrEnabled" })
   @IsOptional()
   @Transform(toBoolTransform)
   @IsBoolean()
   vrEnabled?: boolean;
-
-  @Expose({ name: "vrPlanImageUrl" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(1024)
-  vrPlanImageUrl?: string;
 
   @Expose({ name: "metaTitle" })
   @IsOptional()
@@ -253,8 +255,22 @@ export class ProductInputDto {
 }
 
 export class ProductPatchDto extends ProductInputDto {
+  @IsOptional() @IsBoolean() clearThumbnailTitle?: boolean;
+  @IsOptional() @IsBoolean() clearThumbnailAlt?: boolean;
   @IsOptional()
   override title!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  clearThumbnailMedia?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  clearBrand?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  replaceTagIds?: boolean;
 }
 
 export class CreateProductRequestDto {

@@ -34,62 +34,147 @@ export class GatewayMediaListQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() path?: string;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 200 })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) take?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  take?: number;
 
   @ApiPropertyOptional({ minimum: 0 })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(0) skip?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
 
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) scope?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) entityType?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) entityId?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  scope?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  entityType?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  entityId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() folderPath?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() mimeType?: string;
   @ApiPropertyOptional({ enum: ["image", "video", "audio", "document"] })
-  @IsOptional() @IsIn(["image", "video", "audio", "document"]) mediaType?: string;
+  @IsOptional()
+  @IsIn(["image", "video", "audio", "document"])
+  mediaType?: string;
   @ApiPropertyOptional({ enum: ["name", "createdAt", "updatedAt", "size"] })
-  @IsOptional() @IsIn(["name", "createdAt", "updatedAt", "size"]) sortBy?: string;
+  @IsOptional()
+  @IsIn(["name", "createdAt", "updatedAt", "size"])
+  sortBy?: string;
   @ApiPropertyOptional({ enum: ["asc", "desc"] })
-  @IsOptional() @IsIn(["asc", "desc"]) order?: string;
+  @IsOptional()
+  @IsIn(["asc", "desc"])
+  order?: string;
   @ApiPropertyOptional({ enum: ["PENDING", "READY", "BLOCKED", "DELETED"] })
-  @IsOptional() @IsIn(["PENDING", "READY", "BLOCKED", "DELETED"]) status?: string;
-  @ApiPropertyOptional({ enum: ["NONE", "QUEUED", "SCANNING", "CLEAN", "INFECTED", "FAILED"] })
-  @IsOptional() @IsIn(["NONE", "QUEUED", "SCANNING", "CLEAN", "INFECTED", "FAILED"]) scanStatus?: string;
+  @IsOptional()
+  @IsIn(["PENDING", "READY", "BLOCKED", "DELETED"])
+  status?: string;
+  @ApiPropertyOptional({
+    enum: ["NONE", "QUEUED", "SCANNING", "CLEAN", "INFECTED", "FAILED"],
+  })
+  @IsOptional()
+  @IsIn(["NONE", "QUEUED", "SCANNING", "CLEAN", "INFECTED", "FAILED"])
+  scanStatus?: string;
 }
 
 export class GatewayMediaAdminListQueryDto extends GatewayMediaListQueryDto {
   @ApiPropertyOptional({ format: "uuid" })
-  @IsOptional() @IsUUID("4") ownerId?: string;
+  @IsOptional()
+  @IsUUID("4")
+  ownerId?: string;
 }
 
 export class GatewayMediaPresignDto {
   @ApiProperty() @IsString() @Matches(SAFE_FILENAME) filename!: string;
   @ApiProperty() @IsString() mimeType!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() folderPath?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_FILENAME) displayName?: string;
-  @ApiPropertyOptional({ format: "uuid" }) @IsOptional() @IsUUID("4") ownerId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) scope?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) entityType?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) entityId?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_FILENAME)
+  displayName?: string;
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID("4")
+  ownerId?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  scope?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  entityType?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  entityId?: string;
 }
 
 export class GatewayMediaFinalizeDto {
   @ApiProperty({ enum: ["s3"] }) @IsIn(["s3"]) storage!: string;
   @ApiProperty() @IsString() path!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() folderPath?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_FILENAME) displayName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_FILENAME) originalFilename?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_FILENAME)
+  displayName?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_FILENAME)
+  originalFilename?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() bucket?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_FILENAME) filename?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_FILENAME)
+  filename?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() mimeType?: string;
-  @ApiPropertyOptional({ format: "uuid" }) @IsOptional() @IsUUID("4") ownerId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) scope?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) entityType?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) entityId?: string;
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID("4")
+  ownerId?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  scope?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  entityType?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  entityId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() sha256?: string;
 }
 
 export class GatewayMediaReadUrlQueryDto {
-  @ApiPropertyOptional() @IsOptional() @Transform(strictBoolean) @IsBoolean() download?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(strictBoolean)
+  @IsBoolean()
+  download?: boolean;
 }
 
 export class GatewayMediaOwnedReadUrlQueryDto extends GatewayMediaReadUrlQueryDto {
@@ -100,23 +185,33 @@ export class GatewayMediaOwnedReadUrlQueryDto extends GatewayMediaReadUrlQueryDt
 
 export class GatewayMediaDeleteItemDto {
   @ApiProperty({ enum: ["file", "folder"] })
-  @IsIn(["file", "folder"]) type!: "file" | "folder";
+  @IsIn(["file", "folder"])
+  type!: "file" | "folder";
 
   @ApiPropertyOptional({ format: "uuid" })
   @ValidateIf((item: GatewayMediaDeleteItemDto) => item.type === "file")
-  @IsUUID("4") id?: string;
+  @IsUUID("4")
+  id?: string;
 
   @ApiPropertyOptional()
   @ValidateIf((item: GatewayMediaDeleteItemDto) => item.type === "folder")
-  @IsString() folderPath?: string;
+  @IsString()
+  folderPath?: string;
 }
 
 export class GatewayMediaDeletePreviewDto {
   @ApiProperty({ type: [GatewayMediaDeleteItemDto] })
-  @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => GatewayMediaDeleteItemDto)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => GatewayMediaDeleteItemDto)
   items!: GatewayMediaDeleteItemDto[];
   @ApiPropertyOptional() @IsOptional() @IsBoolean() recursive?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(SAFE_CONTEXT) scope?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(SAFE_CONTEXT)
+  scope?: string;
 }
 
 export class GatewayMediaDeleteConfirmDto extends GatewayMediaDeletePreviewDto {
@@ -124,10 +219,18 @@ export class GatewayMediaDeleteConfirmDto extends GatewayMediaDeletePreviewDto {
 }
 
 export class GatewayMediaRenderQueryDto {
-  @ApiPropertyOptional({ enum: ["web"] }) @IsOptional() @IsIn(["web"]) variant?: "web";
+  @ApiPropertyOptional({
+    enum: ["web", "thumbnail", "card", "detail", "mobile"],
+  })
+  @IsOptional()
+  @IsIn(["web", "thumbnail", "card", "detail", "mobile"])
+  variant?: "web" | "thumbnail" | "card" | "detail" | "mobile";
 }
 
 export class GatewayMediaDto {
+  @ApiProperty({ type: String, nullable: true }) title!: string | null;
+  @ApiProperty({ type: String, nullable: true }) defaultAlt!: string | null;
+  @ApiProperty({ minimum: 1 }) metadataVersion!: number;
   @ApiProperty({ format: "uuid" }) id!: string;
   @ApiProperty() storage!: string;
   @ApiProperty() bucket!: string;
@@ -149,7 +252,8 @@ export class GatewayMediaDto {
   @ApiProperty() quarantineReason!: string;
   @ApiProperty() etag!: string;
   @ApiProperty() promotedAt!: string;
-  @ApiProperty({ enum: ["PUBLIC", "PROTECTED", "STRICT"] }) accessClass!: GatewayMediaAccessClass;
+  @ApiProperty({ enum: ["PUBLIC", "PROTECTED", "STRICT"] })
+  accessClass!: GatewayMediaAccessClass;
   @ApiProperty() folderPath!: string;
   @ApiProperty() displayName!: string;
   @ApiProperty() originalFilename!: string;
@@ -215,12 +319,15 @@ export class GatewayMediaDeletePreviewResultDto {
   @ApiProperty() scope!: string;
   @ApiProperty() recursive!: boolean;
   @ApiProperty() canDelete!: boolean;
-  @ApiProperty({ type: [GatewayMediaDeleteWarningDto] }) warnings!: readonly GatewayMediaDeleteWarningDto[];
+  @ApiProperty({ type: [GatewayMediaDeleteWarningDto] })
+  warnings!: readonly GatewayMediaDeleteWarningDto[];
   @ApiProperty() fileCount!: number;
   @ApiProperty() folderCount!: number;
   @ApiProperty() totalSizeBytes!: string;
-  @ApiProperty({ type: [GatewayMediaDeleteFolderDto] }) folders!: readonly GatewayMediaDeleteFolderDto[];
-  @ApiProperty({ type: [GatewayMediaDeleteFileDto] }) files!: readonly GatewayMediaDeleteFileDto[];
+  @ApiProperty({ type: [GatewayMediaDeleteFolderDto] })
+  folders!: readonly GatewayMediaDeleteFolderDto[];
+  @ApiProperty({ type: [GatewayMediaDeleteFileDto] })
+  files!: readonly GatewayMediaDeleteFileDto[];
   @ApiProperty() confirmToken!: string;
   @ApiProperty() expiresIn!: number;
 }

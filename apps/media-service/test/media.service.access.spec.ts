@@ -1,4 +1,5 @@
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "node:stream";
 import { MediaStatus, ScanStatus } from "../prisma/generated";
 import type { PrismaService } from "../src/prisma.service";
 import { type CreateMediaInput, MediaService } from "../src/media.service";
@@ -10,6 +11,8 @@ jest.mock("@aws-sdk/s3-request-presigner", () => ({
 const mockedGetSignedUrl = jest.mocked(getSignedUrl);
 
 type MockPrisma = {
+  mediaVerifiedSource: { findUnique: jest.Mock };
+  mediaProcessingJob: { findUnique: jest.Mock };
   media: {
     create: jest.Mock<Promise<Record<string, unknown>>, [MediaCreateArgs]>;
     findUnique: jest.Mock;
@@ -23,6 +26,8 @@ type MediaCreateArgs = {
 
 function createMockPrisma(): MockPrisma {
   return {
+    mediaVerifiedSource: { findUnique: jest.fn().mockResolvedValue(null) },
+    mediaProcessingJob: { findUnique: jest.fn().mockResolvedValue(null) },
     media: {
       create: jest.fn(({ data }: MediaCreateArgs) =>
         Promise.resolve({
@@ -136,6 +141,39 @@ describe("MediaService access-class contract", () => {
     const data = lastCreatedData(prisma);
     expect(data.accessClass).toBe("PUBLIC");
     expect(data.visibility).toBe("public");
+    expect(data.status).toBe(MediaStatus.PENDING);
+    expect(data.scanStatus).toBe(ScanStatus.NONE);
+    expect(data.promotedAt).toBeNull();
+  });
+
+  it("renders only the verified copy for a newly processed public image", async () => {
+    const row = readyS3Row("PUBLIC");
+    prisma.media.findUnique.mockResolvedValue(row);
+    prisma.mediaVerifiedSource.findUnique.mockResolvedValue({
+      bucket: "media",
+      path: "private/objects/verified/immutable-copy",
+    });
+    const stream = Readable.from([Buffer.from("approved")]);
+    const send = jest
+      .fn()
+      .mockResolvedValue({ Body: stream, ETag: '"verified-etag"' });
+    Object.assign(service, { internalS3: { send } });
+    const rendered = await service.openPublicRenderStream(row.id);
+    expect(rendered.stream).toBe(stream);
+    const command = send.mock.calls[0][0] as { input: { Key: string } };
+    expect(command.input.Key).toBe("private/objects/verified/immutable-copy");
+    stream.destroy();
+  });
+
+  it("does not fall back to unverified upload bytes when a new approval loses its source", async () => {
+    const row = readyS3Row("PUBLIC");
+    prisma.media.findUnique.mockResolvedValue(row);
+    prisma.mediaProcessingJob.findUnique.mockResolvedValue({
+      id: "processing-job",
+    });
+    await expect(service.openPublicRenderStream(row.id)).rejects.toThrow(
+      "media_verified_source_missing",
+    );
   });
 
   it("maps visibility=private to accessClass=PROTECTED", async () => {

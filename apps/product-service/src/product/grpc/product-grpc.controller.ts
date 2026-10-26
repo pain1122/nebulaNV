@@ -19,6 +19,7 @@ import { UpdateProductDto } from "../dto/update-product.dto";
 import { IdDto } from "../dto/id.dto";
 import { ListProductsDto } from "../dto/list-products.dto";
 import { ApplyDiscountBulkDto } from "../dto/apply-discount-bulk.dto";
+import { ImageMetadataGrpcDto } from "../dto/image-metadata.dto";
 import { AddImagesDto } from "../dto/add-images.dto";
 import { ListGalleryDto } from "../dto/list-gallery.dto";
 import { ReorderImagesDto } from "../dto/reorder-images.dto";
@@ -38,7 +39,12 @@ type GrpcCall<TRequest> = ServerUnaryCall<TRequest, unknown> &
 type GalleryRow = {
   id: string;
   url: string;
+  mediaId: string | null;
   alt: string | null;
+  title?: string | null;
+  altOverride?: string;
+  titleOverride?: string;
+  metadataVersion?: number;
   sortOrder: number;
   deletedAt: Date | null;
 };
@@ -48,8 +54,13 @@ function galleryResponse(productId: string, images: GalleryRow[]) {
     productId,
     images: images.map((image) => ({
       id: image.id,
-      url: image.url,
+      mediaId: image.mediaId ?? "",
+      url: image.mediaId ? `/api/v1/media/render/${image.mediaId}` : "",
       alt: image.alt ?? "",
+      title: image.title ?? "",
+      altOverride: image.altOverride,
+      titleOverride: image.titleOverride,
+      metadataVersion: image.metadataVersion ?? 1,
       sort: image.sortOrder,
       deletedAt: image.deletedAt?.toISOString() ?? "",
     })),
@@ -60,6 +71,16 @@ function galleryResponse(productId: string, images: GalleryRow[]) {
 export class ProductGrpcController {
   private readonly log = new Logger(ProductGrpcController.name);
   constructor(private readonly svc: ProductServiceImpl) {}
+
+  @UsePipes(Pipe)
+  @Roles("admin", "root-admin")
+  @GrpcMethod("ProductService", "UpdateImageMetadata")
+  async updateImageMetadata(req: ImageMetadataGrpcDto) {
+    return galleryResponse(
+      req.productId,
+      await this.svc.updateImageMetadata(req.productId, req.imageId, req),
+    );
+  }
 
   // ------------------------------------------------------
   // CreateProduct (Admin only)
@@ -94,7 +115,12 @@ export class ProductGrpcController {
   ) {
     return this.svc.update(
       dto.id,
-      dto.patch,
+      dto.patch
+        ? {
+            ...dto.patch,
+            tagIds: dto.patch.replaceTagIds ? dto.patch.tagIds : undefined,
+          }
+        : undefined,
       dto.expectedVersion,
       createVerifiedServiceDownstreamContext(metadata, call),
     );
@@ -250,8 +276,16 @@ export class ProductGrpcController {
   @UsePipes(Pipe)
   @Roles("admin", "root-admin")
   @GrpcMethod("ProductService", "AddImages")
-  async addImagesGrpc(req: AddImagesDto) {
-    const imgs = await this.svc.addImages(req.productId, req.images ?? []);
+  async addImagesGrpc(
+    req: AddImagesDto,
+    metadata: MetadataWithContext,
+    call: GrpcCall<AddImagesDto>,
+  ) {
+    const imgs = await this.svc.addImages(
+      req.productId,
+      req.images ?? [],
+      createVerifiedServiceDownstreamContext(metadata, call),
+    );
     return galleryResponse(req.productId, imgs);
   }
 

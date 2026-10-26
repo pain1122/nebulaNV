@@ -29,6 +29,8 @@ import {
   GatewayProductVariantPathDto,
 } from "./product-api.dto";
 
+import { GatewayGalleryMetadataDto } from "../media/media-metadata-api.dto";
+
 function requestId(request: GatewayHttpRequest): string {
   const value = request.requestContext?.requestId;
   if (!value) throw new Error("gateway_request_context_missing");
@@ -275,6 +277,27 @@ export class GatewayProductController {
   ) {
     return gatewayCollectionEnvelope(
       await this.products.addImages(request, params.id, body),
+      { profile: "unpaginated" },
+      requestId(request),
+    );
+  }
+
+  @GatewayApiRoute("admin.products.gallery.metadata.update", {
+    requestType: GatewayGalleryMetadataDto,
+    responseType: GatewayGalleryImageDto,
+  })
+  async updateImageMetadata(
+    @Req() request: GatewayHttpRequest,
+    @Param() params: GatewayProductGalleryPathDto,
+    @Body() input: GatewayGalleryMetadataDto,
+  ) {
+    return gatewayCollectionEnvelope(
+      await this.products.updateImageMetadata(
+        request,
+        params.id,
+        params.imageId,
+        input,
+      ),
       { profile: "unpaginated" },
       requestId(request),
     );

@@ -1,6 +1,6 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-09-15
+Last updated: 2026-10-12
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
 ## 1. Collaboration Contract
@@ -19,6 +19,15 @@ Purpose: fast, safe handoff for AI/developer sessions without re-discovering the
 
 ### Per-Batch Evidence Gate
 
+Mandatory preparation before broad suites, live/build handoffs and implementation
+commits: follow [the test preparation checklist](docs/testing/pre-suite-checklist.md).
+Record exact consumer paths before edits, update/review them afterward and write
+its handoff receipt. Known cheap preparation failures block broad handoff.
+Run `pnpm test:preflight` when Gateway/RPC/protobuf/OpenAPI/client contracts are
+affected. Heavy SQL/runtime proofs may remain explicitly pending for Salar only
+after their fixtures and cheap prerequisites are checked. Mock passes are not
+SQL or runtime evidence; do not blindly rebaseline snapshots or omit consumers.
+
 Apply this gate at the start of every roadmap batch and to every checklist item
 within that batch:
 
@@ -31,8 +40,9 @@ within that batch:
    evidence. Unsupported statements cannot appear in checked-item text.
 4. Migration and seed items require a clean disposable-database execution using
    current source, not historical local state.
-5. After completing a later stateful item, rerun earlier migration and seed
-   verifiers. This checks whether the later item invalidated earlier evidence.
+5. After completing a later stateful item, use the consumer impact table to
+   identify and rerun affected earlier migration/seed verifiers. Record why
+   unrelated passing evidence remains valid; do not repeat every proof by default.
 6. Use two completion passes:
    - implementation appears complete;
    - adversarial evaluation tries clean order, reruns, contradictions, partial
