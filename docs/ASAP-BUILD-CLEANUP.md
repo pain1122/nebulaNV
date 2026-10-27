@@ -83,6 +83,10 @@ hosted image time is 366.8s, including initial cache uploads. Showcase seed pass
 a reproduced idle health-socket race before the next demo login is corrected and
 covered by a real HTTP regression. Hosted runtime/cache-restore/archive gates
 remain pending. [Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
+Hosted boot/metadata upgrade/F3 now pass on `5edbabc`; the next live-test fixture
+type errors are corrected. A mandatory pre-provision no-emit gate covers all
+eight live owners / 125 test/helper inputs, now clean. All existing live/scan/
+archive assertions remain. [Preparation receipt](reports/2026-10-27-live-test-type-preparation.md).
 VPN retry/localization findings and remaining runtime/cache/archive
 gates are recorded in the [image availability checkpoint](reports/2026-10-26-minio-image-availability.md).
 

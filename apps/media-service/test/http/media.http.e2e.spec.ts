@@ -71,7 +71,9 @@ describe("media-service HTTP (admin-only)", () => {
     });
     expect([200, 204]).toContain(up.status);
 
-    const created = await httpJson<any>(
+    const created = await httpJson<{
+      data: { id: string; displayName: string; path: string };
+    }>(
       "POST",
       `${MEDIA_HTTP}/media/public-library/finalize`,
       {
@@ -89,6 +91,9 @@ describe("media-service HTTP (admin-only)", () => {
       { authorization: `Bearer ${adminAccess}` },
     );
 
+    if (typeof created.data.id !== "string" || !created.data.id) {
+      throw new Error("media_public_upload_id_missing");
+    }
     return created.data;
   }
 

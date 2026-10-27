@@ -47,6 +47,8 @@ describe("public Product Media reference resolution", () => {
       "resolveProductReference",
     )?.value;
     expect(typeof handler).toBe("function");
+    if (typeof handler !== "function")
+      throw new Error("media_reference_handler_missing");
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).toBe(true);
     expect(Reflect.getMetadata(INTERNAL_ONLY_KEY, handler)).toBe(true);
     expect(Reflect.getMetadata(ALLOWED_S2S_CALLERS_KEY, handler)).toEqual([

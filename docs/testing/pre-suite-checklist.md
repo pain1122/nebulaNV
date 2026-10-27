@@ -92,6 +92,11 @@ Use this table in the slice's dated report. Revisit it after implementation.
 - [ ] Include new test files in a real typed lint project. Check sibling owners
       using the same fallback configuration; do not raise default-project file
       limits or disable typed rules to hide missing project coverage.
+- [ ] Before backend live suites or image/provision handoff, run
+      `node scripts/check-backend-test-types.mjs` after shared producers and owner
+      Prisma clients are available. Source-only build checks exclude tests; this
+      no-emit gate includes every live owner's tests/helpers and shared fixture
+      imports. It does not run startup hooks or certify running services.
 - [ ] Exercise tooling fixtures with `CI=true` and `GITHUB_ACTIONS=true` when
       hosted CI runs them. Check frozen-lock defaults and grouped/colored output
       against the pinned tools. Author temporary fixture locks with the package

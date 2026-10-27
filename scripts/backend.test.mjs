@@ -940,6 +940,23 @@ test("CI caches preserve quality gates, bounded writers and isolated image scope
   const quality = workflow.jobs.quality;
   const live = workflow.jobs["live-e2e"];
   assert.equal(live.needs, "quality");
+  const liveTypes = quality.steps.findIndex(
+    (step) => step.name === "Check live test types before provisioning",
+  );
+  assert.ok(
+    liveTypes >
+      quality.steps.findIndex((step) => step.name === "Check backend types"),
+  );
+  assert.ok(
+    liveTypes <
+      quality.steps.findIndex(
+        (step) => step.name === "Run focused container-free security tests",
+      ),
+  );
+  assert.equal(
+    quality.steps[liveTypes].run,
+    "node scripts/check-backend-test-types.mjs",
+  );
   const cacheSha = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9";
   for (const job of [quality, live]) {
     const restore = job.steps.find((step) => step.id === "host-turbo");

@@ -19,7 +19,9 @@ save/restore pass on `980e15e`. Exact cached MinIO images are preserved; the
 approved checksum-pinned prerelease cache prepares CI to bypass unavailable
 upstream pulls. Fresh hosted consumption and eleven image builds now pass;
 showcase seed passes. A reproduced boot health-socket race is corrected with
-a real HTTP regression; full hosted runtime/cache-restore/archive proof is pending;
+a real HTTP regression and now passes hosted boot, metadata upgrade and F3.
+Stale live-test types are corrected with mandatory no-emit preparation across
+eight owners / 125 inputs; hosted suites/image scans/archive proof remains pending;
 see [the localization checkpoint](docs/reports/2026-10-26-minio-image-availability.md).
 Hosted BuildKit/image/archive validation and remaining
 integration/release gates stay open.

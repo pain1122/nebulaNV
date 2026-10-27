@@ -536,6 +536,11 @@ bytes. CI now restores the host `.turbo/cache` in both jobs, saving only success
 main pushes with at most 1GiB. OS/architecture/policy/commit keys keep host cache
 identity explicit. This is distinct from Docker's local Turbo/pnpm cache mounts.
 
+Before broad suites or provisioning, quality also runs
+`node scripts/check-backend-test-types.mjs`. It checks every live owner's test
+and helper files with no emit or startup hooks; source-only build checks omit
+those inputs. Shared package outputs and owner Prisma clients must already exist.
+
 Only the live CI job loads `.github/backend-cache.hcl` using `BUILDX_BAKE_FILE`,
 with the normal Compose/Bake files first. Independent per-image GHA v2 scopes
 retain max-mode build layers; PRs import only and main pushes can export.

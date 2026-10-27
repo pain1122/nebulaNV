@@ -15,9 +15,15 @@ approved a public, non-latest prerelease cache for CI, now published with matchi
 GitHub asset digest. The fresh hosted runner successfully downloads, hashes,
 loads and verifies both vendor images. Eleven images build/export successfully
 in 366.8s combined, with successful layer-cache uploads. Showcase seed passes.
-The next failure is a reproduced stale health-socket race before the direct
-demo Auth login. The narrow correction and real HTTP regression pass locally;
-hosted boot/integration/image scans/archive acceptance remains pending.
+The stale health-socket correction is now accepted by hosted boot on `5edbabc`;
+metadata populated upgrade and F3 also pass. Fresh-runner image time is 289.1s,
+with imported layers reused; changed helper input means this is not an unchanged
+warm benchmark. Live tests next stopped before execution on stale Auth fixture
+types. Those and six Media test type errors are corrected; the new mandatory
+no-emit quality gate passes all eight live owners / 125 inputs before provisioning.
+Tooling 82/82, preflight 23/23 and focused Media 14/14 pass. Full live/scan/archive
+acceptance remains pending.
+[Live-test preparation](reports/2026-10-27-live-test-type-preparation.md).
 [Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
 Oct 27 health check: Docker responds; PostgreSQL, both Redis instances, MinIO
 and the scanner are healthy. Eleven application containers are stopped; this is

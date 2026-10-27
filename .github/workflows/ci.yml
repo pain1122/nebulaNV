@@ -42,6 +42,8 @@ jobs:
         run: pnpm lint:backend
       - name: Check backend types
         run: pnpm check-types:backend
+      - name: Check live test types before provisioning
+        run: node scripts/check-backend-test-types.mjs
       - name: Run focused container-free security tests
         run: pnpm test:security
       - name: Run shared backend unit and contract tests

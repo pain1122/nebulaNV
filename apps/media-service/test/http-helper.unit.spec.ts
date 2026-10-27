@@ -44,7 +44,7 @@ describe("integration HTTP helper", () => {
   });
 
   it("propagates a closed socket without replaying a write", async () => {
-    const failure = new TypeError("fetch failed", {
+    const failure = Object.assign(new TypeError("fetch failed"), {
       cause: { code: "UND_ERR_SOCKET" },
     });
     const fetchMock = jest

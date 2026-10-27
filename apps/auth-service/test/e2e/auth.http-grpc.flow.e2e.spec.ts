@@ -8,7 +8,7 @@ import {
   mergeMd,
   CODES,
 } from '../grpc/helpers';
-import type { S2SActorAssertion } from '@nebula/grpc-auth';
+import type { S2SLegacyActorAssertion } from '@nebula/grpc-auth';
 import { httpJson, AUTH_HTTP, subFromJwt, LoginResp } from '../utils/http';
 
 const AUTH_GRPC_URL = process.env.AUTH_GRPC_URL ?? '127.0.0.1:50052';
@@ -29,11 +29,11 @@ function tamperToken(token: string): string {
 
 async function verifiedGatewayActor(
   accessToken: string,
-): Promise<S2SActorAssertion> {
+): Promise<S2SLegacyActorAssertion> {
   const validation = await call<{
     isValid: boolean;
     userId: string;
-    role: S2SActorAssertion['role'];
+    role: S2SLegacyActorAssertion['role'];
     sessionRef: string;
   }>(
     authClient,

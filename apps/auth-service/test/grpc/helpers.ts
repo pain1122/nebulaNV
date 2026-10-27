@@ -6,11 +6,20 @@ import {
   finalizeS2SClientMetadata,
   markS2SMetadata,
   registerS2SClientDefinition,
-  type S2SActorAssertion,
+  type S2SLegacyActorAssertion,
+  type S2SSignedContextV1,
   type S2SSigningIdentity,
 } from '@nebula/grpc-auth';
 
 export const AUTHORIZATION_HEADER = 'authorization';
+
+const gatewayContext: S2SSignedContextV1 = {
+  version: '1',
+  applicationId: 'admin-web-test',
+  tenantId: 'single-site-tenant',
+  siteId: 'single-site',
+  channelId: 'web',
+};
 
 const gatewayAuth: S2SSigningIdentity = {
   kind: 'gateway',
@@ -21,13 +30,7 @@ const gatewayAuth: S2SSigningIdentity = {
       process.env.S2S_TEST_GATEWAY_KEY ??
       'dev-only-gateway-to-auth-s2s-key-00001',
   },
-  context: {
-    version: '1',
-    applicationId: 'admin-web-test',
-    tenantId: 'single-site-tenant',
-    siteId: 'single-site',
-    channelId: 'web',
-  },
+  context: gatewayContext,
 };
 
 const authAuth: S2SSigningIdentity = {
@@ -58,14 +61,14 @@ export function mdBearer(token?: string): grpc.Metadata {
 
 export function mdS2S(opts?: {
   kind?: 'service' | 'gateway';
-  actor?: S2SActorAssertion;
+  actor?: S2SLegacyActorAssertion;
 }): grpc.Metadata {
   const baseIdentity = opts?.kind === 'service' ? authAuth : gatewayAuth;
   const identity = opts?.actor
     ? {
         ...baseIdentity,
         context: {
-          ...gatewayAuth.context!,
+          ...gatewayContext,
           actor: opts.actor,
         },
       }
@@ -102,7 +105,7 @@ export function mdAuth(
   params: {
     access?: string;
     s2s?: boolean;
-    actor?: S2SActorAssertion;
+    actor?: S2SLegacyActorAssertion;
   } = {},
 ): grpc.Metadata {
   const { access, s2s = true, actor } = params;

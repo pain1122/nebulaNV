@@ -558,3 +558,14 @@ closure; the same reproduction and new regression pass with exactly one login
 write. Tooling is 82/82 under CI settings. No mutation retry or broad gate removal.
 [Impact review and handoff](2026-10-27-boot-health-connections.md).
 Full hosted runtime/scan/archive and cross-run cache restore remain pending.
+
+Run 40467611468 (`5edbabc`) confirms the boot connection fix: complete quality,
+native boot, metadata populated upgrade and F3 pass. Eleven hosted images total
+289.1s; fresh-builder GHA import restores dependency layers. Source helper input
+changed, so this is not an unchanged warm benchmark. Live test compilation then
+finds stale V1 Auth fixture types; no Auth tests execute. All eight live owners
+are now checked together before provisioning. Narrow Auth/Media fixture type
+corrections pass 125 input checks, 82 tooling, 23 preflight and 14 focused Media
+tests. No runtime protocol or test assertion was weakened. See the
+[full consumer/handoff receipt](2026-10-27-live-test-type-preparation.md).
+Hosted live suites, image scans and release archive remain pending.
