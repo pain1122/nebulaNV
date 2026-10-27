@@ -149,6 +149,11 @@ its separate production environment with the internal origin.
 
 Do not document secret values. Document names, purpose, and expected format only.
 
+The [runtime environment ownership contract](runtime-environment-ownership.md)
+records actual native/local/release precedence and which file to edit. Its
+Segment 4 review validates all eleven clean local/release schemas without
+changing operator files or starting applications.
+
 ## Local URL Convention
 
 For local process mode, cross-service gRPC URLs use localhost:
@@ -380,12 +385,13 @@ production dependency layer remains unchanged. No real env enters build inputs.
 
 Product/Order image, warm and isolation acceptance passed. The other services
 and batch packaging now pass native build and offline image closure; unchanged
-warm full batch passes at 111.1s (1m51.1s). CI cache persistence is implemented,
-with hosted validation pending; see the [Segment 3 receipt](../reports/2026-10-26-build-cleanup-segment3.md).
-Hosted quality and host Turbo save/restore now pass. CI's MinIO inputs use an
+warm full batch passes at 111.1s (1m51.1s). CI host/BuildKit persistence and full
+hosted acceptance now pass on `7035545`; see the
+[Segment 3 exit proof](../reports/2026-10-27-build-cleanup-segment3-exit.md).
+CI's MinIO inputs use an
 approved checksum-pinned vendor prerelease cache and CI-only pull-never override;
 local/release startup and existing volumes are unchanged. Hosted backend image,
-integration, scan and archive acceptance remain pending. See the
+integration, scan and sixteen-image archive acceptance pass. See the
 [vendor-cache receipt](../reports/2026-10-26-minio-image-availability.md).
 Actual builds report elapsed seconds and preserve caches unless explicitly asked
 for a clean build. Keep automatic cache cleanup enabled; a cache target is not a

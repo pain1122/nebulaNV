@@ -1,5 +1,10 @@
 # Build cleanup Segment 3 - all-target graph and batch compilation
 
+Final status (2026-10-27): **accepted and closed**, tested commit `7035545`.
+Full hosted quality/live/image-scan/sixteen-image archive acceptance is recorded
+in the [exit proof](2026-10-27-build-cleanup-segment3-exit.md).
+The dated preparation/pending entries below describe earlier checkpoints.
+
 Date: 2026-10-26. Status: all eleven native images and offline closures accepted;
 unchanged warm full batch accepted at 111.1s; CI persistence implemented with
 local checks, hosted validation and integration gates remain open.

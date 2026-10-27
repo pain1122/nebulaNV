@@ -1,5 +1,11 @@
 # Build cleanup - bounded CI caches
 
+Final status (2026-10-27): **accepted**, tested commit `7035545`,
+[run 40472070054](https://github.com/pain1122/nebulaNV/actions/runs/40472070054).
+Both jobs, eleven image scans, sixteen-image archive/identity checks and recorded
+backend identities pass. [Final exit proof](2026-10-27-build-cleanup-segment3-exit.md).
+Earlier pending/failure entries below are historical, superseded checkpoints.
+
 Date: 2026-10-26. Status: before-edit implementation trace; hosted proof pending.
 Previous: [all-target build acceptance](2026-10-26-build-cleanup-segment3.md).
 

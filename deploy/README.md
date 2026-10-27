@@ -9,11 +9,13 @@ The deployable package is:
 - `deploy/nebula-images.tar`
 - `scripts/db/init-multiple-dbs.sh`
 - `scripts/db/ensure-tenant-authority-db.sh`
+- `scripts/db/ensure-realm-auth-dbs.sh`
 
-> F3 Batch 6 checkpoint: the nine-image inventory, gateway Compose runtime,
-> release reachability boundary, and image-archive path are implemented and
-> covered by rendered-Compose/tooling checks. Rebuild the images after source
-> changes before starting a live release stack.
+> Build-cleanup Segment 3 accepted on 2026-10-27: eleven backend images and five
+> unique infrastructure references form the sixteen-image archive. Hosted boot,
+> integration, image scans and the identity-preserving archive round trip pass.
+> [Final receipt](../docs/reports/2026-10-27-build-cleanup-segment3-exit.md).
+> Server delivery/deployment remains manual; rebuild after relevant source changes.
 
 F3's generated-client and current-web compatibility gates are source/contract
 checks. Before promoting a rebuilt release candidate, also run the bounded
@@ -55,12 +57,18 @@ deploy/nebula-images.tar
 
 It includes:
 
-- The ten backend runtime images. The F3 archive contained nine; F4 adds the
-  tenant-authority-service foundation image.
+- Eleven backend runtime images, including the default Realm Auth shadow and
+  tenant-authority foundations. The optional operator shadow reuses its image.
 - `postgres:17`
 - `redis:7-alpine`
 - `minio/minio:latest`
 - `minio/mc:latest`
+- The digest-pinned Media scanner image selected by Compose.
+
+The inventory is derived by `scripts/docker/release-image-inventory.mjs` from
+actual Compose configuration, including profile images and the scanner override.
+The published MinIO vendor cache supplies only its two vendor images; CI does
+not publish the full backend release archive or deploy a server automatically.
 
 ## 3. Prepare Production Env
 
@@ -69,6 +77,13 @@ Copy-Item deploy\.env.production.example deploy\.env.production
 ```
 
 Edit `deploy/.env.production` and replace every `change-me-*` value with real secrets.
+
+Authority requires `AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID` and
+`AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY` as well as its audit inputs. The template
+names both; the secret must be at least 32 characters and its ID must satisfy the
+existing Authority schema. Supply new deployment values deliberately. For an
+existing deployment, preserve its current membership-epoch key ID/key; adding
+missing Compose wiring is not a key-rotation operation.
 
 Important: keep `deploy/.env.production` private. Commit only `deploy/.env.production.example`.
 
@@ -82,6 +97,7 @@ deploy/.env.production
 deploy/nebula-images.tar
 scripts/db/init-multiple-dbs.sh
 scripts/db/ensure-tenant-authority-db.sh
+scripts/db/ensure-realm-auth-dbs.sh
 ```
 
 Keep the same relative paths, or update the volume path in `docker-compose.release.yml`.

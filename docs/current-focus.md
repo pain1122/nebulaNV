@@ -1,111 +1,56 @@
 # Current Focus - D2: Cart, Checkout, And Order
 
 Last updated: 2026-10-27.
-Status: active Batch 3 - Orders. Batches 0, 1 and 2 are closed.
-Immediate priority: [ASAP build cleanup](ASAP-BUILD-CLEANUP.md), Segment 3:
-finish hosted integration, CI cache and release archive acceptance. All services
-already use the accepted shared graph. Segments 1 and 2 are closed; D2 feature
-work and its pending deployment/live gates remain preserved. This is build-cleanup
-Segment 3, not a D2 feature implementation slice.
+Status: D2 Batch 3 - Orders remains active; Batches 0, 1 and 2 are closed.
+Immediate priority: [ASAP build cleanup](ASAP-BUILD-CLEANUP.md), Segment 4.
+Segments 1, 2 and 3 are accepted and closed. D2-specific local deployment,
+feature/runtime sign-off and Batch 4 gates remain preserved below.
 
-Current checkpoint: main `0c4ef44` passes the complete hosted quality job and
-host Turbo save/restore between fresh runners. Upstream MinIO pulls remain
-unavailable. The exact cached vendor images are preserved and verified; Salar
-approved a public, non-latest prerelease cache for CI, now published with matching
-GitHub asset digest. The fresh hosted runner successfully downloads, hashes,
-loads and verifies both vendor images. Eleven images build/export successfully
-in 366.8s combined, with successful layer-cache uploads. Showcase seed passes.
-The stale health-socket correction is now accepted by hosted boot on `5edbabc`;
-metadata populated upgrade and F3 also pass. Fresh-runner image time is 289.1s,
-with imported layers reused; changed helper input means this is not an unchanged
-warm benchmark. Live tests next stopped before execution on stale Auth fixture
-types. Those and six Media test type errors are corrected; the new mandatory
-no-emit quality gate passes all eight live owners / 125 inputs before provisioning.
-Tooling 82/82, preflight 23/23 and focused Media 14/14 pass. On `94cd5ad`, full
-quality, boot, metadata upgrade, F3 and all invoked live suites now pass. Fresh
-hosted eleven-image time is 101.5s with cached dependency/generation/compilation.
-Image scans find eleven fixable OS findings in two packages per image, zero
-application-package findings, plus 57 unfixed Debian findings under existing F9
-policy. Same-Bookworm PCRE2/Perl patch preparation passes; updated image scans
-and the sixteen-image archive remain pending.
-[Runtime patch receipt](reports/2026-10-27-runtime-debian-security-patches.md).
-[Live-test preparation](reports/2026-10-27-live-test-type-preparation.md).
-[Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
-Oct 27 health check: Docker responds; PostgreSQL, both Redis instances, MinIO
-and the scanner are healthy. Eleven application containers are stopped; this is
-not full backend readiness. No applications or volumes were recreated.
-[Image availability and next steps](reports/2026-10-26-minio-image-availability.md).
+Segment 4 first review is complete: all eleven source environment schemas
+validate clean local and release renders (twenty-two validations). Native module
+file order, actual Nest/Compose override probes and unchanged build specification
+after runtime tuning all pass. Current behavior is preserved. See the
+[runtime ownership contract](architecture/runtime-environment-ownership.md) and
+[Segment 4 review receipt](reports/2026-10-27-build-cleanup-segment4-env-review.md).
+Duplicated local Gateway tuning inputs remain optional cleanup. One confirmed
+release gap is corrected: two existing Authority membership-epoch inputs are now
+wired through release Compose and its production example. All twenty-two config
+cases pass, and either missing input fails closed. No real operator env file or
+application/schema logic changed. [Correction receipt](reports/2026-10-27-release-authority-env-correction.md).
+Security maps must not be removed based on their prefix.
 
-Product/Order acceptance is complete. Paired graph image builds passed at
-Product 198.2s / Order 240.4s; unchanged warm image builds passed at 11.2s / 9.4s.
-Both packaged images load their own application/shared dependencies without a
-sibling application checkout. All ten native modified-input cases now pass:
-owner source edits compile only their owner, schema edits regenerate only their
-owner, unrelated Media edits preserve downstream layers, and shared contract edits
-compile each producer once with no sibling application compilation. The agent
-verified all ten raw logs against summary run
-`7b74b201-02d4-4e31-b9d3-5af5f79d6cc6`; evidence is archived. No new production
-image was exported by those cache-only cases. Earlier cache-pressure and repeated
-benchmark-marker failures remain documented; neither was silently waived.
+Next bounded Segment 4 work:
 
-Docker currently has seven CPUs/about 13.10GiB usable RAM and an approved active
-40GiB build-cache retention target with automatic cleanup enabled. Config backups
-are preserved. One retired setup container was removed without deleting volumes.
-Resource/cache settings differ from the original slow build baseline, so timings
-are not a controlled single-cause speedup measurement. Application readiness is
-separate; the build proofs do not certify stopped applications or pending D2 SQL.
-[Resource/recovery receipt](reports/2026-10-26-docker-resource-budget.md).
+1. Compare the current shared production dependency layer with service-specific
+   packaging using size/duplication and runtime-closure evidence. Preserve it
+   unless measured benefit justifies the compatibility/build cost.
+2. Prepare a selected-service watch/restart proposal preserving shared producer
+   refresh and image/integration gates.
+3. Consider universal package splits only if remaining measured dependency
+   breadth justifies the maintenance cost. They are not new D2 prerequisites.
 
-All eleven graph images now build/export successfully. The first image compiled
-all five shared packages and eleven applications once (82.0s compilation RUN);
-the following ten reused fetch/install/generation/compilation. Full initial batch
-image elapsed is 665.4s (11m05.4s), including first per-image packaging/export.
-All eleven offline/read-only/no-network image closures pass against exact native
-export digests, including nine native Prisma engines, Gateway/Auth without own
-Prisma, Realm Auth's smaller runtime closure, and Media Sharp/font/license checks.
-Media emits a nonblocking default Fontconfig configuration warning; explicit
-bundled-font rendering succeeds. No application containers were recreated.
+Segment 3 exit: main implementation 7035545 passes the complete hosted quality
+and live-e2e jobs, native boot/migrations/seeds, populated Product metadata upgrade,
+F3/live suites, eleven image scans, sixteen-image archive/identity preservation
+and eleven recorded backend identities. Actual host Turbo/BuildKit restoration
+passes across fresh runners. [Exit proof](reports/2026-10-27-build-cleanup-segment3-exit.md),
+[CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
-Unchanged warm all-image acceptance now passes: 111.1s (1m51.1s), eleven exit0,
-every RUN cached, zero compilation misses, application/config digests unchanged.
-The local all-service optimization is accepted. No repeat local build is needed.
-[Native/warm receipt](reports/2026-10-26-build-cleanup-segment3.md).
+Measured image times: earlier initial local batch 665.4s; unchanged local warm
+batch 111.1s; hosted cached exports 101.5s; final OS-patched exports 151.7s.
+Hardware/cache/network conditions differ; these are not total CI durations or a
+controlled single-cause speedup. All ten native modified-input cases and eleven
+packaged closures remain accepted. Existing optional Media DB skips are eleven
+tests, and 57 unfixed Debian findings per image remain F9-owned with zero image
+blockers. No security gate or test assertion was relaxed.
 
-CI host Turbo/layer-cache persistence and exact tested-image identity evidence
-are implemented with focused YAML/policy/Bake/Bash/redaction checks. All existing
-quality/live/scan gates remain. Hosted cache upload/restore and pipeline acceptance
-now have hosted quality and host Turbo acceptance. Hosted BuildKit layer and
-runtime/archive acceptance remain pending. Docker cache mounts remain ephemeral; host task cache and exported layers
-are separate. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
+Local configuration remains seven Docker CPUs/about 13.10GiB RAM with the approved
+40GiB automatically cleaned build-cache target. Last Oct 27 observation: five
+infrastructure services healthy, eleven app containers stopped. Review renders
+and hosted CI do not start/update local apps or certify their pending D2 gates.
+No repeat local build is needed for these documentation-only changes.
 
-Final release tooling fixes include the previously omitted scanner (sixteen unique
-images), Windows JSON array handling and -Input path handling. All 82 tooling
-checks pass; the hosted workflow will exercise native metadata upgrade, F3/e2e/
-scan gates and a streamed archive round trip without leaving a large tar.
-Hosted graph/COPY checks now pass. The next gate found ten dependency advisories
-across seven backend packages; same-major fixes and an audit-error validation
-regression are prepared. Local graph 9/9, preflight 23/23, frozen lock and valid
-dependency audit pass; fresh installation/runtime acceptance remains hosted-pending.
-Hosted fresh install, lint, types, security, shared checks, Gateway 270/270,
-client/Web checks and all backend source builds now pass. Compose verifier
-corrections pass both actual renders locally, preserving scanner-outage behavior.
-The clean tracked-example render also exposed/fixed a native Media origin leaking
-into local Docker Gateway; both clean local/release renders now pass, plus 14
-focused environment/render tests. Unused inherited fields remain Segment 4 work.
-Hosted source/image scans, integration, cache persistence and archive gates remain.
-
-Remaining [Segment 3 gates](ASAP-BUILD-CLEANUP.md#3-generalize-and-align-integrationrelease):
-hosted CI proof and integration/release/D2 deployment/live evidence. Earlier
-9 graph / 12 tooling / 22 health checks remain historical evidence. The dependency
-patch changes Docker inputs; closure evidence for the new lock is pending in CI.
-Heavy local execution remains with Salar;
-do not restart new images before the pending D2 deployment gate.
-Optional packaging/env/watch/package splits remain separate decisions.
-
-Evidence: [native acceptance](reports/2026-10-26-build-graph-native-proof.md),
-[Segment 2 trace](reports/2026-10-24-build-cleanup-segment2.md),
-[initial audit](reports/2026-10-24-backend-build-audit.md), and
-[selection/dependency receipt](reports/2026-10-24-build-cleanup-execution.md).
+D2 evidence and pending work:
 
 Salar reports corrected Checkout recovery and Cart live passed. Earlier normal
 Checkout/F3, native migrations/deployment, owner SQL proofs, 94 Order unit tests,
@@ -462,10 +407,9 @@ SQL proof pass. Salar reports both unpaid cancellation and status-control SQL
 proofs passed. Salar supplied the complete passing demo payment SQL/recovery/race
 proof, including cleanup. Its owner logic is preserved. Explicit customer start
 and admin outcome bindings, generated contracts and focused checks are prepared.
-Immediate next action is the reusable build path and paired Product/Order
-acceptance in the [ASAP cleanup](ASAP-BUILD-CLEANUP.md). Defer the following D2
-image cycle until its build preparation is ready. Then apply the pending
-Product/Order migrations and build Product, Order and Gateway, following the
+Immediate next action is the bounded Segment 4 review sequence above.
+When returning to D2, use the pending local deployment/runtime proof plan in the
 [transport handoff receipt](reports/2026-10-24-d2-demo-payment-transports.md).
-After recreation/readiness, run the scoped native Order and Gateway payment
-proofs. Batch 3 runtime sign-off and Batch 4/D2/B0 gates remain open.
+Hosted green CI does not close those feature-specific proofs automatically.
+Heavy local execution remains with Salar. Batch 3 runtime sign-off and
+Batch 4/D2/B0 gates remain open.

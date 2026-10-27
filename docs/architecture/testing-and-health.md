@@ -32,7 +32,7 @@ pnpm check-types:backend
 pnpm build:backend
 ```
 
-These commands derive the ten backend workspace filters and their package
+These commands derive the eleven backend workspace filters and their package
 dependencies from the root inventory. They deliberately exclude the postponed
 `apps/web` prototype. The unqualified root commands remain available for work
 that intentionally includes every workspace.
@@ -111,7 +111,7 @@ pnpm test:e2e
 
 `pnpm test:e2e:provision` remains a compatibility alias for `backend:boot`.
 The command delegates to `scripts/backend.mjs`; the same backend inventory
-supplies its ordered migrations, database checks, base seeds, and all ten
+supplies its ordered migrations, database checks, base seeds, and all eleven
 readiness URLs. It waits for healthy infrastructure, idempotently provisions
 the authority database/runtime login, verifies every expected database, runs
 migration deploy and status, applies the base seeds, builds the official Bake
@@ -343,7 +343,7 @@ Current proto-level `Ping` methods:
 Current setup behavior:
 
 - Backend boot waits for healthy infrastructure and all expected databases
-  before migrations, then waits for HTTP `/health/ready` on all ten runtimes.
+  before migrations, then waits for HTTP `/health/ready` on all eleven runtimes.
 - Media-service setup checks open ports, HTTP `/health`, and gRPC `Ping`.
 - Most other service setup files only check required ports.
 - Port-open checks prove a socket is listening, not that the service can process a real gRPC method.
@@ -407,7 +407,7 @@ Exact setup files live under each service's `test/setup/wait-for-services.ts`.
 
 ## Database Migration Pattern
 
-For all eight Prisma services, use the sequential root commands:
+For all nine Prisma owners, use the sequential root commands:
 
 ```powershell
 pnpm prisma:gen

@@ -7,28 +7,24 @@ roadmap and safe comparison; this file owns the selected future phase order.
 
 Created: 2026-08-22
 
-Immediate engineering interruption (2026-10-24):
-[ASAP build cleanup](docs/ASAP-BUILD-CLEANUP.md). Selection/shared-dependency
-corrections and Product/Order graph acceptance are complete as of 2026-10-26:
-native images, warm reruns, packaged imports and all ten isolation cases pass.
-Segment 3 all-target graph/batch build and all eleven offline packaged-image
-closures now pass: initial batch 665.4s, shared/application compilation once.
-Unchanged warm full batch passes at 111.1s (all eleven images). CI cache
-persistence is implemented with local checks; hosted quality and host Turbo
-save/restore pass on `980e15e`. Exact cached MinIO images are preserved; the
-approved checksum-pinned prerelease cache prepares CI to bypass unavailable
-upstream pulls. Fresh hosted consumption and eleven image builds now pass;
-showcase seed passes. A reproduced boot health-socket race is corrected with
-a real HTTP regression and now passes hosted boot, metadata upgrade and F3.
-Stale live-test types are corrected with mandatory no-emit preparation across
-eight owners / 125 inputs. Hosted quality/live suites now pass on `94cd5ad`;
-fresh-builder exports take 101.5s. Same-Bookworm PCRE2/Perl patches address the
-next image-scan blocker; patched scans/archive acceptance remains pending;
-see [the localization checkpoint](docs/reports/2026-10-26-minio-image-availability.md).
-Hosted BuildKit/image/archive validation and remaining
-integration/release gates stay open.
-D2 evidence and the phase order below are preserved; relevant application/live
-proofs remain separate from image packaging acceptance.
+Engineering interruption (2026-10-24):
+[ASAP build cleanup](docs/ASAP-BUILD-CLEANUP.md). Segments 1-3 are closed as of
+2026-10-27. Tested implementation 7035545 passes complete hosted quality/live,
+image security and sixteen-image archive acceptance. Eleven hosted cached
+exports take 101.5s; the final OS-patched exports take 151.7s. Local unchanged
+warm acceptance is 111.1s. These are image timings, not total CI duration.
+[Segment 3 exit proof](docs/reports/2026-10-27-build-cleanup-segment3-exit.md).
+
+Segment 4 is active. Its first runtime environment review is complete: all eleven
+clean local/release schemas and native/Compose override probes pass. Current
+ownership is preserved with an explicit [ownership contract](docs/architecture/runtime-environment-ownership.md).
+Two existing Authority inputs omitted from release configuration are now wired;
+no application or database contract changed.
+Production dependency packaging comparison and selected-service watch/restart
+proposal follow. Shared-package splits and env migration remain conditional on
+verified benefit and compatibility review, not new D2 prerequisites.
+[Segment 4 receipt](docs/reports/2026-10-27-build-cleanup-segment4-env-review.md).
+D2 feature proofs and the adopted phase order below are preserved.
 
 Current execution: D2 Batches 0, 1 and 2 are closed as of 2026-10-19; Batch 3 Orders is active. Salar reports corrected Checkout recovery and affected Cart live passed, completing the stock/replay/recovery feature gates alongside the recorded native/owner SQL/focused/contract evidence. Post-proof checks confirm all sixteen containers healthy, eleven backend health probes passed, no active checkout attempts and no temporary fault trigger. Preserve existing passes; no repeat build or migration without a relevant change. PAYMENT_PROCESSING vocabulary and the approved failure-to-PENDING payment policy remain recorded for Batch 3 transition/concurrency/audit work. D2/B0 exit and Batch 4 fixture/parity gates remain open. D1 and F5 Core are closed as of 2026-10-12;
 remaining F5 consumer integration stays in its adopted later position.

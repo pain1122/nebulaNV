@@ -81,6 +81,40 @@ function source(relativePath) {
   return readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 }
 
+test("release Authority receives its required membership-epoch signing inputs", () => {
+  const require = createRequire(import.meta.url);
+  const eslintRequire = createRequire(require.resolve("eslint/package.json"));
+  const release = eslintRequire("js-yaml").load(
+    source("docker-compose.release.yml"),
+  );
+  const template = envValues(source("deploy/.env.production.example"));
+  for (const name of [
+    "AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID",
+    "AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY",
+  ]) {
+    assert.equal(
+      release.services["tenant-authority-service"].environment[name],
+      "${" + name + ":?" + name + " is required}",
+    );
+    assert.ok(
+      template.has(name),
+      `${name} must be supplied by the deployment template`,
+    );
+    assert.equal(
+      source("deploy/.env.production.example")
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith(`${name}=`)).length,
+      1,
+      `${name} must not have shadowing duplicate declarations`,
+    );
+  }
+  assert.match(
+    template.get("AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY_ID"),
+    /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/,
+  );
+  assert.ok(template.get("AUTHORITY_MEMBERSHIP_EPOCH_HMAC_KEY").length >= 32);
+});
+
 test("D1 upgrade keeps exact historical targets while permitting a later D2 migration", () => {
   const targets = ["20260901000100_one", "20260902000100_two"];
   assert.doesNotThrow(() =>

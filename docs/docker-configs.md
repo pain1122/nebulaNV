@@ -4,6 +4,9 @@
 
 This file summarizes the Docker files an agent should check before changing backend boot, release packaging, image names, ports, or runtime env behavior.
 
+For runtime input ownership and mode-specific precedence, see the
+[environment contract](architecture/runtime-environment-ownership.md).
+
 Use this as a map. Do not duplicate full deployment instructions here; detailed release flow lives in `deploy/README.md`.
 
 ## Main Files
@@ -23,9 +26,10 @@ Use this as a map. Do not duplicate full deployment instructions here; detailed 
   authority database/runtime login for new or existing volumes.
 - Root `package.json` field `nebula.backendServices`: tooling-owned backend
   runtime, transport, Compose admission, database, image, and port
-  inventory. It derives ten runtimes, nine HTTP/gRPC hybrids, and eight
-  Prisma services. Gateway alone is HTTP-only and has no database;
-  tenant-authority-service owns a signed internal read transport.
+  inventory. It derives eleven runtimes, nine HTTP/gRPC hybrids, and nine
+  Prisma owners. Gateway is public HTTP-only; Realm Auth is a health-only HTTP
+  shadow. Gateway/Auth have no Prisma database; tenant-authority-service owns
+  a signed internal read transport.
 - `scripts/backend.mjs`: inventory-backed provisioning, Prisma, development, database verification/recovery, release-image, and security-scan command source.
 
 ## Local Compose
@@ -232,6 +236,7 @@ Current backend images:
 
 - `nebulanv-main-user-service:latest`
 - `nebulanv-main-auth-service:latest`
+- `nebulanv-main-realm-auth-service:latest`
 - `nebulanv-main-tenant-authority-service:latest`
 - `nebulanv-main-settings-service:latest`
 - `nebulanv-main-media-service:latest`
@@ -243,7 +248,7 @@ Current backend images:
 
 The CI live job scans these exact local tags with pinned Trivy after the live
 e2e suites and before Compose cleanup. `pnpm scan:images:backend` derives the
-tags from the root inventory, scans all ten even when an earlier image is
+tags from the root inventory, scans all eleven even when an earlier image is
 affected, and retains every `HIGH` or `CRITICAL` finding in the sanitized
 evidence. During foundation development, application-package findings and
 Debian OS findings with an available fixed version block the gate. Debian OS
@@ -257,6 +262,8 @@ Release archive also includes infrastructure images:
 - `redis:7-alpine`
 - `minio/minio:latest`
 - `minio/mc:latest`
+- The digest-pinned Media scanner selected by Compose (sixteen unique image
+  references total, including eleven backend images).
 
 ## MinIO Images
 
@@ -310,7 +317,9 @@ Important:
   only to `nebula_authority`; the inventory migration connection remains the
   schema owner. `AUTHORITY_DB_RUNTIME_PASSWORD` is required in release.
 - `pnpm db:verify:migrations` and `pnpm test:database-recovery` operate only on guarded disposable `_verify_` databases.
-- `pnpm db:backup` and `pnpm db:restore` cover the eight inventory-owned local databases and require all ten backend runtimes to be stopped.
+- `pnpm db:backup` and `pnpm db:restore` cover nine inventory-owned databases
+  plus the separate operator Realm Auth database (ten total). All eleven default
+  backend runtimes and the optional operator shadow must be stopped.
 - Restore requires `--confirm=RESTORE_LOCAL_DATABASES`; it never removes Docker volumes.
 - The canonical maintenance procedure and backup contents are documented in `docs/architecture/local-dev-and-docker-boot.md`.
 
@@ -478,10 +487,12 @@ pnpm docker:build:backend order-service gateway
 The plan makes no Docker calls. Selected builds stay sequential, report elapsed
 seconds and stop on the first error. Omitting service names still selects the
 full inventory with one shared full compilation. Partial-request application
-compilation is scoped per target. Product/Order use the selected-graph pilot for
-fetch/install/Prisma/compile, with native benchmark/runtime sign-off pending in
-the [ASAP cleanup](ASAP-BUILD-CLEANUP.md). Other targets retain the legacy path;
-the stable production dependency layer remains backend-wide during the pilot.
+compilation uses one canonical union of the selected applications and required
+shared producers. All eleven targets use the accepted graph for selected
+fetch/install/Prisma/compile; standalone Compose builds retain leaf selection.
+Native isolation/closure and hosted acceptance pass in the
+[ASAP cleanup](ASAP-BUILD-CLEANUP.md). The reusable production dependency layer
+remains backend-wide; alternative packaging is a Segment 4 measured decision.
 
 Deliberate cold build:
 
@@ -548,13 +559,16 @@ Pinned Buildx/BuildKit use a cleanup-enabled container builder. Local Compose/
 Bake and the approved Desktop resource/cache budgets are unchanged. No new
 registry credentials or paid repository cache allowance is configured.
 
-Docker exports do not persist cache mounts across new builders. Hosted cache
-transfer/round-trip performance remains pending; don't equate a local Bake render
-with a remote cache hit. Existing quality, F3/live, image scans, tracked-diff and
+Docker exports do not persist cache mounts across new builders. Actual host and
+BuildKit cache round trips now pass across hosted runners. All eleven cached
+exports took 101.5s; the final OS-patched image run took 151.7s. Existing quality,
+F3/live, image scans, tracked-diff and
 14-day allowlisted evidence gates remain. Successful live scans are followed by
 `.ci-evidence/backend-tested-images.json`, which records image IDs/digests without
 Config/env/labels. Detailed trace and local checks:
 [CI cache receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
+Segment 3 is closed on `7035545`; the complete hosted workflow and sixteen-image
+archive pass. [Exit proof](reports/2026-10-27-build-cleanup-segment3-exit.md).
 
 ### CI MinIO vendor cache (2026-10-27)
 

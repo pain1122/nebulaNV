@@ -30,8 +30,8 @@ No routine forced builds, cache pruning or container/database resets.
       required generator scripts, global TypeScript/pnpm settings and runtime assets.
 - [x] Separate lockfile-based fetch, selected dependency install, selected Prisma
       generation and application source layers. No full-backend dev install or
-      nine-client generation on the Product/Order graph path; other targets remain
-      on the recorded legacy path pending rollout.
+      nine-client generation on the Product/Order graph path. Segment 3's accepted
+      rollout now applies this graph selection to every target.
 - [x] Cache shared generation/compilation once and synchronize restored outputs
       before dependent compilation. Prove cached producer + changed consumer;
       retain current signing/runtime import checks and native dependency checks.
@@ -40,7 +40,7 @@ Implementation/cheap-gate evidence:
 [segment 2 receipt](reports/2026-10-24-build-cleanup-segment2.md).
 Segment 2 acceptance is complete as of 2026-10-26. Product/Order select the
 accepted `graph` path. Segment 3 now selects graph for all targets and shared
-batch scopes; its broader native acceptance remains pending below.
+batch scopes; native and hosted acceptance is complete below.
 
 After the output-ignore correction, the paired native builds pass: Product
 198.2s and Order 240.4s. Each shared producer compiles once per graph; later
@@ -59,60 +59,59 @@ these cache-only solves do not export images or certify application readiness.
 - [x] Verify packaged Product and Order need no sibling application output or checkout;
       distinguish required remote runtime APIs from build dependencies.
 
-## 3. Generalize and align integration/release
+<a id="3-generalize-and-align-integrationrelease"></a>
+
+## 3. Generalize and align integration/release - closed 2026-10-27
 
 All-target graph and canonical batch-union native build/export and all eleven
 offline packaged closures pass (2026-10-26). Unchanged warm full batch passes
 at 111.1s (1m51.1s), all RUNs cached and app/config bytes unchanged.
 [native rollout receipt](reports/2026-10-26-build-cleanup-segment3.md).
 The gates below include native acceptance, not just a configuration change.
-CI persistence is implemented and locally checked; actual hosted round-trip
-validation remains pending. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
-Image-only release behavior is retained. Final archive review corrected the
-omitted scanner, PowerShell JSON-array flattening and the automatic Input-variable
-collision. All 82 tooling checks pass. Hosted graph/COPY checks pass; audited
-same-major dependency fixes pass fresh-install quality acceptance.
-Hosted CI runs populated metadata
-upgrade, F3/native integration, scans and a streamed sixteen-image save/load round
-trip. Main `980e15e` passes the full hosted quality job and host Turbo round trip.
-Live provisioning stopped before backend builds because the MinIO images cannot
-be pulled. Exact cached vendor images are now preserved and verified; Salar
-approved a checksum-pinned, non-latest prerelease cache. CI preparation passes
-locally; fresh hosted consumption and all eleven image builds now pass. Combined
-hosted image time is 366.8s, including initial cache uploads. Showcase seed passes;
-a reproduced idle health-socket race before the next demo login is corrected and
-covered by a real HTTP regression. Hosted runtime/cache-restore/archive gates
-remain pending. [Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
-Hosted boot/metadata upgrade/F3 now pass on `5edbabc`; the next live-test fixture
-type errors are corrected. A mandatory pre-provision no-emit gate covers all
-eight live owners / 125 test/helper inputs, now clean. All existing live/scan/
-archive assertions remain. [Preparation receipt](reports/2026-10-27-live-test-type-preparation.md).
-Run 40470059781 (`94cd5ad`) passes quality and all invoked live suites; hosted
-fresh-builder exports take 101.5s with cached dependency/generation/compilation.
-Image gate finds fixable PCRE2/Perl package findings shared by all images.
-Same-release patch preparation passes; image scan/archive acceptance stays open.
-[Runtime patch receipt](reports/2026-10-27-runtime-debian-security-patches.md).
-VPN retry/localization findings and remaining runtime/cache/archive
-gates are recorded in the [image availability checkpoint](reports/2026-10-26-minio-image-availability.md).
+Final tested implementation `7035545` passes the complete hosted quality and
+live-e2e jobs, native boot/migrations/seeds, populated metadata upgrade, F3/live
+suites, all eleven image scans and the sixteen-image identity-preserving archive
+round trip. Eleven tested backend identities are recorded. Actual host Turbo and
+BuildKit cache transfers/restoration pass across fresh runners. Cached exports
+take 101.5s; final OS-patched exports take 151.7s. These are image-build timings,
+not total CI duration. Runtime/package isolation and all quality gates remain.
+
+82 tooling tests and 125 test/helper inputs pass. Existing optional Media DB
+suite skips remain eleven tests; image reports retain 57 unfixed Debian findings
+per image under the existing F9 policy, with zero blockers. D2-specific pending
+local deployment/feature proofs remain owned by D2; automatic image publishing
+and server deployment were not implemented. Chronological intermediate failures
+are preserved in the linked reports.
+[Exit proof](reports/2026-10-27-build-cleanup-segment3-exit.md),
+[CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
 - [x] Extend the proven graph to all targets and Product/Order/Gateway union
       compilation, followed by sequential exports using identical producer inputs.
 - [x] Verify Gateway's database-free build and Media's native Sharp/assets path
       before declaring the shared workflow ready for all eleven services.
-- [ ] Retain the full integration path and image-only release behavior. Check
+- [x] Retain the full integration path and image-only release behavior. Check
       load/save tooling, runtime closures, inventory and relevant D2/F3 proofs.
-- [ ] Add explicit CI Turbo/BuildKit cache persistence with bounded retention;
+- [x] Add explicit CI Turbo/BuildKit cache persistence with bounded retention;
       preserve quality/security gates and identify the actual tested images.
 - [x] Update build/run documentation and current-focus from measured results;
       do not claim completion or a three-minute target without proof.
 
-## 4. Separate decisions after the pilot
+<a id="4-separate-decisions-after-the-pilot"></a>
 
-These are optional, not blockers or silently approved replacements:
+## 4. Runtime configuration and development decisions - active
 
-- [ ] Review runtime env ownership/override rules and duplicated Gateway values;
+Salar authorized starting this segment on 2026-10-27. Its review/measurement
+steps are active; optional replacements still require verified benefit and
+compatibility review. They are not new D2 release blockers.
+
+- [x] Review runtime env ownership/override rules and duplicated Gateway values;
       propose explicit per-service inputs while preserving host/container behavior.
-      Runtime-only configuration changes should not require image builds.
+      All eleven local/release schemas and native/Compose precedence probes pass;
+      runtime tuning leaves the build specification unchanged. Preserve current
+      behavior and document exact ownership. Correct the confirmed two-input
+      Authority release wiring gap; both missing-input negatives fail closed.
+      A broader local input-map migration remains optional. [Review receipt](reports/2026-10-27-build-cleanup-segment4-env-review.md),
+      [ownership contract](architecture/runtime-environment-ownership.md).
 - [ ] Compare per-service production packaging against today's reusable dependency
       layer; adopt only with measured size/time and complete runtime-closure proof.
 - [ ] Propose a selected-service watch/restart loop, preserving shared package

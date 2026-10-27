@@ -1,5 +1,9 @@
 # Runtime Debian security patch receipt
 
+Final status: accepted by run 40472070054 on `7035545`: every backend image has
+zero blocking/application findings. Existing unfixed Debian findings remain F9
+work. Full live and archive gates pass. [Exit proof](2026-10-27-build-cleanup-segment3-exit.md).
+
 Requirement: retain the existing image-security gate while closing build-cleanup
 Segment 3. Classification: confirmed fixable OS package findings in the pinned
 runtime base, not an application-package finding or an optional OS replacement.
