@@ -159,7 +159,7 @@ pnpm scan:images:backend
   dependencies, generated/build output, coverage, and vendored frontend assets;
   tracked `.env.example` contracts remain in scope.
 - `scan:images:backend` uses the same Trivy installation and inventory image
-  tags to scan all ten previously built images. It does not rebuild, upload,
+  tags to scan all eleven previously built images. It does not rebuild, upload,
   ignore unfixed findings, or stop after the first affected image. Its
   vulnerability database sources are the official Docker Hub distribution
   followed by GHCR; this avoids depending on the Google pull-through mirror,

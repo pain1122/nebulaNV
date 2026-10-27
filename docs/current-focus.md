@@ -21,8 +21,14 @@ with imported layers reused; changed helper input means this is not an unchanged
 warm benchmark. Live tests next stopped before execution on stale Auth fixture
 types. Those and six Media test type errors are corrected; the new mandatory
 no-emit quality gate passes all eight live owners / 125 inputs before provisioning.
-Tooling 82/82, preflight 23/23 and focused Media 14/14 pass. Full live/scan/archive
-acceptance remains pending.
+Tooling 82/82, preflight 23/23 and focused Media 14/14 pass. On `94cd5ad`, full
+quality, boot, metadata upgrade, F3 and all invoked live suites now pass. Fresh
+hosted eleven-image time is 101.5s with cached dependency/generation/compilation.
+Image scans find eleven fixable OS findings in two packages per image, zero
+application-package findings, plus 57 unfixed Debian findings under existing F9
+policy. Same-Bookworm PCRE2/Perl patch preparation passes; updated image scans
+and the sixteen-image archive remain pending.
+[Runtime patch receipt](reports/2026-10-27-runtime-debian-security-patches.md).
 [Live-test preparation](reports/2026-10-27-live-test-type-preparation.md).
 [Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
 Oct 27 health check: Docker responds; PostgreSQL, both Redis instances, MinIO

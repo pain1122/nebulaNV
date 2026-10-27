@@ -21,7 +21,9 @@ upstream pulls. Fresh hosted consumption and eleven image builds now pass;
 showcase seed passes. A reproduced boot health-socket race is corrected with
 a real HTTP regression and now passes hosted boot, metadata upgrade and F3.
 Stale live-test types are corrected with mandatory no-emit preparation across
-eight owners / 125 inputs; hosted suites/image scans/archive proof remains pending;
+eight owners / 125 inputs. Hosted quality/live suites now pass on `94cd5ad`;
+fresh-builder exports take 101.5s. Same-Bookworm PCRE2/Perl patches address the
+next image-scan blocker; patched scans/archive acceptance remains pending;
 see [the localization checkpoint](docs/reports/2026-10-26-minio-image-availability.md).
 Hosted BuildKit/image/archive validation and remaining
 integration/release gates stay open.

@@ -569,3 +569,18 @@ corrections pass 125 input checks, 82 tooling, 23 preflight and 14 focused Media
 tests. No runtime protocol or test assertion was weakened. See the
 [full consumer/handoff receipt](2026-10-27-live-test-type-preparation.md).
 Hosted live suites, image scans and release archive remain pending.
+
+Run 40470059781 (`94cd5ad`) passes full quality, live boot, metadata upgrade,
+F3 and every invoked live suite. Media retains its existing optional database
+suite skips (two suites / eleven tests). Fresh-builder GHA restoration reduces
+eleven image exports to 101.5s combined. All dependency/generation/compilation
+RUNs are cached; a runtime overlay and some import/Sharp smoke checks rerun.
+This is hosted cross-run cache evidence, not an all-RUN-cache-hit claim.
+
+All eleven image scans report eleven blocking OS findings in two inherited
+packages (PCRE2/Perl), no application findings, and 57 unfixed Debian findings
+under the pre-existing F9 policy. Debian and actual apt candidate inspection
+confirm patches within Bookworm. The shared runtime apt layer explicitly updates
+those two packages; base indexes, Node major, build graph and scan policy remain.
+82 tooling and Dockerfile checks pass. Patched runtime/scan/archive evidence
+remains pending. [Trace and receipt](2026-10-27-runtime-debian-security-patches.md).

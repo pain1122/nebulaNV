@@ -87,6 +87,11 @@ Hosted boot/metadata upgrade/F3 now pass on `5edbabc`; the next live-test fixtur
 type errors are corrected. A mandatory pre-provision no-emit gate covers all
 eight live owners / 125 test/helper inputs, now clean. All existing live/scan/
 archive assertions remain. [Preparation receipt](reports/2026-10-27-live-test-type-preparation.md).
+Run 40470059781 (`94cd5ad`) passes quality and all invoked live suites; hosted
+fresh-builder exports take 101.5s with cached dependency/generation/compilation.
+Image gate finds fixable PCRE2/Perl package findings shared by all images.
+Same-release patch preparation passes; image scan/archive acceptance stays open.
+[Runtime patch receipt](reports/2026-10-27-runtime-debian-security-patches.md).
 VPN retry/localization findings and remaining runtime/cache/archive
 gates are recorded in the [image availability checkpoint](reports/2026-10-26-minio-image-availability.md).
 

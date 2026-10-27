@@ -382,6 +382,13 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     /FROM node:22-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base/,
     "the runtime base must use an immutable official-image index",
   );
+  const runtimeBase =
+    dockerfile.split(" AS runtime-base")[1]?.split("FROM runtime-base")[0] ??
+    "";
+  assert.match(
+    runtimeBase,
+    /apt-get update[\s\S]*?apt-get install[^\n]*\\\r?\n\s+ca-certificates openssl libpcre2-8-0 perl-base/,
+  );
   assert.doesNotMatch(
     dockerfile,
     /RUN --mount=type=cache,id=nebula-corepack[^\n]*\n\s*set -eu;/,

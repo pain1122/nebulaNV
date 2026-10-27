@@ -261,7 +261,8 @@ WORKDIR /workspace
 ENV NODE_ENV=production
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates openssl && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates openssl libpcre2-8-0 perl-base && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /usr/local/lib/node_modules/npm \
       /usr/local/lib/node_modules/corepack \
