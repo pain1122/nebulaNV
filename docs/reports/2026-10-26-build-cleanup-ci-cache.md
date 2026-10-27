@@ -546,3 +546,15 @@ Full consumer trace and Gate 5 receipt:
 Hosted vendor consumption, backend image/runtime/scan/archive acceptance and
 BuildKit cache persistence remain pending. Quality and host Turbo results on
 `980e15e` stay valid; this is a supply fix, not a storage replacement or D2 closure.
+
+Run 40464082570 (`0c4ef44`) now confirms fresh hosted vendor consumption, all
+eleven graph images built/exported (366.8s combined) and successful per-target
+BuildKit cache uploads. First image includes union compilation and 102.1s initial
+cache upload; later images take 8.5-12.0s each. D1 showcase verification passes.
+All services passed readiness before the later direct Auth seed request failed.
+A real local HTTP-child reproduction identifies stale pooled probe sockets
+across the synchronous seed subprocess. Health probes now request connection
+closure; the same reproduction and new regression pass with exactly one login
+write. Tooling is 82/82 under CI settings. No mutation retry or broad gate removal.
+[Impact review and handoff](2026-10-27-boot-health-connections.md).
+Full hosted runtime/scan/archive and cross-run cache restore remain pending.

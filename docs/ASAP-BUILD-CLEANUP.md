@@ -70,7 +70,7 @@ CI persistence is implemented and locally checked; actual hosted round-trip
 validation remains pending. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 Image-only release behavior is retained. Final archive review corrected the
 omitted scanner, PowerShell JSON-array flattening and the automatic Input-variable
-collision. All 81 tooling checks pass. Hosted graph/COPY checks pass; audited
+collision. All 82 tooling checks pass. Hosted graph/COPY checks pass; audited
 same-major dependency fixes pass fresh-install quality acceptance.
 Hosted CI runs populated metadata
 upgrade, F3/native integration, scans and a streamed sixteen-image save/load round
@@ -78,7 +78,11 @@ trip. Main `980e15e` passes the full hosted quality job and host Turbo round tri
 Live provisioning stopped before backend builds because the MinIO images cannot
 be pulled. Exact cached vendor images are now preserved and verified; Salar
 approved a checksum-pinned, non-latest prerelease cache. CI preparation passes
-locally; actual hosted consumption/runtime/cache/archive gates remain pending.
+locally; fresh hosted consumption and all eleven image builds now pass. Combined
+hosted image time is 366.8s, including initial cache uploads. Showcase seed passes;
+a reproduced idle health-socket race before the next demo login is corrected and
+covered by a real HTTP regression. Hosted runtime/cache-restore/archive gates
+remain pending. [Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
 VPN retry/localization findings and remaining runtime/cache/archive
 gates are recorded in the [image availability checkpoint](reports/2026-10-26-minio-image-availability.md).
 

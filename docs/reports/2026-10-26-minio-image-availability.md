@@ -210,3 +210,11 @@ must download/hash/load these bytes, boot actual services, build/scan images,
 exercise integration and verify the release archive. BuildKit cross-run layer
 persistence still needs actual hosted evidence.
 Readiness: READY FOR AUTHORIZED MAIN PUSH AND HOSTED PROOF; Segment 3 remains open.
+
+Hosted observation: commit `0c4ef44`,
+[run 40464082570](https://github.com/pain1122/nebulaNV/actions/runs/40464082570),
+passes the full quality job. Fresh live runner step "Load checksum-pinned MinIO
+vendor cache" passes; infrastructure boot progresses into backend image builds
+and BuildKit blob uploads. This closes the observed image-supply blocker without
+substituting storage. Runtime/scan/archive and cross-run layer restore remain
+pending; cache upload alone is not a warm-restore proof.

@@ -4345,7 +4345,13 @@ export async function waitForExpectedDatabases({
 
 async function requestBackendHealth(service, fetchImpl) {
   const url = `http://127.0.0.1:${service.httpPort}/health/ready`;
-  const response = await fetchImpl(url, { cache: "no-store" });
+  // Boot runs synchronous CLI commands after readiness. Do not leave pooled
+  // probe sockets that can expire while the event loop is blocked and then be
+  // reused by a demo mutation before their close events have been processed.
+  const response = await fetchImpl(url, {
+    cache: "no-store",
+    headers: { connection: "close" },
+  });
   const body = await response.json();
   if (!response.ok || body?.status !== "ok" || body?.service !== service.name) {
     throw new Error(`backend_health_invalid_${service.name}`);

@@ -17,7 +17,9 @@ Unchanged warm full batch passes at 111.1s (all eleven images). CI cache
 persistence is implemented with local checks; hosted quality and host Turbo
 save/restore pass on `980e15e`. Exact cached MinIO images are preserved; the
 approved checksum-pinned prerelease cache prepares CI to bypass unavailable
-upstream pulls. Hosted consumption remains pending;
+upstream pulls. Fresh hosted consumption and eleven image builds now pass;
+showcase seed passes. A reproduced boot health-socket race is corrected with
+a real HTTP regression; full hosted runtime/cache-restore/archive proof is pending;
 see [the localization checkpoint](docs/reports/2026-10-26-minio-image-availability.md).
 Hosted BuildKit/image/archive validation and remaining
 integration/release gates stay open.

@@ -8,12 +8,17 @@ already use the accepted shared graph. Segments 1 and 2 are closed; D2 feature
 work and its pending deployment/live gates remain preserved. This is build-cleanup
 Segment 3, not a D2 feature implementation slice.
 
-Current checkpoint: main `980e15e` passes the complete hosted quality job and
+Current checkpoint: main `0c4ef44` passes the complete hosted quality job and
 host Turbo save/restore between fresh runners. Upstream MinIO pulls remain
 unavailable. The exact cached vendor images are preserved and verified; Salar
 approved a public, non-latest prerelease cache for CI, now published with matching
-GitHub asset digest. Checksum-before-load and
-pull-never CI preparation pass locally; hosted consumption remains pending.
+GitHub asset digest. The fresh hosted runner successfully downloads, hashes,
+loads and verifies both vendor images. Eleven images build/export successfully
+in 366.8s combined, with successful layer-cache uploads. Showcase seed passes.
+The next failure is a reproduced stale health-socket race before the direct
+demo Auth login. The narrow correction and real HTTP regression pass locally;
+hosted boot/integration/image scans/archive acceptance remains pending.
+[Boot transport receipt](reports/2026-10-27-boot-health-connections.md).
 Oct 27 health check: Docker responds; PostgreSQL, both Redis instances, MinIO
 and the scanner are healthy. Eleven application containers are stopped; this is
 not full backend readiness. No applications or volumes were recreated.
@@ -62,7 +67,7 @@ runtime/archive acceptance remain pending. Docker cache mounts remain ephemeral;
 are separate. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
 Final release tooling fixes include the previously omitted scanner (sixteen unique
-images), Windows JSON array handling and -Input path handling. All 81 tooling
+images), Windows JSON array handling and -Input path handling. All 82 tooling
 checks pass; the hosted workflow will exercise native metadata upgrade, F3/e2e/
 scan gates and a streamed archive round trip without leaving a large tar.
 Hosted graph/COPY checks now pass. The next gate found ten dependency advisories

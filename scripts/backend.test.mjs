@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { createRequire } from "node:module";
 import {
   existsSync,
@@ -3817,6 +3819,82 @@ test("demo seed reruns showcase and skips a matching Blog record", async () => {
     ["POST", "GET"],
   );
 });
+
+test(
+  "boot health sockets cannot poison demo writes after a blocking showcase command",
+  { timeout: 20_000 },
+  async () => {
+    const server = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `
+    import http from 'node:http';
+    let loginCount=0;
+    let probeConnection;
+    const server=http.createServer((req,res)=>{
+      res.setHeader('content-type','application/json');
+      if(req.url==='/health/ready') {
+        probeConnection=req.headers.connection;
+        res.end(JSON.stringify({service:'fixture-service',status:'ok'}));
+      } else if(req.url==='/auth/login' && req.method==='POST') {
+        loginCount+=1;
+        res.end(JSON.stringify({accessToken:'fixture-token'}));
+      } else if(req.url==='/fixture/stats') {
+        res.end(JSON.stringify({loginCount,probeConnection}));
+      } else if(req.url==='/blog/posts/welcome-to-nebulanv' && req.method==='GET') {
+        res.end(JSON.stringify({data:{slug:'welcome-to-nebulanv'}}));
+      } else { res.statusCode=404; res.end('{}'); }
+    });
+    server.keepAliveTimeout=5000;
+    server.listen(0,'127.0.0.1',()=>process.send(server.address().port));
+  `,
+      ],
+      { stdio: ["ignore", "ignore", "inherit", "ipc"] },
+    );
+    try {
+      const [port] = await once(server, "message", {
+        signal: globalThis.AbortSignal.timeout(5_000),
+      });
+      await checkBackendHealth({
+        services: [{ name: "fixture-service", httpPort: port }],
+        logger: { log() {} },
+      });
+      // Real boot probes finish at different times, leaving earlier ones idle.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const result = await seedBackendDemo({
+        env: {
+          AUTH_HTTP_URL: `http://127.0.0.1:${port}`,
+          BLOG_HTTP_URL: `http://127.0.0.1:${port}`,
+        },
+        logger: { log() {} },
+        executePnpm() {
+          const child = spawnSync(process.execPath, [
+            "-e",
+            "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,6500)",
+          ]);
+          assert.equal(child.status, 0);
+          return child;
+        },
+      });
+      assert.deepEqual(result, { product: "d1-showcase", blog: "existing" });
+      const stats = await globalThis.fetch(
+        `http://127.0.0.1:${port}/fixture/stats`,
+      );
+      assert.deepEqual(await stats.json(), {
+        loginCount: 1,
+        probeConnection: "close",
+      });
+    } finally {
+      if (server.exitCode === null) {
+        const stopped = once(server, "exit");
+        server.kill();
+        await stopped;
+      }
+    }
+  },
+);
 
 test("demo seed stops before Blog work when showcase fails", async () => {
   let fetchCalls = 0;
