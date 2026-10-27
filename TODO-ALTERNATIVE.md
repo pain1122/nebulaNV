@@ -14,7 +14,12 @@ native images, warm reruns, packaged imports and all ten isolation cases pass.
 Segment 3 all-target graph/batch build and all eleven offline packaged-image
 closures now pass: initial batch 665.4s, shared/application compilation once.
 Unchanged warm full batch passes at 111.1s (all eleven images). CI cache
-persistence is implemented with local checks; hosted validation and remaining
+persistence is implemented with local checks; hosted quality and host Turbo
+save/restore pass on `980e15e`. Exact cached MinIO images are preserved; the
+approved checksum-pinned prerelease cache prepares CI to bypass unavailable
+upstream pulls. Hosted consumption remains pending;
+see [the localization checkpoint](docs/reports/2026-10-26-minio-image-availability.md).
+Hosted BuildKit/image/archive validation and remaining
 integration/release gates stay open.
 D2 evidence and the phase order below are preserved; relevant application/live
 proofs remain separate from image packaging acceptance.

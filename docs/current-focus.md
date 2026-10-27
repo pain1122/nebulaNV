@@ -1,12 +1,23 @@
 # Current Focus - D2: Cart, Checkout, And Order
 
-Last updated: 2026-10-26.
+Last updated: 2026-10-27.
 Status: active Batch 3 - Orders. Batches 0, 1 and 2 are closed.
 Immediate priority: [ASAP build cleanup](ASAP-BUILD-CLEANUP.md), Segment 3:
 finish hosted integration, CI cache and release archive acceptance. All services
 already use the accepted shared graph. Segments 1 and 2 are closed; D2 feature
 work and its pending deployment/live gates remain preserved. This is build-cleanup
 Segment 3, not a D2 feature implementation slice.
+
+Current checkpoint: main `980e15e` passes the complete hosted quality job and
+host Turbo save/restore between fresh runners. Upstream MinIO pulls remain
+unavailable. The exact cached vendor images are preserved and verified; Salar
+approved a public, non-latest prerelease cache for CI, now published with matching
+GitHub asset digest. Checksum-before-load and
+pull-never CI preparation pass locally; hosted consumption remains pending.
+Oct 27 health check: Docker responds; PostgreSQL, both Redis instances, MinIO
+and the scanner are healthy. Eleven application containers are stopped; this is
+not full backend readiness. No applications or volumes were recreated.
+[Image availability and next steps](reports/2026-10-26-minio-image-availability.md).
 
 Product/Order acceptance is complete. Paired graph image builds passed at
 Product 198.2s / Order 240.4s; unchanged warm image builds passed at 11.2s / 9.4s.
@@ -46,8 +57,8 @@ The local all-service optimization is accepted. No repeat local build is needed.
 CI host Turbo/layer-cache persistence and exact tested-image identity evidence
 are implemented with focused YAML/policy/Bake/Bash/redaction checks. All existing
 quality/live/scan gates remain. Hosted cache upload/restore and pipeline acceptance
-are now moving into the hosted workflow following Salar's explicit authorization
-to push the current project snapshot to main; no hosted pass is claimed yet. Docker cache mounts remain ephemeral; host task cache and exported layers
+now have hosted quality and host Turbo acceptance. Hosted BuildKit layer and
+runtime/archive acceptance remain pending. Docker cache mounts remain ephemeral; host task cache and exported layers
 are separate. [CI receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
 
 Final release tooling fixes include the previously omitted scanner (sixteen unique

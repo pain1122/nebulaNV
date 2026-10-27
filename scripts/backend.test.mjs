@@ -979,6 +979,40 @@ test("CI caches preserve quality gates, bounded writers and isolated image scope
     live.env.BUILDX_BAKE_FILE,
     "docker-compose.yml:docker-bake.hcl:.github/backend-cache.hcl",
   );
+  assert.equal(
+    live.env.COMPOSE_FILE,
+    "docker-compose.yml:.github/minio-offline.yml",
+  );
+  const vendorCache = live.steps.find(
+    (step) => step.name === "Load checksum-pinned MinIO vendor cache",
+  );
+  assert.equal(vendorCache.shell, "bash");
+  assert.equal(vendorCache.env.GH_TOKEN, "${{ github.token }}");
+  assert.match(
+    vendorCache.run,
+    /gh release download vendor-minio-20250907 --repo pain1122\/nebulaNV/,
+  );
+  assert.match(
+    vendorCache.run,
+    /e1d3d52e52abddeec06867839e0b239e50ddd48e1ad49313a309ce6da9ce3a6b/,
+  );
+  assert.ok(
+    vendorCache.run.indexOf("hash.digest") < vendorCache.run.indexOf("'load'"),
+  );
+  assert.match(vendorCache.run, /minio_vendor_identity_mismatch/);
+  assert.ok(
+    live.steps.indexOf(vendorCache) <
+      indexOf(live, "Provision live integration services"),
+  );
+  const offline = eslintRequire("js-yaml").load(
+    source(".github/minio-offline.yml"),
+  );
+  assert.deepEqual(offline, {
+    services: {
+      minio: { pull_policy: "never" },
+      "minio-init": { pull_policy: "never" },
+    },
+  });
   assert.match(
     live.env.NEBULA_CI_CACHE_WRITE,
     /github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/,

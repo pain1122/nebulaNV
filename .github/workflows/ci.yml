@@ -99,6 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILDX_BAKE_FILE: docker-compose.yml:docker-bake.hcl:.github/backend-cache.hcl
+      COMPOSE_FILE: docker-compose.yml:.github/minio-offline.yml
       NEBULA_CI_CACHE_WRITE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v7
@@ -137,6 +138,36 @@ jobs:
               if (name === 'ACTIONS_RUNTIME_TOKEN') core.setSecret(value);
               core.exportVariable(name, value);
             }
+      - name: Load checksum-pinned MinIO vendor cache
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive_dir="$RUNNER_TEMP/nebula-minio-vendor"
+          mkdir -p "$archive_dir"
+          gh release download vendor-minio-20250907 --repo pain1122/nebulaNV --pattern minio-20250907-mc-20250813.tar --dir "$archive_dir"
+          node --input-type=module - "$archive_dir/minio-20250907-mc-20250813.tar" <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createReadStream } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          const archive = process.argv[2];
+          const hash = createHash('sha256');
+          for await (const chunk of createReadStream(archive)) hash.update(chunk);
+          assert.equal(hash.digest('hex'), 'e1d3d52e52abddeec06867839e0b239e50ddd48e1ad49313a309ce6da9ce3a6b', 'minio_vendor_archive_checksum_mismatch');
+          execFileSync('docker', ['image', 'load', '--input', archive], { stdio: 'inherit' });
+          // Index IDs on containerd; config IDs on the classic image store.
+          const images = [
+            ['minio/minio:latest', ['sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e', 'sha256:69b2ec208575b69597784255eec6fa6a2985ee9e1a47f4411a51f7f5fdd193a9']],
+            ['minio/mc:latest', ['sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727', 'sha256:c2ad77420d33bb4ad8694457d3edf7188076428582bd24e3dd4d09d6a1d52872']],
+          ];
+          for (const [reference, approved] of images) {
+            const id = execFileSync('docker', ['image', 'inspect', reference, '--format', '{{.Id}}'], { encoding: 'utf8' }).trim();
+            assert.ok(approved.includes(id), `minio_vendor_identity_mismatch_${reference}`);
+          }
+          console.log('[minio-vendor] checksum and both image identities verified');
+          NODE
       - name: Provision live integration services
         run: pnpm backend:boot
       - name: Verify historical Product metadata upgrade with current migration tails

@@ -550,3 +550,18 @@ with a remote cache hit. Existing quality, F3/live, image scans, tracked-diff an
 `.ci-evidence/backend-tested-images.json`, which records image IDs/digests without
 Config/env/labels. Detailed trace and local checks:
 [CI cache receipt](reports/2026-10-26-build-cleanup-ci-cache.md).
+
+### CI MinIO vendor cache (2026-10-27)
+
+Upstream pulls currently fail. The live CI job downloads the approved
+`vendor-minio-20250907` prerelease asset from `pain1122/nebulaNV`, verifies its
+pinned SHA-256 before Docker load, then checks both recorded image identities.
+`.github/minio-offline.yml` sets `pull_policy: never` for MinIO and its bucket-init
+client only. Original image references, volume definitions, credentials inputs,
+health checks and the sixteen-image release inventory are retained. This overlay
+is CI-only; local and release startup do not inherit it automatically.
+
+The archive is outside the source/build context and contains the two unchanged
+linux/amd64 vendor images, without project env files or volumes. This preserves
+the tested binaries; it is not an upstream maintenance or security update.
+[Supply/provenance and validation receipt](reports/2026-10-26-minio-image-availability.md).

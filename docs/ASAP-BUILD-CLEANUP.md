@@ -71,10 +71,16 @@ validation remains pending. [CI receipt](reports/2026-10-26-build-cleanup-ci-cac
 Image-only release behavior is retained. Final archive review corrected the
 omitted scanner, PowerShell JSON-array flattening and the automatic Input-variable
 collision. All 81 tooling checks pass. Hosted graph/COPY checks pass; audited
-same-major dependency fixes now await fresh-install/runtime CI acceptance.
+same-major dependency fixes pass fresh-install quality acceptance.
 Hosted CI runs populated metadata
 upgrade, F3/native integration, scans and a streamed sixteen-image save/load round
-trip. Salar authorized publication to main; execution results remain pending.
+trip. Main `980e15e` passes the full hosted quality job and host Turbo round trip.
+Live provisioning stopped before backend builds because the MinIO images cannot
+be pulled. Exact cached vendor images are now preserved and verified; Salar
+approved a checksum-pinned, non-latest prerelease cache. CI preparation passes
+locally; actual hosted consumption/runtime/cache/archive gates remain pending.
+VPN retry/localization findings and remaining runtime/cache/archive
+gates are recorded in the [image availability checkpoint](reports/2026-10-26-minio-image-availability.md).
 
 - [x] Extend the proven graph to all targets and Product/Order/Gateway union
       compilation, followed by sequential exports using identical producer inputs.

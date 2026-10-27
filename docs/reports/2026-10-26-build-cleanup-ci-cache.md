@@ -511,3 +511,38 @@ configuration changed for local Gateway, but the release override/native example
 and all images/schemas remain unchanged. Fresh hosted Compose/source scan and
 container integration/render/image/archive/cache proofs remain pending.
 READY FOR HOSTED CLEAN-EXAMPLE COMPOSE VALIDATION; Segment 3 remains open.
+
+## Hosted quality accepted; infrastructure source blocked
+
+Main `980e15e`, run 40332174629, passes the complete quality job, including both
+Compose boundaries and source scan. Host Turbo cache was saved and restored by
+the separate fresh live runner (774,172 compressed bytes); pinned builder setup
+and masked runtime-credential exposure passed. Live provisioning then failed on
+the first MinIO pull, before backend image builds, migration/integration, image
+scans or archive verification. Those gates are not claimed complete.
+
+Salar enabled VPN and requested retries/localization research. Both Docker Hub
+references still deny access, both Quay references return 401, and the public
+Redis control resolves. The local engine is stopped, preventing inspection of
+the existing cached MinIO copies. No fork/source-build choice was approved.
+The [availability/localization checkpoint](2026-10-26-minio-image-availability.md)
+records primary sources, exact probes, candidate source commits, affected files
+and next operator-owned Docker startup. No new heavy CI run is useful until the
+missing image supply is addressed; preserve the passing quality checkpoint.
+
+## Oct 27 approved vendor-cache handoff
+
+Local Docker restarted; five infrastructure services are healthy and eleven
+applications remain stopped. The exact cached MinIO server/client were preserved
+outside the repository, hashed, loaded and checked without recreating any volume
+or container. Salar approved their public non-latest prerelease publication;
+`vendor-minio-20250907` is published and GitHub's asset digest matches the pin.
+CI now has checksum-before-load preparation and a CI-only pull-never overlay;
+original vendor refs and all sixteen archive entries are retained. All 81
+tooling tests pass in normal and CI environments; actual valid/invalid archive
+checks, merged Compose invariants, Bash/Node syntax and scoped lint pass.
+Full consumer trace and Gate 5 receipt:
+[vendor supply receipt](2026-10-26-minio-image-availability.md#oct-27-ci-supply-preparation-receipt).
+Hosted vendor consumption, backend image/runtime/scan/archive acceptance and
+BuildKit cache persistence remain pending. Quality and host Turbo results on
+`980e15e` stay valid; this is a supply fix, not a storage replacement or D2 closure.

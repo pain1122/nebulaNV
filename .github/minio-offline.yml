@@ -1,0 +1,7 @@
+# CI loads the exact checksum-pinned vendor archive before provisioning.
+# Keep original references for release inventory parity; never query retired registries.
+services:
+  minio:
+    pull_policy: never
+  minio-init:
+    pull_policy: never
