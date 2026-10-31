@@ -1,0 +1,104 @@
+name: SeaweedFS vendor image
+on:
+  workflow_dispatch:
+  push:
+    branches: ["agent/seaweed-vendor-*"]
+    paths:
+      - .github/workflows/seaweed-vendor.yml
+      - docker/seaweedfs/security.Dockerfile
+      - scripts/storage/seaweed-vendor-evidence.mjs
+      - scripts/storage/seaweed-vendor-evidence.test.mjs
+
+permissions:
+  contents: read
+concurrency:
+  group: seaweed-vendor-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_TAG: nebulanv-vendor-seaweedfs:4.51-gojose4.1.7
+  TRIVY_VERSION: v0.76.1
+
+jobs:
+  build-scan-export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test the vendor evidence gate
+        run: node --test scripts/storage/seaweed-vendor-evidence.test.mjs
+      - name: Set up the existing pinned BuildKit version
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          version: v0.28.0
+          driver: docker-container
+          driver-opts: image=moby/buildkit:v0.24.0@sha256:6eceb8971ce4fceb3daca562832642706238b7eea72941fcf9896c93c3c4a53e
+          cleanup: true
+      - name: Expose masked cache runtime credentials
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            for (const name of ['ACTIONS_RUNTIME_TOKEN', 'ACTIONS_RESULTS_URL']) {
+              const value = process.env[name];
+              if (!value) throw new Error('Missing cache runtime field: ' + name);
+              core.setSecret(value);
+              core.exportVariable(name, value);
+            }
+      - name: Build only the pinned vendor binary and image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 \
+            --file docker/seaweedfs/security.Dockerfile \
+            --build-arg 'GOPROXY=https://proxy.golang.org|https://goproxy.cn|https://goproxy.io|direct' \
+            --cache-from type=gha,scope=nebula-seaweed-vendor-v1 \
+            --cache-to type=gha,scope=nebula-seaweed-vendor-v1,mode=max \
+            --tag "$IMAGE_TAG" --load --progress=plain docker/seaweedfs
+      - name: Install the pinned current Trivy scanner
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          cache: true
+          version: ${{ env.TRIVY_VERSION }}
+      - name: Scan the actual immutable local image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/seaweed-vendor"
+          image_id="$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')"
+          trivy image --db-repository ghcr.io/aquasecurity/trivy-db:2 \
+            --image-src docker --platform linux/amd64 --scanners vuln \
+            --severity HIGH,CRITICAL --exit-code 1 --timeout 15m --format json \
+            --output "$RUNNER_TEMP/seaweed-vendor/scan.json" "$image_id"
+          node scripts/storage/seaweed-vendor-evidence.mjs "$RUNNER_TEMP/seaweed-vendor"
+      - name: Export only the accepted scanned vendor image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/seaweed-vendor"
+          docker image save "$IMAGE_TAG" | gzip -1 > image.tar.gz
+          sha256sum image.tar.gz > image.tar.gz.sha256
+      - name: Retain the image and verification files for three days
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seaweedfs-linux-amd64-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/seaweed-vendor/image.tar.gz
+            ${{ runner.temp }}/seaweed-vendor/image.tar.gz.sha256
+            ${{ runner.temp }}/seaweed-vendor/image.json
+            ${{ runner.temp }}/seaweed-vendor/scan.json
+            ${{ runner.temp }}/seaweed-vendor/binary.txt
+            ${{ runner.temp }}/seaweed-vendor/module.patch
+            ${{ runner.temp }}/seaweed-vendor/go-jose-tests.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+      - name: Retain scan evidence even if the security gate fails
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seaweedfs-failed-scan-${{ github.run_id }}
+          path: ${{ runner.temp }}/seaweed-vendor/scan.json
+          if-no-files-found: ignore
+          retention-days: 3
