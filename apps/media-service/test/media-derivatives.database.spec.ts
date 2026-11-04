@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
-import { PrismaClient } from "../prisma/generated";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { mediaPrismaOptions } from "../src/prisma-options";
 import type { PrismaService } from "../src/prisma.service";
 import {
   derivativeFacts,
@@ -30,7 +31,7 @@ suite("saved image generations on PostgreSQL", () => {
       throw new Error(
         "media_derivative_proof_requires_disposable_local_database",
       );
-    prisma = new PrismaClient({ datasourceUrl: url.toString() });
+    prisma = new PrismaClient(mediaPrismaOptions(url.toString()));
     await prisma.$connect();
     store = new MediaDerivativeStore(prisma as unknown as PrismaService);
   });

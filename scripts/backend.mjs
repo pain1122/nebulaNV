@@ -13,12 +13,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import console from "node:console";
 import { randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { tmpdir } from "node:os";
+import { performance } from "node:perf_hooks";
+import { setTimeout } from "node:timers";
 import { pipeline } from "node:stream/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
 export const repositoryRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -189,6 +192,8 @@ export const TRIVY_SOURCE_SKIP_DIRECTORIES = Object.freeze([
   ".next",
   "**/.next",
   ".nebula-backups",
+  ".nebula-storage",
+  ".ci-evidence",
   ".security-reports",
   "apps/web",
   "build",
@@ -552,6 +557,38 @@ function databaseEnv(database, env = process.env) {
     DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
     SHADOW_DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:15432/postgres?schema=${database}_shadow`,
   };
+}
+
+export function prepareLocalDatabases({
+  env = process.env,
+  executePnpm = runPnpm,
+  executeDocker = run,
+  logger = console,
+  platform = process.platform,
+} = {}) {
+  if (env.NODE_ENV === "production") {
+    throw new Error("local_database_preparation_refused_in_production");
+  }
+  // Fail clearly before any work if invoked outside a pnpm lifecycle.
+  if (executePnpm === runPnpm) pnpmInvocation(env);
+  for (const operation of ["migrate-deploy", "migrate-status", "seed"]) {
+    runPrismaOperation(operation, {
+      env,
+      environmentFor: (service) => databaseEnv(service.database, env),
+      execute: executePnpm,
+      logger,
+    });
+  }
+  // Fresh tables inherit default grants. Reapply the existing table-specific
+  // restrictions now that Prisma's migration-history table exists.
+  for (const service of ["tenant-authority-db-init", "realm-auth-db-init"]) {
+    runCompose(["run", "-T", "--rm", "--no-deps", "--pull", "never", service], {
+      label: `post-migration-${service}`,
+      env,
+      execute: executeDocker,
+      platform,
+    });
+  }
 }
 
 const DATABASE_NAME_PATTERN = /^[a-z][a-z0-9_]{0,62}$/;
@@ -1826,7 +1863,7 @@ VALUES (
         redisContainer,
         "--publish",
         "127.0.0.1::6379",
-        "redis:7-alpine",
+        "redis:7.4.12-bookworm@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5",
       ],
       "redis_start",
       { capture: true },
@@ -4363,7 +4400,7 @@ async function waitForHealth(
   service,
   deadline,
   {
-    fetchImpl = fetch,
+    fetchImpl = globalThis.fetch,
     now = Date.now,
     sleep = (milliseconds) =>
       new Promise((resolve) => setTimeout(resolve, milliseconds)),
@@ -4381,7 +4418,7 @@ async function waitForHealth(
 }
 
 export async function checkBackendHealth({
-  fetchImpl = fetch,
+  fetchImpl = globalThis.fetch,
   logger = console,
   services = backendServices,
 } = {}) {
@@ -4429,7 +4466,7 @@ export async function provisionBackend({
   env = process.env,
   executeDocker = run,
   executePnpm = runPnpm,
-  fetchImpl = fetch,
+  fetchImpl = globalThis.fetch,
   logger = console,
   now = Date.now,
   platform = process.platform,
@@ -4438,6 +4475,17 @@ export async function provisionBackend({
     new Promise((resolve) => setTimeout(resolve, milliseconds)),
 } = {}) {
   ensureEnvironment();
+
+  const storage = configuredMediaStorage(
+    runCompose(["config", "--format", "json"], {
+      label: "storage-configuration",
+      env,
+      execute: executeDocker,
+      platform,
+      capture: true,
+      emitCaptured: false,
+    }).stdout,
+  );
 
   runCompose(
     [
@@ -4449,7 +4497,7 @@ export async function provisionBackend({
       "postgres",
       "redis",
       "realm-auth-default-redis",
-      "minio",
+      storage.service,
     ],
     {
       label: "infrastructure",
@@ -4482,24 +4530,7 @@ export async function provisionBackend({
     sleep,
   });
 
-  runPrismaOperation("migrate-deploy", {
-    env,
-    environmentFor: (service) => databaseEnv(service.database, env),
-    execute: executePnpm,
-    logger,
-  });
-  runPrismaOperation("migrate-status", {
-    env,
-    environmentFor: (service) => databaseEnv(service.database, env),
-    execute: executePnpm,
-    logger,
-  });
-  runPrismaOperation("seed", {
-    env,
-    environmentFor: (service) => databaseEnv(service.database, env),
-    execute: executePnpm,
-    logger,
-  });
+  prepareLocalDatabases({ env, executePnpm, executeDocker, logger, platform });
 
   const build = executePnpm(["run", "docker:build:backend"], { env });
   if (build.status !== 0) {
@@ -4616,6 +4647,52 @@ function requireExactValues(actual, expected, error) {
   ) {
     throw new Error(error);
   }
+}
+
+export function configuredMediaStorage(value) {
+  const document = renderedComposeDocument(value, "storage");
+  const media = renderedService(document, "storage", "media-service");
+  const environment = isRecord(media.environment) ? media.environment : {};
+  if (environment.MEDIA_STORAGE_DRIVER !== "s3") {
+    throw new Error("compose_storage_driver_unsupported");
+  }
+  let endpoint;
+  try {
+    endpoint = new URL(
+      environment.MEDIA_S3_INTERNAL_ENDPOINT ?? environment.MEDIA_S3_ENDPOINT,
+    );
+  } catch {
+    throw new Error("compose_storage_internal_endpoint_invalid");
+  }
+  const service = endpoint.hostname;
+  const port = { minio: 9000, seaweed: 8333 }[service];
+  if (
+    !port ||
+    endpoint.protocol !== "http:" ||
+    Number(endpoint.port) !== port ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash ||
+    endpoint.pathname !== "/"
+  ) {
+    throw new Error("compose_storage_internal_endpoint_unsupported");
+  }
+  renderedService(document, "storage", service);
+  if (media.depends_on?.[service]?.condition !== "service_healthy") {
+    throw new Error("compose_storage_dependency_health_required");
+  }
+  const other = service === "minio" ? "seaweed" : "minio";
+  if (
+    media.depends_on?.[other] !== undefined ||
+    media.depends_on?.[`${other}-init`] !== undefined
+  ) {
+    throw new Error("compose_storage_mixed_dependencies_forbidden");
+  }
+  if (service === "seaweed" && environment.MEDIA_STORAGE_PROVIDER !== "s3") {
+    throw new Error("compose_storage_seaweed_requires_s3_provider");
+  }
+  return { service, port };
 }
 
 function requireGatewayRuntimeContract(document, label) {
@@ -4738,11 +4815,6 @@ export function validateRenderedComposeBoundary(label, value) {
         `compose_boundary_release_${name}_ports_forbidden`,
       );
     }
-    requireExactValues(
-      renderedPortTargets(renderedService(document, label, "minio")),
-      [9000],
-      "compose_boundary_release_minio_ports_invalid",
-    );
     for (const service of hybridServices) {
       const rendered = renderedService(document, label, service.dockerService);
       const environment = isRecord(rendered.environment)
@@ -4772,6 +4844,17 @@ export function validateRenderedComposeBoundary(label, value) {
       ) {
         throw new Error(`compose_boundary_${label}_service_started_forbidden`);
       }
+    }
+  }
+  const storage = configuredMediaStorage(document);
+  if (label === "release") {
+    for (const name of ["minio", "seaweed"]) {
+      if (!document.services[name]) continue;
+      requireExactValues(
+        renderedPortTargets(document.services[name]),
+        name === storage.service ? [storage.port] : [],
+        `compose_boundary_release_${name}_ports_invalid`,
+      );
     }
   }
   return document;
@@ -5016,26 +5099,42 @@ export function classifyDependencyAdvisories(
             .filter((version) => typeof version === "string"),
         ),
       ];
-      const classifications = [];
-      if (
-        versions.some((version) =>
-          dependencyVersionMatches(
-            backendInventory,
-            advisory.module_name,
-            version,
-          ),
-        )
-      ) {
-        classifications.push("backend-runtime");
+      const scopes = new Set();
+      const findings = Array.isArray(advisory.findings)
+        ? advisory.findings
+        : [];
+      if (findings.length === 0) scopes.add("unresolved");
+      for (const finding of findings) {
+        const backend = dependencyVersionMatches(
+          backendInventory,
+          advisory.module_name,
+          finding?.version,
+        );
+        const web = dependencyVersionMatches(
+          webInventory,
+          advisory.module_name,
+          finding?.version,
+        );
+        const paths = Array.isArray(finding?.paths) ? finding.paths : [];
+        // pnpm 10's audit identifies apps/web as apps__web. An absent installed
+        // match is not evidence that this lockfile dependency is backend tooling.
+        const isWebPath = (value) =>
+          typeof value === "string" && value.startsWith("apps__web>");
+        if (backend) scopes.add("backend-runtime");
+        if (web || paths.some(isWebPath)) scopes.add("deferred-web");
+        if (
+          !backend &&
+          (paths.some((value) => !isWebPath(value)) ||
+            (paths.length === 0 && !web))
+        ) {
+          scopes.add("unresolved");
+        }
       }
-      if (
-        versions.some((version) =>
-          dependencyVersionMatches(webInventory, advisory.module_name, version),
-        )
-      ) {
-        classifications.push("deferred-web");
-      }
-      if (classifications.length === 0) classifications.push("backend-tooling");
+      const classifications = [
+        "backend-runtime",
+        "deferred-web",
+        "unresolved",
+      ].filter((scope) => scopes.has(scope));
 
       return {
         id: advisory.id,
@@ -5132,8 +5231,10 @@ export function generateBackendDependencyReport({
     collectRuntimeDependencyInventory(backendWorkspaces),
     collectRuntimeDependencyInventory(webWorkspaces),
   );
-  const blockers = findings.filter((finding) =>
-    finding.classifications.includes("backend-runtime"),
+  const blockers = findings.filter(
+    (finding) =>
+      finding.classifications.includes("backend-runtime") ||
+      finding.classifications.includes("unresolved"),
   );
   const report = {
     generatedAt: new Date().toISOString(),
@@ -5141,16 +5242,22 @@ export function generateBackendDependencyReport({
       scope: "backend-runtime",
       severities: ["HIGH", "CRITICAL"],
       approvedAdvisories: [],
+      blockUnresolved: true,
     },
     auditMetadata: auditReport.metadata ?? {},
     summary: {
       highCritical: findings.length,
-      backendRuntime: blockers.length,
+      backendRuntime: findings.filter((finding) =>
+        finding.classifications.includes("backend-runtime"),
+      ).length,
       backendTooling: findings.filter((finding) =>
         finding.classifications.includes("backend-tooling"),
       ).length,
       deferredWeb: findings.filter((finding) =>
         finding.classifications.includes("deferred-web"),
+      ).length,
+      unresolved: findings.filter((finding) =>
+        finding.classifications.includes("unresolved"),
       ).length,
     },
     findings,
@@ -5160,7 +5267,7 @@ export function generateBackendDependencyReport({
   writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
   logger.log(
-    `[backend] dependency report: runtime=${report.summary.backendRuntime}, tooling=${report.summary.backendTooling}, deferred-web=${report.summary.deferredWeb}`,
+    `[backend] dependency report: runtime=${report.summary.backendRuntime}, tooling=${report.summary.backendTooling}, deferred-web=${report.summary.deferredWeb}, unresolved=${report.summary.unresolved}`,
   );
   if (blockers.length > 0) {
     throw new Error(
@@ -5538,6 +5645,7 @@ function usage() {
     "  node scripts/backend.mjs database verify-migrations [tenant-authority|product|order|media]",
     "  node scripts/backend.mjs database migrate-deploy <tenant-authority|product|order|media>",
     "  node scripts/backend.mjs database migrate-status <tenant-authority|product|order|media>",
+    "  pnpm db:prepare (local owner migrations, status and base seeds; no image build)",
     "  node scripts/backend.mjs database verify-media-processing-upgrade",
     "  node scripts/backend.mjs database verify-product-metadata-upgrade",
     "  node scripts/backend.mjs database verify-d1-commerce-upgrade",
@@ -5557,6 +5665,11 @@ function usage() {
 
 export async function main(args = process.argv.slice(2)) {
   const [command, operation, extra, confirmationArg, unexpected] = args;
+
+  if (command === "database" && operation === "prepare" && !extra) {
+    prepareLocalDatabases();
+    return;
+  }
 
   if ((command === "boot" || command === "provision") && !operation) {
     await provisionBackend();

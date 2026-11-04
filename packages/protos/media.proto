@@ -294,6 +294,7 @@ message PresignUploadRes {
   string entityType = 14;
   string entityId = 15;
   string ownerId = 16;
+  map<string, string> uploadHeaders = 17;
 }
 
 message FinalizeUploadReq {

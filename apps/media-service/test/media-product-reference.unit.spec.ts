@@ -12,7 +12,7 @@ import {
   IS_PUBLIC_KEY,
   createGrpcValidationPipe,
 } from "@nebula/grpc-auth";
-import { MediaStatus, ScanStatus } from "../prisma/generated";
+import { MediaStatus, ScanStatus } from "../src/generated/prisma/client";
 import { ResolveProductReferenceDto } from "../src/dto/resolve-product-reference.dto";
 import { MediaService } from "../src/media.service";
 import { MediaGrpcController } from "../src/grpc/media-grpc.controller";

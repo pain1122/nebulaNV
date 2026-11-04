@@ -3,7 +3,7 @@ import {
   OrderStatus,
   type OrderStatusChange,
   type Prisma,
-} from "../prisma/generated/client";
+} from "../src/generated/prisma/client";
 import {
   applyOrderStatus,
   type OrderStatusCommand,

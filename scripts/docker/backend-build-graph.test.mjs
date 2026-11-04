@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import {
@@ -213,6 +214,11 @@ function fixture(
     `${order.directory}/prisma/schema.prisma`,
     "// selected-owner schema fixture\n",
   );
+  write(
+    root,
+    `${order.directory}/prisma.config.ts`,
+    "export default { schema: 'prisma/schema.prisma' };\n",
+  );
   run(
     "pnpm",
     [
@@ -381,6 +387,11 @@ test("native proof snapshot excludes credentials/dependencies/generated files an
     write(source, "apps/product-service/dist/main.js", "compiled");
     write(source, "packages/protos/generated/product.ts", "generated");
     write(source, "apps/order-service/prisma/generated/client.js", "generated");
+    write(
+      source,
+      "apps/product-service/src/generated/prisma/client.ts",
+      "generated",
+    );
     prepareSnapshot(source, target);
     assert.equal(
       readFileSync(
@@ -395,6 +406,7 @@ test("native proof snapshot excludes credentials/dependencies/generated files an
       "apps/product-service/dist",
       "packages/protos/generated",
       "apps/order-service/prisma/generated",
+      "apps/product-service/src/generated/prisma",
     ])
       assert.equal(existsSync(path.join(target, file)), false, file);
     assert.equal(
@@ -674,12 +686,14 @@ test("union builds compile real shared producers once before both injected consu
 
 test("runtime verification dispatches separate validated owners for leaves, batches and full inventory", () =>
   temporary((root) => {
-    for (const service of backendServices)
+    for (const service of backendServices) {
+      write(root, `${service.directory}/package.json`, { dependencies: {} });
       write(
         root,
         `${service.directory}/dist/config/env.validation.js`,
         "exports.schema = {};\n",
       );
+    }
     for (const selection of [
       "gateway",
       "product-service,order-service,gateway",
@@ -727,6 +741,56 @@ test("runtime verification dispatches separate validated owners for leaves, batc
     assert.match(denied.stderr, /relative imports/);
   }));
 
+test("migrated runtime verification requires compiled client/options even when a legacy client exists", () =>
+  temporary((root) => {
+    const app = "apps/product-service";
+    write(root, `${app}/package.json`, {
+      dependencies: { "@prisma/adapter-pg": "7.10.1" },
+    });
+    write(
+      root,
+      `${app}/dist/config/env.validation.js`,
+      "exports.schema = {};\n",
+    );
+    write(
+      root,
+      `${app}/prisma/generated/client.js`,
+      "exports.PrismaClient = class Legacy {};\n",
+    );
+    const check = () =>
+      spawnSync(
+        process.execPath,
+        [
+          path.join(
+            repositoryRoot,
+            "scripts/docker/verify-runtime-imports.mjs",
+          ),
+          root,
+          "product-service",
+        ],
+        { encoding: "utf8" },
+      );
+    const missing = check();
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /generated.*prisma.*client/);
+    write(
+      root,
+      `${app}/dist/generated/prisma/client.js`,
+      "exports.PrismaClient = class Current {};\n",
+    );
+    const missingOptions = check();
+    assert.notEqual(missingOptions.status, 0);
+    assert.match(missingOptions.stderr, /prisma-options/);
+    write(
+      root,
+      `${app}/dist/prisma-options.js`,
+      "exports.productPrismaOptions = () => ({});\n",
+    );
+    const valid = check();
+    assert.equal(valid.status, 0, valid.stderr);
+    assert.match(valid.stdout, /passed for 1 backend service/);
+  }));
+
 test("pruned cache inputs isolate source, schema, unrelated source and root script edits", () =>
   temporary((root) => {
     const input = path.join(root, "input");
@@ -765,8 +829,31 @@ test("pruned cache inputs isolate source, schema, unrelated source and root scri
     for (const part of ["fetch", "json"])
       assert.equal(schema[part], source[part], part);
     assert.notEqual(schema.schemas, source.schemas);
+    write(
+      input,
+      "apps/order-service/prisma.config.ts",
+      "export default { schema: 'prisma/schema.prisma', migrations: { seed: 'node seed.js' } };\n",
+    );
+    const config = prepare();
+    for (const part of ["fetch", "json"])
+      assert.equal(config[part], schema[part], part);
+    assert.notEqual(config.schemas, schema.schemas);
+    assert.equal(
+      readFileSync(
+        path.join(
+          root,
+          `prune-${counter - 1}`,
+          "schemas/apps/order-service/prisma.config.ts",
+        ),
+        "utf8",
+      ),
+      readFileSync(
+        path.join(input, "apps/order-service/prisma.config.ts"),
+        "utf8",
+      ),
+    );
     write(input, "apps/unrelated/src/extra.ts", "// unrelated\n");
-    assert.deepEqual(prepare(), schema);
+    assert.deepEqual(prepare(), config);
     const manifest = JSON.parse(readFileSync(path.join(input, "package.json")));
     manifest.scripts = { unrelated: "node -e \"console.log('example')\"" };
     write(input, "package.json", manifest);

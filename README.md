@@ -8,7 +8,7 @@
 
 **Author:** Salar Abbasi — 25, Iran  
 **Experience:** Senior Software Engineer since 19  
-**Education:** Computer Science Diploma  
+**Education:** Computer Science Diploma
 
 NebulaNV is a **modern polyglot e-commerce monorepo**, designed for modular scalability, cloud-native deployments, and future-ready 3D & AI integrations.  
 It evolves from a basic service-oriented architecture to a **multi-tenant, polyglot, AI-driven ecosystem** — powered by **NestJS, Go, Rust, and Python**.
@@ -48,33 +48,19 @@ NebulaNV's media layer is intentionally split between **file storage**, **securi
 - admin file-manager actions: list, search, upload, finalize, read, delete
 - future edit/variant records for thumbnails, optimized images, and edited versions
 
-### Supabase, MinIO, and AWS Roles
+### Object Storage Roles
 
-Supabase Storage is planned as the preferred managed/self-contained file backend because it has a clean dashboard UI, useful storage tooling, and an S3-compatible API. It is **not** treated as the final privacy authority for NebulaNV.
+SeaweedFS now serves local Media through the existing S3-compatible boundary. The 302-object copy, scoped access, browser-style upload CORS, persistence, processing, cropped derivatives, metadata and restart recovery are accepted. MinIO is stopped with retained data for guarded rollback, not ordinary startup.
 
-MinIO is the local development S3-compatible replacement. It lets the project test AWS-style object storage without needing an AWS account.
+The unused Supabase CLI scaffold is retired. Media-service remains the privacy and metadata authority; storage holds bytes behind its existing S3-compatible boundary.
 
-AWS S3 is the future production-compatible target. The media contract should stay S3-compatible so MinIO, Supabase Storage S3, and AWS S3 can all sit behind the same media-service policy layer.
+Cloud provider selection and CDN integration remain deferred to F9. See [current-focus](docs/current-focus.md) and the [Seaweed setup](docker/seaweedfs/README.md) for actual transition status.
 
-The intended endpoint split is:
-
-```env
-MEDIA_S3_INTERNAL_ENDPOINT=http://minio:9000
-MEDIA_S3_PUBLIC_ENDPOINT=http://127.0.0.1:9000
-```
-
-For Supabase:
+For the prepared Compose profile, the active storage endpoint split is:
 
 ```env
-MEDIA_S3_INTERNAL_ENDPOINT=https://project-ref.storage.supabase.co/storage/v1/s3
-MEDIA_S3_PUBLIC_ENDPOINT=https://project-ref.storage.supabase.co/storage/v1/s3
-```
-
-For AWS/CDN later:
-
-```env
-MEDIA_S3_INTERNAL_ENDPOINT=https://s3.amazonaws.com
-MEDIA_S3_PUBLIC_ENDPOINT=https://cdn.example.com
+MEDIA_S3_INTERNAL_ENDPOINT=http://seaweed:8333
+MEDIA_S3_PUBLIC_ENDPOINT=http://127.0.0.1:19000
 ```
 
 ### Access Classes
@@ -96,16 +82,16 @@ The guiding rule is: **storage holds bytes, media-service enforces access, worke
 
 ## 🛠 Tech Stack
 
-| Layer | Technology |
-|-------|-------------|
-| **Backend** | Node.js ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square), NestJS, TypeScript, Go, PostgreSQL ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=flat-square), gRPC |
-| **Frontend** | Next.js ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square), Tailwind CSS ![Tailwind](https://img.shields.io/badge/Tailwind-38B2AC?style=flat-square), React Query, NextAuth |
-| **Mobile** | React Native (Expo) / Flutter 3+, gRPC bridge, SQLite Offline Cache |
-| **Infrastructure** | Docker ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square), Kubernetes ![K8s](https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square), AWS (EKS, S3, MSK, RDS, ElastiCache), Helm |
-| **Messaging & Events** | Kafka, NATS, Redis Streams |
-| **Auth & Security** | JWT, S2S HMAC, OAuth2 (future), token versioning |
-| **Monitoring** | OpenTelemetry, Prometheus, Grafana, AWS CloudWatch |
-| **Developer Tools** | TurboRepo, ts-proto, Prisma, Jest, ESLint, Prettier |
+| Layer                  | Technology                                                                                                                                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Backend**            | Node.js ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square), NestJS, TypeScript, Go, PostgreSQL ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=flat-square), gRPC     |
+| **Frontend**           | Next.js ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square), Tailwind CSS ![Tailwind](https://img.shields.io/badge/Tailwind-38B2AC?style=flat-square), React Query, NextAuth              |
+| **Mobile**             | React Native (Expo) / Flutter 3+, gRPC bridge, SQLite Offline Cache                                                                                                                                             |
+| **Infrastructure**     | Docker ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square), Kubernetes ![K8s](https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square), AWS (EKS, S3, MSK, RDS, ElastiCache), Helm |
+| **Messaging & Events** | Kafka, NATS, Redis Streams                                                                                                                                                                                      |
+| **Auth & Security**    | JWT, S2S HMAC, OAuth2 (future), token versioning                                                                                                                                                                |
+| **Monitoring**         | OpenTelemetry, Prometheus, Grafana, AWS CloudWatch                                                                                                                                                              |
+| **Developer Tools**    | TurboRepo, ts-proto, Prisma, Jest, ESLint, Prettier                                                                                                                                                             |
 
 ---
 
@@ -114,25 +100,25 @@ The guiding rule is: **storage holds bytes, media-service enforces access, worke
 The detailed source of truth is [`TODO-ALTERNATIVE.md`](TODO-ALTERNATIVE.md).
 The active execution checklist is [`docs/current-focus.md`](docs/current-focus.md).
 
-| Order | Phase | Current intent |
-| --- | --- | --- |
-| Complete | F0-F3 | Preserve media/security/quality foundations and the gateway |
-| Paused after R5 | F4 | Preserve dormant authority/Realm Auth/V3 work; resume after F9 |
-| 1 | D1 | Complete and harden the Product/catalog backend |
-| 2 | D2 | Complete cart, idempotent demo checkout, and Order backend |
-| B0 | Backend release | Prove ecommerce through gateway APIs without a frontend |
-| 3 | F7, D3 | When supplied, integrate the Vite admin and prove operator workflows |
-| Non-gating after B0 | D4 | Build a storefront only from concrete client requirements |
-| 5 | M2 | Add CMS, composition, and content |
-| 6 | F5 | Add bounded media processing and delivery; file-manager work starts here |
-| 7 | M5 | Deliver a bounded 3D showroom with proven jobs |
-| 8 | M3S | Add demonstrated advanced media and storage compatibility only |
-| 9 | F8, F6, D5 | Add mobile commerce and evidence-backed module compatibility |
-| 10 | AI0, M7 | Add evaluated default-site AI/RAG and analytics |
-| 11 | F9 | Prove the primary cloud and actual storage topology |
-| 12 | F4 | Resume at R6.1 and complete tenant/realm isolation |
+| Order               | Phase           | Current intent                                                           |
+| ------------------- | --------------- | ------------------------------------------------------------------------ |
+| Complete            | F0-F3           | Preserve media/security/quality foundations and the gateway              |
+| Paused after R5     | F4              | Preserve dormant authority/Realm Auth/V3 work; resume after F9           |
+| 1                   | D1              | Complete and harden the Product/catalog backend                          |
+| 2                   | D2              | Complete cart, idempotent demo checkout, and Order backend               |
+| B0                  | Backend release | Prove ecommerce through gateway APIs without a frontend                  |
+| 3                   | F7, D3          | When supplied, integrate the Vite admin and prove operator workflows     |
+| Non-gating after B0 | D4              | Build a storefront only from concrete client requirements                |
+| 5                   | M2              | Add CMS, composition, and content                                        |
+| 6                   | F5              | Add bounded media processing and delivery; file-manager work starts here |
+| 7                   | M5              | Deliver a bounded 3D showroom with proven jobs                           |
+| 8                   | M3S             | Add demonstrated advanced media and storage compatibility only           |
+| 9                   | F8, F6, D5      | Add mobile commerce and evidence-backed module compatibility             |
+| 10                  | AI0, M7         | Add evaluated default-site AI/RAG and analytics                          |
+| 11                  | F9              | Prove the primary cloud and actual storage topology                      |
+| 12                  | F4              | Resume at R6.1 and complete tenant/realm isolation                       |
 
-M3S keeps media-service as policy authority and MinIO as local storage. It uses
+M3S keeps media-service as policy authority and SeaweedFS as local storage. It uses
 only required S3-compatible operations until F9 selects and proves the primary
 cloud. General M6 infrastructure and commercial SaaS expansion remain deferred.
 
@@ -140,23 +126,27 @@ cloud. General M6 infrastructure and commercial SaaS expansion remain deferred.
 
 ## ⚡ Getting Started
 
-```bash
-# Clone the repo
-git clone https://github.com/pain1122/nebulaNV.git
-cd nebulaNV
+The native toolchain target is Node `24.22.2` from `.node-version` with pnpm
+`10.17.1`; [Setup.md](Setup.md) shows the session-local Windows selection.
+D3 Windows runtime/native/tooling verification passes; the grouped D8 Linux image
+rollout remains pending. The source target does not update running containers.
 
-# Install dependencies
-pnpm install
+The accepted setup is the prepared local workspace; current-snapshot hosted CI
+and clean-machine B0 setup remain pending. Existing provisioned workspaces use
+images already loaded and the persistent local Seaweed selection:
 
-# Start local infrastructure
-docker compose up -d
-
-# Run backend service (example)
-pnpm run dev:auth
-
-# Run tests
-pnpm -w turbo test
+```powershell
+docker compose up -d --no-build
+pnpm backend:health
 ```
+
+Follow [the boot guide](docs/architecture/local-dev-and-docker-boot.md) and
+[storage procedure](docker/seaweedfs/README.md) for actual prerequisites and
+recovery. A fresh clone does not contain private storage settings or the ignored
+Compose selection. B3 must verify that bootstrap before it becomes a release
+recipe; the bare base Compose file remains explicit MinIO rollback. Do not pair
+container startup with a native process on the same port. The adopted
+[current focus](docs/current-focus.md) supplies the scoped test/build sequence.
 
 ---
 
@@ -173,7 +163,7 @@ pnpm -w turbo test
   ├── taxonomy-service    # Manage grouping and labeling post types
   ├── media-service       # Upload, watermark, CDN
   └── web                 # Next.js (admin + public)
-  
+
 /packages
   ├── protos              # .proto files + ts-proto outputs
   ├── config              # Env & schema validation
@@ -189,13 +179,13 @@ pnpm -w turbo test
 🚀 Full-stack engineer & architecture enthusiast  
 🧠 Passionate about scalable systems, AI-driven development, and modular design  
 🎨 Combining software engineering with 3D & game-dev experience  
-🇮🇷 Based in Iran — building globally  
+🇮🇷 Based in Iran — building globally
 
 ---
 
 ## 📬 Contact
 
-- **GitHub:** [pain1122](https://github.com/pain1122)  
+- **GitHub:** [pain1122](https://github.com/pain1122)
 - **Email:** [abbasisalar24@gmail.com](mailto:abbasisalar24@gmail.com)
 
 ---
@@ -203,4 +193,4 @@ pnpm -w turbo test
 ## 🧭 Vision
 
 > “NebulaNV isn’t just an e-commerce platform — it’s a living ecosystem.”  
-Built to scale across services, devices, and realities — from backend APIs to immersive 3D environments — with an architecture that grows smarter, faster, and stronger with every phase.
+> Built to scale across services, devices, and realities — from backend APIs to immersive 3D environments — with an architecture that grows smarter, faster, and stronger with every phase.

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { PrismaClient } from "../prisma/generated";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { mediaPrismaOptions } from "../src/prisma-options";
 import type { PrismaService } from "../src/prisma.service";
 import { MediaProcessingStore } from "../src/processing/media-processing.store";
 import { ProcessingError } from "../src/processing/processing-policy";
@@ -26,7 +27,7 @@ suite("Media durable jobs on PostgreSQL", () => {
       throw new Error(
         "media_processing_proof_requires_disposable_local_database",
       );
-    prisma = new PrismaClient({ datasourceUrl: url.toString() });
+    prisma = new PrismaClient(mediaPrismaOptions(url.toString()));
     await prisma.$connect();
     store = new MediaProcessingStore(prisma as unknown as PrismaService);
   });

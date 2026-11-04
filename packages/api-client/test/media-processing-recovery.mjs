@@ -2,32 +2,36 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const docker = process.platform === "win32" ? "docker.exe" : "docker";
-function compose(args, input) {
-  return execFileSync(
-    docker,
-    [
-      "compose",
-      "--project-directory",
-      root,
-      "--file",
-      path.join(root, "docker-compose.yml"),
-      ...args,
-    ],
-    {
-      cwd: root,
+export function createMediaCompose({
+  execute = execFileSync,
+  directory = root,
+} = {}) {
+  return (args, input) =>
+    execute(docker, ["compose", "--project-directory", directory, ...args], {
+      cwd: directory,
       input,
       encoding: "utf8",
       timeout: 240_000,
       maxBuffer: 1024 * 1024,
-    },
-  );
+    });
+}
+const compose = createMediaCompose();
+
+// Serialized into the container's Node process; keep this function self-contained.
+export function mediaRecoveryClient(load) {
+  if (load("./package.json").dependencies?.["@prisma/adapter-pg"]) {
+    const { PrismaClient } = load("./dist/generated/prisma/client");
+    const { mediaPrismaOptions } = load("./dist/prisma-options");
+    return new PrismaClient(mediaPrismaOptions());
+  }
+  const { PrismaClient } = load("./prisma/generated");
+  return new PrismaClient();
 }
 function fixtureId(id) {
   assert.match(
@@ -103,9 +107,8 @@ const runtimeTools = {
       "node",
       "-e",
       `
-      const {PrismaClient}=require('./prisma/generated');
       const {S3Client,DeleteObjectCommand}=require('@aws-sdk/client-s3');
-      const p=new PrismaClient(); let s;
+      const p=(${mediaRecoveryClient.toString()})(require); let s;
       (async()=>{try {
         const m=await p.media.findUniqueOrThrow({where:{id:process.argv[1]}});
         if(m.status!=='PENDING'||!m.filename.startsWith('media-processing-'))

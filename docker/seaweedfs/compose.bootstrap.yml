@@ -1,0 +1,24 @@
+# Opt-in initializer only. Merge after the base and compose.storage.yml.
+# Reuses the prebuilt Media image/SDK; starts no application process.
+services:
+  seaweed-init:
+    image: ${NEBULA_IMAGE_PREFIX:-nebulanv-main}-media-service:${NEBULA_IMAGE_TAG:-latest}
+    pull_policy: never
+    restart: "no"
+    read_only: true
+    depends_on:
+      seaweed:
+        condition: service_healthy
+    entrypoint:
+      - node
+      - /workspace/scripts/storage/seaweed-setup.mjs
+      - init-container
+    environment:
+      SEAWEED_HOST_PORT: ${SEAWEED_HOST_PORT:-19000}
+      SEAWEED_CORS_ORIGINS: ${SEAWEED_CORS_ORIGINS:?prepare Seaweed settings first}
+    volumes:
+      - ./scripts/storage/seaweed-setup.mjs:/workspace/scripts/storage/seaweed-setup.mjs:ro
+    secrets:
+      - seaweed-s3-config
+    healthcheck:
+      disable: true

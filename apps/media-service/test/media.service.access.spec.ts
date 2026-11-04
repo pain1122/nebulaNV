@@ -1,6 +1,6 @@
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "node:stream";
-import { MediaStatus, ScanStatus } from "../prisma/generated";
+import { MediaStatus, ScanStatus } from "../src/generated/prisma/client";
 import type { PrismaService } from "../src/prisma.service";
 import { type CreateMediaInput, MediaService } from "../src/media.service";
 

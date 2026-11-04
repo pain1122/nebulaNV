@@ -41,15 +41,14 @@ require("ts-node").register({
   project: path.join(root, "apps/order-service/tsconfig.json"),
   transpileOnly: true,
 });
-const { PrismaClient, Prisma } = require("./prisma/generated/client");
+const { PrismaClient, Prisma } = require("./src/generated/prisma/client");
+const { orderPrismaOptions } = require("./src/prisma-options.ts");
 const { OrderService } = require("./src/order/order.service.ts");
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
-    },
-  },
-});
+const prisma = new PrismaClient(
+  orderPrismaOptions(
+    `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
+  ),
+);
 const id = (n) => `fd230000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const owner = id(90),
   other = id(91);

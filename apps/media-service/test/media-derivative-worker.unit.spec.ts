@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
-import type { MediaDerivativeGeneration } from "../prisma/generated";
+import type { MediaDerivativeGeneration } from "../src/generated/prisma/client";
 import {
   MediaDerivativeStore,
   type SavedOutput,

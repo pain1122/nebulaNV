@@ -66,31 +66,44 @@ export function validateState(state) {
 }
 
 export async function withJournal(directory, action) {
+  return withNamedJournal(directory, action, {
+    name: "d1",
+    createState: emptyState,
+    validate: validateState,
+  });
+}
+
+export async function withNamedJournal(
+  directory,
+  action,
+  { name, createState, validate },
+) {
+  assert.match(name, /^[a-z0-9-]{1,48}$/u, "demo_journal_name_invalid");
   const root = resolve(directory);
   await mkdir(root, { recursive: true });
-  const lockPath = resolve(root, "d1.lock");
+  const lockPath = resolve(root, `${name}.lock`);
   let lock;
   try {
     lock = await open(lockPath, "wx");
   } catch (error) {
     if (error.code === "EEXIST")
       throw new Error(
-        "demo_run_already_locked; if the previous process crashed, confirm it stopped before removing .nebula-demo/d1.lock",
+        `demo_run_already_locked; if the previous process crashed, confirm it stopped before removing .nebula-demo/${name}.lock`,
       );
     throw error;
   }
   try {
-    const file = resolve(root, "d1.json");
+    const file = resolve(root, `${name}.json`);
     let state;
     try {
-      state = validateState(JSON.parse(await readFile(file, "utf8")));
+      state = validate(JSON.parse(await readFile(file, "utf8")));
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
-      state = emptyState();
+      state = createState();
     }
     const save = async () => {
-      validateState(state);
-      const temporary = resolve(root, "d1.json.tmp");
+      validate(state);
+      const temporary = resolve(root, `${name}.json.tmp`);
       await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
         mode: 0o600,
       });

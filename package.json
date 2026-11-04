@@ -188,6 +188,7 @@
     "prisma:migrate:deploy": "node ./scripts/backend.mjs prisma migrate-deploy",
     "prisma:migrate:status": "node ./scripts/backend.mjs prisma migrate-status",
     "prisma:seed": "node ./scripts/backend.mjs prisma seed",
+    "db:prepare": "node ./scripts/backend.mjs database prepare",
     "backend:seed": "node ./scripts/backend.mjs seed",
     "db:push": "node ./scripts/backend.mjs prisma push",
     "db:verify:migrations": "node ./scripts/backend.mjs database verify-migrations",
@@ -217,6 +218,8 @@
     "db:restore": "node ./scripts/backend.mjs database restore",
     "test:database-recovery": "node ./scripts/backend.mjs database test-recovery",
     "test:backend-tooling": "node --test ./scripts/backend.test.mjs",
+    "test:storage:setup": "node --test ./scripts/storage/seaweed-vendor-evidence.test.mjs ./scripts/storage/seaweed-setup.test.mjs ./scripts/storage/seaweed-transfer.test.mjs",
+    "test:backend-dev": "node --test ./scripts/backend-dev.test.mjs",
     "test:build-graph": "node --test ./scripts/docker/backend-build-graph.test.mjs",
     "test:preflight": "pnpm api:check && pnpm --filter @nebula/gateway exec jest --config ./jest.config.ts --runInBand test/openapi-contract.spec.ts test/contracts/route-policy.aggregate.spec.ts test/contracts/input-profiles.aggregate.spec.ts test/r5-v3-receiver-inventory.spec.ts",
     "dev:auth": "pnpm --filter ./apps/auth-service start",
@@ -231,6 +234,7 @@
     "dev:product": "wait-on tcp:127.0.0.1:50052 tcp:127.0.0.1:50054 tcp:127.0.0.1:50057 && pnpm --filter ./apps/product-service start",
     "dev:order": "wait-on tcp:127.0.0.1:50052 tcp:127.0.0.1:50054 tcp:127.0.0.1:50053 && pnpm --filter ./apps/order-service start",
     "dev:backend": "node ./scripts/backend.mjs dev",
+    "dev:watch": "node ./scripts/backend-dev.mjs",
     "dev:web": "pnpm --filter ./apps/web dev",
     "dev:all": "concurrently -k \"pnpm run dev:backend\"",
     "db:verify:d2:cart": "node ./scripts/db/verify-d2-cart.mjs",
@@ -250,7 +254,13 @@
     "db:status:product": "node ./scripts/backend.mjs database migrate-status product",
     "db:migrate:order": "node ./scripts/backend.mjs database migrate-deploy order",
     "db:status:order": "node ./scripts/backend.mjs database migrate-status order",
-    "test:d2:payment:live": "pnpm --filter @nebula/api-client test:d2-demo-payment-live"
+    "test:d2:payment:live": "pnpm --filter @nebula/api-client test:d2-demo-payment-live",
+    "test:d2:cancellation:live": "pnpm --filter @nebula/api-client test:d2-cancellation-live",
+    "demo:d2:plan": "node ./scripts/demo/run.mjs plan --commerce",
+    "demo:d2:seed": "pnpm --filter @nebula/api-client build && node ./scripts/demo/run.mjs seed --commerce",
+    "demo:d2:verify": "pnpm --filter @nebula/api-client build && node ./scripts/demo/run.mjs verify --commerce",
+    "demo:d2:reset": "pnpm --filter @nebula/api-client build && node ./scripts/demo/run.mjs reset --commerce",
+    "test:demo:d2": "pnpm --filter @nebula/api-client build && node --test ./scripts/demo/commerce.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -292,17 +302,18 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "express": "^5.2.1",
-    "joi": "18.2.6",
+    "joi": "18.3.1",
     "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {
-    "node": ">=22"
+    "node": ">=24.22.2 <25"
   },
   "pnpm": {
     "overrides": {
+      "ajv@8.17.1>fast-uri": "3.1.9",
       "@nestjs/testing": "11.2.5",
       "@aws-sdk/xml-builder>fast-xml-parser": "5.5.6",
       "@nestjs/swagger>js-yaml": "5.2.3",

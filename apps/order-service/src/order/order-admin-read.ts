@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { OrderStatus, Prisma } from "../../prisma/generated/client";
+import { OrderStatus, Prisma } from "../generated/prisma/client";
 
 export const VISIBLE_ORDER: Prisma.OrderWhereInput = {
   OR: [

@@ -1,11 +1,39 @@
 ﻿# Docker Configs
 
+## Product, Order and Media Prisma 7 preparation (November 4)
+
+Each migrated owner's `prisma.config.ts` joins selected schema generation and
+legacy install inputs. Its CJS client compiles under `dist/generated/prisma`
+and travels with the existing application dist copy. Generated source is excluded
+from Docker/snapshot/cache inputs. Runtime checks require the new client/options
+instead of accepting a stale legacy client; six unmigrated owners retain their
+engine checks. Product and Order installed host SQL gates pass. Media's candidate
+types, focused units, actual database suites and compiled-client selection pass.
+Media root install/generation, installed types/lint/63 tests, lock/security and
+eight-service type checks now pass; complete native CLI upgrade gates remain pending.
+Its recovery helper selects legacy versus modern clients from the image manifest,
+supporting existing images while refusing stale output in a modern image.
+All three image acceptances remain D8 work. The maintenance report records exact
+input cohorts and detailed evidence.
+
 ## Purpose
 
 This file summarizes the Docker files an agent should check before changing backend boot, release packaging, image names, ports, or runtime env behavior.
 
 For runtime input ownership and mode-specific precedence, see the
 [environment contract](architecture/runtime-environment-ownership.md).
+
+The optional runtime-packaging comparison is complete:
+[measured results](reports/2026-10-27-runtime-packaging-comparison.md#completed-comparison-616d63fe-retain-the-accepted-shared-layer).
+Retain the shared production dependency layer; smaller individual candidate
+images increased the measured mixed-fleet archive by 46.3%. The prototype stays
+opt-in with owned temporary contexts/tags. The accepted builder is unchanged.
+
+For source iteration, the opt-in
+[selected native watch workflow](architecture/local-dev-and-docker-boot.md#selected-native-watch-workflow)
+keeps dependencies in Docker and moves the selected services plus required native
+callers to host processes. It performs no Docker commands itself. Existing image
+build, full-backend startup and release paths remain available and unchanged.
 
 Use this as a map. Do not duplicate full deployment instructions here; detailed release flow lives in `deploy/README.md`.
 
@@ -41,7 +69,7 @@ File:
 Purpose:
 
 - Builds backend service images from local source.
-- Starts local infrastructure: Postgres, Redis, MinIO, and MinIO bucket init.
+- The explicit base defines Postgres/Redis and legacy MinIO/init. Persistent local selection adds Seaweed/init and removes MinIO from ordinary startup.
 - Starts backend services with local image tags.
 - Uses root `.env` plus service-local `.env` files.
 - Overrides database URLs to point at the Docker Postgres service.
@@ -73,6 +101,11 @@ Host ports expose all nine hybrid HTTP/gRPC pairs, including authority ports
 
 ## Release Compose
 
+The explicit base file below retains the MinIO rollback model. Selected Seaweed
+release configuration also merges the storage, bootstrap and selected-runtime
+overlays; its boundary render passes, while the final B0 package/deployment
+recipe remains B4/B5 work. A base-only example is not selected release acceptance.
+
 File:
 
 `docker-compose.release.yml`
@@ -85,7 +118,8 @@ Purpose:
 - Uses required env interpolation for production secrets.
 - Keeps runtime state in Docker volumes.
 - Uses the same Docker service DNS model for internal gRPC and database URLs.
-- Publishes gateway port 3002 and the selected MinIO data port 9000 only.
+- The explicit base publishes gateway port 3002 and MinIO data port 9000 only;
+  the selected Seaweed overlay publishes its loopback data port 19000 instead.
 - Keeps tenant-authority-service internal, gives it only its dedicated runtime
   database credential, and supplies S2S/Redis receiver configuration without
   publishing either authority port to the host.
@@ -112,8 +146,10 @@ File:
 Purpose:
 
 - Builds all backend services from one shared Dockerfile.
-- Uses immutable official `node:22-bookworm` and
-  `node:22-bookworm-slim` image-index digests for build and runtime stages.
+- Targets immutable official `node:24.22.2-bookworm` and
+  `node:24.22.2-bookworm-slim` image-index digests for build and runtime stages,
+  matching `.node-version` and both CI jobs. D3 Windows host proof passes; the
+  grouped D8 Linux rebuild remains pending. Older images are not certified by this pin.
   This prevents sequential service targets from resolving different base bytes
   during one build. Updating either digest is an explicit dependency/security
   maintenance change followed by backend image and scan evidence.
@@ -258,16 +294,112 @@ command does not use `--ignore-unfixed`, rebuild, export, or upload an image.
 
 Release archive also includes infrastructure images:
 
-- `postgres:17`
-- `redis:7-alpine`
-- `minio/minio:latest`
-- `minio/mc:latest`
-- The digest-pinned Media scanner selected by Compose (sixteen unique image
-  references total, including eleven backend images).
+- `nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10` (pinned upstream/source recipe)
+- `redis:7.4.12-bookworm` (digest pinned in Compose)
+- The accepted SeaweedFS 4.51/go-jose 4.1.7 image.
+- The digest-pinned Media scanner selected by Compose (fifteen unique selected
+  references total, including eleven backends; initialization reuses Media).
 
-## MinIO Images
+The explicit legacy base adds MinIO/server-client instead of Seaweed and retains
+sixteen references for rollback; ordinary selected archives do not include them.
 
-Keep both MinIO images:
+D4 maintenance selects PostgreSQL 18.6 on Debian 13/Trixie with gosu 1.20,
+and Redis 7.4.12 on supported Debian Bookworm. The published Redis Alpine
+variant remains on Alpine 3.21 after its support end; the Redis engine branch
+stays 7.4. The PostgreSQL vendor image is built from
+`docker/postgres/security.Dockerfile`: exact official 18.6 base digest plus the
+checksum/commit-pinned gosu source, compiled with pinned supported Go 1.26.10.
+Only the helper is rebuilt; the database server and extensions remain upstream.
+Build steps test patched parser code and actual UID/GID privilege switching.
+Moby 0.4.1's published file-cap test fixture conflicts with its separate line
+cap. The build applies the publisher's checksum/commit-pinned test-only fix in
+an isolated module copy, runs the full parser suite and verifies every other
+file unchanged. Runtime module bytes and checksum verification remain intact;
+no test is skipped. The focused `helper-tests` build target can verify this
+boundary without exporting the runtime image.
+Native image scan, fresh database initialization, Prisma/seed and
+session/replay acceptance remain pending in the
+[maintenance report](reports/2026-10-31-dependency-maintenance-execution.md#d4-preparation---infrastructure-patch-boundaries-nov-3).
+Do not treat source selection as a deployed upgrade. PostgreSQL 18 uses fresh
+`pgdata18:/var/lib/postgresql` and inherited PGDATA `/var/lib/postgresql/18/docker`.
+Salar permits discarding the seeded demo data; do not remount the old 17 cluster
+as an 18 cluster. The old `pgdata` volume can be retired after fresh acceptance.
+Retain Redis's existing anonymous `/data` volumes, scanner signatures and old image IDs.
+Do not use `down -v`, `--renew-anon-volumes` or enable the dormant operator profile
+for this patch. ClamAV 1.4.6 and accepted Seaweed inputs stay unchanged; scanner
+signature freshness is a separate operational acceptance check.
+
+### PostgreSQL 18 vendor image
+
+Build the PostgreSQL vendor image before provisioning a fresh host or archiving
+the selected stack (long execution belongs to Salar):
+
+```powershell
+docker buildx build --platform linux/amd64 --file docker/postgres/security.Dockerfile --tag nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10 --load --progress=plain docker/postgres
+```
+
+CI builds/loads this same recipe with an isolated bounded-writer cache and scans
+it with the existing backend image policy before provisioning. Backend runtime
+images are still a separate build; this adds no service or container. Release
+archives discover the vendor image through effective Compose configuration.
+The helper license, source commit, module versions, tests, binary metadata and
+checksum are embedded under `/usr/share/nebula-vendor/gosu` (license separately
+under `/usr/share/licenses/gosu`). The derivative image digest must be recorded
+from the actual built/scanned artifact; no guessed canonical config digest.
+
+**November 19, 2026 review:** PostgreSQL 19 GA is planned, subject to delay.
+Recheck the final release, image/helper/compiler, Prisma/driver compatibility and
+native migration/seed/runtime proofs. Retire the custom helper layer if a verified
+official image satisfies the requirement. This is a review note, not an automatic
+upgrade; [official schedule](https://www.postgresql.org/about/news/postgresql-19-rc-1-released-3409/).
+
+Nov 3 scanner refresh: both Compose defaults now select the official ClamAV
+1.4.6 index `sha256:8ad6197396974726c35d017e50aaaaf4b91745726a04faec8480c203edd98052`.
+Its Alpine 3.24.3 image passes the native HIGH/CRITICAL scan with zero findings;
+the earlier image's three fixable package findings remain recorded. Running-image
+replacement and fresh loaded definitions are still pending; the existing
+signature volume/cooldown is preserved.
+
+### Local Docker Hub mirrors
+
+Salar's Windows Docker Desktop engine configuration at
+`C:\Users\asus\.docker\daemon.json` selects Arvan then Liara:
+
+```json
+{
+  "registry-mirrors": [
+    "https://docker.arvancloud.ir",
+    "https://docker-mirror.liara.ir"
+  ]
+}
+```
+
+This is the mirror fragment, not a replacement for the complete engine config.
+Other settings, including enabled 40GB builder GC, are preserved. A private
+before-change backup and the actual image metadata/blob probes are recorded in
+the [maintenance execution report](reports/2026-10-31-dependency-maintenance-execution.md#docker-mirror-selection-and-local-configuration-preparation).
+Both current Buildx builders use the integrated Docker driver; retain them and
+their caches. The active engine now advertises both mirrors. After a timed-out
+Desktop restart and partial restoration, direct starts recover sixteen healthy
+containers and all eleven readiness probes with original IDs/images/mounts.
+Native new-image pull/resolver checks remain pending. Future restarts stay
+operator-owned and must verify each engine/service stage before proceeding.
+
+These endpoints are documented by [Liara](https://docs.liara.ir/mirrors/docker/)
+and [Arvan](https://www.arvancloud.ir/fa/dev/docker), with actual pinned Node,
+PostgreSQL and ClamAV index/manifest/config hashes verified over normal HTTPS.
+Full image-layer throughput is not benchmarked. Keep official image names and
+immutable digests. No insecure-registry exception or logout is required.
+Docker Hub mirrors do not redirect GHCR, Go/npm package downloads, apt/apk or
+FreshClam signature requests. Standalone BuildKit builders, if later introduced,
+need their own explicitly validated mirror settings.
+
+## Selected Storage And Rollback Images
+
+The selected local stack uses the accepted SeaweedFS 4.51/go-jose 4.1.7 image.
+The complete selected archive has fifteen unique images: eleven backends plus
+Postgres, Redis, the pinned scanner and Seaweed. Initialization reuses Media.
+Keep the legacy MinIO pair only for the explicit retained rollback route:
 
 - `minio/minio:latest` is the actual object storage server.
 - `minio/mc:latest` is the MinIO client used by `minio-init` to create the media bucket.
@@ -276,10 +408,22 @@ Keep both MinIO images:
 
 ## Database Model
 
+For local databases that are already initialized and have their runtime roles
+provisioned, use `pnpm db:prepare` to apply all nine owners' migrations, check
+status and run base seeds. It reuses backend:boot's exact schema-owner connection
+mapping and stops at the first failure, without building images or starting apps.
+After the owner operations, it reruns the two existing client-only role
+initializers so freshly created migration-history tables receive their intended
+SELECT-only runtime grants. These clients reuse the local PostgreSQL image and
+do not start dependencies or pull images.
+Run it through the root pnpm script: plain Node or pnpm exec does not supply the
+required npm_execpath lifecycle context on this Windows setup. Production mode
+is refused. D1/D2 demo showcase seeds remain separate after application readiness.
+
 Postgres service:
 
 ```text
-postgres:17
+nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10
 ```
 
 Local host port:
@@ -308,7 +452,7 @@ The init script creates:
 Important:
 
 - `scripts/db/init-multiple-dbs.sh` runs only on first Postgres volume initialization.
-- If the `pgdata` volume already exists, changing the script will not recreate databases.
+- If the `pgdata18` volume already exists, changing the script will not recreate databases.
 - The `tenant-authority-db-init` one-shot service closes that existing-volume gap only
   for the additive authority database/login. It never drops or recreates
   existing data and must complete before tenant-authority-service starts.
@@ -321,27 +465,40 @@ Important:
   plus the separate operator Realm Auth database (ten total). All eleven default
   backend runtimes and the optional operator shadow must be stopped.
 - Restore requires `--confirm=RESTORE_LOCAL_DATABASES`; it never removes Docker volumes.
+- These commands back up SQL only. Object bytes, Seaweed filer metadata and the
+  private storage credential/configuration material need their own consistent
+  recovery package; final acceptance belongs to the B4 release recovery gate.
 - The canonical maintenance procedure and backup contents are documented in `docs/architecture/local-dev-and-docker-boot.md`.
 
 ## Media Storage Model
 
-Local Compose uses MinIO as an S3-compatible backend.
+Persistent local Compose selection uses SeaweedFS through the generic s3 adapter.
+
+Seaweed setup passes scoped S3 access, CORS and container recreation; the
+302-object cutover and native processing/derivative/metadata/recovery acceptance
+pass. Old MinIO is stopped with data retained for guarded rollback. Runtime tooling selects storage from the
+effective Media internal endpoint plus its declared healthy dependency, never
+from a container's mere existence. Release validation permits only the selected
+store's data port and rejects management or unused-store publications. Use the selected storage/bootstrap/runtime overlays together; the bare
+alongside fragment alone does not select Media or replace release acceptance.
+Private scoped Media env enters only its own container. The complete recovery
+package and current-snapshot hosted CI remain B4/B5.
 
 Docker-internal media endpoint:
 
 ```text
-http://minio:9000
+http://seaweed:8333
 ```
 
 Host/browser-facing media endpoint:
 
 ```text
-http://127.0.0.1:9000
+http://127.0.0.1:19000
 ```
 
 Media-service separates:
 
-- `MEDIA_S3_INTERNAL_ENDPOINT`: container-to-MinIO access.
+- `MEDIA_S3_INTERNAL_ENDPOINT`: container-to-selected-store access.
 - `MEDIA_S3_PUBLIC_ENDPOINT`: signed URL endpoint visible to clients/tests.
 
 Do not collapse these into one value unless the runtime environment actually uses one address for both internal and public access.
@@ -414,8 +571,9 @@ Save images:
 ```
 
 The save script derives all runtime references from Compose, checks the eleven
-backend inventory entries, and includes Postgres, Redis, MinIO/client and the
-pinned Media scanner: sixteen unique default images. The scanner is required for
+backend inventory entries, and includes Postgres, Redis, Seaweed and the
+pinned Media scanner: fifteen unique images in the persistent selected topology.
+The explicit legacy base retains sixteen images including MinIO/client. The scanner is required for
 release processing. Prefix/tag overrides are preserved; `-EnvFile` can supply the
 image environment for another deployment. Local/release image expressions are
 checked for exact parity. Use `-WhatIf` to verify the complete list without writing
@@ -570,7 +728,12 @@ Config/env/labels. Detailed trace and local checks:
 Segment 3 is closed on `7035545`; the complete hosted workflow and sixteen-image
 archive pass. [Exit proof](reports/2026-10-27-build-cleanup-segment3-exit.md).
 
-### CI MinIO vendor cache (2026-10-27)
+### Published CI MinIO baseline (2026-10-27; retained history)
+
+The following describes the older published workflow, not current local storage.
+The prepared Seaweed workflow uses the verified durable vendor release and
+selected fifteen-image topology; whole-snapshot hosted acceptance remains B5.
+See [the transition receipt](reports/2026-10-28-seaweedfs-transition.md).
 
 Upstream pulls currently fail. The live CI job downloads the approved
 `vendor-minio-20250907` prerelease asset from `pain1122/nebulaNV`, verifies its

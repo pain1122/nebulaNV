@@ -83,5 +83,7 @@ docker-compose.*.yml
 # exclude only generated client
 # -------------------------------------------
 **/prisma/generated
+**/src/generated/prisma
 /packages/protos/generated
 .nebula-demo/
+/.nebula-storage/

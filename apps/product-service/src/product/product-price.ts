@@ -1,4 +1,4 @@
-import { Prisma, DiscountType, type Product } from "../../prisma/generated";
+import { Prisma, DiscountType, type Product } from "../generated/prisma/client";
 
 // One calculation for catalogue replies and the stock transaction's price check.
 export function effectiveProductPrice(

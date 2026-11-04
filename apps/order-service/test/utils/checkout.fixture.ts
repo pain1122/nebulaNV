@@ -1,6 +1,6 @@
 import type { ClientGrpc } from "@nestjs/microservices";
 import { of, throwError } from "rxjs";
-import { Prisma, type CheckoutReceipt } from "../../prisma/generated/client";
+import { Prisma, type CheckoutReceipt } from "../../src/generated/prisma/client";
 import { OrderService } from "../../src/order/order.service";
 import type { PrismaService } from "../../src/prisma.service";
 import type { CartProduct, StoredCart } from "../../src/order/cart-contract";

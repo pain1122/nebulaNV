@@ -13,7 +13,7 @@ import {
   type MetadataWithContext,
 } from "@nebula/grpc-auth";
 import { of, throwError, Observable } from "rxjs";
-import { OrderStatus } from "../prisma/generated/client";
+import { OrderStatus } from "../src/generated/prisma/client";
 import type { PrismaService } from "../src/prisma.service";
 import { OrderService } from "../src/order/order.service";
 import { CHECKOUT_RPC_MS } from "../src/order/checkout-attempt-contract";

@@ -12,7 +12,7 @@ import {
   MediaService,
   type PresignUploadInput,
 } from "../media.service";
-import type { Media as MediaRecord } from "../../prisma/generated";
+import type { Media as MediaRecord } from "../generated/prisma/client";
 import {
   createGrpcValidationPipe,
   DormantS2SAuthorizationV3Receiver,
@@ -40,6 +40,7 @@ type GrpcPresignOutput = {
   bucket?: string | null;
   path?: string | null;
   uploadUrl?: string | null;
+  uploadHeaders?: Record<string, string>;
   expiresIn?: number | null;
   filename?: string | null;
   mimeType?: string | null;
@@ -272,6 +273,7 @@ export class MediaGrpcController {
       bucket: out.bucket ?? "",
       path: out.path ?? "",
       uploadUrl: out.uploadUrl ?? "",
+      uploadHeaders: out.uploadHeaders ?? {},
       expiresIn: out.expiresIn ?? 600,
 
       filename: out.filename ?? "",

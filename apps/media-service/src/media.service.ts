@@ -28,7 +28,7 @@ import {
   MediaStatus,
   Prisma,
   ScanStatus,
-} from "../prisma/generated";
+} from "./generated/prisma/client";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Readable } from "node:stream";
 import { processingPolicy } from "./processing/processing-policy";
@@ -285,7 +285,13 @@ export class MediaService implements OnModuleDestroy {
       process.env.MEDIA_S3_ENDPOINT;
     if (!endpoint) throw new Error("MEDIA_S3_PUBLIC_ENDPOINT_missing");
 
-    this.publicS3 = new S3Client(this.getS3Config(endpoint));
+    this.publicS3 = new S3Client({
+      ...this.getS3Config(endpoint),
+      // Upload URLs are issued before the caller provides its bytes. Automatic
+      // checksums here would sign the empty-body CRC32 and reject real uploads.
+      // Explicit checksums and normal internal write-client validation remain.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+    });
     return this.publicS3;
   }
 
@@ -1821,7 +1827,10 @@ export class MediaService implements OnModuleDestroy {
       "MEDIA_SIGNED_UPLOAD_TTL_SECONDS",
       600,
     );
-    const uploadUrl = await getSignedUrl(client, cmd, { expiresIn });
+    const uploadUrl = await getSignedUrl(client, cmd, {
+      expiresIn,
+      unhoistableHeaders: new Set([`x-amz-meta-${UPLOAD_BINDING_METADATA}`]),
+    });
 
     return {
       storage: "s3",
@@ -1839,6 +1848,11 @@ export class MediaService implements OnModuleDestroy {
       entityType: context.entityType,
       entityId: context.entityId,
       uploadUrl,
+      uploadHeaders: {
+        "content-type": mimeType,
+        [`x-amz-meta-${UPLOAD_BINDING_METADATA}`]:
+          cmd.input.Metadata![UPLOAD_BINDING_METADATA],
+      },
       expiresIn,
     };
   }
@@ -1907,7 +1921,10 @@ export class MediaService implements OnModuleDestroy {
       "MEDIA_SIGNED_UPLOAD_TTL_SECONDS",
       600,
     );
-    const uploadUrl = await getSignedUrl(client, cmd, { expiresIn });
+    const uploadUrl = await getSignedUrl(client, cmd, {
+      expiresIn,
+      unhoistableHeaders: new Set([`x-amz-meta-${UPLOAD_BINDING_METADATA}`]),
+    });
 
     return {
       storage: "s3",
@@ -1925,6 +1942,11 @@ export class MediaService implements OnModuleDestroy {
       entityId: context.entityId,
       ownerId,
       uploadUrl,
+      uploadHeaders: {
+        "content-type": mimeType,
+        [`x-amz-meta-${UPLOAD_BINDING_METADATA}`]:
+          cmd.input.Metadata![UPLOAD_BINDING_METADATA],
+      },
       expiresIn,
     };
   }

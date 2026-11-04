@@ -4,21 +4,18 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
-import { Prisma, PrismaClient } from "../prisma/generated/client";
-
-const prismaClientOptions = {
-  log: [{ emit: "event" as const, level: "error" as const }],
-} satisfies Prisma.PrismaClientOptions;
+import { PrismaClient } from "./generated/prisma/client";
+import { mediaPrismaOptions } from "./prisma-options";
 
 @Injectable()
 export class PrismaService
-  extends PrismaClient<typeof prismaClientOptions>
+  extends PrismaClient<ReturnType<typeof mediaPrismaOptions>>
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly log = new Logger("PrismaService");
 
   constructor() {
-    super(prismaClientOptions);
+    super(mediaPrismaOptions());
 
     this.$on("error", () => {
       this.log.error("prisma_error");

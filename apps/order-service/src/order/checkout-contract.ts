@@ -1,5 +1,5 @@
 import { ConflictException } from "@nestjs/common";
-import { Prisma } from "../../prisma/generated/client";
+import { Prisma } from "../generated/prisma/client";
 import { boundedMoney, type StoredCart } from "./cart-contract";
 
 export function stableFacts(value: unknown): string {

@@ -13,6 +13,8 @@ out/
 coverage/
 .security-reports/
 .ci-evidence/
+# Local command output; portable results belong in the owning report.
+/*.log
 deploy/*
 !deploy/
 !deploy/README.md
@@ -38,6 +40,7 @@ lerna-debug.log*
 !*.env.example
 !**/.env.example
 !deploy/.env.production.example
+!docker/seaweedfs/.env.storage.example
 
 # ----------------------------
 # OS / editors
@@ -77,6 +80,7 @@ Thumbs.db
 .nebula-backups/
 .nebula-migration-artifacts/
 .nebula-demo/
+.nebula-storage/
 
 
 # ----------------------------

@@ -9,7 +9,7 @@ import {
   Prisma,
   ProductSelectionMode,
   ProductStatus,
-} from "../prisma/generated";
+} from "../src/generated/prisma/client";
 import { ProductServiceImpl } from "../src/product/product.service";
 import type { PrismaService } from "../src/prisma.service";
 

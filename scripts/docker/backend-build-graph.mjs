@@ -36,6 +36,7 @@ function ensureBuildOutputIgnores(root) {
       "*.tsbuildinfo",
       "/packages/protos/generated/",
       "**/prisma/generated/",
+      "**/src/generated/prisma/",
       "/.runtime-packages/",
       "",
     ].join("\n"),
@@ -197,6 +198,10 @@ export function prepareGraph(root, selection, output, run = execute) {
         recursive: true,
       });
       cpSync(path.join(root, schema), path.join(output, "schemas", schema));
+      const config = path.join(service.directory, "prisma.config.ts");
+      if (existsSync(path.join(root, config))) {
+        cpSync(path.join(root, config), path.join(output, "schemas", config));
+      }
     }
   }
   ensureBuildOutputIgnores(full);

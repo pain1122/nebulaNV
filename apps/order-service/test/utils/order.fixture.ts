@@ -1,4 +1,4 @@
-import { Prisma, OrderStatus } from "../../prisma/generated/client";
+import { Prisma, OrderStatus } from "../../src/generated/prisma/client";
 import type { StoredOrder } from "../../src/order/checkout-contract";
 import { PRODUCT_ID, VARIANT_ID } from "./cart.fixture";
 

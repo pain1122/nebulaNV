@@ -82,11 +82,13 @@ try {
     transpileOnly: true,
   });
   const { PrismaClient: OrderPrisma } = orderRequire(
-    "./prisma/generated/client",
+    "./src/generated/prisma/client",
   );
   const { PrismaClient: ProductPrisma } = productRequire(
-    "./prisma/generated/client",
+    "./src/generated/prisma/client",
   );
+  const { productPrismaOptions } = productRequire("./src/prisma-options.ts");
+  const { orderPrismaOptions } = orderRequire("./src/prisma-options.ts");
   const { OrderService } = orderRequire("./src/order/order.service.ts");
   const { ProductServiceImpl } = productRequire(
     "./src/product/product.service.ts",
@@ -96,14 +98,12 @@ try {
   );
   const { defer, of } = orderRequire("rxjs");
   const { toGrpcBoundaryException } = orderRequire("@nebula/grpc-auth");
-  const connect = (Driver, kind) =>
-    new Driver({
-      datasources: {
-        db: {
-          url: `postgresql://postgres:postgres@127.0.0.1:15432/${databases[kind]}?schema=public`,
-        },
-      },
-    });
+  const connect = (Driver, kind) => {
+    const url = `postgresql://postgres:postgres@127.0.0.1:15432/${databases[kind]}?schema=public`;
+    return new Driver(
+      kind === "product" ? productPrismaOptions(url) : orderPrismaOptions(url),
+    );
+  };
   const orderDb = connect(OrderPrisma, "order"),
     productDb = connect(ProductPrisma, "product");
   clients.push(orderDb, productDb);

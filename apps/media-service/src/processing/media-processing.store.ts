@@ -5,7 +5,7 @@ import {
   MediaJobStatus,
   MediaStatus,
   ScanStatus,
-} from "../../prisma/generated";
+} from "../generated/prisma/client";
 import { PrismaService } from "../prisma.service";
 import {
   ProcessingError,

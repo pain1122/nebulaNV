@@ -10,7 +10,7 @@ import {
   OrderStatus,
   Prisma,
   type OrderStatusChange,
-} from "../../prisma/generated/client";
+} from "../generated/prisma/client";
 import type { PrismaService } from "../prisma.service";
 import { adminOrderId } from "./order-admin-read";
 import { orderReply, stableFacts } from "./checkout-contract";

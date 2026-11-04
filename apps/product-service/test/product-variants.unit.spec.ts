@@ -6,7 +6,7 @@ import {
   ProductSelectionMode,
   ProductStatus,
   type Product,
-} from "../prisma/generated";
+} from "../src/generated/prisma/client";
 import { ProductServiceImpl } from "../src/product/product.service";
 
 const product = {

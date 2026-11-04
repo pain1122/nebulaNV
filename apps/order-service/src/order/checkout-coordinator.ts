@@ -6,7 +6,7 @@ import {
   Prisma,
   type CheckoutAttempt,
   type CheckoutReceipt,
-} from "../../prisma/generated/client";
+} from "../generated/prisma/client";
 import { capturedCart, orderReply } from "./checkout-contract";
 import {
   CHECKOUT_REPLAY_MS,

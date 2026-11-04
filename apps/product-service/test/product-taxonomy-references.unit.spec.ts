@@ -6,7 +6,7 @@ import {
   Prisma,
   ProductSelectionMode,
   ProductStatus,
-} from "../prisma/generated";
+} from "../src/generated/prisma/client";
 import { ProductServiceImpl } from "../src/product/product.service";
 import { ProductStatusDto } from "../src/product/dto/product-input.dto";
 import type { PrismaService } from "../src/prisma.service";

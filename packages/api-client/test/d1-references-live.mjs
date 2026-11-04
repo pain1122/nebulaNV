@@ -3,7 +3,7 @@ import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import process from "node:process";
-import { URL } from "node:url";
+import { URL, fileURLToPath } from "node:url";
 import { createGatewayClient } from "../dist/index.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { demoPng } from "../../../scripts/demo/png.mjs";
@@ -183,11 +183,19 @@ try {
   process.stdout.write("[d1-references-live] raw-gallery-url-denied=ok\n");
 
   if (process.env.D1_READY_MEDIA_FIXTURE === "1") {
-    const require = createRequire(import.meta.url);
-    const {
-      PrismaClient,
-    } = require("../../../apps/media-service/prisma/generated");
-    mediaPrisma = new PrismaClient({ datasourceUrl: localMediaDatabaseUrl() });
+    const databaseUrl = localMediaDatabaseUrl();
+    const mediaRequire = createRequire(
+      new URL("../../../apps/media-service/package.json", import.meta.url),
+    );
+    mediaRequire("ts-node").register({
+      project: fileURLToPath(
+        new URL("../../../apps/media-service/tsconfig.json", import.meta.url),
+      ),
+      transpileOnly: true,
+    });
+    const { PrismaClient } = mediaRequire("./src/generated/prisma/client");
+    const { mediaPrismaOptions } = mediaRequire("./src/prisma-options.ts");
+    mediaPrisma = new PrismaClient(mediaPrismaOptions(databaseUrl));
     const filename = `d1-reference-${suffix}.png`;
     const presigned = success(
       "references_media_presign",
@@ -205,7 +213,7 @@ try {
     );
     const upload = await globalThis.fetch(presigned.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/png" },
+      headers: presigned.uploadHeaders,
       body: png,
     });
     assert.ok([200, 204].includes(upload.status), "references_media_upload");

@@ -1,0 +1,4 @@
+# Objects AND this metadata directory live on the persistent /data volume.
+[leveldb2]
+enabled = true
+dir = "/data/filerldb2"

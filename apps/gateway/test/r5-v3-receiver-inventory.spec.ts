@@ -64,7 +64,7 @@ const legacyProtoSha256 = {
   "packages/protos/order.proto":
     "6ec54d32a9c0a8ca6b7f635443ef206a3970d0f8ca654011a3be4e1a363f58c2",
   "packages/protos/media.proto":
-    "d8815d105e6644ecdf451b2adb6d2f539d20575f30fdc870bb5b0841f97038b2",
+    "63e3fbac19c23ce876552b48e871b92405fb1a393e611e8144d859ee421e11ed",
 } as const;
 
 // F4 is paused. Track these exact post-R5 v2 additions for its restart audit.

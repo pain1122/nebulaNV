@@ -10,7 +10,7 @@ import {
   Prisma,
   type DemoPaymentAttempt,
   type DemoPaymentCommand,
-} from "../../prisma/generated/client";
+} from "../generated/prisma/client";
 import type { PrismaService } from "../prisma.service";
 import type { StoredOrder } from "./checkout-contract";
 import { CHECKOUT_LEASE_MS } from "./checkout-attempt-contract";

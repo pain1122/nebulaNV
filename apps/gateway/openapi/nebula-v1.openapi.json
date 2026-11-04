@@ -1725,6 +1725,13 @@
           "storage": {
             "type": "string"
           },
+          "uploadHeaders": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Required headers to send unchanged with the signed upload PUT.",
+            "type": "object"
+          },
           "uploadUrl": {
             "format": "uri",
             "type": "string"
@@ -1738,6 +1745,7 @@
           "bucket",
           "path",
           "uploadUrl",
+          "uploadHeaders",
           "expiresIn",
           "filename",
           "mimeType",

@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { VerifiedServiceDownstreamContext } from "@nebula/grpc-auth";
-import type { OrderCancellation } from "../../prisma/generated/client";
+import type { OrderCancellation } from "../generated/prisma/client";
 import type { PrismaService } from "../prisma.service";
 import { CHECKOUT_LEASE_MS } from "./checkout-attempt-contract";
 import { orderReply } from "./checkout-contract";

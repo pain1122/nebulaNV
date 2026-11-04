@@ -5,7 +5,7 @@ import type { ClientGrpc } from "@nestjs/microservices";
 import { of, throwError } from "rxjs";
 import { IS_PUBLIC_KEY, ROLES_KEY } from "@nebula/grpc-auth";
 import type { PrismaService } from "../src/prisma.service";
-import { ProductStatus, ProductSelectionMode } from "../prisma/generated";
+import { ProductStatus, ProductSelectionMode } from "../src/generated/prisma/client";
 import { ProductController } from "../src/product/product.controller";
 import { ListProductsRequestDto } from "../src/product/dto/product-input.dto";
 import { ProductGrpcController } from "../src/product/grpc/product-grpc.controller";

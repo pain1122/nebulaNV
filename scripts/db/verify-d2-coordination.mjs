@@ -169,7 +169,8 @@ try {
   sql(
     "order",
     `BEGIN; ${completeControl} DELETE FROM "Order" WHERE id='${controlId}'; COMMIT;`,
-    /^ERROR:\s+23503:[\s\S]*CheckoutAttempt_orderId_fkey/,
+    // PostgreSQL 18 reports parent RESTRICT separately from an invalid child FK.
+    /^ERROR:\s+23001:[\s\S]*CheckoutAttempt_orderId_fkey/,
   );
   sql(
     "order",
@@ -188,11 +189,13 @@ try {
     transpileOnly: true,
   });
   const { PrismaClient: OrderPrisma } = orderRequire(
-    "./prisma/generated/client",
+    "./src/generated/prisma/client",
   );
   const { PrismaClient: ProductPrisma } = productRequire(
-    "./prisma/generated/client",
+    "./src/generated/prisma/client",
   );
+  const { productPrismaOptions } = productRequire("./src/prisma-options.ts");
+  const { orderPrismaOptions } = orderRequire("./src/prisma-options.ts");
   const { OrderService } = orderRequire("./src/order/order.service.ts");
   const { CheckoutReceiptRetention } = orderRequire(
     "./src/order/checkout-receipt-retention.ts",
@@ -213,14 +216,12 @@ try {
       throw toGrpcBoundaryException(error).getError();
     }
   }
-  const connect = (Driver, kind) =>
-    new Driver({
-      datasources: {
-        db: {
-          url: `postgresql://postgres:postgres@127.0.0.1:15432/${databases[kind]}?schema=public`,
-        },
-      },
-    });
+  const connect = (Driver, kind) => {
+    const url = `postgresql://postgres:postgres@127.0.0.1:15432/${databases[kind]}?schema=public`;
+    return new Driver(
+      kind === "product" ? productPrismaOptions(url) : orderPrismaOptions(url),
+    );
+  };
   const orderDb = connect(OrderPrisma, "order"),
     productDb = connect(ProductPrisma, "product");
   clients.push(orderDb, productDb);

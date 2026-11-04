@@ -138,6 +138,15 @@ function presignResult(
   const policy = LANE_POLICY[lane];
   if (
     !value.uploadUrl ||
+    !value.uploadHeaders ||
+    value.uploadHeaders["content-type"] !== value.mimeType ||
+    !/^[a-f0-9]{64}$/.test(
+      value.uploadHeaders["x-amz-meta-nebula-upload-binding"] ?? "",
+    ) ||
+    Object.keys(value.uploadHeaders).some(
+      (name) =>
+        !["content-type", "x-amz-meta-nebula-upload-binding"].includes(name),
+    ) ||
     !Number.isInteger(value.expiresIn) ||
     value.expiresIn < 1 ||
     value.accessClass !== policy.accessClass ||
@@ -150,6 +159,7 @@ function presignResult(
     bucket: value.bucket,
     path: value.path,
     uploadUrl: value.uploadUrl,
+    uploadHeaders: Object.freeze({ ...value.uploadHeaders }),
     expiresIn: value.expiresIn,
     filename: value.filename,
     mimeType: value.mimeType,

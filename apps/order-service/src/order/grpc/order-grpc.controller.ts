@@ -14,7 +14,7 @@ import {
 } from "@nebula/grpc-auth";
 import { orderv1 } from "@nebula/protos";
 import { OrderService } from "../order.service";
-import { OrderStatus } from "../../../prisma/generated/client";
+import { OrderStatus } from "../../generated/prisma/client";
 
 type ProtoLoaderRequest<T extends { $type: string }> = Omit<T, "$type">;
 type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;

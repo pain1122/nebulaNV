@@ -59,10 +59,13 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
     svc: "MediaService",
   });
 
-  async function putTinyObject(uploadUrl: string) {
+  async function putTinyObject(
+    uploadUrl: string,
+    uploadHeaders: Record<string, string>,
+  ) {
     const up = await fetch(uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/webp" },
+      headers: uploadHeaders,
       body: await tinyWebp(),
     });
 
@@ -134,7 +137,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
 
     const up = await fetch(presign.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/webp" },
+      headers: presign.uploadHeaders,
       body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
@@ -354,7 +357,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
         mdS2S({ role: "admin" }),
       );
 
-      await putTinyObject(presign.uploadUrl);
+      await putTinyObject(presign.uploadUrl, presign.uploadHeaders);
 
       const created = await call<any>(
         client,
@@ -479,7 +482,7 @@ describe("MediaService gRPC (gateway-only S2S, svc:bucket)", () => {
         mdS2S({ role: "admin" }),
       );
 
-      await putTinyObject(presign.uploadUrl);
+      await putTinyObject(presign.uploadUrl, presign.uploadHeaders);
 
       const created = await call<any>(
         client,

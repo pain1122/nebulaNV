@@ -1,3 +1,4 @@
+/** @jest-config-loader ts-node */
 import unitConfig from "./jest.unit.config";
 
 process.env.MEDIA_PROCESSING_DB_PROOF = "1";

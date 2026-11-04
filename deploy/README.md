@@ -59,14 +59,20 @@ It includes:
 
 - Eleven backend runtime images, including the default Realm Auth shadow and
   tenant-authority foundations. The optional operator shadow reuses its image.
-- `postgres:17`
-- `redis:7-alpine`
+- `nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10`, built/scanned using the
+  [pinned PostgreSQL recipe](../docs/docker-configs.md#postgresql-18-vendor-image)
+  before archiving.
+- `redis:7.4.12-bookworm` (digest pinned in Compose)
 - `minio/minio:latest`
 - `minio/mc:latest`
 - The digest-pinned Media scanner image selected by Compose.
 
 The inventory is derived by `scripts/docker/release-image-inventory.mjs` from
 actual Compose configuration, including profile images and the scanner override.
+PostgreSQL 18 mounts fresh `pgdata18` at `/var/lib/postgresql`; its inherited
+PGDATA is `/var/lib/postgresql/18/docker`. Do not reuse a PostgreSQL 17 cluster
+without an explicit major-version migration. The local seeded demo is disposable;
+this does not authorize discarding a future production database.
 The published MinIO vendor cache supplies only its two vendor images; CI does
 not publish the full backend release archive or deploy a server automatically.
 

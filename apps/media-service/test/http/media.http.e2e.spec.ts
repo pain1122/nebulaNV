@@ -66,7 +66,7 @@ describe("media-service HTTP (admin-only)", () => {
 
     const up = await fetch(presign.data.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/webp" },
+      headers: presign.data.uploadHeaders,
       body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
@@ -122,7 +122,7 @@ describe("media-service HTTP (admin-only)", () => {
 
     const up = await fetch(presign.data.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/webp" },
+      headers: presign.data.uploadHeaders,
       body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);
@@ -372,7 +372,7 @@ describe("media-service HTTP (admin-only)", () => {
     // 2) upload tiny payload
     const up = await fetch(uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/webp" },
+      headers: presign.data.uploadHeaders,
       body: await tinyWebp(),
     });
     expect([200, 204]).toContain(up.status);

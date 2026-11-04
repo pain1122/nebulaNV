@@ -7,7 +7,7 @@ import {
   CheckoutStockState,
   Prisma,
   type CheckoutStockIntent,
-} from "../../prisma/generated";
+} from "../generated/prisma/client";
 import { PrismaService } from "../prisma.service";
 import { ProductServiceImpl } from "./product.service";
 import {

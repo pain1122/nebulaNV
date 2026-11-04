@@ -1,0 +1,30 @@
+# Isolated compatibility gate. This does not replace the active MinIO service.
+services:
+  seaweed:
+    image: chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+    command:
+      - mini
+      - -dir=/data
+      - -ip=seaweed
+      - -ip.bind=0.0.0.0
+      - -s3.config=/proof/s3.json
+      - -s3.autoCreateBucket=false
+      - -webdav=false
+      - -admin.ui=false
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -volume.max=4
+    ports:
+      - "127.0.0.1:19333:8333"
+    volumes:
+      - proof-data:/data
+      - ../../.ci-evidence/seaweed-s3-proof:/proof:ro
+    healthcheck:
+      test:
+        ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8333/status"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+volumes:
+  proof-data:

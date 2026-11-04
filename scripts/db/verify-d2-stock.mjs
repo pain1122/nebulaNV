@@ -127,7 +127,8 @@ try {
     );
   sql(
     `BEGIN; ${control} DELETE FROM "Product" WHERE id='${baseId}'; COMMIT;`,
-    /^ERROR:\s+23503:[\s\S]*CheckoutStockLine_heldProductId_fkey/,
+    // PostgreSQL 18 distinguishes parent RESTRICT from invalid child references.
+    /^ERROR:\s+23001:[\s\S]*CheckoutStockLine_heldProductId_fkey/,
   );
 
   // Current runtime follows the pinned historical migration/rollback proof.
@@ -143,19 +144,18 @@ try {
     project: path.join(root, "apps/product-service/tsconfig.json"),
     transpileOnly: true,
   });
-  const { PrismaClient } = require("./prisma/generated/client");
+  const { PrismaClient } = require("./src/generated/prisma/client");
+  const { productPrismaOptions } = require("./src/prisma-options.ts");
   const {
     CheckoutStockService,
   } = require("./src/product/checkout-stock.service.ts");
   const { ProductServiceImpl } = require("./src/product/product.service.ts");
   const { checkoutStockHash } = require("@nebula/clients");
-  const prisma = new PrismaClient({
-    datasources: {
-      db: {
-        url: `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
-      },
-    },
-  });
+  const prisma = new PrismaClient(
+    productPrismaOptions(
+      `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
+    ),
+  );
   try {
     // Only remote publication eligibility is stubbed. Quantities, discounts,
     // versions, FK protection and transaction/concurrency use actual owner Prisma.

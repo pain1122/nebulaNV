@@ -49,20 +49,22 @@ describe("gateway Media JSON routes", () => {
       regenerateDerivatives: jest
         .fn()
         .mockResolvedValue({ status: "QUEUED", outputs: [] }),
-      updateMetadata: jest
-        .fn()
-        .mockResolvedValue({
-          id: ID,
-          metadataVersion: 2,
-          title: null,
-          defaultAlt: "",
-        }),
+      updateMetadata: jest.fn().mockResolvedValue({
+        id: ID,
+        metadataVersion: 2,
+        title: null,
+        defaultAlt: "",
+      }),
       get: jest.fn(),
       list: jest.fn().mockResolvedValue([]),
       listOwned: jest.fn().mockResolvedValue([]),
-      presign: jest
-        .fn()
-        .mockResolvedValue({ uploadUrl: "http://storage/upload" }),
+      presign: jest.fn().mockResolvedValue({
+        uploadUrl: "http://storage/upload",
+        uploadHeaders: {
+          "content-type": "image/png",
+          "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+        },
+      }),
       finalize: jest.fn(),
       readUrl: jest.fn(),
       readOwnedUrl: jest.fn(),

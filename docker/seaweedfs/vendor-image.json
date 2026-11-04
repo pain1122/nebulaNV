@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "repository": "pain1122/nebulaNV",
+  "releaseTag": "vendor-seaweedfs-4.51-gojose4.1.7",
+  "archive": "image.tar.gz",
+  "archiveSha256": "6ddc676c6f1b1ef6802f8108f2132b9f4775b5904a6f110110f34ac7819a06c6",
+  "workflowRun": "41203305981",
+  "workflowCommit": "c26ca397e1c6e9376fc6b01bcee57e7758508f7d",
+  "imageTag": "nebulanv-vendor-seaweedfs:4.51-gojose4.1.7",
+  "imageConfigId": "sha256:f8f5f36e5a431ba22a2bdc53fb80700982ca0292430bf11cf091cf639d209cc8",
+  "diffIds": [
+    "sha256:75c137aedfb2760f88629236cb7b797630aed0c3d91d626d1d1bb694878fc2ba",
+    "sha256:14d28a8561c0323bfa76edd6bca302081ac63d3b0cb7ef45955a69e729ce0f06",
+    "sha256:5c2a12fbb0348e17e541422ab5639226008d4bfd0a133ea759470dc537cce42f",
+    "sha256:c9aac12923afabb4e0b0cd4c30c2c96f17aec00a258928880581d8861c59bcf6",
+    "sha256:18a6be0eab2649832a383d2ae3b92c11209078f4eb919717a5fbf9aabbd351fe",
+    "sha256:42664d44ed25abf36ba99eb50bd36916c7112c8b028b9ce64c4265664ba233ee",
+    "sha256:2bb9f79cd65bbdbc3eff10877e1752e8a6013f11e3d529455dd51025583b19a2",
+    "sha256:8b6ee38e2c0092bcce475079cfd98fac523f6bdb133eeae9bbab154d75d6a4ca",
+    "sha256:83f90d3184f33a3dc2d8a502016cd4a129354efaaae30ef8e48046e9371ac239",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:a771f8f9b614541b9ca1f8ea58672b53fd7b3a433323fb0df6c6adb13c818671",
+    "sha256:70d1279541553a302e02ceb0ed4f141f9645927e45d8c6bae0c57397eea8b1af",
+    "sha256:a5d6b1dcbb07366335ee277c98dfb51cd55b8e2eaf0a1fd4fa1950bcc0030b57",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+  ],
+  "vendorRevision": "153ab668c99731a6d29492bf6c61d0b4fa701101",
+  "platform": "linux/amd64",
+  "evidenceSha256": {
+    "image.tar.gz.sha256": "a76d7743eaad4d32d64aa2c8e0ed02901e0362ccf342207f09b728b3c84b7bc9",
+    "image.json": "18d7c4acb88c3b03b18bd02e94adb291efe5cd2efaad0710ab51a27fac2e59ac",
+    "scan.json": "431de95ae3332e5c66ddd26b6d850f86acbfa657e4308f08e5996893449d7db1",
+    "binary.txt": "972213178327b405dff69d273ea34198895075d47078dd65ae8c36b4077874a5",
+    "module.patch": "3cb10267c0e1b69c7a77af8bae9a228d2f05b5333e58a41077ab72a17bff22ce",
+    "go-jose-tests.txt": "d4e4d7fd035bb2c86f0982832d828ce0dea028a0f2ad4a568a354efb7e3ab6b0"
+  }
+}

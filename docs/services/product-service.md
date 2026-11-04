@@ -2,6 +2,27 @@
 
 Last reviewed: 2026-10-24 (Batch 2 closed; restoration locally proved, Order binding source prepared, deployment pending).
 
+## Prisma 7 maintenance preparation (November 4)
+
+Product selects matching Prisma CLI/client/adapter-pg 7.10.1 and pg8.23.1.
+The CLI loads `prisma.config.ts`, including dotenv, owner/shadow URLs and the
+existing empty base-seed command. Temporary `--schema` migration directories
+remain supported. Models and historical migration SQL are unchanged.
+
+Generation writes CommonJS TypeScript to `src/generated/prisma`; Nest compiles
+it into `dist/generated/prisma`. `src/prisma-options.ts` supplies the service and
+Product SQL proofs with an explicit required URL and schema/driver options.
+Defaults are ten connections and a five-second connection timeout; `schema`,
+`connection_limit` and `connect_timeout` URL settings are honored. TLS follows
+pg's supported driver behavior. Error events and shutdown hooks remain.
+
+Workspace installation/generation, installed source/test/tool type checks,
+63 focused tests, security gate and complete Product stock proof now pass.
+Native clean/populated CLI migration and the three changed downstream SQL proofs
+also pass for the tested Product7/Order6 combination. Image acceptance remains
+pending. Order is the next owner migration; seven other owners remain on Prisma6.
+The maintenance report owns the detailed acceptance trace.
+
 ## Purpose
 
 Product-service owns product catalog data, product pricing fields, product presentation metadata, product gallery records, discount fields, and product-scoped taxonomy facade routes.

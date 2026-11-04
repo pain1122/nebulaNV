@@ -2,7 +2,7 @@
 
 ARG BACKEND_BUILD_PIPELINE=graph
 
-FROM node:22-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d AS build-base
+FROM node:24.22.2-bookworm@sha256:e7add2a490bb17d97b485b8641bd88455fff7839ade0f5eba493c3508124d413 AS build-base
 WORKDIR /app
 
 ENV PNPM_HOME=/root/.local/share/pnpm
@@ -66,8 +66,11 @@ COPY --from=deps /app/packages ./packages
 COPY apps/blog-service/prisma/schema.prisma apps/blog-service/prisma/schema.prisma
 COPY apps/tenant-authority-service/prisma/schema.prisma apps/tenant-authority-service/prisma/schema.prisma
 COPY apps/media-service/prisma/schema.prisma apps/media-service/prisma/schema.prisma
+COPY apps/media-service/prisma.config.ts apps/media-service/prisma.config.ts
 COPY apps/order-service/prisma/schema.prisma apps/order-service/prisma/schema.prisma
+COPY apps/order-service/prisma.config.ts apps/order-service/prisma.config.ts
 COPY apps/product-service/prisma/schema.prisma apps/product-service/prisma/schema.prisma
+COPY apps/product-service/prisma.config.ts apps/product-service/prisma.config.ts
 COPY apps/settings-service/prisma/schema.prisma apps/settings-service/prisma/schema.prisma
 COPY apps/taxonomy-service/prisma/schema.prisma apps/taxonomy-service/prisma/schema.prisma
 COPY apps/user-service/prisma/schema.prisma apps/user-service/prisma/schema.prisma
@@ -255,7 +258,7 @@ COPY --from=build /app/.runtime-packages /packages
 # This layer is referenced by every final service image. The layer is shared in
 # a registry/local store, but is still part of each image manifest, so every
 # image remains independently pushable, pullable, savable, and runnable.
-FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS runtime-base
+FROM node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS runtime-base
 WORKDIR /workspace
 
 ENV NODE_ENV=production

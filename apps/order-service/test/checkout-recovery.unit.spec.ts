@@ -2,7 +2,7 @@ import { CheckoutRecovery } from "../src/order/checkout-recovery";
 import { CheckoutReceiptRetention } from "../src/order/checkout-receipt-retention";
 import type { OrderService } from "../src/order/order.service";
 import type { PrismaService } from "../src/prisma.service";
-import type { Prisma } from "../prisma/generated/client";
+import type { Prisma } from "../src/generated/prisma/client";
 
 describe("bounded checkout recovery scheduling and receipt retention", () => {
   it("prevents overlapping ticks and resumes after a failed pass", async () => {

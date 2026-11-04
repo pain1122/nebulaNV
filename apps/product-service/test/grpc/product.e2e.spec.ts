@@ -19,6 +19,7 @@ const GALLERY_PNG = Buffer.from(
 type LoginResp = { accessToken: string };
 type GalleryMediaPresign = {
   uploadUrl: string;
+  uploadHeaders: Record<string, string>;
   storage: string;
   bucket: string;
   path: string;
@@ -70,7 +71,7 @@ describe("ProductService gRPC (admin required on writes)", () => {
     );
     const uploaded = await fetch(presign.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/png" },
+      headers: presign.uploadHeaders,
       body: GALLERY_PNG,
       signal: AbortSignal.timeout(20_000),
     });

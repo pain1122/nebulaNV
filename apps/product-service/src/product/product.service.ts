@@ -17,7 +17,7 @@ import {
   DiscountType,
   type Product,
   type ProductVariant,
-} from "../../prisma/generated";
+} from "../generated/prisma/client";
 import { SETTINGS_SERVICE } from "../settings-client.module";
 import { MEDIA_SERVICE } from "../media-client.module";
 import {

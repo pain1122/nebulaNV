@@ -103,7 +103,7 @@ Purpose: single source of truth for launch essentials before prioritization.
 - `MED-06` Presigned upload lifecycle: request upload URL, upload object, finalize, create DB row, read/list/delete.
 - `MED-07` Storage endpoint split: internal S3 endpoint for services and public/client endpoint for browsers/tests.
 - `MED-08` Immutable original + variant model for thumbnails, optimized images, and edited files.
-- `MED-09` Provider compatibility mode for MinIO now, Supabase Storage S3 next, and AWS S3 later.
+- `MED-09` S3-compatible storage with SeaweedFS active and natively accepted, MinIO retained stopped for rollback, and cloud-provider selection deferred to F9.
 - `MED-10` Asset bundle metadata model for future 3D showroom files and grouped media assets.
 
 ## 9) Admin Panel Essentials

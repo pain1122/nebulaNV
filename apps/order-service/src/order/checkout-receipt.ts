@@ -8,7 +8,7 @@ import {
   OrderStatus,
   Prisma,
   type CheckoutReceipt,
-} from "../../prisma/generated/client";
+} from "../generated/prisma/client";
 import { stableFacts, type orderReply } from "./checkout-contract";
 
 export const CHECKOUT_REPLAY_MS = 7 * 24 * 60 * 60 * 1000;

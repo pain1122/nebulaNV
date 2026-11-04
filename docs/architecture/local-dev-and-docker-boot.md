@@ -6,6 +6,15 @@ This document explains how the backend starts locally and in Docker.
 
 It intentionally avoids listing secret values. Environment variable names are safe to document; secret values are not.
 
+Nov 2 storage activation checkpoint: ordinary Compose commands now discover the
+Seaweed selection from ignored root .env; image archive inventory uses that same
+default discovery. Gateway/Media and Seaweed are now healthy; old MinIO remains
+stopped for rollback. No temporary shell COMPOSE overrides are needed. Root env
+contains file selection and public storage settings; scoped credentials enter
+only Media through its private env file. Preserve stopped MinIO and its volume
+for rollback. Use [the exact storage procedure](../../docker/seaweedfs/README.md#m5-persistent-activation)
+for startup and guarded restoration instead of switching base files casually.
+
 ## Service Port Map
 
 Current service ports from app `.env` files:
@@ -49,6 +58,119 @@ dev:gateway
 ```
 
 Most scripts use `wait-on tcp:127.0.0.1:<port>` so a service does not start before the dependency it needs is listening.
+
+## Selected native watch workflow
+
+`pnpm dev:watch` is an opt-in development command. It uses cached serial builds
+and direct Node process restarts; it does not build/export images. The full
+`pnpm dev:backend` command above retains its existing behavior. Do not run the
+two development launchers together.
+
+Inspect the scope first:
+
+```powershell
+pnpm dev:watch order-service --plan
+```
+
+The plan derives native companion callers from source RPC references and Compose
+startup dependencies. Selecting Order also selects Gateway; a Gateway left in
+Docker would keep calling Docker's Order address. Selecting a heavily used
+provider can include more native callers. The plan lists all selected native
+services, containers to stop, shared producers and Docker dependencies. Review
+that scope when service-to-service dependencies change; source planning is not
+proof that existing images match the current source.
+The first application trial is Order/Gateway. Native Media is explicitly blocked
+while its scanner has only a private Docker listener; provider selections whose
+caller closure includes Media report that limitation too. Keep Media in Docker
+for this trial. This command does not publish scanner TCP or certify every
+service's native infrastructure adapter.
+
+For the initial Order/Gateway trial, use one terminal:
+
+```powershell
+docker compose up -d --no-build --wait user-service auth-service settings-service media-service taxonomy-service product-service blog-service
+docker compose stop order-service gateway
+pnpm db:status:order
+```
+
+If Order reports pending migrations, use the existing explicit
+`pnpm db:migrate:order` preparation command and recheck status before continuing.
+This is local development preparation; the watcher never applies migrations or
+seeds. Keep existing DB credentials and native database/store endpoints in the
+owning env files. Published PostgreSQL may use port 15432 on this workstation;
+an old example's 5432 value is not evidence of the actual listener.
+
+Then start the session and leave the terminal open:
+
+```powershell
+pnpm dev:watch order-service
+```
+
+Initial preparation builds only the native services and their shared producer
+graph, generates clients only for native Prisma owners, and verifies runtime
+imports. It can take time on its first run. `--plan` itself performs no builds,
+process startup, environment-file parsing or Docker commands.
+
+The explicit native network profile supplies inventory HTTP/gRPC bind ports,
+loopback gRPC routes and the published Media render origin through child process
+variables. Mode is development; a production shell is rejected. A Node preload
+uses the established process > app `.env` > root `.env` expansion policy, then
+sets local DATABASE_URL/SHADOW_DATABASE_URL ports to Compose's literal published
+PostgreSQL port (currently 15432). Credentials, owning database, shadow schema
+and URL options are preserved. A remote URL or wrong owning database is rejected,
+never silently redirected. Env files are never rewritten. Other secrets and
+store inputs retain the normal native precedence. The same Joi schema is checked
+before runtime startup; diagnostics name invalid keys/types, not their values.
+Declared store endpoints must be loopback inputs. Validation does not establish
+connectivity or migration currency. The opt-in preload is verified on the pinned
+Node 22 toolchain in its accepted live pilot. D3 now uses Node 24.22.2 via
+`.node-version`; native imports, preload, filesystem/process tests and the full
+watch regression suite pass on Windows. New Linux images/current-snapshot hosted
+proofs remain D8/B5-owned. Production image startup does not use this preload.
+
+Wait for `[dev-watch] ready: order-service, gateway` (ordering can vary after a
+repair), then check from another terminal:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3005/health/ready
+Invoke-RestMethod http://127.0.0.1:3002/health/ready
+```
+
+App source saves rebuild/restart only their affected native consumers. Shared
+source saves refresh required producers/injected copies before restarting native
+consumers. Cached builds still receive explicit injected-output refresh. Authored
+file hashes suppress duplicate save events; generated outputs, dependencies,
+tests and caches do not trigger builds. Edits during a build are queued. Requests
+may receive 503s while a provider restarts; wait for the next ready message.
+Compiler errors keep affected consumers stopped; correcting a source file
+retries the failed group. Root/app env edits restart consumers without compiling
+already valid outputs. Manifest/lock, tooling, Prisma schema or migration edits
+stop the session for explicit preparation/restart. New dependencies require the
+normal frozen install/lock workflow; there is no automatic install or migration.
+
+The first Order/Gateway pilot passed on 2026-10-28: native readiness, six F3
+Gateway flows, Order-only and shared-consumer ready restarts, comment cleanup
+and shutdown releasing the lock and HTTP listeners. This does not certify
+every native service adapter or D2 payment/cancellation behavior. The owned
+fixture tests separately check actual changed shared values and cached producer
+restoration. [Pilot evidence](../reports/2026-10-27-selected-service-dev-workflow.md#pilot-closure---2026-10-28).
+
+Ctrl+C stops only owned runtime/build processes and releases the workspace
+session lock. A port conflict never kills its listener. The lock prevents two
+watch sessions from updating the same shared outputs. After a crash/power loss,
+inspect `.ci-evidence/backend-dev/session.lock`; remove that exact file only
+after confirming its recorded process is no longer running. Do not run manual
+build/clean/install commands concurrently with this session.
+
+To return to the existing Docker stack, stop the native session first, then:
+
+```powershell
+docker compose up -d --no-build --wait order-service gateway
+```
+
+This restores the existing images; it does not update them from native edits.
+Use the normal selected image build, integration and release gates when accepting
+application changes. [Plan, impact trace and proof status](../reports/2026-10-27-selected-service-dev-workflow.md).
 
 ## Local Dependency Graph
 
@@ -193,6 +315,14 @@ Core infrastructure:
 - `minio`
 - `minio-init`
 
+Seaweed is active under the persistent local selection; MinIO is stopped with retained data. The opt-in Seaweed preparation and completed
+container-recreation proof are documented in [the storage setup](../../docker/seaweedfs/README.md).
+Boot reads the effective Media internal endpoint and its matching healthy
+dependency before startup. An alongside Seaweed service does not change that
+selection. The controlled M5 cutover reconciled objects and initializer
+wiring, and M6 native feature/recovery proofs pass. Do not rerun a transfer or
+full boot merely to repeat this accepted result.
+
 The inventory-backed stack contains eleven backend runtimes:
 
 - `user-service`
@@ -213,13 +343,15 @@ For a complete supported boot, run:
 pnpm backend:boot
 ```
 
-The command extends the single inventory-backed provisioner. It waits for
-healthy PostgreSQL, legacy/default-realm Redis, and MinIO; idempotently provisions
+The command extends the single inventory-backed provisioner. It reads the rendered
+storage configuration without printing secrets, then waits for healthy PostgreSQL,
+legacy/default-realm Redis and the configured local object store (currently Seaweed).
+It idempotently provisions
 the Authority and default/operator Realm Auth databases/runtime logins; proves
-all nine inventory databases exist; completes
-MinIO bucket initialization; deploys and checks migrations; applies all base
+all nine inventory databases exist; deploys and checks migrations; applies all base
 seeds; builds the eleven official Bake targets sequentially; starts
-Compose with `--no-build`; waits for the eleven HTTP readiness contracts; and
+Compose with `--no-build`, including bucket initialization through Media's declared
+dependencies; waits for the eleven HTTP readiness contracts; and
 runs the idempotent API demo seed. `pnpm test:e2e:provision` is a compatibility
 alias to the same workflow.
 
@@ -249,7 +381,7 @@ docker compose up -d --no-build
 
 Readiness can be checked without changing the stack. The down command removes
 containers and the Compose network but deliberately omits `-v`, preserving the
-PostgreSQL and MinIO named volumes:
+PostgreSQL and selected Seaweed named volumes (retained MinIO is separate rollback data):
 
 ```powershell
 pnpm backend:health
@@ -496,7 +628,7 @@ plus the profiled operator Realm Auth database.
 The target directory must be explicit and must not already exist. It contains
 one binary PostgreSQL custom-format dump per database plus `manifest.json`,
 which records the exact service, database, file, format, and creation time.
-Backups do not include Redis, MinIO objects, secrets, or Docker volumes.
+SQL backups do not include Redis, S3 objects, Seaweed filer metadata, secrets or Docker volumes; B4 owns the complete recovery package.
 
 Stop the eleven inventory-backed runtimes and the profiled operator Realm Auth
 runtime before backup or restore, but leave PostgreSQL running:

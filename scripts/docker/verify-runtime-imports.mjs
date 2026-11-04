@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import console from "node:console";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -56,11 +57,7 @@ for (const service of services) {
     process.exit(1);
   }
 
-  const envSchemaPath = path.join(
-    distDirectory,
-    "config",
-    "env.validation.js",
-  );
+  const envSchemaPath = path.join(distDirectory, "config", "env.validation.js");
 
   try {
     await import(pathToFileURL(envSchemaPath).href);
@@ -81,6 +78,18 @@ for (const service of services) {
         specifier: match[2],
       });
     }
+  }
+  const manifest = JSON.parse(
+    await readFile(path.join(distDirectory, "..", "package.json"), "utf8"),
+  );
+  if (manifest.dependencies?.["@prisma/adapter-pg"]) {
+    // A stale legacy client must not satisfy a migrated owner's runtime gate.
+    await import(
+      pathToFileURL(path.join(distDirectory, "generated/prisma/client.js")).href
+    );
+    await import(
+      pathToFileURL(path.join(distDirectory, "prisma-options.js")).href
+    );
   }
 }
 

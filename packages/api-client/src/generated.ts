@@ -451,6 +451,7 @@ export type GatewayMediaPresignResultDto = Readonly<{
   readonly "path": string;
   readonly "scope": string;
   readonly "storage": string;
+  readonly "uploadHeaders": Readonly<Record<never, never>> & Readonly<Record<string, string>>;
   readonly "uploadUrl": string;
   readonly "visibility": string;
 }>;

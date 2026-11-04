@@ -3,7 +3,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { isUUID } from "class-validator";
-import { Prisma } from "../../prisma/generated/client";
+import { Prisma } from "../generated/prisma/client";
 
 export const MAX_CART_QUANTITY = 2147483647;
 const MAX_AMOUNT = new Prisma.Decimal("9999999999999999.99");

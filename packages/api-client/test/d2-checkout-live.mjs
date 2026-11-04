@@ -4,13 +4,18 @@ import process from "node:process";
 import { createGatewayClient } from "../dist/index.js";
 import { runCheckoutRecovery } from "./d2-checkout-recovery.mjs";
 import { runDemoPayment } from "./d2-demo-payment-live.mjs";
+import { runOrderCancellation } from "./d2-order-cancellation-live.mjs";
 if (process.env.NODE_ENV?.toLowerCase() === "production")
   throw new Error("d2_checkout_live_refused_in_production");
 const baseUrl =
   process.env.NEBULA_LIVE_GATEWAY_BASE_URL ?? "http://127.0.0.1:3002";
 const recoveryMode = process.argv.includes("--recovery");
 const paymentMode = process.argv.includes("--demo-payment");
-assert.ok(!(recoveryMode && paymentMode), "d2_proof_modes_must_run_separately");
+const cancellationMode = process.argv.includes("--cancellation");
+assert.ok(
+  [recoveryMode, paymentMode, cancellationMode].filter(Boolean).length <= 1,
+  "d2_proof_modes_must_run_separately",
+);
 if (recoveryMode) {
   assert.ok(
     ["http://127.0.0.1:3002", "http://localhost:3002"].includes(baseUrl),
@@ -384,8 +389,9 @@ try {
           })
         ).stockQuantity,
     });
-  if (paymentMode) {
-    await runDemoPayment({
+  if (paymentMode || cancellationMode) {
+    const runEffect = paymentMode ? runDemoPayment : runOrderCancellation;
+    await runEffect({
       first,
       adminCall,
       customerCall,
@@ -418,17 +424,29 @@ try {
           (row) => row.id === variant.id,
         );
         assert.ok(selected, "demo_payment_variant_missing");
-        return {
+        const quantities = {
           base: baseState.stockQuantity,
           variant: selected.stockQuantity,
         };
+        if (cancellationMode) {
+          const unmanagedState = await adminCall("admin_products_get", {
+            path: { id: unmanaged.id },
+          });
+          assert.equal(unmanagedState.trackInventory, false);
+          return { ...quantities, unmanaged: unmanagedState.stockQuantity };
+        }
+        return quantities;
       },
     });
     assert.deepEqual(
       await customerCall("orders_checkout", { idempotencyKey: key, body }),
       first,
     );
-    log("payment-does-not-rewrite-original-checkout-reply");
+    log(
+      cancellationMode
+        ? "cancellation-does-not-rewrite-original-checkout-reply"
+        : "payment-does-not-rewrite-original-checkout-reply",
+    );
   } else {
     const current = await adminCall("admin_products_get", {
       path: { id: base.id },

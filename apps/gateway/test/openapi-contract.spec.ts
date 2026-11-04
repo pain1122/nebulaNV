@@ -33,6 +33,20 @@ class RouteDecoratorProbe {
 }
 
 describe("gateway OpenAPI contract setup", () => {
+  it("documents the required signed upload header map", async () => {
+    const document = await generateGatewayOpenApiDocument();
+    expect(
+      document.components?.schemas?.GatewayMediaPresignResultDto,
+    ).toMatchObject({
+      required: expect.arrayContaining(["uploadUrl", "uploadHeaders"]),
+      properties: {
+        uploadHeaders: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
+      },
+    });
+  });
   it("documents explicit demo attempts with distinct version limits and UUID targets", async () => {
     const document = await generateGatewayOpenApiDocument();
     const schemas = document.components?.schemas;

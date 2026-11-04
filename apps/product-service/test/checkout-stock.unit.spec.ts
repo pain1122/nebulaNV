@@ -7,7 +7,7 @@ import {
 } from "@nebula/grpc-auth";
 import { checkoutStockHash } from "@nebula/clients";
 import { productv1 } from "@nebula/protos";
-import { Prisma } from "../prisma/generated";
+import { Prisma } from "../src/generated/prisma/client";
 import type { PrismaService } from "../src/prisma.service";
 import { CheckoutStockService } from "../src/product/checkout-stock.service";
 import { stockReservation } from "../src/product/checkout-stock-contract";

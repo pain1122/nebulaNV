@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
+import console from "node:console";
+import { performance } from "node:perf_hooks";
 import { randomUUID } from "node:crypto";
 import {
   cpSync,
@@ -113,6 +116,8 @@ export function prepareSnapshot(root, destination) {
     if (
       relative.includes("/prisma/generated/") ||
       relative.endsWith("/prisma/generated") ||
+      relative.includes("/src/generated/prisma/") ||
+      relative.endsWith("/src/generated/prisma") ||
       relative.startsWith("packages/protos/generated")
     )
       return false;

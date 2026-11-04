@@ -94,7 +94,10 @@ export function validateTarget(env) {
 
 export async function connectGateway(
   env = process.env,
-  { limitRequest = createDemoRequestLimiter() } = {},
+  {
+    limitRequest = createDemoRequestLimiter(),
+    customer: customerCredentials,
+  } = {},
 ) {
   const baseUrl = validateTarget(env);
   const admin = createGatewayClient({
@@ -106,6 +109,10 @@ export async function connectGateway(
     baseUrl,
     publicClientId: "storefront-web-local",
     applicationOrigin: "http://localhost:3008",
+  });
+  const customer = createGatewayClient({
+    baseUrl,
+    publicClientId: "mobile-local",
   });
   const sessions = [];
   const request = (client, operation, input) =>
@@ -122,7 +129,7 @@ export async function connectGateway(
     const token = unwrapGatewayResult("login", result).accessToken;
     const cookie = result.headers.get("set-cookie")?.split(";", 1)[0];
     if (!token || !cookie) throw new Error("demo_login_session_invalid");
-    sessions.push({ token, cookie });
+    sessions.push({ token, cookie, client: admin });
     return token;
   }
   const token = await login(
@@ -130,21 +137,90 @@ export async function connectGateway(
     env.SEED_ADMIN_PASS ?? "Admin123!",
   );
   let userToken;
+  let customerSession;
+  async function ensureCustomer() {
+    if (customerSession) return customerSession;
+    if (!customerCredentials?.email || !customerCredentials?.password)
+      throw new Error("demo_customer_credentials_missing");
+    let result = await request(customer, "auth_login", {
+      body: {
+        identifier: customerCredentials.email,
+        password: customerCredentials.password,
+      },
+    });
+    if (result.status === 401) {
+      unwrapGatewayResult(
+        "customer_register",
+        await request(customer, "auth_register", {
+          body: {
+            email: customerCredentials.email,
+            password: customerCredentials.password,
+          },
+          idempotencyKey: randomUUID(),
+        }),
+      );
+      result = await request(customer, "auth_login", {
+        body: {
+          identifier: customerCredentials.email,
+          password: customerCredentials.password,
+        },
+      });
+    }
+    const data = unwrapGatewayResult("customer_login", result);
+    if (!data.accessToken || !data.refreshToken)
+      throw new Error("demo_customer_session_invalid");
+    const session = {
+      token: data.accessToken,
+      refreshToken: data.refreshToken,
+      client: customer,
+    };
+    sessions.push(session);
+    const profile = unwrapGatewayResult(
+      "customer_me",
+      await request(customer, "auth_me", {
+        accessToken: session.token,
+      }),
+    );
+    if (
+      profile.role !== "user" ||
+      profile.email?.toLowerCase() !== customerCredentials.email.toLowerCase()
+    )
+      throw new Error("demo_customer_identity_invalid");
+    customerSession = { ...session, profile };
+    return customerSession;
+  }
   const api = {
     baseUrl,
+    async customer() {
+      return (await ensureCustomer()).profile;
+    },
     async result(operation, input = {}, identity = "admin") {
+      if (!["admin", "anonymous", "user", "customer"].includes(identity))
+        throw new Error("demo_identity_invalid");
       if (identity === "user" && !userToken)
         userToken = await login(
           env.SEED_USER_EMAIL ?? "user@example.com",
           env.SEED_USER_PASS ?? "User123!",
         );
-      return request(identity === "anonymous" ? storefront : admin, operation, {
-        ...input,
-        ...(identity === "anonymous"
-          ? {}
-          : { accessToken: identity === "user" ? userToken : token }),
-        idempotencyKey: input.idempotencyKey ?? randomUUID(),
-      });
+      const session = identity === "customer" ? await ensureCustomer() : null;
+      return request(
+        identity === "anonymous"
+          ? storefront
+          : identity === "customer"
+            ? customer
+            : admin,
+        operation,
+        {
+          ...input,
+          ...(identity === "anonymous"
+            ? {}
+            : {
+                accessToken:
+                  session?.token ?? (identity === "user" ? userToken : token),
+              }),
+          idempotencyKey: input.idempotencyKey ?? randomUUID(),
+        },
+      );
     },
     async call(operation, input, identity) {
       return unwrapGatewayResult(
@@ -152,7 +228,14 @@ export async function connectGateway(
         await api.result(operation, input, identity),
       );
     },
-    async upload(url, bytes) {
+    async upload(url, bytes, uploadHeaders) {
+      if (
+        !uploadHeaders ||
+        !/^[a-f0-9]{64}$/u.test(
+          uploadHeaders["x-amz-meta-nebula-upload-binding"] ?? "",
+        )
+      )
+        throw new Error("demo_upload_headers_missing");
       const target = new URL(url);
       if (
         !["localhost", "127.0.0.1"].includes(target.hostname) ||
@@ -161,7 +244,7 @@ export async function connectGateway(
         throw new Error("demo_upload_requires_local_store");
       const result = await globalThis.fetch(url, {
         method: "PUT",
-        headers: { "content-type": "image/png" },
+        headers: uploadHeaders,
         body: bytes,
         signal: globalThis.AbortSignal.timeout(30_000),
       });
@@ -212,9 +295,12 @@ export async function connectGateway(
         try {
           unwrapGatewayResult(
             "logout",
-            await request(admin, "auth_logout", {
+            await request(session.client, "auth_logout", {
               accessToken: session.token,
               cookie: session.cookie,
+              ...(session.refreshToken
+                ? { body: { refreshToken: session.refreshToken } }
+                : {}),
               idempotencyKey: randomUUID(),
             }),
           );

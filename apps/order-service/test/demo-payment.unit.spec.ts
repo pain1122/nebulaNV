@@ -4,7 +4,7 @@ import {
   Prisma,
   type DemoPaymentAttempt,
   type DemoPaymentCommand,
-} from "../prisma/generated/client";
+} from "../src/generated/prisma/client";
 import {
   demoCommand,
   demoReply,

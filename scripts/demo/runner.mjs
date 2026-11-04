@@ -270,7 +270,11 @@ export function createDemoRunner({
             mimeType: "image/png",
           },
         });
-        await api.upload(presign.uploadUrl, demoPng(item.index, item));
+        await api.upload(
+          presign.uploadUrl,
+          demoPng(item.index, item),
+          presign.uploadHeaders,
+        );
         const row = await api.call("admin_media_public_finalize", {
           body: {
             storage: presign.storage,

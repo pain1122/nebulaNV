@@ -12,7 +12,7 @@ import type {
   OrderCancellation,
   OrderStatusChange,
   Prisma,
-} from "../prisma/generated/client";
+} from "../src/generated/prisma/client";
 import { storedOrder } from "./utils/order.fixture";
 
 const ID = "fd230000-0000-4000-8000-000000000001";

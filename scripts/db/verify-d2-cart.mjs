@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import console from "node:console";
+import { setTimeout, clearTimeout } from "node:timers";
 import { randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
@@ -194,9 +196,8 @@ if (!failure)
         child.on("error", reject);
         child.on("close", (code) => {
           clearTimeout(timer);
-          code === 0
-            ? resolve()
-            : reject(new Error(`d2_concurrency_failed ${output}`));
+          if (code === 0) resolve();
+          else reject(new Error(`d2_concurrency_failed ${output}`));
         });
         child.stdin.end(statement);
       });
@@ -234,15 +235,14 @@ if (!failure)
       transpileOnly: true,
     });
     const { OrderService } = orderRequire("./src/order/order.service.ts");
-    const { PrismaClient } = orderRequire("./prisma/generated/client");
+    const { PrismaClient } = orderRequire("./src/generated/prisma/client");
+    const { orderPrismaOptions } = orderRequire("./src/prisma-options.ts");
     const { of } = orderRequire("rxjs");
-    const prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
-        },
-      },
-    });
+    const prisma = new PrismaClient(
+      orderPrismaOptions(
+        `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
+      ),
+    );
     try {
       let amount = "0.10";
       const service = new OrderService(prisma, {}, {});

@@ -2,6 +2,25 @@
 
 Last reviewed: 2026-10-24 (demo payment owner SQL passed; transports prepared, deployment pending).
 
+## Prisma 7 maintenance preparation (November 4)
+
+Order source selects matching Prisma CLI/client/adapter-pg7.10.1 and pg8.23.1.
+CLI URLs/shadow URL and the empty base-seed command live in `prisma.config.ts`.
+The generated CJS client moves to `src/generated/prisma` and compiles into dist.
+The service and seven existing SQL proof callers share `src/prisma-options.ts`:
+required URL, explicit schema, bounded ten-connection/five-second defaults, and
+preserved connection_limit/connect_timeout URL settings. Initialization/readiness,
+sanitized error events and shutdown behavior remain unchanged.
+
+Workspace install/generation, installed types, typed lint, 96 focused tests and
+native cart/receipt/rollback/shutdown checks pass. The dependency security gate
+and eight-owner test-type checks pass. Salar reports all nine installed host
+SQL gates pass: clean/populated migration, cart, checkout, reads, status,
+cancellation, coordination and demo payment. Image/live acceptance remains D8
+work. No cart, checkout, payment or
+cancellation policy changes in this slice; the maintenance report distinguishes
+host, candidate and image results.
+
 ## Purpose
 
 Order-service owns carts, checkout, order persistence, order item snapshots, and order status updates.
@@ -506,3 +525,14 @@ It retains demo Order history like the existing Checkout proof and cleans owned
 catalogue/Cart/session fixtures. Its three local harness checks prove fixture
 preparation only. Native/live/image proof remains pending in the
 [transport receipt](../reports/2026-10-24-d2-demo-payment-transports.md).
+
+Oct 28 acceptance supersedes that earlier pending handoff: admin Order/status,
+demo payment and explicit unpaid Order cancellation pass their deployed Gateway
+proofs. [Batch 3 closure](../reports/2026-10-28-d2-batch3-exit.md).
+
+The D2 demo runner now has separate owned customer/catalogue journals and uses
+only those public operations. Seed reruns do not create new purchases; reset
+retains immutable Order/receipt history and cancels only eligible owned unpaid
+work. Showcase is default; limits is opt-in. Salar reports both complete live
+cycles passed on Oct 28, closing Batch 4/D2. See the
+[commerce demo workflow](../architecture/d2-demo-workflow.md).

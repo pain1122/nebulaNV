@@ -21,6 +21,19 @@ ready merely because its own focused test passes.
 - [ ] For each dependency, record update required, unchanged with a reason, or
       explicitly deferred with its owning phase. An unexplained missing consumer
       blocks the handoff. Deferred behavior must not be advertised as complete.
+- [ ] Reuse the existing documentation owner and tool before adding another.
+      docs/README.md is the navigation index, the adopted TODO owns phase order,
+      current-focus owns active actions, service/package/operations notes own
+      current behavior, and the owning dated report holds detailed evidence.
+      Trace commands, CI, Docker inputs and dynamic inventories before declaring
+      a script or document redundant; a missing text reference is insufficient.
+- [ ] For a feature spanning two systems or formats, trace the complete path:
+      producer -> encoding/export -> transport/import/defaulting -> consumer ->
+      verifier and retry/recovery. Name the actual files/tools on both sides and
+      distinguish source identity from runtime identity. Inspect actual boundary
+      output before finalizing comparisons; mark unavailable native observations
+      pending with the exact missing proof rather than treating assumptions as
+      verified behavior.
 
 Use this table in the slice's dated report. Revisit it after implementation.
 
@@ -33,6 +46,12 @@ Use this table in the slice's dated report. Revisit it after implementation.
 - [ ] Follow the actual input and response through every affected transport.
       Test omitted/null/empty/false/zero values where meaningful; do not turn
       omitted patch booleans into false or absent overrides into zero.
+- [ ] Build boundary regressions from independently observed producer and
+      consumer representations. Reusing the same assumed object on both sides
+      cannot prove serialization/import compatibility. Cover documented or
+      observed harmless differences and reject meaningful value changes; retain
+      exact byte/digest checks where required. For operator-owned heavy proofs,
+      prepare these focused cases and label the remaining native result pending.
 - [ ] Exercise actual protobuf serialization for changed responses. Empty
       repeated fields may be omitted on the wire; consumers must honor the
       defined empty-list contract rather than crash on `.map`.
@@ -42,6 +61,10 @@ Use this table in the slice's dated report. Revisit it after implementation.
       exact OpenAPI paths, pinned hashes and fixtures. Inspect the source diff
       before rebaselining. Preserve uniqueness, authorization and signature
       checks; never delete assertions or broadly exclude new entries to get green.
+- [ ] When changing a package command or registered test-file list, search both
+      the old exact command and its individual filenames through tooling tests,
+      CI and docs. Update exact registration assertions before handoff; passing
+      the newly registered suite does not exercise a separate script-list test.
 - [ ] Check dormant/deferred compatibility separately from active behavior.
       The 59 preserved R5 receivers and eight explicitly deferred post-R5 RPCs
       are separate claims; unknown additions still fail the inventory check.
@@ -89,6 +112,11 @@ Use this table in the slice's dated report. Revisit it after implementation.
 - [ ] Inspect the selected test config and global setup before execution.
       Filtering to unit files does not bypass integration startup hooks; use
       the existing unit-only config when live dependencies are not required.
+      After a Node major change, load every applicable inherited TS config with
+      the actual installed runner and verify selected files/proof flags. After a
+      database major change, probe changed diagnostics through both native SQL
+      and the installed generated client before handing off dependent proofs;
+      preserving a constraint does not guarantee the client's error mapping.
 - [ ] Include new test files in a real typed lint project. Check sibling owners
       using the same fallback configuration; do not raise default-project file
       limits or disable typed rules to hide missing project coverage.
@@ -101,6 +129,20 @@ Use this table in the slice's dated report. Revisit it after implementation.
       hosted CI runs them. Check frozen-lock defaults and grouped/colored output
       against the pinned tools. Author temporary fixture locks with the package
       manager, then validate frozen installs; keep production installs frozen.
+      Audit isolated dependency trials before promoting them to the workspace.
+      Native behavior/type success does not establish dependency security;
+      preserve unknown-path blockers and inspect newly introduced CLI transitives.
+- [ ] When adding native vendor tests to an image recipe, prove their bounded
+      test stage before a full image handoff. Inspect published fixture fixes
+      when a dependency's tests contradict its own limits; preserve every case
+      and runtime module bytes. If that stage is long, hand over that focused
+      proof first. Use the actual container's shell/tool options, not assumed
+      GNU options on BusyBox.
+- [ ] Verify actual launcher context for operator snippets that call the backend
+      runner. Its pnpm child invocations require npm_execpath from a root pnpm
+      lifecycle; direct Node and pnpm exec do not supply it here. A mock executor
+      validates arguments, not real process launch. Use a read-only native probe
+      and verify its intended host/database before a migration handoff.
 - [ ] Verify environment-sensitive tests in a clean owned snapshot without local
       `.env` files or inherited deployment variables. Supply and restore every
       required fixture input; import pure contract inventories without runtime
@@ -118,6 +160,13 @@ Use this table in the slice's dated report. Revisit it after implementation.
 
 ## Gate 4 - Runtime and command preparation
 
+- [ ] Separate engine restart and container restoration stages. Check each
+      native command's exit and actual daemon availability before continuing;
+      PowerShell does not automatically stop a multiline native-command block
+      after failure. Verify restored running/readiness states after dependency
+      groups. When staged source pins must not deploy, restore witnessed existing
+      container identities directly; config rendering and partial start progress
+      do not prove full lifecycle recovery.
 - [ ] Before live tests, confirm the needed services and their dependencies are
       ready: PostgreSQL accepts connections; Auth/Gateway/domain services and
       any required storage/scanner respond. A running container alone is not
@@ -129,6 +178,10 @@ Use this table in the slice's dated report. Revisit it after implementation.
       affected services/dependencies and confirm the internal build scope;
       selecting one image previously still compiled eleven apps. Preserve cache
       and bound concurrency on the limited Docker VM. No routine forced rebuild.
+- [ ] When changing the selected Compose topology/provider, inspect every
+      affected restart/restoration runner for forced base-file arguments. Test
+      the actual runner with config-only rendering: a mock stop/start assertion
+      cannot prove it will preserve the active provider after recreation.
 - [ ] After changing Dockerfile COPY inputs or context exclusions, run
       `node scripts/docker/check-build-context.mjs` before handing over an image
       build. It checks all local COPY inputs against the actual `.dockerignore`
@@ -178,6 +231,33 @@ Readiness: READY FOR NAMED PROOF / BLOCKED BY NAMED PREPARATION FAILURE
       checks made before it; do not repeat unrelated proofs by default.
 - [ ] Complete the final required suite/live/migration proofs, then update
       current-focus, the adopted TODO and the dated exit report consistently.
+- [ ] Check documentation and output hygiene in the final diff: update canonical
+      instructions and link evidence rather than copy whole command transcripts
+      into current-focus. Place raw logs/reports in existing ignored output folders.
+      Give new persistent artifacts an owner and retention/regeneration decision.
+      Before removing existing artifacts, verify callers, resolved target paths
+      and rollback/evidence needs; preserve private config, ownership journals and
+      persistent data. Record justified retention instead of blindly pruning.
+- [ ] When an operator finds a missed preparation defect, record its symptom,
+      root cause, missed boundary/consumer, corrective regression and prevention
+      in the owning report and the ledger below. Link the evidence; a generic
+      promise to double-check does not close the defect.
+
+## Preparation failure ledger
+
+Append confirmed preparation defects here with their owning report. Keep details
+in that report and the applicable prevention in the gates above; do not create a
+new task hierarchy or repeat unrelated expensive proofs.
+
+| Date / defect                                                                            | Root cause and missed boundary                                                                                                                                                                                          | Correction / required prevention                                                                                                                                                                                                                | Evidence                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-02: M4 loaded vendor config falsely rejected                                     | Archive config was compared literally with Docker's imported config; the synthetic loaded fixture reused the archive object and missed added empty User/OnBuild defaults                                                | Narrow two-field default normalization; regression accepts observed import shape and rejects meaningful config changes. Trace both actual sides and intermediate transformations before handoff                                                 | [M4 correction and acceptance](../reports/2026-10-28-seaweedfs-transition.md#nov-2---m4-acceptance-and-preparation-failure-log); scripts/storage/seaweed-vendor-evidence.test.mjs; 26 tests pass and native verify-loaded passes                         |
+| 2026-11-02: M5 storage test registration missed a tooling consumer                       | Adding the transfer test to package.json left scripts/backend.test.mjs asserting the old two-file command; the focused storage suite could not detect that separate stale assertion                                     | Preserve the exact assertion and update its third filename; search old command strings and registered filenames across tooling tests/CI before handoff. Caught in activation preparation; no operator suite failure reported                    | [M5 activation trace](../reports/2026-10-28-seaweedfs-transition.md#nov-2---m5-accepted-copy-and-persistent-activation-preparation); five focused hosted-flag tooling tests pass                                                                         |
+| 2026-11-03: mirror-restart handoff left applications stopped                             | Desktop restart timed out; subsequent restoration was partial, while config-only checks did not establish actual lifecycle completion. Exact earlier Compose start failure is unavailable.                              | Split engine/service stages, verify native exit and daemon state, then restore witnessed containers by dependency group and check real readiness. Preserve original images while staged pins are unaccepted.                                    | [Actual recovery and preparation correction](../reports/2026-10-31-dependency-maintenance-execution.md#mirror-activation-and-actual-service-recovery---nov-3); sixteen healthy containers, eleven readiness passes, original IDs/images/mounts preserved |
+| 2026-11-04: PostgreSQL vendor build reaches broken upstream parser fixtures              | Moby user 0.4.1's file-cap test uses NUL padding that hits its line cap; static recipe checks did not exercise the new native test dependency. An agent-only repair probe also caught unsupported BusyBox diff -x.      | Apply the publisher's exact test-only fix to an isolated module copy, preserve every case, compare production-file SHA-256 manifests and prove the native test stage before retrying a full image.                                              | [Parser fixture correction](../reports/2026-10-31-dependency-maintenance-execution.md#november-4-build-failure---upstream-parser-test-fixture-correction); actual full parser package passes with unchanged module checksums.                            |
+| 2026-11-04: inline migration command fails before Prisma                                 | The handoff invoked a runner requiring npm_execpath through plain Node; mocked argument checks bypassed the actual launcher.                                                                                            | Use the supported root db:prepare lifecycle command and verify actual pnpm-to-Prisma launch against the intended local port/database. Keep the existing launcher guard and explicit owner mapping.                                              | [Launcher correction](../reports/2026-10-31-dependency-maintenance-execution.md#november-4-migration-launcher-failure---supported-pnpm-handoff-correction); real read-only launch and focused regression pass.                                           |
+| 2026-11-04: PG18/Node24 proof preparation missed diagnostic and config-loader boundaries | Parent RESTRICT changed from 23503 to 23001; Prisma 6.16.2 also leaves it unmapped. Node24 native TS loading cannot resolve Media's inherited config import. Migration/source checks did not establish these consumers. | Correct only parent SQL expectations; preserve P2003 runtime assertions and make D7 compatibility a PG18 prerequisite. Explicit existing ts-node loader passes actual config/selection/proof-flag checks; native client failure stays recorded. | [PG18 regression trace](../reports/2026-10-31-dependency-maintenance-execution.md#november-4-postgresql-18-regression-failures---preparation-trace); five actual FK definitions checked; temporary SQL controls pass; Media full retry pending.          |
+| 2026-11-04: Product pilot omitted its dependency audit                                   | The isolated Prisma7 trial checked generation/types/native behavior but did not audit the new CLI graph before workspace installation; fast-uri3.1.0 introduced eight high unresolved findings.                         | Audit isolated trials before promotion; preserve the strict gate, patch only Ajv8.17.1's compatible fast-uri edge to3.1.9 and verify installed binding/security before stock handoff.                                                           | [Product installed dependency correction](../reports/2026-10-31-dependency-maintenance-execution.md#product-workspace-installation-accepted---fast-uri-dependency-correction); original failing report retained in D7 evidence.                          |
 
 This document enforces the assistant's preparation workflow. The automated
 command detects the existing contract/inventory regressions; it does not

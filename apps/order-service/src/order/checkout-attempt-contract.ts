@@ -3,7 +3,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { checkoutStockHash, type CheckoutStockFacts } from "@nebula/clients";
-import { Prisma, type CheckoutAttempt } from "../../prisma/generated/client";
+import { Prisma, type CheckoutAttempt } from "../generated/prisma/client";
 import { boundedMoney, cartId, cartMoney, cartQuantity } from "./cart-contract";
 
 export const CHECKOUT_LEASE_MS = 120_000;

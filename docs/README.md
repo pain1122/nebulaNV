@@ -70,6 +70,11 @@ For most backend tasks, read in this order:
 
 ## Reports
 
+- [November 4 continuation and device handoff](current-focus.md#november-4-device-handoff)
+- [Dependency Maintenance Execution](reports/2026-10-31-dependency-maintenance-execution.md): current D4/D7 installed/candidate/image evidence and next Media proofs.
+- [Media and SeaweedFS Transition](reports/2026-10-28-seaweedfs-transition.md): accepted cutover, supply and recovery evidence.
+- [D2 Accepted Exit](reports/2026-10-28-d2-exit-proof.md): completed Cart/Checkout/Order demo scope.
+- [Build Cleanup](ASAP-BUILD-CLEANUP.md): accepted build/watch work and retained boundaries.
 - [2026-09-15 D1 Batch 1 Existing-Contract Repair Checkpoint](reports/2026-09-15-d1-batch1-contract-repair-checkpoint.md)
 - [2026-09-15 D1 Batch 0 Product Contract And Data Audit](reports/2026-09-15-d1-batch0-product-contract-data-audit.md)
 - [2026-09-14 Backend Ecommerce Roadmap Correction](reports/2026-09-14-backend-ecommerce-roadmap-correction.md)

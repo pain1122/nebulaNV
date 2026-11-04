@@ -1,6 +1,6 @@
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
-import type { Media } from "../prisma/generated";
+import type { Media } from "../src/generated/prisma/client";
 import { MediaProcessingStorage } from "../src/processing/media-processing.storage";
 
 const binding = "b".repeat(64);

@@ -55,18 +55,17 @@ require("ts-node").register({
   project: path.join(root, "apps/product-service/tsconfig.json"),
   transpileOnly: true,
 });
-const { PrismaClient } = require("./prisma/generated");
+const { PrismaClient } = require("./src/generated/prisma/client");
+const { productPrismaOptions } = require("./src/prisma-options.ts");
 const {
   CheckoutStockService,
 } = require("./src/product/checkout-stock.service.ts");
 const { checkoutStockHash } = require("@nebula/clients");
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
-    },
-  },
-});
+const prisma = new PrismaClient(
+  productPrismaOptions(
+    `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
+  ),
+);
 const stock = () =>
   new CheckoutStockService(prisma, { getPublic: async () => ({}) });
 const create = (id = randomUUID(), overrides = {}) =>
@@ -168,7 +167,8 @@ try {
   );
   sql(
     `BEGIN; ${valid} DELETE FROM "CheckoutStockLine" WHERE "intentId"='${control}'; DELETE FROM "CheckoutStockIntent" WHERE id='${control}'; COMMIT;`,
-    /^ERROR:\s+23503:[\s\S]*CheckoutStockRestoration_intentId_fkey/,
+    // PostgreSQL 18 reports parent RESTRICT separately from an invalid child FK.
+    /^ERROR:\s+23001:[\s\S]*CheckoutStockRestoration_intentId_fkey/,
   );
 
   const base = await create();

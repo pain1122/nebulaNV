@@ -6,7 +6,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
-import type { Media } from "../../prisma/generated";
+import type { Media } from "../generated/prisma/client";
 import { ProcessingError, processingPolicy } from "./processing-policy";
 import type { Readable } from "node:stream";
 import {

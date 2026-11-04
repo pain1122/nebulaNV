@@ -1,0 +1,35 @@
+# Explicit fresh-CI / later M5 selection. Never merge into the existing demo
+# until its object reconciliation is accepted. Root files retain MinIO rollback.
+services:
+  minio: !reset null
+  minio-init: !reset null
+  media-service:
+    env_file:
+      - ./.nebula-storage/seaweedfs/media.env
+    depends_on: !override
+      media-scanner:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweed:
+        condition: service_healthy
+      seaweed-init:
+        condition: service_completed_successfully
+    environment:
+      MEDIA_STORAGE_DRIVER: s3
+      MEDIA_STORAGE_PROVIDER: s3
+      MEDIA_S3_ENDPOINT: http://seaweed:8333
+      MEDIA_S3_INTERNAL_ENDPOINT: http://seaweed:8333
+      MEDIA_S3_PUBLIC_ENDPOINT: !reset null
+      MEDIA_S3_REGION: !reset null
+      MEDIA_S3_BUCKET: !reset null
+      MEDIA_S3_ACCESS_KEY: !reset null
+      MEDIA_S3_SECRET_KEY: !reset null
+      MEDIA_S3_FORCE_PATH_STYLE: "true"
+
+volumes:
+  minio-data: !reset null

@@ -7,6 +7,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createGatewayClient } from "../dist/index.js";
 import { demoPng } from "../../../scripts/demo/png.mjs";
 import {
+  assertDeniedOriginPreflight,
+  assertPreflight,
+} from "../../../scripts/storage/seaweed-storage-proof.mjs";
+import {
   readAfterMediaRestart,
   runMediaRecovery,
 } from "./media-processing-recovery.mjs";
@@ -19,6 +23,7 @@ const target = new URL(baseUrl);
 const recoveryMode = process.argv.includes("--recovery");
 const derivativesMode = process.argv.includes("--derivatives");
 const metadataMode = process.argv.includes("--metadata");
+const uploadOrigin = "http://localhost:3000";
 if (
   process.env.NODE_ENV === "production" ||
   !["localhost", "127.0.0.1"].includes(target.hostname)
@@ -36,7 +41,7 @@ if (
 const admin = createGatewayClient({
   baseUrl,
   publicClientId: "admin-web-local",
-  applicationOrigin: "http://localhost:3000",
+  applicationOrigin: uploadOrigin,
 });
 const storefront = createGatewayClient({
   baseUrl,
@@ -62,6 +67,7 @@ if (!cookie) throw new Error("processing_browser_cookie_missing");
 const ids = [];
 const cleanupFailures = [];
 let proofError;
+let browserCorsChecked = false;
 
 async function upload(bytes, suffix, mimeType = "image/png") {
   const filename = `media-processing-${randomUUID()}-${suffix}`;
@@ -79,13 +85,50 @@ async function upload(bytes, suffix, mimeType = "image/png") {
       },
     }),
   );
+  if (!browserCorsChecked) {
+    const requestedHeaders = Object.keys(presign.uploadHeaders)
+      .map((name) => name.toLowerCase())
+      .sort();
+    assert.ok(
+      requestedHeaders.length > 0,
+      "processing_signed_upload_headers_missing",
+    );
+    const preflight = (origin) =>
+      globalThis.fetch(presign.uploadUrl, {
+        method: "OPTIONS",
+        headers: {
+          Origin: origin,
+          "Access-Control-Request-Method": "PUT",
+          "Access-Control-Request-Headers": requestedHeaders.join(","),
+        },
+        signal: globalThis.AbortSignal.timeout(10000),
+      });
+    assertPreflight(
+      await preflight(uploadOrigin),
+      uploadOrigin,
+      requestedHeaders,
+    );
+    const denied = "https://nebula-denied.invalid";
+    assertDeniedOriginPreflight(await preflight(denied), denied);
+  }
   const result = await globalThis.fetch(presign.uploadUrl, {
     method: "PUT",
-    headers: { "content-type": mimeType },
+    headers: { ...presign.uploadHeaders, Origin: uploadOrigin },
     body: bytes,
     signal: globalThis.AbortSignal.timeout(20_000),
   });
   assert.ok([200, 204].includes(result.status), "processing_put_failed");
+  assert.equal(
+    result.headers.get("access-control-allow-origin"),
+    uploadOrigin,
+    "processing_upload_cors_origin",
+  );
+  if (!browserCorsChecked) {
+    browserCorsChecked = true;
+    process.stdout.write(
+      "[media-processing-live] gateway-presigned-browser-cors-upload=ok\n",
+    );
+  }
   const media = success(
     "processing_finalize",
     await admin.request("admin_media_public_finalize", {
@@ -192,7 +235,7 @@ try {
   } else {
     const changed = await globalThis.fetch(presign.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/png" },
+      headers: presign.uploadHeaders,
       body: demoPng(1),
       signal: globalThis.AbortSignal.timeout(20_000),
     });

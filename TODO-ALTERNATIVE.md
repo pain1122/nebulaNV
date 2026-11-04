@@ -15,19 +15,23 @@ exports take 101.5s; the final OS-patched exports take 151.7s. Local unchanged
 warm acceptance is 111.1s. These are image timings, not total CI duration.
 [Segment 3 exit proof](docs/reports/2026-10-27-build-cleanup-segment3-exit.md).
 
-Segment 4 is active. Its first runtime environment review is complete: all eleven
+Segment 4's bounded work is complete as of 2026-10-28. Its runtime environment
+review is complete: all eleven
 clean local/release schemas and native/Compose override probes pass. Current
 ownership is preserved with an explicit [ownership contract](docs/architecture/runtime-environment-ownership.md).
 Two existing Authority inputs omitted from release configuration are now wired;
 no application or database contract changed.
-Production dependency packaging comparison and selected-service watch/restart
-proposal follow. Shared-package splits and env migration remain conditional on
-verified benefit and compatibility review, not new D2 prerequisites.
+Production packaging comparison retains the shared layer: the candidate grows
+the measured mixed-fleet archive by 46.3%. The opt-in selected-service watch
+workflow passes the Order/Gateway native pilot: readiness, six F3 flows,
+source/shared-edit restart scopes and clean shutdown. Tooling remains local and
+uncommitted without a new hosted CI run. Shared-package splits and env migration
+remain deferred, conditional on verified benefit and compatibility review.
+[Pilot closure](docs/reports/2026-10-27-selected-service-dev-workflow.md#pilot-closure---2026-10-28).
 [Segment 4 receipt](docs/reports/2026-10-27-build-cleanup-segment4-env-review.md).
 D2 feature proofs and the adopted phase order below are preserved.
 
-Current execution: D2 Batches 0, 1 and 2 are closed as of 2026-10-19; Batch 3 Orders is active. Salar reports corrected Checkout recovery and affected Cart live passed, completing the stock/replay/recovery feature gates alongside the recorded native/owner SQL/focused/contract evidence. Post-proof checks confirm all sixteen containers healthy, eleven backend health probes passed, no active checkout attempts and no temporary fault trigger. Preserve existing passes; no repeat build or migration without a relevant change. PAYMENT_PROCESSING vocabulary and the approved failure-to-PENDING payment policy remain recorded for Batch 3 transition/concurrency/audit work. D2/B0 exit and Batch 4 fixture/parity gates remain open. D1 and F5 Core are closed as of 2026-10-12;
-remaining F5 consumer integration stays in its adopted later position.
+Current execution (2026-11-03): follow [current-focus](docs/current-focus.md): **close dependency maintenance -> reconcile B0 release evidence**. D2 Batches 0-4, D1 and F5 Core are accepted. Local Media tasks M1-M7 are now accepted: patched community SeaweedFS supply/security evidence, scoped persistent setup, the verified 302-object cutover, active generic S3 routing and native processing/CORS/derivative/metadata/recovery/Product/Gateway proofs. MinIO remains stopped with data retained for guarded rollback. Eight-owner test types, 89 tooling tests and post-recovery health pass; detailed live suite counts were not supplied. Host frozen package realignment is already complete. Maintenance D1 review and D2 attribution/shipping scope are accepted. Joi 18.3.1 is installed and verified on the host; the fresh dependency gate passes with 47 explicitly deferred Web findings. Maintenance D3 host acceptance is complete; D4 infrastructure maintenance is next. Nine running images have older Nest/gRPC packages than the lockfile; group their rollout under D8 after source preparation, rather than rebuilding per decision. The Joi update changes the host lockfile; current images remain unchanged pending the grouped rollout. B0 is not signed off, and current-snapshot hosted CI/recovery packaging remain open. Preserve accepted evidence; avoid repeating unchanged storage work. F7/D3 Vite admin integration requires its own later checklist; tenant implementation, cloud/CDN and non-selected media expansion remain deferred. [Media closure](docs/reports/2026-10-28-seaweedfs-transition.md); [D2 exit](docs/reports/2026-10-28-d2-exit-proof.md).
 
 ## Purpose
 
@@ -545,9 +549,11 @@ compatibility. Later F5 work extends this checkpoint rather than rebuilding it.
 
 ## D2 - Cart, Checkout, And Order
 
-Active 2026-10-12 after D1 sign-off. Begin with the existing implementation audit
-in [current-focus](docs/current-focus.md#d2-entry-audit); unchecked items remain
-planned behavior, not certified functionality.
+Accepted 2026-10-28 after both demo profiles and all scoped feature gates pass.
+[Final evidence](docs/reports/2026-10-28-d2-exit-proof.md).
+The execution history below preserves its original dated checkpoints; final
+closure supersedes their pending notes. B0 and current-tooling hosted acceptance
+remain separate. [Original entry audit](docs/current-focus.md#d2-entry-audit).
 
 Batch 0 completed 2026-10-13. The four Batch 1 items now have a
 [main-file/consumer trace and execution plan](docs/reports/2026-10-13-d2-batch1-file-trace-and-plan.md);
@@ -618,8 +624,21 @@ have SQL proof. Order cancellation/recovery source is prepared; Salar reports
 cancellation/status SQL proofs passed. Native deployment remains pending.
 Backed demo payment owner/recovery passed its complete two-owner SQL proof
 (Salar-supplied output, two disposable databases cleaned). Customer/admin signed
-HTTP/RPC/Gateway/SDK operations are prepared; grouped native deployment/live proof
-remains pending. Real payment providers remain deferred.
+HTTP/RPC/Gateway/SDK operations are deployed. On Oct 28 Salar reports scoped
+startup, admin Orders/status live and demo payment live all passed; exact stdout
+was not supplied. Agent inspection confirms Product/Order/Gateway healthy.
+Explicit Order cancellation live stock effects now pass: Salar supplied the
+full successful Checkout/cancellation markers including stock restored once,
+original Checkout replay and owned cleanup. Batch 3 is closed on Oct 28;
+Batch 4 final contracts/fixtures/exit is active.
+Its D2 commerce showcase/limits runner is implemented and under final preparation;
+real seed/rerun/reset acceptance and final native exit checks remain pending.
+[Batch 4 execution](docs/reports/2026-10-28-d2-batch4-execution.md),
+[demo commands](docs/architecture/d2-demo-workflow.md).
+[Batch 3 closure](docs/reports/2026-10-28-d2-batch3-exit.md),
+[final live proof](docs/reports/2026-10-28-d2-order-cancellation-live.md).
+Real payment providers remain deferred. Earlier pending deployment notes above
+are superseded by this checkpoint.
 [Payment transport preparation](docs/reports/2026-10-24-d2-demo-payment-transports.md).
 [Read evidence](docs/reports/2026-10-19-d2-batch3-reads.md),
 [status-control evidence](docs/reports/2026-10-19-d2-batch3-status-controls.md),
@@ -628,29 +647,85 @@ remains pending. Real payment providers remain deferred.
 [Demo payment owner trace and proof status](docs/reports/2026-10-24-d2-demo-payment-plan.md).
 
 - [x] Preserve user order list/detail restricted to the verified owner.
-- [ ] Complete admin order list/detail and authorized status changes through the
+- [x] Complete admin order list/detail and authorized status changes through the
       gateway.
-- [ ] Define permitted status transitions, concurrency behavior, idempotency,
+- [x] Define permitted status transitions, concurrency behavior, idempotency,
       and audit facts.
 - [x] Replace Prisma-shaped external results with explicit service and gateway
       response mapping.
-- [ ] Prevent client-supplied user, price, currency, totals, status, application,
+- [x] Prevent client-supplied user, price, currency, totals, status, application,
       or site authority.
-- [ ] Add integration tests for replay, stale product/variant state, ownership
+- [x] Add integration tests for replay, stale product/variant state, ownership
       denial, role denial, invalid transitions, dependency failure, and complete
       transaction rollback.
 
 ### D2 Exit Gate
 
-- [ ] A user can create a cart and produce one durable idempotent demo order
+- [x] A user can create a cart and produce one durable idempotent demo order
       entirely through gateway APIs.
-- [ ] Orders retain immutable commercial snapshots and correct user ownership.
-- [ ] User/admin reads and status transitions enforce distinct policies.
-- [ ] Currency, totals, stock behavior, error envelopes, and rollback are
+- [x] Orders retain immutable commercial snapshots and correct user ownership.
+- [x] User/admin reads and status transitions enforce distinct policies.
+- [x] Currency, totals, stock behavior, error envelopes, and rollback are
       deterministic and covered by live evidence.
 
 ## Backend Ecommerce Exit Gate - Release B0
 
+- [ ] Complete the post-D2 dependency maintenance review before release sign-off:
+      target current stable, supported, mutually compatible runtime/build/test
+      packages and container bases. Validate compatible updates and stage major
+      migrations separately. Retained older versions need a documented concrete
+      compatibility/replacement blocker, maintenance/security status and upgrade
+      path; age alone must not become the default. Salar confirmed this new-product
+      expectation on 2026-10-28. Prioritize verified urgent security fixes.
+      Include bounded documentation, tooling-pattern and artifact-retention
+      control under maintenance D9-D11, then close the ledger at D12. Reuse the
+      existing docs index and evidence folders; preserve accepted proofs, private
+      settings and rollback data. Measure waste before deleting it. D2 advisory
+      attribution remains the next task; cleanup does not reopen tenant/cloud work.
+      Treat maintenance as the active foundation priority: prepare compatible
+      changes with exact consumer tracing and focused proofs before advancing;
+      distinguish reviewed candidates, source preparation and deployed acceptance.
+      Required pending proofs block closure. Group final image rollout under D8
+      without postponing intermediate validation; B0 release-wide evidence remains
+      separately owned by B.
+      Nov 2 audit: Joi 18.2.6 is a blocking runtime advisory. Nov 3: the 18.3.1
+      installation, lock review and focused compatibility checks pass. Fresh audit
+      passes: runtime=0, tooling=0, deferred-web=47, unresolved=0. Maintenance D2 is
+      accepted locally; image rollout/parity/scans remain D8/B5-owned. Corrected attribution
+      keeps Web findings visible and blocks unknown ownership. Legacy Web is
+      excluded from backend B0 shipping, with remediation owned by F7/D3 before
+      reuse; this does not certify the vulnerable Web packages as safe.
+      Nov 3 full module/log trace maps all 19 owners and 98 declared libraries.
+      Maintenance D3 host acceptance is complete; D4 owns confirmed scanner-update denials,
+      D5 owns the EOL lint cohort and D7 must account for Prisma 6 security
+      support ending Nov 19. Current running images still carry older Joi and
+      require the D8/B5 rollout/scan proof. See the maintenance execution report
+      for exact consumers, deprecated-package paths and optional cleanup findings.
+      Full workspace audit is collected and attributed: no high/critical backend
+      runtime records, but 70 high/critical backend-tooling advisory records
+      across 18 package names require D5 remediation. Preserve all Web and lower
+      severity records; the production gate alone does not close maintenance.
+      D3 now prepares Node 24.22.2 LTS as the newest explicitly documented
+      Prisma 6-compatible line, superseding the earlier proposed Node 26 target.
+      Local/CI/Docker source pins agree; Windows native/import/preload/configuration
+      checks and full tooling/watch regressions pass on Node 24. D3 host acceptance
+      is complete; deployed-image acceptance remains pending under D8/B5. No claim is made that
+      Node 22 is unsupported.
+      [Cost/priority assessment](docs/reports/2026-10-28-dependency-maintenance-assessment.md)
+      is complete; batch selection, implementation and validation remain open.
+      [Frozen package realignment](docs/reports/2026-10-28-package-realignment.md)
+      is complete on the host with unchanged dependency inputs; image rollout
+      and the remaining maintenance decisions/validation remain open.
+      [Community SeaweedFS transition](docs/reports/2026-10-28-seaweedfs-transition.md)
+      is accepted through local M1-M7: native S3/isolation/restart proofs, scoped
+      persistent setup, verified 302-object cutover and deployed Media/Gateway
+      processing/reference/recovery proofs. Paid activation/subscription is
+      excluded. MinIO data remains retained for guarded rollback. Current-snapshot
+      release packaging/CI evidence remains B-owned; keep F4 tenant implementation
+      deferred.
+      Target suitability includes commercially sold multi-tenant NebulaNV without
+      per-tenant license fees. Storage credential isolation is a primitive;
+      authoritative end-to-end tenant isolation remains F4/P2-owned.
 - [ ] Deterministic setup can authenticate an admin, create and publish a
       product, authenticate a customer, mutate a cart, perform idempotent demo
       checkout, read the order, and perform one permitted admin transition.
@@ -961,9 +1036,9 @@ by the early checkpoint.
 - [ ] Define provider-level versus application-level encryption, retention, and
       secure deletion responsibilities.
 - [ ] Freeze only the S3-compatible operations required by current workflows;
-      retain MinIO locally and prove that media policy does not depend on MinIO
-      console/API extensions.
-- [ ] Record Supabase Storage S3, AWS S3, and Azure Blob as candidates without
+      use the accepted local storage transition and prove that media policy does
+      not depend on provider console/API extensions.
+- [ ] Record AWS S3 and Azure Blob as future candidates without
       implementing provider topology or parity before F9 selects the primary
       cloud.
 - [ ] Keep provider configuration behind the media-service boundary and add a
@@ -1603,7 +1678,7 @@ finish tenant isolation.
 - [ ] At F9 entry, select AWS or Azure as the primary deployment using explicit
       cost, regional availability, managed-service, learning, and portfolio
       criteria; record the decision and exit strategy in an ADR.
-- [ ] Re-evaluate Supabase Storage S3, AWS S3, and Azure Blob from the measured
+- [ ] Evaluate SeaweedFS self-hosting, AWS S3, and Azure Blob from the measured
       F5/M5/M3S operation inventory. Select the primary object-store structure
       here rather than retroactively treating the pre-cloud compatibility layer
       as a permanent design.

@@ -14,7 +14,7 @@ const tseslint = authServiceRequire("typescript-eslint");
 
 export default tseslint.config(
   {
-    ignores: ["eslint.config.mjs"],
+    ignores: ["eslint.config.mjs", "src/generated/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -27,9 +27,7 @@ export default tseslint.config(
       },
       sourceType: "commonjs",
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["jest.processing-db.config.ts"],
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -43,6 +41,9 @@ export default tseslint.config(
   },
   {
     files: ["test/**/*.ts"],
+    languageOptions: {
+      parserOptions: { projectService: false, project: "./tsconfig.test.json" },
+    },
     rules: {
       "@typescript-eslint/no-unsafe-assignment": "warn",
       "@typescript-eslint/no-unsafe-member-access": "warn",
@@ -50,6 +51,19 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-return": "warn",
       "@typescript-eslint/no-unsafe-argument": "warn",
       "@typescript-eslint/no-redundant-type-constituents": "warn",
+    },
+  },
+  {
+    files: [
+      "prisma.config.ts",
+      "prisma/seed.ts",
+      "jest.processing-db.config.ts",
+    ],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.tools.json",
+      },
     },
   },
 );

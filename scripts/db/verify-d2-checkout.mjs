@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import process from "node:process";
+import console from "node:console";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
@@ -204,15 +206,14 @@ try {
     transpileOnly: true,
   });
   const { OrderService } = require("./src/order/order.service.ts");
-  const { PrismaClient } = require("./prisma/generated/client");
+  const { PrismaClient } = require("./src/generated/prisma/client");
+  const { orderPrismaOptions } = require("./src/prisma-options.ts");
   const { of } = require("rxjs");
-  const prisma = new PrismaClient({
-    datasources: {
-      db: {
-        url: `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
-      },
-    },
-  });
+  const prisma = new PrismaClient(
+    orderPrismaOptions(
+      `postgresql://postgres:postgres@127.0.0.1:15432/${database}?schema=public`,
+    ),
+  );
   try {
     let amount = "7.25";
     let title = "Demo variant";
@@ -407,9 +408,10 @@ try {
       SELECT gen_random_uuid(),'${retentionOwner}',repeat(md5(id::text),2),repeat('b',64),repeat('c',64),id,'{}','2021-01-01','2021-01-08' FROM fixtures;`);
     sql(
       `BEGIN; DELETE FROM "Order" WHERE id=(SELECT "orderId" FROM "CheckoutReceipt" WHERE "userId"='${retentionOwner}' LIMIT 1); COMMIT;`,
-      /23503:[\s\S]*CheckoutReceipt_orderId_fkey/,
+      // PostgreSQL 18 reports parent RESTRICT separately from an invalid child FK.
+      /23001:[\s\S]*CheckoutReceipt_orderId_fkey/,
     );
-    const { Prisma: receiptPrisma } = require("./prisma/generated/client");
+    const { Prisma: receiptPrisma } = require("./src/generated/prisma/client");
     await new CheckoutReceiptRetention(prisma).compact();
     assert.equal(
       await prisma.checkoutReceipt.count({

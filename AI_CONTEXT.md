@@ -1,7 +1,15 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-10-12
+Last updated: 2026-11-04
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
+
+Resume at the [November 4 handoff](docs/current-focus.md#november-4-device-handoff):
+D7 Media is installed on Prisma7.10.1; finish its installed acceptance and native
+CLI proofs before migrating another owner. Product/Order host SQL gates pass;
+six owners remain on6.16.2. D4/D7/D8 and B0 are still open. Read the linked
+canonical maintenance report; ignored local logs/candidates are not portable.
+Use Node24.22.2/pnpm10.17.1. Do not mistake existing Docker images or prior hosted
+CI for acceptance of this dependency cohort. Long execution stays with Salar.
 
 ## 1. Collaboration Contract
 
@@ -110,7 +118,9 @@ operation, remains disabled until its isolation work is complete.
   `order-service`, `blog-service`, and `media-service`.
 - Frontend app: `web`.
 - Shared packages: `grpc-auth`, `clients`, `config`, `protos`, `api-client`.
-- Runtime target: Node `>=22`, pnpm `10.17.1`.
+- Runtime target: Node `24.22.2` from `.node-version`, compatible Node 24 patch
+  line `>=24.22.2 <25`, pnpm `10.17.1`. D3 Windows host/native/tooling checks pass;
+  D8 Linux image rollout remains pending. Source pins do not certify older containers.
 - Default branch: `main`.
 - GitHub remote: `origin` -> `https://github.com/pain1122/nebulaNV`.
 
@@ -153,7 +163,11 @@ operation, remains disabled until its isolation work is complete.
 - Completed F3 evidence: `docs/reports/2026-08-22-f3-exit-proof.md` and
   `docs/reports/2026-08-24-f3-execution-checklist.md`.
 
-### Active Milestone
+### October 12 milestone history
+
+The phase/count statements in this subsection describe the October12 checkpoint.
+For the active November4 objective and accepted D1/D2 exit, use the handoff at
+the top of this file and docs/current-focus.md; do not restart these old batches.
 
 - F3 External API Gateway is complete as of 2026-08-24.
 - F4 is paused after the audited R0-R5 checkpoint at commit `3285c00`.
@@ -205,8 +219,8 @@ operation, remains disabled until its isolation work is complete.
   this corrected layer.
 - That retry cached the corrected Prisma layer and exported media image 6/11,
   then mutable Node tags resolved to different digests for taxonomy and forced
-  a Corepack network request that failed. The existing official Node 22
-  Bookworm build/runtime bases are now pinned by index digest, and Corepack has
+  a Corepack network request that failed. At that checkpoint the official Node 22
+  Bookworm build/runtime bases were pinned by index digest, and Corepack had
   a shared locked cache plus three bounded attempts. Base updates now require
   explicit image/scan evidence. All 55 backend-tooling tests, Dockerfile build
   validation, the sequential image build, and runtime startup passed.
@@ -225,7 +239,7 @@ operation, remains disabled until its isolation work is complete.
   compatibility work. It must preserve gateway/service ownership and accept no
   public tenant/site override, but it cannot claim multi-tenant isolation.
 - M3S storage is a compatibility feature before F9. Media-service remains the
-  policy authority, MinIO remains local storage, and only demonstrated
+  policy authority, SeaweedFS is local storage, and only demonstrated
   S3-compatible operations/provider-neutral tests may be added. F9 selects and
   proves primary-cloud bucket/KMS/lifecycle/migration structure from measured
   product evidence.
@@ -377,15 +391,15 @@ console.log("safe multiline script")
 - Settings-service must not define secrets, authentication policy, internal trust boundaries, role hierarchy, storage credentials, database URLs, or whether auth is required.
 - Taxonomy-service owns taxonomy/category/tag/grouping records and taxonomy-specific CRUD.
 - Media-service owns media policy, media metadata, access classes, signed URLs, and upload/read authorization.
-- Object storage providers such as MinIO, Supabase Storage S3, and AWS S3 hold bytes; they are not the app privacy authority.
+- Object storage providers hold bytes; media-service remains the app privacy authority. SeaweedFS is active after accepted object-preserving cutover and native feature/recovery proofs; MinIO is stopped for guarded rollback.
 - Services should not import another service's Prisma client or query another service's database directly.
 - Service-to-service communication should use explicit gRPC/client contracts.
 - Source files should avoid unsafe `any`; test files may still have warning-level loose typing during stabilization.
 
 ## 9. Media Boundary Summary
 
-- Current local object storage: MinIO.
-- Planned compatible providers: Supabase Storage S3 mode and AWS S3.
+- Current local object storage: community SeaweedFS 4.51 with the accepted go-jose 4.1.7 vendor patch.
+- M1-M7 local Media tasks are accepted: scoped setup, durable supply, object-preserving activation and native feature/recovery proofs. Remaining maintenance/B0/current-snapshot hosted CI is open in current-focus. Cloud provider selection is deferred to F9; the unused Supabase CLI scaffold is retired.
 - Admin filemanager is a public media-library lane restricted to `admin/root-admin`.
 - Public filemanager assets live under `MEDIA_PUBLIC_FOLDER`, currently `uploads`.
 - Public filemanager paths should be human-readable, such as `uploads/images/products/hero.webp`.
@@ -396,11 +410,11 @@ console.log("safe multiline script")
 
 ## 10. Docker And Runtime Notes
 
-- Docker service-to-service URLs use Docker DNS names such as `postgres:5432`, `auth-service:50052`, and `minio:9000`.
-- Host tests and browser-facing URLs use exposed localhost ports such as `127.0.0.1:3007` or `127.0.0.1:9000`.
+- Docker service-to-service URLs use Docker DNS names such as `postgres:5432`, `auth-service:50052`, and `seaweed:8333`.
+- Host tests and browser-facing URLs use exposed localhost ports such as `127.0.0.1:3007` or `127.0.0.1:19000`.
 - Docker Postgres is exposed locally on host port `15432`.
-- MinIO server container should stay running.
-- `minio-init` is expected to exit with status `0` after creating/configuring the bucket.
+- Seaweed server should stay healthy. Retained MinIO stays stopped unless executing the guarded rollback procedure.
+- `seaweed-init` is expected to exit with status `0` after scoped bucket/CORS initialization.
 - If a service was recreated with `--no-deps`, verify required dependencies are already running and healthy.
 - Docker image release packaging exists through `docker-compose.release.yml`, `deploy/.env.production.example`, and `scripts/docker/*.ps1`.
 
@@ -442,7 +456,7 @@ Preferred test types:
 - HTTP e2e tests for public/admin/user-facing routes.
 - gRPC e2e tests for service-to-service contracts.
 - Smoke/health tests for `/health/ready`, gRPC readiness, DB reachability,
-  Redis, MinIO/S3, and S2S connectivity.
+  Redis, selected Seaweed/S3, and S2S connectivity.
 
 Do not weaken tests just to make them pass. If a test fails, first decide whether the code is wrong, the test is stale, or the contract intentionally changed.
 

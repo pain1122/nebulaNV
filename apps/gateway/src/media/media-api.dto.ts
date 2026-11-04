@@ -266,6 +266,13 @@ export class GatewayMediaPresignResultDto {
   @ApiProperty() bucket!: string;
   @ApiProperty() path!: string;
   @ApiProperty({ format: "uri" }) uploadUrl!: string;
+  @ApiProperty({
+    type: "object",
+    additionalProperties: { type: "string" },
+    description:
+      "Required headers to send unchanged with the signed upload PUT.",
+  })
+  uploadHeaders!: Record<string, string>;
   @ApiProperty() expiresIn!: number;
   @ApiProperty() filename!: string;
   @ApiProperty() mimeType!: string;

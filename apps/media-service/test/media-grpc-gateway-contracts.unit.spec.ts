@@ -9,6 +9,7 @@ import {
 } from "@nebula/grpc-auth";
 import { MediaGrpcController } from "../src/grpc/media-grpc.controller";
 import { MediaService } from "../src/media.service";
+import { media } from "@nebula/protos";
 import { ListMediaDto, MyProtectedReadUrlGrpcDto } from "../src/dto";
 
 function handler(
@@ -42,6 +43,33 @@ async function rpcError(promise: Promise<unknown>) {
 }
 
 describe("Media additive gateway contracts", () => {
+  it("preserves required signed upload headers through the real protobuf codec", async () => {
+    const uploadHeaders = {
+      "content-type": "image/png",
+      "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+    };
+    const presignUpload = jest.fn().mockResolvedValue({
+      uploadUrl: "http://storage/upload",
+      uploadHeaders,
+    });
+    const response = new MediaGrpcController({
+      presignUpload,
+    } as unknown as MediaService);
+    const result = await response.presignPublicLibraryUpload(
+      media.PresignUploadReq.create({
+        filename: "fixture.png",
+        mimeType: "image/png",
+      }),
+      actorMetadata(undefined, "admin"),
+    );
+    const decoded = media.PresignUploadRes.decode(
+      media.PresignUploadRes.encode(result).finish(),
+    );
+    expect(decoded.uploadHeaders).toEqual(uploadHeaders);
+    expect(
+      media.PresignUploadRes.decode(new Uint8Array()).uploadHeaders,
+    ).toEqual({});
+  });
   const browseProtectedFilemanager = jest.fn();
   const createProtectedFeatureReadUrl = jest.fn();
   const previewPublicLibraryDelete = jest.fn();

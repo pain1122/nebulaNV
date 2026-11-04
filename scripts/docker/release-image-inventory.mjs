@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import console from "node:console";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -10,10 +11,28 @@ export function releaseArchiveImages({
   tag = "latest",
   envFile,
   env = process.env,
+  composeFiles = env.COMPOSE_FILE
+    ? env.COMPOSE_FILE.split(env.COMPOSE_PATH_SEPARATOR ?? path.delimiter)
+    : undefined,
   execute = (args, options) => execFileSync("docker", args, options),
 } = {}) {
   const backend = releaseImages(prefix, tag);
-  const args = ["compose", "--file", "docker-compose.yml"];
+  assert.ok(
+    composeFiles === undefined ||
+      (Array.isArray(composeFiles) &&
+        composeFiles.length > 0 &&
+        composeFiles.every(
+          (file) =>
+            typeof file === "string" && file.trim() && !/[\r\n\0]/u.test(file),
+        )),
+    "invalid Compose file selection",
+  );
+  // Let Compose discover its persistent .env/COMPOSE_FILE selection by default.
+  // Explicit callers still control every selected file as before.
+  const args = [
+    "compose",
+    ...(composeFiles ?? []).flatMap((file) => ["--file", file]),
+  ];
   if (envFile) args.push("--env-file", path.resolve(repositoryRoot, envFile));
   args.push("--profile", "*", "config", "--images");
   const output = execute(args, {

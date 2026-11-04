@@ -26,13 +26,13 @@ Each service owns its own data and business boundary. Other services must use HT
 
 ## Runtime Infrastructure
 
-| Infra            | Used For                                                               | Notes                                                                                                                                                                                                                                                           |
-| ---------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Postgres         | Service and future realm databases                                     | Each service uses its own DB target. F4 development may prove several isolated logical realm databases on one local process; production physical realm placement/HA belongs to a consulted F9 amendment.                                                        |
-| Redis            | Current Auth/session state, S2S replay claims, and gateway idempotency | Auth, `grpc-auth`, and gateway remain the logical owners. Customer session keys become realm/application scoped; Redis remains rotation/replay acceleration, not the sole durable realm credential/session generation, legacy bridge, or active-session ledger. |
-| MinIO            | Local S3-compatible object storage                                     | Future-compatible with Supabase S3 and AWS S3.                                                                                                                                                                                                                  |
-| Supabase Storage | Planned filemanager/storage provider                                   | Must not replace media-service policy.                                                                                                                                                                                                                          |
-| AWS S3           | Future production object storage                                       | Same S3-compatible boundary as MinIO/Supabase.                                                                                                                                                                                                                  |
+| Infra         | Used For                                                               | Notes                                                                                                                                                                                                                                                           |
+| ------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres      | Service and future realm databases                                     | Each service uses its own DB target. F4 development may prove several isolated logical realm databases on one local process; production physical realm placement/HA belongs to a consulted F9 amendment.                                                        |
+| Redis         | Current Auth/session state, S2S replay claims, and gateway idempotency | Auth, `grpc-auth`, and gateway remain the logical owners. Customer session keys become realm/application scoped; Redis remains rotation/replay acceleration, not the sole durable realm credential/session generation, legacy bridge, or active-session ledger. |
+| MinIO         | Stopped legacy S3-compatible rollback storage                          | Retained data; excluded from selected image supply and ordinary startup.                                                                                                                                                                                        |
+| SeaweedFS     | Active local S3-compatible object storage                              | Scoped setup/recreation, 302-object cutover and native Media feature/recovery proofs pass.                                                                                                                                                                      |
+| Cloud storage | Future deployment decision                                             | Provider selection belongs to F9; preserve the Media S3-compatible boundary.                                                                                                                                                                                    |
 
 ## Valid Communication Paths
 
@@ -82,7 +82,7 @@ Each service owns its own data and business boundary. Other services must use HT
 
 - Public admin filemanager assets use human-readable keys under `MEDIA_PUBLIC_FOLDER`.
 - Protected/strict assets use feature-owned flows and opaque storage keys.
-- MinIO/Supabase/AWS store bytes only.
+- Object storage holds bytes only; SeaweedFS is active; Media remains policy authority and retained MinIO stays stopped for guarded rollback.
 - Media-service owns metadata, signed URLs, and access checks.
 
 ## Authority Foundation And Future Boundaries

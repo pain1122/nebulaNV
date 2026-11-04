@@ -1,20 +1,42 @@
 # Media Service
 
-Last reviewed: 2026-10-10
+## Prisma 7 maintenance preparation (November 4)
+
+Media source now selects matching CLI/client/adapter-pg7.10.1 and pg8.23.1.
+CLI URL/shadow URL and the empty seed move into `prisma.config.ts`. Generated CJS
+source lives in `src/generated/prisma` and compiles into dist. The service,
+two guarded disposable-database suites and opt-in D1 reference fixture use
+`src/prisma-options.ts`: explicit URL/schema, ten-connection/five-second defaults
+and preserved connection_limit/connect_timeout parameters. Media still fails
+initialization on a database connection error; shutdown and error logging stay.
+Models, eight migrations, API contracts and processing/storage policy stay intact.
+
+The candidate uses the identical audited installed Product dependency bytes.
+Source/test/tool types, typed lint, 63 focused tests, all 11 native processing/
+derivative database cases, and compiled owner/recovery/source-fixture loading
+pass; all owned proof databases and pools close. Fourteen recovery helper tests
+pass, including strict modern selection and compatibility with existing legacy
+images. Root install/generation now succeeds; actual installed versions,
+source/test/tool types, focused lint, 63 tests, lock review, dependency security
+and the eight-service type gate (128 files) pass. Complete native CLI clean/
+populated upgrade proofs remain pending. Candidate native results are not native
+CLI deployment acceptance; image/storage/scanner acceptance remains D8-owned.
+
+Last reviewed: 2026-11-02 (SeaweedFS active; native feature/recovery and Product/Gateway regressions accepted)
 
 ## Purpose
 
 Media-service owns media metadata, upload/finalize/read/delete flows, signed URL generation, access classes, and S3-compatible storage integration.
 
-Media-service is the app privacy authority for media. MinIO, Supabase Storage, and AWS S3 store bytes only.
+Media-service is the app privacy authority for media. Object storage holds bytes behind its S3-compatible boundary.
 
 ## Current Storage Model
 
-| Provider            | Role                                            |
-| ------------------- | ----------------------------------------------- |
-| MinIO               | Current local S3-compatible storage             |
-| Supabase Storage S3 | Planned storage/filemanager-compatible provider |
-| AWS S3              | Future production object storage                |
+| Provider             | Role                                                             |
+| -------------------- | ---------------------------------------------------------------- |
+| MinIO                | Stopped legacy rollback store; data retained                     |
+| SeaweedFS            | Active community S3 storage; native feature/recovery proofs pass |
+| Cloud object storage | Provider selection deferred to F9                                |
 
 The service uses AWS S3 SDK commands against S3-compatible providers.
 
@@ -108,14 +130,13 @@ sign-off is complete; saved image recipes remain next. See the
   scanner has independent container health, no published host port, a persisted
   signature volume, and a 4 GiB memory limit. Media startup starts it; shutdown
   allows an in-flight bounded job to drain.
-- This checkpoint has no resizing/cropping/saved-size/watermark derivatives,
-  title/alt changes, or new external API operations yet. `variant=web` remains
-  the approved render object; those image tools are the next Media batch.
+- The initial scan/promotion checkpoint predates the saved-size and metadata
+  batches documented below. Current native image tools are accepted;
+  `variant=web` remains the approved original render object.
 
 ## Saved Image Sizes (2026-10-07)
 
-Implemented locally; additive migration, updated containers and live sign-off
-are pending. The [saved-size checkpoint](../reports/2026-10-07-media-image-recipes.md)
+Implemented and natively accepted, including the Nov 2 SeaweedFS derivative proof. The [saved-size checkpoint](../reports/2026-10-07-media-image-recipes.md)
 contains the operator commands and exact verification evidence.
 
 Media owns generation recipes, immutable output facts and separate desired
@@ -176,7 +197,7 @@ Future UI reference: when the Vite admin panel is uploaded, design the media fil
 | `PROTECTED` | Context-scoped list by owner/scope/entity metadata      | Opaque keys under `MEDIA_PRIVATE_FOLDER`     | Private business files tied to a product/order/course/etc. |
 | `STRICT`    | Context-scoped list with stricter view/audit rules      | Opaque keys under `MEDIA_PRIVATE_FOLDER`     | Personal/sensitive documents and high-privacy material     |
 
-Supabase/MinIO/AWS storage UIs may remain useful for trusted raw storage inspection, but the Nebula admin panel should use media-service route families, not raw storage APIs.
+Provider storage UIs may remain useful for trusted raw storage inspection, but the Nebula admin panel should use media-service route families, not raw storage APIs.
 
 ## Public Library Folders And Deletes
 
@@ -426,6 +447,18 @@ Routes:
 - `POST /media/my/protected-library/:id/read-url`
 
 Notes:
+
+- All public/protected/strict presign responses return `uploadUrl` plus required
+  `uploadHeaders` (Content-Type and signed opaque upload-binding metadata).
+  Clients send those headers unchanged on PUT before finalize. Bind metadata is
+  signed as a header for S3-compatible providers; missing/tampered binding is
+  denied. The unknown-body signer avoids an incorrect empty-file checksum;
+  processing/internal clients retain normal checksums, ETag and SHA256 checks.
+  Deploy Media, Gateway and upload consumers together. The
+  [SeaweedFS transition](../reports/2026-10-28-seaweedfs-transition.md) has native
+  S3/restart, object-preserving cutover, processing/derivative/metadata/recovery,
+  browser-style upload CORS and Product/Gateway acceptance. Hosted snapshot
+  acceptance and a fresh release-security scan remain separate gates.
 
 - Readiness checks DB, S3-compatible storage, and the S2S replay store;
   liveness is dependency-free.
@@ -685,19 +718,28 @@ Tests:
 - Strict durable audit storage is not implemented yet; current strict wrappers only emit service logs.
 - Strict app-level encryption is not implemented yet; current privacy layer is opaque keys, safe DB filenames, no original filename storage, and short read TTLs.
 - Focused protected/strict HTTP and gRPC e2e validation passes against Docker after applying the media context migration.
-- Supabase integration needs provider config and operational tests.
+- The Supabase CLI scaffold is retired. Seaweed supply, the 302-object cutover and native Media acceptance are complete; maintenance/B0 evidence remains in current-focus.
 - Move/copy/rename/edit filemanager actions are future work.
-- The scan/promotion worker foundation is locally implemented; rebuilt-image,
-  real ClamAV and restart proof remain pending. Generated image tools follow it.
+- Scan/promotion, real ClamAV, saved cropped sizes, watermarking, metadata and
+  restart recovery have native evidence. Cloud/CDN and tenant implementation
+  remain deferred; storage adapters remain compatibility scope.
 
 ## Latest Verification
+
+Nov 2: Salar reports Media test:e2e, derivatives, metadata, recovery, ready-Media
+Product references and F3 live all pass on active SeaweedFS. Agent confirms
+post-recovery health and provider selection. Counts/skip totals were not supplied;
+the two opt-in DB suites retain their separately accepted Oct 31 evidence. The
+eight-owner type gate (125 files) and focused Media recheck (21 files) pass.
+Older dated counts below are historical, not current suite totals. No new
+full-service lint pass is inferred from feature execution.
 
 - `pnpm --filter @nebula/media-service build` passes as of 2026-08-11.
 - The focused gateway-contract and existing access-policy unit suites pass 21 tests as of 2026-08-11; media-service type-check and focused lint also pass.
 - `pnpm --filter @nebula/media-service test:unit` passes with 13 tests as of 2026-07-15, including explicit public-render denial for `PROTECTED` and `STRICT` media.
 - `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/http/media.http.e2e.spec.ts --runInBand` passes with 20 tests as of 2026-07-01 when `DATABASE_URL` points at Docker Postgres on `127.0.0.1:15432`.
-- The HTTP e2e suite now includes a strict-media public-render denial assertion; its updated live run is queued for the later Docker-backed verification step.
-- `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand` last passed its prior 9-test form on 2026-07-01. The suite now contains 11 scenarios; the two additive F3 scenarios are compiled but await the later service-stack run.
+- The HTTP e2e suite now includes a strict-media public-render denial assertion; the current native suite passes as reported Nov 2.
+- `pnpm --filter @nebula/media-service test:e2e -- --runTestsByPath test/grpc/media.e2e.spec.ts --runInBand` last passed its prior 9-test form on 2026-07-01. The suite now contains 11 scenarios; the current suite passes as reported Nov 2; those older counts are not current.
 - `pnpm --filter @nebula/media-service lint` is intentionally left for the later `lint:fix` cleanup pass and currently fails on Prettier formatting in modified media files.
 
 ## Descriptive metadata (Batch C deployment checkpoint)

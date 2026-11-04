@@ -26,14 +26,14 @@ x-common-service-env: &common-service-env
 
 services:
   postgres:
-    image: postgres:17
+    image: nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-nebula}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata18:/var/lib/postgresql
       - ./scripts/db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
     healthcheck:
       test:
@@ -46,7 +46,7 @@ services:
       retries: 10
 
   tenant-authority-db-init:
-    image: postgres:17
+    image: nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,7 +60,7 @@ services:
     entrypoint: ["bash", "/scripts/ensure-tenant-authority-db.sh"]
 
   realm-auth-db-init:
-    image: postgres:17
+    image: nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,7 +75,7 @@ services:
     entrypoint: ["bash", "/scripts/ensure-realm-auth-dbs.sh"]
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.12-bookworm@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5
     restart: unless-stopped
     command:
       [
@@ -92,7 +92,7 @@ services:
       retries: 10
 
   realm-auth-default-redis:
-    image: redis:7-alpine
+    image: redis:7.4.12-bookworm@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5
     restart: unless-stopped
     command:
       [
@@ -110,7 +110,7 @@ services:
 
   realm-auth-operator-redis:
     profiles: ["r3-shadow"]
-    image: redis:7-alpine
+    image: redis:7.4.12-bookworm@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5
     restart: unless-stopped
     command:
       [
@@ -385,7 +385,7 @@ services:
       SHADOW_DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres?schema=nebula_order_shadow"
 
   media-scanner:
-    image: ${MEDIA_SCANNER_IMAGE:-clamav/clamav:1.4@sha256:57deb108fc4c72778aa83eafbca7bb7153e28c3f57c005afd38d31f16da86f23}
+    image: ${MEDIA_SCANNER_IMAGE:-clamav/clamav:1.4.6@sha256:8ad6197396974726c35d017e50aaaaf4b91745726a04faec8480c203edd98052}
     restart: unless-stopped
     mem_limit: 4g
     cpus: 1.0
@@ -492,6 +492,6 @@ services:
       retries: 5
 
 volumes:
-  pgdata:
+  pgdata18:
   minio-data:
   media-scanner-data:

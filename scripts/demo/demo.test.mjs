@@ -366,6 +366,48 @@ test("Gateway mutation retries keep their idempotency key and renew request time
   }
 });
 
+test("demo upload forwards required signed headers and refuses their omission", async () => {
+  const originalFetch = globalThis.fetch;
+  const uploads = [];
+  let api;
+  globalThis.fetch = async (url, init) => {
+    if (url.endsWith("/auth/login"))
+      return new Response(
+        JSON.stringify({ data: { accessToken: "test-token" } }),
+        {
+          status: 200,
+          headers: { "Set-Cookie": "demo_session=test; HttpOnly" },
+        },
+      );
+    if (init.method === "PUT") uploads.push(init);
+    return new Response(JSON.stringify({ data: { success: true } }), {
+      status: 200,
+    });
+  };
+  try {
+    api = await connectGateway({});
+    const headers = {
+      "content-type": "image/png",
+      "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+    };
+    const body = Buffer.from("fixture-upload");
+    await assert.rejects(
+      api.upload("http://localhost/upload", body),
+      /demo_upload_headers_missing/u,
+    );
+    await api.upload("http://localhost/upload", body, headers);
+    assert.equal(uploads.length, 1);
+    assert.deepEqual(uploads[0].headers, headers);
+    assert.equal(uploads[0].body, body);
+  } finally {
+    try {
+      if (api) await api.close();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+});
+
 test("PNG generation preserves the original default and supports landscape fixtures without invalid sizes", () => {
   assert.deepEqual(demoPng(1), demoPng(1, { width: 64, height: 64 }));
   const png = demoPng(1, { width: 640, height: 480 });
@@ -542,6 +584,10 @@ function harness(profile = "showcase") {
         return {
           ...input.body,
           uploadUrl: "http://localhost/upload",
+          uploadHeaders: {
+            "content-type": "image/png",
+            "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+          },
           storage: "s3",
           bucket: "test",
           path: "test",
@@ -693,7 +739,12 @@ function harness(profile = "showcase") {
           }
         : { ok: false, status: 404 };
     },
-    async upload() {},
+    async upload(_url, _bytes, headers) {
+      assert.deepEqual(headers, {
+        "content-type": "image/png",
+        "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+      });
+    },
     async render(id, view) {
       if (view !== "web") return Buffer.from(view);
       const item = plan.media.find((definition) =>

@@ -1,11 +1,115 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import {
+  createMediaCompose,
+  mediaRecoveryClient,
   readAfterMediaRestart,
   runMediaRecovery,
   waitForApprovedDeliveryAfterRestart,
 } from "./media-processing-recovery.mjs";
+
+test("serialized Media recovery client uses the migrated image's compiled owner adapter", () => {
+  const calls = [];
+  const options = { adapter: { owned: true } };
+  class Driver {
+    constructor(actual) {
+      this.options = actual;
+    }
+  }
+  const load = (name) => {
+    calls.push(name);
+    if (name === "./package.json")
+      return { dependencies: { "@prisma/adapter-pg": "7.10.1" } };
+    if (name === "./dist/generated/prisma/client")
+      return { PrismaClient: Driver };
+    if (name === "./dist/prisma-options")
+      return { mediaPrismaOptions: () => options };
+    throw new Error("unexpected_module");
+  };
+  const client = runInNewContext(`(${mediaRecoveryClient.toString()})(load)`, {
+    load,
+  });
+  assert.equal(client.options, options);
+  assert.deepEqual(calls, [
+    "./package.json",
+    "./dist/generated/prisma/client",
+    "./dist/prisma-options",
+  ]);
+});
+
+test("serialized Media recovery client retains the existing legacy image contract", () => {
+  const calls = [];
+  class Driver {
+    constructor(...args) {
+      this.args = args;
+    }
+  }
+  const load = (name) => {
+    calls.push(name);
+    if (name === "./package.json")
+      return { dependencies: { "@prisma/client": "6.16.2" } };
+    if (name === "./prisma/generated") return { PrismaClient: Driver };
+    throw new Error("unexpected_module");
+  };
+  const client = runInNewContext(`(${mediaRecoveryClient.toString()})(load)`, {
+    load,
+  });
+  assert.deepEqual(client.args, []);
+  assert.deepEqual(calls, ["./package.json", "./prisma/generated"]);
+});
+
+test("a migrated Media image cannot substitute a stale legacy client for missing compiled output", () => {
+  const missing = new Error("compiled_client_missing");
+  const calls = [];
+  const load = (name) => {
+    calls.push(name);
+    if (name === "./package.json")
+      return { dependencies: { "@prisma/adapter-pg": "7.10.1" } };
+    if (name === "./dist/generated/prisma/client") throw missing;
+    if (name === "./prisma/generated") return { PrismaClient: class Legacy {} };
+    throw new Error("unexpected_module");
+  };
+  assert.throws(
+    () => mediaRecoveryClient(load),
+    (error) => error === missing,
+  );
+  assert.deepEqual(calls, ["./package.json", "./dist/generated/prisma/client"]);
+});
+
+test("Media recovery inherits the active Compose selection instead of forcing MinIO", () => {
+  const args = [
+    "up",
+    "-d",
+    "--no-build",
+    "--wait",
+    "--no-deps",
+    "media-service",
+  ];
+  const run = createMediaCompose({
+    directory: "owned-fixture-root",
+    execute(_docker, actual, options) {
+      assert.deepEqual(actual, [
+        "compose",
+        "--project-directory",
+        "owned-fixture-root",
+        ...args,
+      ]);
+      assert.ok(!actual.includes("--file") && !actual.includes("-f"));
+      assert.equal(options.cwd, "owned-fixture-root");
+      assert.equal(options.input, "owned-input");
+      assert.equal(options.timeout, 240000);
+      assert.equal(
+        Object.hasOwn(options, "env"),
+        false,
+        "inherit explicit caller env and default root selection",
+      );
+      return "owned-output";
+    },
+  });
+  assert.equal(run(args, "owned-input"), "owned-output");
+});
 
 function harness({ stopFailure = false, restoreFailure = false } = {}) {
   const calls = [];

@@ -141,3 +141,72 @@ confirm readiness, then run native Order and Gateway payment/admin-read proofs.
 Those runtime commands/results remain pending, not inferred from local mocks.
 Readiness: READY FOR NAMED SCOPED DEPLOYMENT/IMAGE PROOF; actual native/live pending.
 ```
+
+## Resumed deployment receipt - 2026-10-28
+
+This checkpoint supersedes the older build command block above. No app,
+protocol, generated contract, fixture or database migration source changed during
+the build-cleanup interruption (`git diff HEAD -- apps packages docker
+docker-compose.yml docker-bake.hcl` is empty). Preserve the passing owner SQL,
+focused/preflight and Oct 27 eight-owner/125-file no-emit test-type evidence;
+the temporary watch comments are removed. No blind repeat of those proofs.
+
+Current runtime inspection: the seven backend dependencies used by the
+Order/Gateway pilot and PostgreSQL/Redis/MinIO/scanner are healthy. Order and
+Gateway containers are stopped after the native pilot; Realm Auth and Authority
+are also stopped. Do not advertise full-backend health or invoke its aggregate
+check as this pilot's readiness test.
+
+Existing local tags already contain the D2 additions:
+
+| Target  | Inspected image ID                                                 | Targeted artifact evidence                                                    |
+| ------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Product | `c1f38df0194664cbf8033c6f0a3031241875bdd6d0f3d3e4066d0dc27a44917f` | Running image matches current tag; `RestoreCheckoutStock` binding present.    |
+| Order   | `8b0a36ce270ddb26ff802c37e2b0897a75fe02d2f30df20c4b2b7b9f1e71738a` | Both demo RPC bindings and status/cancellation/payment owner modules present. |
+| Gateway | `45af127fe6b6058b9434bfcf6cbfc7685390e8fe7f71444feef9f4a933c7c027` | Both demo routes and both admin read bindings present.                        |
+
+The four relevant migration files inside these images match current source
+SHA-256 bytes: Product finalized restoration, Order status controls, Order
+cancellation and demo attempts. Order/Gateway artifact probes used ephemeral,
+read-only, network-disabled containers with Node reading files only; no app
+bootstrap or live feature result is inferred. The old stopped containers are
+not the new tagged-image deployment. No image rebuild is justified here.
+
+`pnpm db:status:order` passes: all eleven migrations applied. Product status
+identified exactly one pending migration, `20261019000100_finalized_stock_restoration`.
+After reviewing its additive table/FK SQL and preserving its existing passing
+SQL proof, the agent ran `pnpm db:migrate:product`: success. Subsequent
+`pnpm db:status:product` passes with all twelve migrations applied. No seed/reset
+or migration source edit. The existing Prisma configuration deprecation warning
+remains visible; no dependency upgrade is part of this work.
+
+Handoff receipt: unchanged app/contract consumers retain the exact trace and
+focused/preflight/type checks above and in the watch report. Scoped docs format
+and `git diff --check` pass. Runtime image probes are not business-flow evidence.
+Ready for Salar's scoped container deployment and admin-read/status/payment live
+proofs, run sequentially and stop on error:
+
+```powershell
+docker compose up -d --no-build --wait --no-deps order-service gateway
+pnpm test:d2:orders:live
+pnpm test:d2:payment:live
+```
+
+Expected: both containers healthy, admin-read/role/version/replay checks, and
+customer-start/admin-outcome payment policy with stock release/retry/unknown/
+success assertions and owned cleanup. The drivers refuse a nonempty existing
+demo customer Cart; do not erase it to obtain a pass. They retain Order history
+and delete only their owned catalogue fixtures. These actual runs remain pending.
+Payment-attempt cancellation does not certify explicit Order cancellation;
+that distinct live effect and remaining Batch 3/4 gates stay open. The local
+tooling changes remain uncommitted and have no new hosted CI acceptance.
+
+## Operator deployment/payment result - 2026-10-28
+
+Salar reports every command in the resumed block completed without errors:
+scoped container startup, admin Orders/status live and demo payment live.
+Exact stdout/counts were not supplied. Agent inspection confirms Product,
+Order and Gateway running/healthy. Those feature-specific Gateway proofs are
+now operator-reported passed; do not repeat without relevant changes. Explicit
+Order cancellation remains a distinct pending proof, tracked in the
+[final cancellation live slice](2026-10-28-d2-order-cancellation-live.md).

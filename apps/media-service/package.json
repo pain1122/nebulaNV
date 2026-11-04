@@ -26,9 +26,6 @@
     "test:e2e": "jest --config ./jest.config.ts --runInBand",
     "postinstall": "pnpm run prisma:gen"
   },
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
-  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",
     "@aws-sdk/s3-request-presigner": "^3.1106.0",
@@ -43,16 +40,18 @@
     "@nestjs/platform-express": "11.2.5",
     "@nestjs/throttler": "^6.4.0",
     "@packages/config": "workspace:*",
-    "@prisma/client": "6.16.2",
+    "@prisma/client": "7.10.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "express": "^5.2.1",
-    "joi": "18.2.6",
+    "joi": "18.3.1",
     "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sharp": "0.35.5",
-    "throttler": "^0.0.1"
+    "throttler": "^0.0.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
@@ -63,11 +62,12 @@
     "@types/node": "^24.5.2",
     "jest": "^30.2.0",
     "prettier": "^3.6.2",
-    "prisma": "6.16.2",
+    "prisma": "7.10.1",
     "ts-jest": "^29.4.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.2",
-    "wait-port": "^1.1.0"
+    "wait-port": "^1.1.0",
+    "dotenv": "17.2.3"
   }
 }

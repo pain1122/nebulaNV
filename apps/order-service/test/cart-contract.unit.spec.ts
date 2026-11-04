@@ -1,6 +1,6 @@
 import { orderv1, productv1 } from "@nebula/protos";
 import * as protoLoader from "@grpc/proto-loader";
-import { Prisma } from "../prisma/generated/client";
+import { Prisma } from "../src/generated/prisma/client";
 import {
   cartMoney,
   cartQuantity,

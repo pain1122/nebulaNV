@@ -7,7 +7,7 @@ import {
   ProductStatus,
   ProductSelectionMode,
   type Product,
-} from "../prisma/generated";
+} from "../src/generated/prisma/client";
 import { ProductServiceImpl } from "../src/product/product.service";
 
 const CATEGORY_ID = "11111111-1111-4111-8111-111111111111";

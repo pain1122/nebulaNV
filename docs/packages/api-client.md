@@ -13,8 +13,9 @@ declaration; rebuilt runtime proof remains separate.
 For checkout, continue supplying idempotencyKey in the client's request options
 and repeat the exact body on retry. The SDK already emits the required header;
 it is not a new body field. The replay slice propagates that header to Order's
-durable receipt. New-image integration remains pending, and no stock/recovery
-guarantee is implied by the unchanged external type declaration.
+durable receipt. D2 Batches 0-4 have accepted runtime evidence in the
+[D2 exit ledger](../reports/2026-10-28-d2-exit-proof.md); the type declaration
+alone is not the basis for stock/recovery guarantees.
 
 ## Ownership
 
@@ -32,7 +33,8 @@ Regeneration requires an admin access token and idempotency key.
 `media_render` accepts web/thumbnail/card/detail/mobile; image recipes are
 admin requests, never public render query parameters. Run
 `pnpm test:media:derivatives:live` after deploying the Media migration and
-updated Media/Gateway images. Runtime evidence remains pending.
+updated Media/Gateway images. Current runtime evidence is accepted in the Nov 2
+SeaweedFS transition; original checkpoint instructions remain historical.
 
 Change gateway controllers, DTOs, or manifest metadata first, regenerate the
 OpenAPI artifact, and then regenerate this client. Never hand-edit generated
@@ -53,6 +55,31 @@ There are no Auth, Product, Taxonomy, Media, gRPC, database, Redis, or MinIO
 control-plane URL settings. Browser/mobile consumers configure only the
 gateway API base. A client may follow a presigned storage or CDN URL returned
 by a successful gateway response.
+
+Media presign responses include required `uploadHeaders`. Upload bytes directly
+to `uploadUrl`, forwarding that map unchanged, then finalize using the returned
+storage metadata. Example:
+
+```ts
+await fetch(presign.uploadUrl, {
+  method: "PUT",
+  headers: presign.uploadHeaders,
+  body: fileBytes,
+});
+```
+
+The map includes Content-Type and an opaque signed upload-binding header.
+
+Nov 2: native Media acceptance on active SeaweedFS passes Gateway-issued signed
+headers, allowed/denied browser-style preflight, Origin-bearing upload, processing,
+saved cropped sizes/watermarks, metadata, restart recovery and Product references;
+F3 also passes. Browser-origin checks use Node HTTP assertions, not a rendered
+admin UI. See the [transition ledger](../reports/2026-10-28-seaweedfs-transition.md).
+Omitting/changing the binding fails storage signature validation. Do not forward
+Gateway Bearer/session credentials to storage. This is a required client behavior
+change; update upload callers with the matching Media/Gateway deployment. Browser
+storage CORS must permit the returned headers for the configured application
+origins. SDK Gateway request-header restrictions below remain unchanged.
 
 The client does not accept arbitrary headers. It derives the exact route,
 method, public-client header, path/query/body encoding, Bearer requirement,
@@ -149,7 +176,21 @@ Order version for each new command and preserve the original body/key for replay
 
 Browser and React Native compiler fixtures cover nested demo responses. The
 focused client check covers actual path, key/header and body forwarding.
-`pnpm test:d2:payment:live` is prepared for the grouped deployment; it uses the
-existing owned Checkout fixture and retains Order history. Its local harness
+`pnpm test:d2:payment:live` passed after the Oct 28 deployment (operator-reported).
+It uses the existing owned Checkout fixture and retains Order history. Its local harness
 checks do not certify running services. See the
 [transport receipt](../reports/2026-10-24-d2-demo-payment-transports.md).
+
+`pnpm test:d2:cancellation:live` separately checks explicit unpaid Order
+cancellation via the existing admin status operation: version/role denial,
+base/variant restoration exactly once, unchanged unmanaged stock, key replay,
+terminal conflicts and immutable original Checkout response. It reuses the
+same owned fixture and leaves existing demo Cart work untouched; no server
+rebuild is required. Preparation and actual live status are recorded in the
+[cancellation receipt](../reports/2026-10-28-d2-order-cancellation-live.md).
+
+Root `demo:d2:plan/seed/verify/reset` commands use the same generated operations
+for the reusable commerce showcase. They add no SDK operations or direct SQL.
+The dedicated customer application/session and mutation journal preserve role
+boundaries and original keys; the limits profile is separate and opt-in.
+[Demo workflow](../architecture/d2-demo-workflow.md).

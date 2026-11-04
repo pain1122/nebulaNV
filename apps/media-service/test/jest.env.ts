@@ -20,10 +20,10 @@ process.env.SVC_NAME ||= "gateway";
 // IMPORTANT: S2S secret used by mdS2S() in gRPC tests
 process.env.S2S_TEST_GATEWAY_KEY ||= "dev-only-gateway-to-media-s2s-key-0001";
 
-// Storage (Supabase Storage S3 gateway)
+// Configured app env takes precedence; local S3 fallback is SeaweedFS.
 process.env.MEDIA_STORAGE_DRIVER ||= "s3";
-process.env.MEDIA_S3_ENDPOINT ||= "http://127.0.0.1:54321/storage/v1/s3";
-process.env.MEDIA_S3_REGION ||= "local";
+process.env.MEDIA_S3_ENDPOINT ||= "http://127.0.0.1:19000";
+process.env.MEDIA_S3_REGION ||= "us-east-1";
 process.env.MEDIA_S3_BUCKET ||= "media";
 
 // If you already set these in apps/media-service/.env you can omit here.

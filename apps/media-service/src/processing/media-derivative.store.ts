@@ -6,7 +6,10 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { Prisma, type MediaDerivativeGeneration } from "../../prisma/generated";
+import {
+  Prisma,
+  type MediaDerivativeGeneration,
+} from "../generated/prisma/client";
 import { PrismaService } from "../prisma.service";
 import {
   assertImageWatermarkContext,

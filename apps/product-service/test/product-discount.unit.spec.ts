@@ -7,7 +7,7 @@ import {
   ProductStatus,
   ProductSelectionMode,
   type Product,
-} from "../prisma/generated";
+} from "../src/generated/prisma/client";
 import { DiscountTypeDto } from "../src/product/dto/product-input.dto";
 import { ProductServiceImpl } from "../src/product/product.service";
 import { productv1 } from "@nebula/protos";

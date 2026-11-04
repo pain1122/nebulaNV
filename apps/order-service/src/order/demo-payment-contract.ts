@@ -10,7 +10,7 @@ import type {
   DemoPaymentAttempt,
   DemoPaymentCommand,
   Prisma,
-} from "../../prisma/generated/client";
+} from "../generated/prisma/client";
 import { adminOrderId } from "./order-admin-read";
 import { cartQuote, checkCartStock, type CartProduct } from "./cart-contract";
 import { orderReply, stableFacts, type StoredOrder } from "./checkout-contract";

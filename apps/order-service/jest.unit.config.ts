@@ -5,6 +5,7 @@ const config: Config = {
   testEnvironment: "node",
   roots: ["<rootDir>/test"],
   testMatch: [
+    "<rootDir>/test/prisma-options.unit.spec.ts",
     "<rootDir>/test/demo-payment.unit.spec.ts",
     "<rootDir>/test/order-cancellation.unit.spec.ts",
     "<rootDir>/test/order-status.unit.spec.ts",

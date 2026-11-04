@@ -259,6 +259,10 @@ describe("GatewayMediaApiService", () => {
         storage: "s3",
         path: "public/library/file.jpg",
         uploadUrl: "http://storage/upload",
+        uploadHeaders: {
+          "content-type": "image/jpeg",
+          "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+        },
         expiresIn: 300,
         filename: "file.jpg",
         mimeType: "image/jpeg",
@@ -267,7 +271,7 @@ describe("GatewayMediaApiService", () => {
       });
     });
     const { service } = harness({ PresignPublicLibraryUpload: presign });
-    await service.presign(gatewayRequest(), "public", {
+    const result = await service.presign(gatewayRequest(), "public", {
       filename: "file.jpg",
       mimeType: "image/jpeg",
     });
@@ -275,7 +279,51 @@ describe("GatewayMediaApiService", () => {
       accessClass: "",
       visibility: "",
     });
+    expect(result.uploadHeaders).toEqual({
+      "content-type": "image/jpeg",
+      "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+    });
   });
+
+  it.each([
+    undefined,
+    {},
+    {
+      "content-type": "wrong/type",
+      "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+    },
+    {
+      "content-type": "image/png",
+      "x-amz-meta-nebula-upload-binding": "invalid",
+    },
+    {
+      "content-type": "image/png",
+      "x-amz-meta-nebula-upload-binding": "a".repeat(64),
+      authorization: "must-not-forward",
+    },
+  ])(
+    "rejects missing or unsafe upstream upload header contracts: %j",
+    async (uploadHeaders) => {
+      const { service } = harness({
+        PresignPublicLibraryUpload: jest.fn(() =>
+          of({
+            uploadUrl: "http://storage/upload",
+            expiresIn: 60,
+            mimeType: "image/png",
+            visibility: "public",
+            accessClass: "PUBLIC",
+            uploadHeaders,
+          }),
+        ),
+      });
+      await expect(
+        service.presign(gatewayRequest(), "public", {
+          filename: "file.png",
+          mimeType: "image/png",
+        }),
+      ).rejects.toMatchObject({ status: 502 });
+    },
+  );
 
   it("uses the Media default scope for public delete preview and confirm", async () => {
     const preview = jest.fn((_request: unknown, _metadata?: unknown) => {

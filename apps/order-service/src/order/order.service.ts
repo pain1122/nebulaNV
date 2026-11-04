@@ -24,7 +24,7 @@ import { status as grpcStatus } from "@grpc/grpc-js";
 import { firstValueFrom, timeout, TimeoutError, type Observable } from "rxjs";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma.service";
-import { Prisma, OrderStatus } from "../../prisma/generated/client";
+import { Prisma, OrderStatus } from "../generated/prisma/client";
 import { AddToCartDto, UpdateCartItemDto } from "./dto/order.dto";
 import { PRODUCT_SERVICE } from "../product-client.module";
 import { SETTINGS_SERVICE } from "../settings-client.module";

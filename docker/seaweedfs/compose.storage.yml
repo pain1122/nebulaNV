@@ -1,0 +1,43 @@
+# Opt-in M2 preparation. Merge after either root Compose file from the repo root.
+# Select only seaweed; Media remains on MinIO until the M5 cutover.
+services:
+  seaweed:
+    image: nebulanv-vendor-seaweedfs:4.51-gojose4.1.7
+    pull_policy: never
+    restart: unless-stopped
+    command:
+      - mini
+      - -dir=/data
+      - -ip=seaweed
+      - -ip.bind=0.0.0.0
+      - -s3.config=/run/secrets/seaweed-s3-config
+      - -s3.autoCreateBucket=false
+      - -s3.iam.readOnly=true
+      - -s3.allowedOrigins=${SEAWEED_CORS_ORIGINS:?prepare Seaweed settings first}
+      - -webdav=false
+      - -admin.ui=false
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -master.volumeSizeLimitMB=1024
+      - -volume.max=4
+    ports:
+      - "127.0.0.1:${SEAWEED_HOST_PORT:-19000}:8333"
+    volumes:
+      - seaweed-data:/data
+      - ./docker/seaweedfs/filer.toml:/etc/seaweedfs/filer.toml:ro
+    secrets:
+      - seaweed-s3-config
+    healthcheck:
+      test:
+        ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8333/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 15s
+
+volumes:
+  seaweed-data:
+
+secrets:
+  seaweed-s3-config:
+    file: ./.nebula-storage/seaweedfs/s3.json

@@ -3,7 +3,7 @@ import { orderv1 } from "@nebula/protos";
 import path from "node:path";
 import { status as grpcStatus } from "@grpc/grpc-js";
 import { Observable, throwError } from "rxjs";
-import { Prisma } from "../prisma/generated/client";
+import { Prisma } from "../src/generated/prisma/client";
 import { orderReply } from "../src/order/checkout-contract";
 import {
   PRODUCT_ID,

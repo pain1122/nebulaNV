@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { createRequire } from "node:module";
@@ -12,6 +13,9 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import process from "node:process";
+import { setTimeout } from "node:timers";
+import { URL } from "node:url";
 import test from "node:test";
 import { collectImageIdentities } from "./docker/record-image-identities.mjs";
 import { releaseArchiveImages } from "./docker/release-image-inventory.mjs";
@@ -46,7 +50,9 @@ import {
   missingExpectedDatabases,
   migrationVerificationServices,
   prismaServices,
+  prepareLocalDatabases,
   provisionBackend,
+  configuredMediaStorage,
   releaseImages,
   repositoryRoot,
   runBackendImageScans,
@@ -76,6 +82,10 @@ import {
   verifyTenantAuthorityRegistrationRecords,
   waitForExpectedDatabases,
 } from "./backend.mjs";
+
+const postgresImage = "nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10";
+const redisImage =
+  "redis:7.4.12-bookworm@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5";
 
 function source(relativePath) {
   return readFileSync(path.join(repositoryRoot, relativePath), "utf8");
@@ -176,15 +186,16 @@ function serviceDependencies(contents, serviceName) {
   );
 }
 
-function renderedBoundaryFixture(label) {
+function renderedBoundaryFixture(label, storage = "minio") {
+  const storagePort = storage === "seaweed" ? 8333 : 9000;
   const services = {
     postgres: { ports: label === "local" ? [{ target: 5432 }] : [] },
     redis: { ports: label === "local" ? [{ target: 6379 }] : [] },
-    minio: {
+    [storage]: {
       ports:
-        label === "local"
+        label === "local" && storage === "minio"
           ? [{ target: 9000 }, { target: 9001 }]
-          : [{ target: 9000 }],
+          : [{ target: storagePort }],
     },
   };
   for (const service of backendServices) {
@@ -241,7 +252,14 @@ function renderedBoundaryFixture(label) {
   services["media-scanner"] = {};
   services["media-service"].depends_on = {
     "media-scanner": { condition: "service_started" },
+    [storage]: { condition: "service_healthy" },
   };
+  Object.assign(services["media-service"].environment, {
+    MEDIA_STORAGE_DRIVER: "s3",
+    MEDIA_STORAGE_PROVIDER: storage === "seaweed" ? "s3" : "minio",
+    MEDIA_S3_INTERNAL_ENDPOINT: `http://${storage}:${storagePort}`,
+    MEDIA_S3_PUBLIC_ENDPOINT: `http://127.0.0.1:${storagePort}`,
+  });
   return { services };
 }
 
@@ -405,15 +423,107 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
   const databaseInit = source("scripts/db/init-multiple-dbs.sh");
   const rootExample = envValues(source(".env.example"));
   const releaseExample = envValues(source("deploy/.env.production.example"));
+  const nodeVersion = source(".node-version").trim();
+  const nodeMajor = Number(nodeVersion.split(".")[0]);
+  const workflow = source(".github/workflows/ci.yml");
+  assert.match(nodeVersion, /^\d+\.\d+\.\d+$/);
+  assert.equal(
+    JSON.parse(source("package.json")).engines.node,
+    `>=${nodeVersion} <${nodeMajor + 1}`,
+    "local/runtime Node selection and the declared compatible patch line must agree",
+  );
+  assert.equal(
+    [...workflow.matchAll(/node-version-file: \.node-version/g)].length,
+    [...workflow.matchAll(/uses: actions\/setup-node@/g)].length,
+    "every hosted Node job must use the same exact local selector",
+  );
+  assert.doesNotMatch(workflow, /\bnode-version:/);
+  assert.ok(
+    JSON.parse(source("turbo.json")).globalDependencies.includes(
+      "package.json",
+    ),
+    "a Node engine-policy change must invalidate cached workspace tasks",
+  );
+  const escapedNodeVersion = nodeVersion.replaceAll(".", "\\.");
+  assert.equal(
+    postgresImage,
+    "nebulanv-vendor-postgres:18.6-gosu1.20-go1.26.10",
+  );
+  const postgresRecipe = source("docker/postgres/security.Dockerfile");
+  assert.match(
+    postgresRecipe,
+    /FROM postgres:18\.6-trixie@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81 AS security-runtime/,
+  );
+  assert.match(
+    postgresRecipe,
+    /ADD --checksum=sha256:2b70da8a5480fafedc16bb1fc91b572f064d03df736cbd91a616af2f1b66ab51 https:\/\/codeload\.github\.com\/tianon\/gosu\/tar\.gz\/29b939aa5bd4dc588af765b8248f6e39150d2565/,
+  );
+  assert.match(postgresRecipe, /GOTOOLCHAIN=local CGO_ENABLED=0/);
+  assert.match(postgresRecipe, /ENV GOSU_VERSION=1\.20/);
+  assert.match(postgresRecipe, /go mod verify/);
+  assert.match(
+    postgresRecipe,
+    /ADD --checksum=sha256:5dd67fd1ccfd0287084ed60ce1b791c7094204e9a2158b765c2ec1b2b13d5adc https:\/\/raw\.githubusercontent\.com\/moby\/sys\/764f6927e9b8e5cf9c5b3c67efcd7875064ec481\/user\/user_test\.go/,
+  );
+  assert.match(postgresRecipe, /FROM helper-tests AS helper-build/);
+  assert.match(postgresRecipe, /cp -a "\$parser_module" \/tmp\/parser-tests/);
+  assert.equal(
+    postgresRecipe.match(
+      /cmp \/out\/provenance\/parser-inputs\.sha256 \/tmp\/parser-test-inputs\.sha256/g,
+    )?.length,
+    2,
+    "production module bytes must match before and after corrected fixture tests",
+  );
+  assert.match(
+    postgresRecipe,
+    /find \. -type f ! -path \.\/user_test\.go -exec sha256sum/,
+  );
+  assert.match(postgresRecipe, /go test -mod=readonly -count=1 -v \./);
+  assert.doesNotMatch(postgresRecipe, /go test[^\n]*(?:-skip|-run)/);
+  assert.match(postgresRecipe, /sha256sum -c \/tmp\/source-modules\.sha256/);
+  assert.match(postgresRecipe, /COPY --from=helper-build --chmod=0755/);
+  assert.doesNotMatch(postgresRecipe, /^\s*(ENTRYPOINT|CMD|VOLUME)\s/m);
+  assert.match(redisImage, /^redis:7\.4\.12-bookworm@sha256:[a-f0-9]{64}$/);
+  for (const compose of [localCompose, releaseCompose]) {
+    for (const name of [
+      "postgres",
+      "tenant-authority-db-init",
+      "realm-auth-db-init",
+    ]) {
+      assert.ok(
+        serviceBlock(compose, name).includes(`image: ${postgresImage}`),
+      );
+    }
+    for (const name of [
+      "redis",
+      "realm-auth-default-redis",
+      "realm-auth-operator-redis",
+    ]) {
+      assert.ok(serviceBlock(compose, name).includes(`image: ${redisImage}`));
+    }
+    assert.match(
+      serviceBlock(compose, "postgres"),
+      /pgdata18:\/var\/lib\/postgresql(?:\s|$)/,
+    );
+    assert.doesNotMatch(compose, /pgdata:\/var\/lib\/postgresql\/data/);
+  }
+  assert.ok(
+    source("scripts/backend.mjs").includes(JSON.stringify(redisImage)),
+    "the owned R3 Redis fixture must use the selected infrastructure image",
+  );
 
   assert.match(
     dockerfile,
-    /FROM node:22-bookworm@sha256:[a-f0-9]{64} AS build-base/,
+    new RegExp(
+      `FROM node:${escapedNodeVersion}-bookworm@sha256:[a-f0-9]{64} AS build-base`,
+    ),
     "the build base must use an immutable official-image index",
   );
   assert.match(
     dockerfile,
-    /FROM node:22-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base/,
+    new RegExp(
+      `FROM node:${escapedNodeVersion}-bookworm-slim@sha256:[a-f0-9]{64} AS runtime-base`,
+    ),
     "the runtime base must use an immutable official-image index",
   );
   const runtimeBase =
@@ -724,8 +834,8 @@ test("runtime ports, healthchecks, dependencies, and database initialization mat
     assert.doesNotMatch(defaultRealmAuth, /realm-auth-operator-redis/);
     assert.match(operatorRealmAuth, /realm-auth-operator-redis/);
     assert.doesNotMatch(operatorRealmAuth, /realm-auth-default-redis/);
-    assert.match(defaultRedis, /redis:7-alpine/);
-    assert.match(operatorRedis, /redis:7-alpine/);
+    assert.ok(defaultRedis.includes(`image: ${redisImage}`));
+    assert.ok(operatorRedis.includes(`image: ${redisImage}`));
     assert.match(operatorRedis, /profiles:\s*\["r3-shadow"\]/);
     assert.match(operatorRealmAuth, /profiles:\s*\["r3-shadow"\]/);
   }
@@ -824,6 +934,7 @@ test("root command names point at the consolidated backend tool", () => {
       deploy: manifest.scripts["prisma:migrate:deploy"],
       status: manifest.scripts["prisma:migrate:status"],
       seed: manifest.scripts["prisma:seed"],
+      prepare: manifest.scripts["db:prepare"],
       demoSeed: manifest.scripts["backend:seed"],
       push: manifest.scripts["db:push"],
       verifyMigrations: manifest.scripts["db:verify:migrations"],
@@ -861,6 +972,7 @@ test("root command names point at the consolidated backend tool", () => {
       deploy: "node ./scripts/backend.mjs prisma migrate-deploy",
       status: "node ./scripts/backend.mjs prisma migrate-status",
       seed: "node ./scripts/backend.mjs prisma seed",
+      prepare: "node ./scripts/backend.mjs database prepare",
       demoSeed: "node ./scripts/backend.mjs seed",
       push: "node ./scripts/backend.mjs prisma push",
       verifyMigrations: "node ./scripts/backend.mjs database verify-migrations",
@@ -965,7 +1077,9 @@ test("CI retains only allowlisted backend evidence for fourteen days", () => {
     ".ci-evidence/compose-local.yaml",
     ".ci-evidence/compose-release.yaml",
     ".security-reports/nebulanv-main-*.json",
+    ".security-reports/nebulanv-vendor-postgres-*.json",
     ".ci-evidence/backend-tested-images.json",
+    ".ci-evidence/seaweed-vendor.json",
     ".ci-evidence/compose-state.jsonl",
     ".ci-evidence/compose-logs.txt",
   ]);
@@ -1026,6 +1140,42 @@ test("CI caches preserve quality gates, bounded writers and isolated image scope
   assert.match(save.if, /turbo-budget\.outputs\.save == 'true'/);
   const indexOf = (job, name) =>
     job.steps.findIndex((step) => step.name === name);
+  const postgresBuild = live.steps.find(
+    (step) => step.name === "Build the pinned PostgreSQL and gosu vendor image",
+  );
+  assert.ok(
+    postgresBuild,
+    "fresh CI must supply its selected PostgreSQL image",
+  );
+  assert.match(postgresBuild.run, /--platform linux\/amd64/);
+  assert.ok(postgresBuild.run.includes(`--tag ${postgresImage}`));
+  assert.match(
+    postgresBuild.run,
+    /--file docker\/postgres\/security\.Dockerfile/,
+  );
+  assert.match(postgresBuild.run, /--load/);
+  assert.match(
+    postgresBuild.run,
+    /--cache-from type=gha,scope=nebula-postgres-v1/,
+  );
+  assert.match(postgresBuild.run, /NEBULA_CI_CACHE_WRITE/);
+  assert.ok(
+    indexOf(live, "Build the pinned PostgreSQL and gosu vendor image") <
+      indexOf(live, "Provision live integration services"),
+    "vendor image must be loaded before provisioning can use its tag",
+  );
+  const postgresScan = live.steps.find(
+    (step) =>
+      step.name === "Scan the PostgreSQL vendor image with the existing policy",
+  );
+  assert.ok(postgresScan?.run.includes("runBackendImageScans"));
+  assert.ok(postgresScan.run.includes(`defaultImage: '${postgresImage}'`));
+  assert.ok(
+    live.steps.indexOf(postgresScan) > live.steps.indexOf(postgresBuild) &&
+      live.steps.indexOf(postgresScan) <
+        indexOf(live, "Provision live integration services"),
+    "scan the supplied image before it can become the integration database",
+  );
   assert.ok(
     indexOf(quality, "Verify checks leave tracked files unchanged") <
       quality.steps.indexOf(save),
@@ -1041,25 +1191,74 @@ test("CI caches preserve quality gates, bounded writers and isolated image scope
   );
   assert.equal(
     live.env.COMPOSE_FILE,
-    "docker-compose.yml:.github/minio-offline.yml",
+    "docker-compose.yml:docker/seaweedfs/compose.storage.yml:docker/seaweedfs/compose.bootstrap.yml:.github/seaweed-runtime.yml",
+  );
+  assert.equal(
+    live.env.COMPOSE_ENV_FILES,
+    ".env,.nebula-storage/seaweedfs/.env",
   );
   const vendorCache = live.steps.find(
-    (step) => step.name === "Load checksum-pinned MinIO vendor cache",
+    (step) => step.name === "Load checksum-pinned Seaweed vendor cache",
   );
   assert.equal(vendorCache.shell, "bash");
   assert.equal(vendorCache.env.GH_TOKEN, "${{ github.token }}");
+  assert.match(vendorCache.run, /readSupplyManifest, validateSupplyManifest/);
   assert.match(
     vendorCache.run,
-    /gh release download vendor-minio-20250907 --repo pain1122\/nebulaNV/,
+    /execFileSync\('gh', \['release', 'download', vendor.releaseTag/,
   );
   assert.match(
     vendorCache.run,
-    /e1d3d52e52abddeec06867839e0b239e50ddd48e1ad49313a309ce6da9ce3a6b/,
+    /vendor\.archive, \.\.\.Object\.keys\(vendor\.evidenceSha256\)/,
+  );
+  assert.match(vendorCache.run, /seaweed-vendor-evidence\.mjs load-archive/);
+  const supplyHelper = source("scripts/storage/seaweed-vendor-evidence.mjs");
+  const verifyIndex = supplyHelper.indexOf(
+    "await verifyVendorArchive(path.resolve(process.argv[3]))",
+  );
+  const loadIndex = supplyHelper.indexOf(
+    '["image", "load", "--input", supply.archive]',
+  );
+  assert.ok(verifyIndex >= 0 && loadIndex > verifyIndex);
+  assert.match(supplyHelper, /vendor_archive_checksum_mismatch/);
+  assert.match(supplyHelper, /vendor_loaded_configuration_mismatch/);
+  assert.match(supplyHelper, /vendor_loaded_layers_mismatch/);
+  assert.ok(
+    indexOf(live, "Prepare private fresh-CI storage configuration") <
+      live.steps.indexOf(vendorCache),
   );
   assert.ok(
-    vendorCache.run.indexOf("hash.digest") < vendorCache.run.indexOf("'load'"),
+    live.steps.indexOf(vendorCache) <
+      indexOf(live, "Validate selected fresh storage topology"),
   );
-  assert.match(vendorCache.run, /minio_vendor_identity_mismatch/);
+  assert.ok(
+    indexOf(live, "Validate selected fresh storage topology") <
+      indexOf(live, "Provision live integration services"),
+  );
+  const storageRuntime = source(".github/seaweed-runtime.yml");
+  assert.match(storageRuntime, /minio: !reset null/);
+  assert.match(storageRuntime, /minio-init: !reset null/);
+  assert.match(storageRuntime, /minio-data: !reset null/);
+  assert.match(storageRuntime, /depends_on: !override/);
+  assert.match(
+    storageRuntime,
+    /env_file:\s+- \.\/\.nebula-storage\/seaweedfs\/media\.env/,
+  );
+  for (const field of [
+    "PUBLIC_ENDPOINT",
+    "REGION",
+    "BUCKET",
+    "ACCESS_KEY",
+    "SECRET_KEY",
+  ])
+    assert.ok(
+      storageRuntime.includes(`MEDIA_S3_${field}: !reset null`),
+      "selected store credentials must come from the scoped Media env file",
+    );
+  assert.match(
+    storageRuntime,
+    /seaweed-init:\s+condition: service_completed_successfully/,
+  );
   assert.ok(
     live.steps.indexOf(vendorCache) <
       indexOf(live, "Provision live integration services"),
@@ -1351,7 +1550,7 @@ test("dependency findings are classified before the backend runtime gate", () =>
         id: 2,
         module_name: "effect",
         severity: "high",
-        title: "tooling finding",
+        title: "unattributed finding",
         patched_versions: ">=3.20.0",
         findings: [{ version: "3.16.12" }],
       },
@@ -1381,11 +1580,136 @@ test("dependency findings are classified before the backend runtime gate", () =>
       findings.map((finding) => [finding.package, finding.classifications]),
     ),
     {
-      effect: ["backend-tooling"],
+      effect: ["unresolved"],
       protobufjs: ["backend-runtime"],
       next: ["deferred-web"],
     },
   );
+});
+
+test("dependency attribution retains observed Web paths and fails closed for mixed or unknown owners", () => {
+  const observed = [
+    ["ckeditor5", "47.3.0", "apps__web>ckeditor5"],
+    [
+      "@ckeditor/ckeditor5-engine",
+      "47.3.0",
+      "apps__web>ckeditor5>@ckeditor/ckeditor5-engine",
+    ],
+    [
+      "browserslist",
+      "4.28.1",
+      "apps__web>next>styled-jsx>@babel/core>@babel/helper-compilation-targets>browserslist",
+    ],
+  ];
+  for (const [name, version, auditPath] of observed) {
+    const audit = {
+      advisories: {
+        1: {
+          id: 1,
+          module_name: name,
+          severity: "high",
+          findings: [{ version, paths: [auditPath] }],
+        },
+      },
+    };
+    const [web] = classifyDependencyAdvisories(audit, new Map(), new Map());
+    assert.deepEqual(web.classifications, ["deferred-web"]);
+    assert.deepEqual(web.auditPaths, [auditPath]);
+    assert.deepEqual(
+      web.webPaths,
+      [],
+      "audit evidence survives an inventory miss",
+    );
+
+    const backend = new Map([[name, new Set([version])]]);
+    assert.deepEqual(
+      classifyDependencyAdvisories(audit, backend, new Map())[0]
+        .classifications,
+      ["backend-runtime", "deferred-web"],
+      "a Web importer never hides a shared backend-runtime package",
+    );
+
+    audit.advisories[1].findings.push({
+      version: "unknown-version",
+      paths: ["apps__other>dependency"],
+    });
+    assert.deepEqual(
+      classifyDependencyAdvisories(audit, new Map(), new Map())[0]
+        .classifications,
+      ["deferred-web", "unresolved"],
+      "a resolved Web version cannot hide another unresolved version",
+    );
+
+    audit.advisories[1].findings = [
+      { version, paths: [auditPath, "apps__website>dependency"] },
+    ];
+    assert.deepEqual(
+      classifyDependencyAdvisories(audit, new Map(), new Map())[0]
+        .classifications,
+      ["deferred-web", "unresolved"],
+      "a similar importer name is not Web, even within the same finding",
+    );
+  }
+});
+
+test("dependency report blocks unresolved attribution and permits evidenced unshipped Web only", () => {
+  const temporary = mkdtempSync(path.join(tmpdir(), "nebula-audit-scope-"));
+  try {
+    for (const paths of [
+      [],
+      [".>unknown"],
+      ["apps__web>unknown", "apps__other>unknown"],
+      ["apps__website>unknown"],
+      ["apps__web>unknown"],
+    ]) {
+      const audit = {
+        metadata: { vulnerabilities: { high: 1 } },
+        advisories: {
+          1: {
+            id: 1,
+            module_name: "unknown",
+            severity: "high",
+            findings: [{ version: "1.0.0", paths }],
+          },
+        },
+      };
+      const logs = [];
+      const run = () =>
+        generateBackendDependencyReport({
+          execute: (args) => ({
+            status: args[0] === "audit" ? 1 : 0,
+            stdout: JSON.stringify(args[0] === "audit" ? audit : []),
+          }),
+          services: [],
+          outputDirectory: temporary,
+          logger: { log: (message) => logs.push(message) },
+        });
+      const webOnly = paths.length === 1 && paths[0] === "apps__web>unknown";
+      if (webOnly) run();
+      else
+        assert.throws(run, /backend_dependency_gate_failed_1_high_or_critical/);
+      const report = JSON.parse(
+        readFileSync(path.join(temporary, "backend-dependencies.json"), "utf8"),
+      );
+      assert.equal(report.policy.blockUnresolved, true);
+      assert.equal(report.summary.backendRuntime, 0);
+      assert.equal(report.summary.backendTooling, 0);
+      assert.equal(report.summary.unresolved, webOnly ? 0 : 1);
+      assert.equal(logs.includes("[backend] dependency gate passed"), webOnly);
+    }
+    const [missingEvidence] = classifyDependencyAdvisories(
+      {
+        advisories: {
+          1: { id: 1, module_name: "unknown", severity: "critical" },
+        },
+      },
+      new Map(),
+      new Map(),
+    );
+    assert.deepEqual(missingEvidence.classifications, ["unresolved"]);
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });
 
 test("dependency report writes classifications and blocks runtime findings", () => {
@@ -1453,6 +1777,7 @@ test("dependency report writes classifications and blocks runtime findings", () 
       backendRuntime: 1,
       backendTooling: 0,
       deferredWeb: 1,
+      unresolved: 0,
     });
     assert.deepEqual(report.policy.approvedAdvisories, []);
     assert.deepEqual(
@@ -1543,6 +1868,8 @@ test("Trivy source scope excludes web, env, generated, and vendor inputs", () =>
     "source.json",
   ]);
   for (const excluded of [
+    ".nebula-storage",
+    ".ci-evidence",
     "apps/web",
     "**/node_modules",
     "**/dist",
@@ -1899,6 +2226,85 @@ test("rendered Compose boundary permits only the selected release data plane", (
   );
 });
 
+test("configured Media storage follows its endpoint and healthy dependency, not an alongside store", () => {
+  const local = renderedBoundaryFixture("local");
+  local.services.seaweed = { ports: [{ target: 8333 }] };
+  assert.deepEqual(configuredMediaStorage(local), {
+    service: "minio",
+    port: 9000,
+  });
+  for (const label of ["local", "release"]) {
+    const selected = renderedBoundaryFixture(label, "seaweed");
+    assert.deepEqual(configuredMediaStorage(JSON.stringify(selected)), {
+      service: "seaweed",
+      port: 8333,
+    });
+    assert.equal(validateRenderedComposeBoundary(label, selected), selected);
+    const media = selected.services["media-service"];
+    media.depends_on.minio = { condition: "service_healthy" };
+    assert.throws(
+      () => configuredMediaStorage(selected),
+      /mixed_dependencies_forbidden/,
+    );
+    delete media.depends_on.minio;
+    media.depends_on.seaweed.condition = "service_started";
+    assert.throws(
+      () => configuredMediaStorage(selected),
+      /dependency_health_required/,
+    );
+    media.depends_on.seaweed.condition = "service_healthy";
+    media.environment.MEDIA_STORAGE_PROVIDER = "minio";
+    assert.throws(
+      () => configuredMediaStorage(selected),
+      /seaweed_requires_s3_provider/,
+    );
+  }
+  const badEndpoint = renderedBoundaryFixture("local");
+  badEndpoint.services["media-service"].environment.MEDIA_S3_INTERNAL_ENDPOINT =
+    "http://private:do-not-print@seaweed:8333/path";
+  assert.throws(
+    () => configuredMediaStorage(badEndpoint),
+    (error) =>
+      error.message === "compose_storage_internal_endpoint_unsupported",
+  );
+});
+
+test("release storage boundary rejects management ports and unused store publications", () => {
+  for (const [extraName, extraPort, expected] of [
+    ["seaweed", 9333, /release_seaweed_ports_invalid/],
+    ["minio", 9000, /release_minio_ports_invalid/],
+  ]) {
+    const document = renderedBoundaryFixture("release", "seaweed");
+    if (extraName === "seaweed")
+      document.services.seaweed.ports.push({ target: extraPort });
+    else document.services.minio = { ports: [{ target: extraPort }] };
+    assert.throws(
+      () => validateRenderedComposeBoundary("release", document),
+      expected,
+    );
+  }
+});
+
+test("backend boot refuses an invalid storage plan before startup, migration or builds", async () => {
+  const invalid = renderedBoundaryFixture("local", "seaweed");
+  delete invalid.services["media-service"].depends_on.seaweed;
+  const events = [];
+  await assert.rejects(
+    provisionBackend({
+      ensureEnvironment() {},
+      executeDocker(_command, args) {
+        events.push(args);
+        return { status: 0, stdout: JSON.stringify(invalid) };
+      },
+      executePnpm() {
+        throw new Error("must_not_reach_builds_or_migrations");
+      },
+    }),
+    /dependency_health_required/,
+  );
+  assert.deepEqual(events, [["compose", "config", "--format", "json"]]);
+});
+
 test("failure evidence keeps bounded Compose diagnostics and redacts secrets", () => {
   const temporary = mkdtempSync(
     path.join(tmpdir(), "nebula-failure-evidence-"),
@@ -2185,83 +2591,108 @@ test("database readiness uses the inventory and waits for missing databases", as
 });
 
 test("backend boot reuses migration, seed, Bake, Compose, and readiness owners in order", async () => {
-  const events = [];
-  const allDatabases = prismaServices
-    .map((service) => service.database)
-    .join("\n");
+  for (const storage of ["minio", "seaweed"]) {
+    const events = [];
+    const allDatabases = prismaServices
+      .map((service) => service.database)
+      .join("\n");
 
-  await provisionBackend({
-    ensureEnvironment() {
-      events.push("environment");
-    },
-    executeDocker(command, args) {
-      if (args.includes("psql")) {
-        events.push("databases");
-        return { status: 0, stdout: `${allDatabases}\n` };
-      }
-      events.push(`docker:${args.join(" ")}`);
-      return { status: 0, stdout: "" };
-    },
-    executePnpm(args) {
-      if (args[0] === "run" && args[1] === "docker:build:backend") {
-        events.push("bake");
-      } else if (args.includes("deploy")) {
-        events.push(`deploy:${args[1]}`);
-      } else if (args.includes("status")) {
-        events.push(`status:${args[1]}`);
-      } else if (args.includes("db:seed")) {
-        events.push(`base-seed:${args[1]}`);
-      }
-      return { status: 0 };
-    },
-    async fetchImpl(url) {
-      const service = backendServices.find((entry) =>
-        String(url).includes(`:${entry.httpPort}/`),
+    await provisionBackend({
+      ensureEnvironment() {
+        events.push("environment");
+      },
+      executeDocker(command, args, options) {
+        if (args[1] === "config") {
+          events.push("storage-config");
+          assert.equal(options.capture, true);
+          assert.equal(options.emitCaptured, false);
+          return {
+            status: 0,
+            stdout: JSON.stringify(renderedBoundaryFixture("local", storage)),
+          };
+        }
+        if (args.includes("psql")) {
+          events.push("databases");
+          return { status: 0, stdout: `${allDatabases}\n` };
+        }
+        events.push(`docker:${args.join(" ")}`);
+        return { status: 0, stdout: "" };
+      },
+      executePnpm(args) {
+        if (args[0] === "run" && args[1] === "docker:build:backend") {
+          events.push("bake");
+        } else if (args.includes("deploy")) {
+          events.push(`deploy:${args[1]}`);
+        } else if (args.includes("status")) {
+          events.push(`status:${args[1]}`);
+        } else if (args.includes("db:seed")) {
+          events.push(`base-seed:${args[1]}`);
+        }
+        return { status: 0 };
+      },
+      async fetchImpl(url) {
+        const service = backendServices.find((entry) =>
+          String(url).includes(`:${entry.httpPort}/`),
+        );
+        assert.notEqual(service, undefined);
+        events.push(`health:${service.name}`);
+        return jsonResponse(200, { service: service.name, status: "ok" });
+      },
+      logger: { log() {} },
+      async seedDemo() {
+        events.push("demo-seed");
+      },
+    });
+
+    assert.deepEqual(events.slice(0, 5), [
+      "environment",
+      "storage-config",
+      `docker:compose up -d --wait --wait-timeout 120 postgres redis realm-auth-default-redis ${storage}`,
+      "docker:compose run -T --rm --no-deps tenant-authority-db-init",
+      "docker:compose run -T --rm --no-deps realm-auth-db-init",
+    ]);
+    assert.equal(events[5], "databases");
+    for (const initializer of [
+      "tenant-authority-db-init",
+      "realm-auth-db-init",
+    ]) {
+      const afterDdl = events.indexOf(
+        `docker:compose run -T --rm --no-deps --pull never ${initializer}`,
       );
-      assert.notEqual(service, undefined);
-      events.push(`health:${service.name}`);
-      return jsonResponse(200, { service: service.name, status: "ok" });
-    },
-    logger: { log() {} },
-    async seedDemo() {
-      events.push("demo-seed");
-    },
-  });
-
-  assert.deepEqual(events.slice(0, 4), [
-    "environment",
-    "docker:compose up -d --wait --wait-timeout 120 postgres redis realm-auth-default-redis minio",
-    "docker:compose run -T --rm --no-deps tenant-authority-db-init",
-    "docker:compose run -T --rm --no-deps realm-auth-db-init",
-  ]);
-  assert.equal(events[4], "databases");
-  assert.equal(
-    events.some((event) => event.includes("minio-init")),
-    false,
-  );
-  assert.deepEqual(
-    events.filter((event) => event.startsWith("deploy:")),
-    prismaServices.map((service) => `deploy:${service.packageName}`),
-  );
-  assert.deepEqual(
-    events.filter((event) => event.startsWith("status:")),
-    prismaServices.map((service) => `status:${service.packageName}`),
-  );
-  assert.deepEqual(
-    events.filter((event) => event.startsWith("base-seed:")),
-    prismaServices.map((service) => `base-seed:${service.packageName}`),
-  );
-  assert.equal(events.filter((event) => event === "bake").length, 1);
-  assert.equal(events.includes("docker:compose up -d --no-build"), true);
-  assert.equal(
-    events.some((event) => event.includes("--build")),
-    false,
-  );
-  assert.deepEqual(
-    events.filter((event) => event.startsWith("health:")),
-    composeServices.map((service) => `health:${service.name}`),
-  );
-  assert.equal(events.at(-1), "demo-seed");
+      assert.ok(
+        afterDdl >
+          events.indexOf(`base-seed:${prismaServices.at(-1).packageName}`),
+      );
+      assert.ok(afterDdl < events.indexOf("bake"));
+    }
+    assert.equal(
+      events.some((event) => event.includes("minio-init")),
+      false,
+    );
+    assert.deepEqual(
+      events.filter((event) => event.startsWith("deploy:")),
+      prismaServices.map((service) => `deploy:${service.packageName}`),
+    );
+    assert.deepEqual(
+      events.filter((event) => event.startsWith("status:")),
+      prismaServices.map((service) => `status:${service.packageName}`),
+    );
+    assert.deepEqual(
+      events.filter((event) => event.startsWith("base-seed:")),
+      prismaServices.map((service) => `base-seed:${service.packageName}`),
+    );
+    assert.equal(events.filter((event) => event === "bake").length, 1);
+    assert.equal(events.includes("docker:compose up -d --no-build"), true);
+    assert.equal(
+      events.some((event) => event.includes("--build")),
+      false,
+    );
+    assert.deepEqual(
+      events.filter((event) => event.startsWith("health:")),
+      composeServices.map((service) => `health:${service.name}`),
+    );
+    assert.equal(events.at(-1), "demo-seed");
+  }
 });
 
 test("backend health is read-only and backend down preserves named volumes", async () => {
@@ -2295,6 +2726,127 @@ test("backend health is read-only and backend down preserves named volumes", asy
   assert.deepEqual(dockerCalls[0].args, ["compose", "down"]);
   assert.equal(dockerCalls[0].args.includes("-v"), false);
   assert.match(logs.at(-1), /volumes were preserved/);
+});
+
+test("local database preparation pins every owner, preserves operation order and refuses production", () => {
+  const inherited = {
+    NODE_ENV: "development",
+    DATABASE_URL: "postgresql://wrong:wrong@remote.invalid/other",
+    KEEP_SETTING: "retained",
+  };
+  const calls = [];
+  const grants = [];
+  prepareLocalDatabases({
+    env: inherited,
+    logger: { log() {} },
+    executePnpm(args, options) {
+      calls.push({ args, env: options.env });
+      return { status: 0 };
+    },
+    executeDocker(command, args) {
+      assert.equal(calls.length, prismaServices.length * 3);
+      grants.push(args);
+      return { status: 0 };
+    },
+  });
+  assert.equal(calls.length, prismaServices.length * 3);
+  assert.deepEqual(grants, [
+    [
+      "compose",
+      "run",
+      "-T",
+      "--rm",
+      "--no-deps",
+      "--pull",
+      "never",
+      "tenant-authority-db-init",
+    ],
+    [
+      "compose",
+      "run",
+      "-T",
+      "--rm",
+      "--no-deps",
+      "--pull",
+      "never",
+      "realm-auth-db-init",
+    ],
+  ]);
+  let index = 0;
+  for (const operation of ["migrate-deploy", "migrate-status", "seed"]) {
+    for (const service of prismaServices) {
+      const call = calls[index++];
+      assert.deepEqual(call.args, buildPrismaArgs(operation, service));
+      assert.equal(call.env.KEEP_SETTING, "retained");
+      assert.equal(
+        call.env.DATABASE_URL,
+        `postgresql://postgres:postgres@127.0.0.1:15432/${service.database}?schema=public`,
+      );
+      assert.equal(
+        call.env.SHADOW_DATABASE_URL,
+        `postgresql://postgres:postgres@127.0.0.1:15432/postgres?schema=${service.database}_shadow`,
+      );
+    }
+  }
+  assert.equal(
+    inherited.DATABASE_URL,
+    "postgresql://wrong:wrong@remote.invalid/other",
+  );
+  assert.throws(
+    () =>
+      prepareLocalDatabases({
+        env: { NODE_ENV: "production" },
+        executePnpm() {
+          assert.fail("production must not invoke tools");
+        },
+        executeDocker() {
+          assert.fail("production must not alter grants");
+        },
+      }),
+    /local_database_preparation_refused_in_production/,
+  );
+  assert.throws(
+    () => prepareLocalDatabases({ env: {} }),
+    /pnpm_cli_unavailable_run_through_pnpm/,
+  );
+  let attempts = 0;
+  assert.throws(
+    () =>
+      prepareLocalDatabases({
+        env: {},
+        logger: { log() {} },
+        executePnpm() {
+          attempts++;
+          return { status: 9 };
+        },
+        executeDocker() {
+          assert.fail("failed migrations must not alter grants");
+        },
+      }),
+    /prisma_migrate-deploy_user-service_nebula_users_failed_exit_9/,
+  );
+  assert.equal(
+    attempts,
+    1,
+    "no later owner, status or seed runs after failure",
+  );
+  let grantAttempts = 0;
+  assert.throws(
+    () =>
+      prepareLocalDatabases({
+        env: {},
+        logger: { log() {} },
+        executePnpm() {
+          return { status: 0 };
+        },
+        executeDocker() {
+          grantAttempts++;
+          return { status: 5 };
+        },
+      }),
+    /post-migration-tenant-authority-db-init_failed_exit_5/,
+  );
+  assert.equal(grantAttempts, 1, "stop when post-migration grants fail");
 });
 
 test("Prisma actions run sequentially and stop at the first failure", () => {
@@ -3458,7 +4010,7 @@ test("backup writes one binary dump per maintenance database and a strict manife
     assert.equal(existsSync(path.join(target, entry.file)), true);
   }
 
-  const changed = structuredClone(manifest);
+  const changed = globalThis.structuredClone(manifest);
   changed.databases[0].database = "unexpected_database";
   assert.throws(
     () => validateBackupManifest(changed),
@@ -4049,14 +4601,19 @@ test("release archive covers both Compose image sets including scanner and custo
     /^\$\{MEDIA_SCANNER_IMAGE:-(.+)\}$/,
   )?.[1];
   assert.match(scanner, /^clamav\/clamav:.+@sha256:[a-f0-9]{64}$/);
+  assert.equal(
+    scanner,
+    "clamav/clamav:1.4.6@sha256:8ad6197396974726c35d017e50aaaaf4b91745726a04faec8480c203edd98052",
+    "the fallback must retain the scanned official engine/OS refresh",
+  );
   for (const custom of [false, true]) {
     const prefix = custom ? "example/nebula" : "nebulanv-main";
     const tag = custom ? "archive-proof" : "latest";
     const scanImage = custom ? "example/scanner:custom" : scanner;
     const expected = [
       ...releaseImages(prefix, tag),
-      "postgres:17",
-      "redis:7-alpine",
+      postgresImage,
+      redisImage,
       "minio/minio:latest",
       "minio/mc:latest",
       scanImage,
@@ -4067,11 +4624,11 @@ test("release archive covers both Compose image sets including scanner and custo
       envFile: "deploy/.env.production.example",
       env: { MEDIA_SCANNER_IMAGE: scanImage },
       execute(args, options) {
-        assert.deepEqual(args.slice(0, 3), [
-          "compose",
-          "--file",
-          "docker-compose.yml",
-        ]);
+        assert.equal(args[0], "compose");
+        assert.ok(
+          !args.includes("--file"),
+          "default selection belongs to Compose discovery",
+        );
         assert.deepEqual(args.slice(-4), [
           "--profile",
           "*",
@@ -4087,14 +4644,14 @@ test("release archive covers both Compose image sets including scanner and custo
         assert.equal(options.env.NEBULA_IMAGE_PREFIX, prefix);
         assert.equal(options.env.NEBULA_IMAGE_TAG, tag);
         assert.equal(options.env.MEDIA_SCANNER_IMAGE, scanImage);
-        return [...expected, "postgres:17", expected[0]].join("\r\n");
+        return [...expected, postgresImage, expected[0]].join("\r\n");
       },
     });
     assert.deepEqual(images, [...expected].sort());
     assert.equal(images.length, 16);
   }
   assert.throws(
-    () => releaseArchiveImages({ execute: () => "postgres:17\n" }),
+    () => releaseArchiveImages({ execute: () => `${postgresImage}\n` }),
     /missing backend image/,
   );
   assert.throws(
@@ -4114,6 +4671,106 @@ test("release archive covers both Compose image sets including scanner and custo
       }),
     /release_image_name_invalid/,
   );
+});
+
+test("release inventory honors selected alongside Compose files and includes vendor/init images", () => {
+  const files = [
+    "docker-compose.yml",
+    "docker/seaweedfs/compose.storage.yml",
+    "docker/seaweedfs/compose.bootstrap.yml",
+  ];
+  const images = releaseArchiveImages({
+    env: { COMPOSE_FILE: files.join(";"), COMPOSE_PATH_SEPARATOR: ";" },
+    execute(args) {
+      assert.deepEqual(args.slice(0, 7), [
+        "compose",
+        ...files.flatMap((file) => ["--file", file]),
+      ]);
+      assert.deepEqual(args.slice(-4), [
+        "--profile",
+        "*",
+        "config",
+        "--images",
+      ]);
+      return [
+        ...releaseImages(),
+        postgresImage,
+        redisImage,
+        "minio/minio:latest",
+        "minio/mc:latest",
+        "clamav/clamav:fixture",
+        "nebulanv-vendor-seaweedfs:4.51-gojose4.1.7",
+        releaseImages().find((image) => image.includes("-media-service:")),
+      ].join("\n");
+    },
+  });
+  assert.equal(images.length, 17);
+  assert.equal(
+    images.filter((image) => image.includes("-media-service:")).length,
+    1,
+  );
+  assert.ok(images.includes("nebulanv-vendor-seaweedfs:4.51-gojose4.1.7"));
+  assert.throws(
+    () =>
+      releaseArchiveImages({
+        composeFiles: [],
+        execute: () => assert.fail("invalid selection must not execute Docker"),
+      }),
+    /invalid Compose file selection/,
+  );
+});
+
+test("CI quality registers storage setup and vendor evidence regressions", () => {
+  const require = createRequire(import.meta.url);
+  const workflow = createRequire(require.resolve("eslint/package.json"))(
+    "js-yaml",
+  ).load(source(".github/workflows/ci.yml"));
+  assert.ok(
+    workflow.jobs.quality.steps.some(
+      (step) => step.run === "pnpm test:storage:setup",
+    ),
+  );
+  const script = JSON.parse(source("package.json")).scripts[
+    "test:storage:setup"
+  ];
+  assert.equal(
+    script,
+    "node --test ./scripts/storage/seaweed-vendor-evidence.test.mjs ./scripts/storage/seaweed-setup.test.mjs ./scripts/storage/seaweed-transfer.test.mjs",
+  );
+});
+
+test("selected Seaweed release inventory retains every backend and replaces only MinIO vendor images", () => {
+  const files = [
+    "docker-compose.yml",
+    "docker/seaweedfs/compose.storage.yml",
+    "docker/seaweedfs/compose.bootstrap.yml",
+    ".github/seaweed-runtime.yml",
+  ];
+  const expected = [
+    ...releaseImages(),
+    postgresImage,
+    redisImage,
+    "clamav/clamav:fixture",
+    "nebulanv-vendor-seaweedfs:4.51-gojose4.1.7",
+  ];
+  const actual = releaseArchiveImages({
+    composeFiles: files,
+    execute(args) {
+      assert.deepEqual(args.slice(0, 9), [
+        "compose",
+        ...files.flatMap((file) => ["--file", file]),
+      ]);
+      assert.deepEqual(args.slice(-4), [
+        "--profile",
+        "*",
+        "config",
+        "--images",
+      ]);
+      return [...expected, ...expected.slice(0, 1)].join("\n");
+    },
+  });
+  assert.deepEqual(actual, expected.sort());
+  assert.equal(actual.length, 15);
 });
 
 test("Product metadata populated proof injects rollback, reruns deploy and cleans its disposable database", () => {

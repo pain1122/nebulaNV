@@ -3,7 +3,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { orderv1 } from "@nebula/protos";
 import { ROLES_KEY, grpcS2SProtoLoaderOptions } from "@nebula/grpc-auth";
 import { loadSync, type ServiceDefinition } from "@grpc/proto-loader";
-import { Prisma } from "../prisma/generated/client";
+import { Prisma } from "../src/generated/prisma/client";
 import { OrderService } from "../src/order/order.service";
 import { AdminOrderController } from "../src/order/admin-order.controller";
 import { OrderGrpcController } from "../src/order/grpc/order-grpc.controller";

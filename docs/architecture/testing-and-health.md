@@ -139,7 +139,7 @@ so a failed earlier step cannot silently skip the cleanliness proof.
 
 F2 keeps the postponed `apps/web` prototype outside the backend gates. The
 existing root backend inventory is also the source for dependency selection and
-the ten image tags; do not maintain a second service or image list.
+the backend image tags; do not maintain a second service or image list.
 
 ```powershell
 pnpm scan:dependencies:backend
@@ -147,13 +147,21 @@ pnpm scan:source:backend
 pnpm scan:images:backend
 ```
 
-- `scan:dependencies:backend` runs the pnpm production audit, classifies every
-  high/critical package-version finding as backend runtime, backend tooling, or
-  deferred web, and fails for any backend-runtime finding. Optional Prisma CLI
-  peers are tooling and are not treated as application-reachable runtime
-  dependencies. The image scan remains filesystem-based: if pnpm retains those
+- `scan:dependencies:backend` runs the pnpm production audit and fails for any
+  high/critical backend-runtime or unresolved finding. Installed runtime inventory
+  establishes backend reachability; explicit `apps__web>` audit importer paths
+  also establish deferred Web ownership when installed Web inventory misses a
+  package. Shared backend/Web packages still block, and mixed Web/unknown paths
+  remain unresolved. Missing inventory matches never default to tooling. The
+  report retains the legacy `backendTooling` counter for compatibility; it does
+  not grant an exemption to unknown findings. Optional Prisma CLI peers are
+  excluded from application-runtime traversal, but audit findings lacking other
+  ownership evidence remain unresolved and blocking. The image scan remains
+  filesystem-based: if pnpm retains those
   package bytes in its shared virtual store, their findings are still visible
   and blocking until the bytes are patched or removed.
+  Deferred Web findings remain visible and require remediation under F7/D3
+  before the legacy Web app is reused or shipped; backend B0 does not ship Web.
 - `scan:source:backend` uses pinned Trivy to detect high/critical secrets and
   configuration defects. It excludes `apps/web`, materialized local env files,
   dependencies, generated/build output, coverage, and vendored frontend assets;
@@ -391,17 +399,17 @@ Cross-runtime contract owners:
 
 ## Dependency Notes
 
-| Service Tests            | Usually Need                                              |
-| ------------------------ | --------------------------------------------------------- |
-| auth-service             | user-service, Redis, Postgres                             |
-| tenant-authority-service | dedicated authority Postgres database only                |
-| user-service             | auth HTTP/gRPC, user-service HTTP/gRPC, Postgres          |
-| settings-service         | auth HTTP, settings HTTP/gRPC, Postgres                   |
-| taxonomy-service         | auth HTTP, settings HTTP/gRPC, taxonomy runtime, Postgres |
-| media-service            | auth HTTP/gRPC, media HTTP/gRPC, MinIO/S3, Postgres       |
-| product-service          | auth, settings, taxonomy, product runtime, Postgres       |
-| blog-service             | auth, settings, taxonomy, blog runtime, Postgres          |
-| order-service            | auth, settings, product, order runtime, Postgres          |
+| Service Tests            | Usually Need                                                   |
+| ------------------------ | -------------------------------------------------------------- |
+| auth-service             | user-service, Redis, Postgres                                  |
+| tenant-authority-service | dedicated authority Postgres database only                     |
+| user-service             | auth HTTP/gRPC, user-service HTTP/gRPC, Postgres               |
+| settings-service         | auth HTTP, settings HTTP/gRPC, Postgres                        |
+| taxonomy-service         | auth HTTP, settings HTTP/gRPC, taxonomy runtime, Postgres      |
+| media-service            | auth HTTP/gRPC, media HTTP/gRPC, selected Seaweed/S3, Postgres |
+| product-service          | auth, settings, taxonomy, product runtime, Postgres            |
+| blog-service             | auth, settings, taxonomy, blog runtime, Postgres               |
+| order-service            | auth, settings, product, order runtime, Postgres               |
 
 Exact setup files live under each service's `test/setup/wait-for-services.ts`.
 
@@ -543,4 +551,4 @@ For media-service changes, verify:
 - S3/MinIO object path behavior.
 - Public endpoint versus internal endpoint behavior.
 - Admin filemanager route behavior.
-- Future Supabase/AWS compatibility assumptions.
+- Future cloud-provider compatibility assumptions; the Supabase CLI scaffold is retired.

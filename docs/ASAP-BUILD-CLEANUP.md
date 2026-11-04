@@ -98,11 +98,13 @@ are preserved in the linked reports.
 
 <a id="4-separate-decisions-after-the-pilot"></a>
 
-## 4. Runtime configuration and development decisions - active
+## 4. Runtime configuration and development decisions - bounded work complete
 
-Salar authorized starting this segment on 2026-10-27. Its review/measurement
-steps are active; optional replacements still require verified benefit and
-compatibility review. They are not new D2 release blockers.
+Salar authorized starting this segment on 2026-10-27. Its bounded reviews and
+Order/Gateway development pilot are complete as of 2026-10-28. Optional
+replacements still require verified benefit and compatibility review; they are
+deferred and are not new D2 release blockers. The latest local tooling changes
+remain uncommitted and have no new hosted CI acceptance.
 
 - [x] Review runtime env ownership/override rules and duplicated Gateway values;
       propose explicit per-service inputs while preserving host/container behavior.
@@ -112,16 +114,28 @@ compatibility review. They are not new D2 release blockers.
       Authority release wiring gap; both missing-input negatives fail closed.
       A broader local input-map migration remains optional. [Review receipt](reports/2026-10-27-build-cleanup-segment4-env-review.md),
       [ownership contract](architecture/runtime-environment-ownership.md).
-- [ ] Compare per-service production packaging against today's reusable dependency
+- [x] Compare per-service production packaging against today's reusable dependency
       layer; adopt only with measured size/time and complete runtime-closure proof.
-- [ ] Propose a selected-service watch/restart loop, preserving shared package
+      All twenty exports and three paired offline/native checks pass. Retain the
+      accepted shared layer: mixed-fleet archive grows 46.3% with the candidate.
+      Eleven cached baseline exports total 176.4s. No candidate is adopted.
+      [Measured decision](reports/2026-10-27-runtime-packaging-comparison.md#completed-comparison-616d63fe-retain-the-accepted-shared-layer).
+- [x] Propose a selected-service watch/restart loop, preserving shared package
       refresh and integration/release image gates.
+      Implemented as opt-in `pnpm dev:watch`; Order includes its native Gateway
+      caller. Preparation/fixture checks are recorded; Salar supplied native
+      Order/Gateway readiness and all six F3 Gateway flows on Oct 28.
+      Source/shared-edit restart scopes pass. Temporary comments are removed;
+      Salar confirms shutdown releases the lock and both HTTP listeners.
+      Acceptance covers the Order/Gateway pilot, not every native service.
+      [Plan and receipt](reports/2026-10-27-selected-service-dev-workflow.md).
 - [x] Apply the separately approved WSL CPU/RAM trial: seven CPUs, 13,761 MB
       configured / about 13.10GiB usable. Retain bounded compiler concurrency;
       later tuning still requires measured host headroom/paging. The separately
       approved 40GiB build-cache target keeps automatic cleanup enabled.
 - [ ] Split universal contract/client packages only if remaining measured fan-out
       justifies generation/import/compatibility maintenance costs.
+      Deferred optional work; no evidence-backed split is required to resume D2.
 
 Existing real `.env` files stay outside Docker build inputs. No application API,
 database schema, tenant/cloud activation or real payment integration is part of
