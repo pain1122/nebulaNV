@@ -4735,3 +4735,247 @@ without package/runtime-map changes. The exact117-file staging manifest excludes
 private/ignored/generated artifacts; staged path and whitespace review precede
 commit. Full root/Tenant installation and corresponding native gates remain
 the next action on this or another device, not a publication completion claim.
+
+#### Installed Tenant Authority/root preparation - operator native handoff
+
+Salar supplies frozen install success in46.9s; scripts generate all nine clients.
+This task explicitly limits the agent to focused preparation and static native
+prerequisite review. No reinstall, lock modification, build, Docker/Compose,
+native PostgreSQL or clean CLI proof is executed by the agent.
+
+Ordered gates pass under actual Node24.22.2. Root and all nine owner CLI/client/
+adapter identities agree7.10.1; Tenant pg8.23.1/dotenv17.2.3 and physical candidate
+dependency identities match. All19 importer specifiers match manifests and
+declared extra peers. Published and installed lock contents agree, obsolete
+Prisma6 lock entries are absent, and the SHA256 remains unchanged.
+
+The existing scoped dependency gate exits0: runtime0/tooling0/unresolved0,
+deferred-Web47. It is the production/shipping scope, not a full development-tool
+audit. Sequential no-emit tsc checks for tsconfig.build.json, tsconfig.spec.json
+and tsconfig.tools.json exit0. Strict eslint on src/test/config/all six CLI tools
+exits0. Existing jest.config.ts --runInBand passes19 suites/92 tests, no skips.
+The root check-backend-test-types.mjs exits0: eight owners/132 files/zero errors;
+Tenant's spec/tools projects provide its separate actual typed coverage.
+
+No implementation changed, so the earlier exact consumer table and frozen model/
+policy/migration/lifecycle evidence remain applicable. Public contracts remain
+unchanged; no external preflight regeneration or broad suite is required here.
+Fail-fast diagnostics stop on any nonzero child result and preserve per-gate logs.
+Native candidate results stay historical candidate evidence, not installed proof.
+
+Evidence under existing ignored d7-prisma/tenant-authority:
+installed-identity.json, installed-lock-review.json, installed-security.log,
+installed-source-types.log, installed-spec-types.log, installed-tools-types.log,
+installed-focused-lint.log, installed-focused-unit.log,
+installed-all-test-types.log, installed-preparation-result.json and
+installed-native-prerequisites.json. All actual commands/exit codes are in the
+preparation receipt. Prepared installed-native.cjs reuses the reviewed native
+proof against the real owner, preserves candidate logs and writes separate
+installed-native-\* logs/result. It has not been executed.
+
+Static prerequisite review confirms the existing root command, seed config,
+preserved legacy6 generated entry/runtime/Windows engine and eight original
+migrations. Operator must supply development mode, already-running Docker/
+PostgreSQL18.6 on127.0.0.1:15432 and existing seed audit inputs. Native helper
+creates its own ephemeral keys and owned disposable database; runtime readiness
+and cleanup are still unverified for the installed run. The helper uses compiled
+owner dist, so the operator's scoped build must precede it. This ignored local
+helper is not supplied by a fresh Git clone.
+
+Handoff receipt: installed preparation PASS, all child exits0; exact lock hash
+preserved. Installed native PG18 proof and full clean CLI proof remain PENDING\_
+OPERATOR. No tenant activation, image rollout, commit/push or next-phase work is
+performed. Stop on either native failure and retain the first meaningful error.
+
+```powershell
+$d7Evidence = '.ci-evidence/dependency-review/d7-prisma/tenant-authority'
+fnm exec --using=24.22.2 pnpm.cmd --filter @nebula/tenant-authority-service build *> "$d7Evidence/installed-build.log"
+if ($LASTEXITCODE -ne 0) { throw 'STOP: installed-build.log' }
+fnm exec --using=24.22.2 node "$d7Evidence/installed-native.cjs" *> "$d7Evidence/installed-native.log"
+if ($LASTEXITCODE -ne 0) { throw 'STOP: installed-native.log' }
+fnm exec --using=24.22.2 pnpm.cmd db:verify:tenant-authority *> "$d7Evidence/installed-clean-cli.log"
+if ($LASTEXITCODE -ne 0) { throw 'STOP: installed-clean-cli.log' }
+Get-Content "$d7Evidence/installed-clean-cli.log" -Tail 4
+```
+
+Expected: scoped build exit0; installed-native-result.json success/cleaned true
+with actual installed six-CLI/PG18/audit/rollback controls; clean CLI applies
+eight original migrations, status/seed/contracts pass and its disposable DB is
+removed. Neither native result is claimed before operator evidence arrives.
+
+#### D7 final host/native acceptance - operator receipts reviewed
+
+Salar reports completed operator verification. Review existing receipts only;
+no install, audit, tests, build, Docker/Compose, PostgreSQL proof or clean CLI
+command is rerun. Only this report and docs/current-focus.md are updated.
+
+Evidence base: .ci-evidence/dependency-review/d7-prisma/tenant-authority/.
+
+- Installed build: exit0 explicitly reported by operator; installed-build.log
+  records the actual owner Nest build without a reported build failure.
+- Installed native: installed-native-result.json and installed-native.log both
+  record success=true/cleaned=true for nebula_authority_verify_045bcdf747d0.
+  The reviewed helper sets a failing process exit on proof/cleanup failure;
+  exit0 is therefore supported by its successful receipt and operator no-STOP
+  flow, not a standalone numeric exit field in the log.
+- Native scope: original eight migrations; real6-populated bigint/date facts;
+  all six installed CLI consumers; production guards; seed/role/editor/evidence
+  reruns; actor resolution; independent v1/v2 audit HMAC/epoch verification;
+  append-only/P2002 rollback; owned pool/database cleanup. The corrected Batch2
+  verifier accepts exactly nine default events while preserving20 total tenant
+  revision-one events. No ordinary tenant runtime was activated or modified.
+- Clean CLI: installed-clean-cli.log identifies
+  nebula_authority_verify_3fd370a0efdd, eight migrations current, successful SQL
+  controls and both default/control-plane seeds CREATED then ALREADY_CURRENT.
+  Operator reports no STOP in the guarded command sequence. Accept exit0 from
+  that reported flow; numeric exit is not independently printed in this log.
+  The reviewed verifyCleanMigrations runner propagates cleanup errors, so its
+  successful exit accepts cleanup under that existing contract. No fresh catalog
+  observation or fabricated cleanup receipt is claimed.
+
+Stderr classification: clean CLI PowerShell NativeCommandError wraps Prisma's
+config/schema informational stderr. Native log separately contains sanitized
+prisma_error markers from the deliberate append-only and duplicate-key controls;
+their exact denials are asserted before success. These records do not identify
+an unexpected database failure and do not override accepted exit/proof evidence.
+Do not rerun successful work solely because PowerShell renders stderr as an error
+record, and do not generalize that all future stderr/errors are harmless.
+
+PowerShell execution note retained for later handoffs: NativeCommandError is
+PowerShell's stderr/error-record presentation, not itself a numeric native-process
+exit. The observed Prisma config/schema notices are classified only after the
+successful guarded flow and expected receipts above. Capture `$LASTEXITCODE`
+immediately after each native command, before another native command overwrites
+it; preserve the explicit nonzero STOP checks. Do not substitute `$?`, console
+colour, stderr presence or a final log line for process exit/proof evidence.
+Unexpected stderr at exit0 still requires investigation; genuine nonzero exits,
+failed assertions, missing cleanup or contradictory receipts remain failures.
+No error preference, redirect, exit check or implementation is changed here.
+
+Prior installed preparation remains valid: root/all nine owner identities7.10.1,
+matching19 importers/installed/published lock with unchanged SHA256; dependency
+gate exit0 runtime0/tooling0/unresolved0/deferred-Web47; three no-emit type gates,
+strict lint and92 tests/19 suites exit0; backend test types132 files/eight owners
+exit0. Paths: installed-identity.json, installed-lock-review.json,
+installed-security.log, installed-preparation-result.json and its per-step logs.
+No changed input invalidates those accepted receipts.
+
+Final classification: **PASS - D7 source/installed host/generated-client/native
+PG18 scope across all nine owners**. The final Tenant Authority/root gate is
+accepted. D8 still must prove packaged/running dependency versions; current
+hosted CI and B0 remain unaccepted. PostgreSQL compatibility evidence satisfies
+the D7 dependency of D4; it does not close scanner freshness or all D4 obligations.
+F4/cross-tenant feature implementation stays deferred. No architecture, roadmap,
+security policy or acceptance criterion is expanded.
+
+Next operator-owned action is D4 scanner-definition freshness, not another D7
+run: inspect current persisted cooldown/update state; last recorded eligibility
+is November8 07:13:48UTC / 10:43:48Tehran and loaded definitions28145/October6.
+When eligible, verify Docker/WSL egress and make one existing supported official
+updater attempt. Inspect actual updater result and loaded clamd VERSION; a
+healthy container or patched engine is insufficient freshness evidence. Stop
+on403/429/new cooldown. Preserve signature/cooldown volume, existing updater and
+AV enforcement; no duplicate updater, cooldown deletion or unreviewed alternative
+supply. That action is not executed or accepted by this receipt. D5/D6, D8-D12
+and the B0 ledger/live/demo/archive/hosted gates remain as already planned.
+
+#### D4 scanner freshness - inspection-only preparation
+
+Boundary: repository/local receipt inspection and lightweight preparation only.
+No agent Docker/Compose operation, updater, rebuild, signature-volume write or
+live probe ran. D7 acceptance is preserved; F4/cross-tenant work stays deferred.
+
+Retained baseline d4-nov7-rollout.json records the accepted1.4.6 reviewed image,
+unchanged nebulanv-main_media-scanner-data volume, healthy/benign/EICAR results,
+loaded28145/October6 and cooldownUntilUtc2026-11-08T07:13:48Z. Those observations
+are historical. Current cooldown, file contents, loaded version and health cannot
+be asserted without the operator-owned inspection. Do not authorize an update
+from an old log timestamp or assume the updater is alive after earlier403 exits.
+
+Pinned upstream1.4.6 sources reviewed:
+
+- https://raw.githubusercontent.com/Cisco-Talos/clamav/clamav-1.4.6/libfreshclam/libfreshclam_internal.h
+- https://raw.githubusercontent.com/Cisco-Talos/clamav/clamav-1.4.6/libfreshclam/libfreshclam_internal.c
+- https://raw.githubusercontent.com/Cisco-Talos/clamav/clamav-1.4.6/libfreshclam/libfreshclam.c
+- https://raw.githubusercontent.com/Cisco-Talos/clamav/clamav-1.4.6/freshclam/freshclam.c
+
+The v1 persisted file is read-only decoded for Linux amd64, with magic/version/
+length/UUID/time guards; unsupported layout fails closed. Most importantly,
+fc_update_databases returns FC_SUCCESS while still in cooldown. Therefore a
+FreshClam exit0 does not prove an update occurred or freshness was restored.
+The existing SIGUSR1 handler can wake the daemon but is not invoked here.
+
+Prepared disposable ignored d4-scanner-inspect.cjs; no maintained tool/API or
+application source is added. Its inspect mode reads existing Compose selection,
+scanner/image platform and requested pinned reference, original signature-volume
+identity, host/container time, persisted freshclam.dat before/after, updater
+processes, signature file listing and daily sigtool metadata. A bounded VERSION/
+PING probe from the existing Media container observes the actual loaded daemon
+on Media's configured scanner endpoint. It never starts FreshClam, signals,
+reloads, writes a volume, pulls/rebuilds/recreates or contacts the CDN.
+
+Raw evidence and inspection.json use a unique ignored directory under
+.ci-evidence/dependency-review/d4-scanner-freshness/. Raw container configuration
+is not printed/saved; snapshots exclude credentials. Persisted file bytes are
+retained locally, not uploaded. Runtime image identity is not confused with a
+registry configuration digest. Missing/changed volume/reference, unknown ABI,
+ambiguous daily file, timeout, clock disagreement or changing cooldown snapshot
+stops the collector. Zero/duplicate live updaters or loaded/disk mismatch block
+the next stage rather than spawning another updater or forcing reload.
+
+Preparation commands exit0: Node --check and --self-test. Ten synthetic cooldown
+parser cases cover future/past/equality/zero, bad length/magic/version/UUID/time;
+the actual generated wire program passes mocked NUL-framed VERSION/PING roundtrip.
+This proves only diagnostic parsing/encoding, not BusyBox/sigtool availability,
+Docker execution, persisted live state, scanner health or update eligibility.
+
+Operator prerequisites: repository root/Node24.22.2 and existing Docker/scanner/
+Media running with retained volume. Local reads do not require CDN/VPN access.
+
+```powershell
+fnm exec --using=24.22.2 node .ci-evidence/dependency-review/d4-scanner-inspect.cjs inspect
+$d4Exit = $LASTEXITCODE
+"exit_code=$d4Exit"
+if ($d4Exit -ne 0) { throw 'STOP: review D4 inspection receipt; do not update' }
+```
+
+Exit0 means inspection completed, not D4 passed. WAIT_COOLDOWN requires waiting;
+BLOCKED_REVIEW or FAIL requires reviewing first evidence without updates.
+ELIGIBLE_FOR_NETWORK_REVIEW means persisted cooldown expired plus one live
+updater/healthy scanner/matching disk-loaded version; actual CDN routing and
+freshness remain unverified. Return the receipt before a bounded official update
+handoff. No updater command is paired with this inspection or inferred from its
+exit. Every subprocess exit is recorded, preserving PowerShell exit-code rules.
+
+Remaining acceptance, without expanding scope: verify eligible routing, one
+supported existing official update with successful current-version evidence and
+no unresolved403/429/new cooldown; actual clamd reload/loaded daily matches disk;
+healthy/PONG and benign/EICAR verdicts after the update; unchanged signature
+volume and security controls. Existing infra image/security/PG18/Redis proofs
+remain valid unless inputs change. Engine version, a disk header, success exit
+or healthy container alone cannot close freshness. No arbitrary age policy,
+unreviewed mirrors or alternative signature supply is introduced. D4 remains open.
+
+#### November 7 synchronization checkpoint
+
+Documentation-only publication records accepted D7 host/native results, the
+PowerShell stderr/exit-code distinction and D4 inspection prerequisites/remaining
+acceptance. AI_CONTEXT.md is reconciled with docs/current-focus.md and this
+report: D7 is accepted; D4 freshness, D8 and remaining B0 gates stay open;
+F4/cross-tenant feature work stays deferred.
+
+Affected consumers: AI_CONTEXT.md resume summary, docs/current-focus.md active
+checkpoint and this canonical report. Application source, contracts, lockfile,
+scanner configuration and signatures are unchanged; no contract preflight,
+database proof or broad suite is applicable to these documentation edits.
+Node24 syntax/synthetic helper checks, documentation formatting and
+git diff --check pass with exit0. No Docker/Compose, update or runtime proof ran.
+
+Ignored local inspection helper, retained baseline receipts, raw snapshots and
+logs are not part of this Git publication. The documented helper command is for
+the current device; a fresh clone requires preparing the local collector and
+its baseline input first. Historical acceptance remains recorded here, while
+unavailable raw local files must never be treated as newly executed evidence.
+Next operator action remains the inspection-only D4 command above, followed by
+receipt review before any update. Git commit/push identifiers are reported after
+publication; this entry does not pre-claim a successful push.

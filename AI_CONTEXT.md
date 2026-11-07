@@ -12,12 +12,24 @@ actual PG18 seed/role/resolver/audit-HMAC/rollback/cleanup pass. The stale Batch
 verifier now checks exact default pairs (nine), preserving20 real revision-one
 rows. Publication preparation synchronizes the final lock offline (19 matching
 importers, no new package versions); BuildKit verifies60 COPY inputs. Installed
-root/Tenant still resolve6.16.2. Next: serialized frozen Tenant Authority/root install, then final installed
-lock/security/types/native review and `pnpm db:verify:tenant-authority`.
-All nine owner source manifests/configs match; installed root/Tenant and D7
-sign-off remain pending. Nine prepared owner images remain D8. Tenant feature
-implementation stays paused. D4 Redis/scanner replacements
-are verified; signature freshness stays open. D4/D7/D8 and B0 are still open. Read the linked
+root/Tenant frozen install now succeeds (46.9s). Actual root/all nine owner
+identities,19-importer lock review, scoped dependency gate, source/spec/tools
+no-emit types, strict lint/92 tests and132-file backend test types pass. Lock
+unchanged. Operator build exits0; installed native receipt reports success=true,
+cleaned=true; clean CLI verifies eight migrations and CREATED/ALREADY_CURRENT
+seed reruns. D7 source/installed host/generated-client/native PG18 acceptance
+passes across all nine owners; do not rerun those accepted proofs.
+Next: operator-owned D4 persisted cooldown, loaded signature VERSION/PING and
+health inspection; no update before current eligibility is established. Last
+recorded cooldown is November8 07:13:48UTC; definitions28145/October6 are historical.
+Current-focus documents the local inspection helper and stop conditions. It and
+raw receipts remain ignored/local, not available from a fresh Git clone.
+FreshClam may exit0 while skipping an update during cooldown. Capture
+PowerShell `$LASTEXITCODE` immediately; informational stderr alone is not a
+nonzero exit, and unexpected errors still require investigation.
+Nine prepared owner images remain D8. F4/cross-tenant implementation stays
+deferred. D4 Redis/scanner replacements are verified; signature freshness stays
+open. D4, D5/D6, D8-D12 and B0 obligations remain. Read the linked
 canonical maintenance report; ignored local logs/candidates are not portable.
 Use Node24.22.2/pnpm10.17.1. Do not mistake existing Docker images or prior hosted
 CI for acceptance of this dependency cohort. Long execution stays with Salar.

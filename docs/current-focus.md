@@ -1,19 +1,19 @@
 # Current Focus - Media, Dependency Maintenance And B0
 
-Updated: 2026-11-07. Execution order: **M -> D -> B**. Realm Auth host proof passes;
-resume **D7 Tenant Authority/root installation**. D4 signature freshness remains open.
+Updated: 2026-11-07. Execution order: **M -> D -> B**. D7 host/native acceptance passes;
+next operator-owned obligation is **D4 scanner signature freshness**. D8 image acceptance remains open.
 This checklist ends at backend ecommerce release B0. F7/D3 Vite admin integration
 will receive a separate checklist; it is outside this implementation scope.
 
 ## November 7 D7 Tenant Authority And Root
 
 Salar's full Realm foundation transcript verifies both deployments and removal
-of two disposable DBs; agent confirms zero Realm verification DBs remain. Eight
-owners have host acceptance. Tenant Authority is the final owner prepared on the
+of two disposable DBs; agent confirms zero Realm verification DBs remain. All nine
+owners now have host/native acceptance. Tenant Authority is the final owner on the
 approved CLI/client/adapter7.10.1, pg8.23.1/dotenv17.2.3 cohort. Root CLI/client
 pins join the same install. All nine owner manifests/configs now match in source;
 The publication preparation now synchronizes the root/Tenant lock importers;
-installed identities and final installed verification remain pending.
+installed identities agree7.10.1; final native/clean CLI acceptance now passes.
 
 Candidate generation/source/spec/tools types, strict lint and92 tests pass.
 All17 authority policy bodies,21 models/27 enums and eight migrations are
@@ -34,21 +34,81 @@ Publication checkpoint: offline lockfile-only synchronization passes; all19
 importers match and no new package identities are introduced. BuildKit verifies
 all60 COPY inputs. No dependency installation or application rebuild ran.
 
-Next: Salar runs the serialized combined frozen install into
-`.ci-evidence/dependency-review/d7-tenant-authority-install.log`. Then review
-actual installed versions, final lock/security/types/tests/native checks before
-the existing `pnpm db:verify:tenant-authority` clean proof. No image rebuild or
-tenant feature implementation here. D7 sign-off remains open until installed
-reconciliation/proof; nine prepared owner images remain D8. D4 signatures/B5/B0
-remain open. Exact files, findings and evidence:
-[maintenance report](reports/2026-10-31-dependency-maintenance-execution.md).
+Salar's frozen install succeeds in46.9s; no reinstall needed. Installed identity
+and lock review pass for root/all nine owners and19 importers. Scoped dependency
+gate passes runtime0/tooling0/unresolved0, deferred-Web47. Actual installed
+source/spec/tools no-emit types, strict lint and92 tests/19 suites pass. The
+eight-service test-type gate passes132 files with zero errors. Lock hash and
+published content remain unchanged. No build, Docker/Compose or SQL ran in this
+preparation. Existing candidate native evidence does not certify installed runtime.
+
+Operator results accepted without reruns:
+
+- Scoped installed build exits0 (explicit operator report; installed-build.log).
+- Installed native receipt reports success=true/cleaned=true for owned DB
+  nebula_authority_verify_045bcdf747d0; native exit0 follows the successful
+  helper/guarded operator flow, not a separately persisted numeric exit record.
+- Clean CLI shows eight migrations current, SQL controls and both base/control-
+  plane seeds CREATED then ALREADY_CURRENT in nebula_authority_verify_3fd370a0efdd.
+  Exit0 is accepted from the operator's no-STOP guarded flow; the log does not
+  separately print the numeric exit. The reviewed runner throws on cleanup
+  failure; no independent catalog query or command rerun is claimed.
+- Clean CLI NativeCommandError wraps Prisma config/schema stderr notices.
+  Native proof also logs expected sanitized prisma_error for append-only/P2002
+  denial controls. Neither is an identified unexpected database failure.
+
+PowerShell execution rule: NativeCommandError can represent native stderr
+without a nonzero process exit. Capture `$LASTEXITCODE` immediately after each
+native command and retain the nonzero STOP check. Accept success only with the
+exit result and expected proof/cleanup evidence; inspect unexpected stderr even
+when exit0. Never suppress errors or classify them as informational by label alone.
+
+Classification: **D7 PASS for source/installed host/generated client/native PG18**.
+No running-image, current hosted-CI, D4 freshness or B0 acceptance is implied.
+Evidence directory: .ci-evidence/dependency-review/d7-prisma/tenant-authority/.
+See installed-native-result.json, installed-native.log, installed-build.log,
+installed-clean-cli.log and the earlier installed-preparation-result.json.
+
+Next operator-owned action: D4 official scanner update/freshness verification,
+only after inspecting and respecting persisted cooldown. Last recorded eligibility
+is November8 07:13:48UTC / 10:43:48Tehran; loaded definitions were28145/October6.
+Confirm Docker/WSL egress, use the existing supported updater once when eligible,
+then inspect updater outcome and the loaded daemon VERSION. Stop on403/429 or
+new cooldown; do not delete cooldown state, bypass AV or start a second updater.
+Do not repeat accepted D7 proofs, reinstall, rebuild images or resume F4 features.
+D4, D5/D6, D8-D12 and B0 obligations remain; no next-phase work runs in this task.
+
+D4 inspection preparation: a local ignored read-only collector is prepared at
+.ci-evidence/dependency-review/d4-scanner-inspect.cjs. Agent reviewed retained
+receipts/config/source only and ran synthetic parser/wire checks; no Docker,
+CDN request, update or live health command ran. Current persisted cooldown,
+signature files, loaded VERSION and health must be observed by the operator;
+November8 eligibility above is historical, not live authorization.
 
 ```powershell
-fnm exec --using=24.22.2 pnpm.cmd install --frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-tenant-authority-install.log
-$installExit = $LASTEXITCODE
-Get-Content .ci-evidence/dependency-review/d7-tenant-authority-install.log -Tail 20
-"exit_code=$installExit"
+fnm exec --using=24.22.2 node .ci-evidence/dependency-review/d4-scanner-inspect.cjs inspect
+$d4Exit = $LASTEXITCODE
+"exit_code=$d4Exit"
+if ($d4Exit -ne 0) { throw 'STOP: review D4 inspection receipt; do not update' }
 ```
+
+Prerequisites: repository root, Node24.22.2, existing Docker/scanner/Media
+containers running and retained signature volume; VPN is not needed for these
+local reads. Receipt/raw local evidence goes under
+.ci-evidence/dependency-review/d4-scanner-freshness/inspection-\*/.
+Stop on FAIL, WAIT_COOLDOWN or BLOCKED_REVIEW. ELIGIBLE_FOR_NETWORK_REVIEW only
+establishes the inspection prerequisites; it does not verify CDN routing or
+authorize an update. Return that receipt before any updater action. FreshClam
+can itself exit0 while skipping updates during cooldown; neither exit0, image
+health nor disk headers alone establish loaded-definition freshness.
+
+Remaining D4 acceptance: official updater success/current-version evidence
+without unresolved403/429/new cooldown; loaded daemon version matches updated
+disk daily version; scanner healthy/PONG after reload; benign/EICAR controls
+retain expected outcomes; original volume/controls remain. Reuse accepted
+engine/image/PG18/Redis evidence. No new age limit, mirror, restart or F4 work.
+Exact files, findings and evidence:
+[maintenance report](reports/2026-10-31-dependency-maintenance-execution.md).
 
 ## November 7 D7 Realm Auth
 
@@ -886,7 +946,10 @@ their remediation; the accepted D2 high/critical production gate stays valid.
       validation and OpenAPI behavior when preparing compatible corrections;
       zero high/critical runtime findings is not a zero-advisory claim.
 
-- [ ] **D7 - Resolve Prisma maintenance independently.**
+- [x] **D7 - Resolve Prisma maintenance independently.**
+      Accepted November7 for the source/installed host/generated-client/native
+      PG18 cohort across all nine owners. Runtime image versions remain a required
+      D8 gate; neither D4 freshness nor B0 is closed by this checkbox.
       Files: root and nine Prisma owner manifests; each owner's
       prisma/schema.prisma, generators, seeds and Prisma service; scripts/backend.mjs;
       docker/backend.Dockerfile; packages/migration-artifacts/; scripts/db/.
@@ -990,11 +1053,11 @@ their remediation; the accepted D2 high/critical production gate stays valid.
       identities/lock/security, source/spec/tools/lint/56 tests and native
       both-deployment/five-CLI/crypto/SQL/cleanup pass. Realm's complete foundation
       proof now passes both deployments and cleanup. Final Tenant Authority/root
-      source is prepared; candidate types/lint/92 tests, frozen policy/lifecycle
-      and original native six-CLI/audit/role/rollback/cleanup checks pass. Next:
-      combined install, installed final reconciliation and existing clean proof.
-      All nine prepared owner runtime images remain separate; D7/PG18
-      sign-off stays open. The missed pilot audit remains in the preparation ledger.
+      installed identity/lock/security, types/lint/92 tests and132-file backend
+      test types pass. Operator build/native/clean CLI proof now pass with eight
+      migrations current, exact seed/rerun and owned cleanup. D7 host/native
+      sign-off is accepted; all nine owner runtime images remain D8-owned. D4
+      signature freshness stays open. The missed pilot audit remains in the ledger.
 
 - [ ] **D8 - Reconcile the installed and packaged dependency cohort.**
       Files: pnpm-lock.yaml; docker/backend.Dockerfile; docker-bake.hcl;
