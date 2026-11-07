@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "../../prisma/generated/client";
+import type { Prisma } from "../generated/prisma/client";
 import {
   AuthorityAuditSigner,
   type CanonicalJson,

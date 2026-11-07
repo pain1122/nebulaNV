@@ -1,11 +1,11 @@
-/* eslint-disable no-console */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   migrationKeyFromBase64url,
   openMigrationArtifact,
 } from "@nebula/migration-artifacts";
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { realmAuthPrismaOptions } from "../src/prisma-options";
 import { REALM_AUTH_DEPLOYMENTS } from "../src/config/realm-deployments";
 import { importF4R3ShadowArtifacts } from "../src/migration/f4-r3-shadow-import";
 
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     .includes("--verify-concurrent-idempotency");
   const clients = Array.from(
     { length: concurrentProof ? 2 : 1 },
-    () => new PrismaClient(),
+    () => new PrismaClient(realmAuthPrismaOptions()),
   );
   try {
     const results = await Promise.all(

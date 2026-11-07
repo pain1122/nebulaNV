@@ -1,5 +1,25 @@
 # Tenant Authority Service
 
+## Prisma 7 maintenance (November 7)
+
+Source adopts matching CLI/client/adapter-pg7.10.1, pg8.23.1 and dotenv17.2.3.
+Root CLI/client pins join the final owner install. `prisma.config.ts` owns the
+unchanged seed command and datasource URLs; the CJS client generates under
+`src/generated/prisma` and compiles into dist. Lazy connection, bounded error
+logging and disconnect remain; all21 models/27 enums and eight migrations stay.
+
+Six CLI tools use the adapter. Four cleanup wrappers await shutdown on success
+and failure; stdin readers validate actual text/byte chunks. The Batch2 verifier
+retains its nine-event assertion but scopes it to exact default manifest pairs,
+preserving later inactive control-plane events. Spec/tools projects replace the
+default-project fallback; source scans exclude only generated Prisma files.
+
+Candidate types/strict lint/92 tests, frozen authority bodies,16 lifecycle/eight
+stdin cases and actual PG18 seed/role/resolver/audit-HMAC/epoch/rollback/cleanup
+checks pass. Root install, installed reconciliation and complete
+`pnpm db:verify:tenant-authority` remain pending. No tenant feature implementation
+or runtime authority activation resumes; image acceptance remains D8.
+
 ## Current Status
 
 Batch 2 and Batch 3 items 1 through 4 are complete. Scoped-membership
@@ -11,7 +31,8 @@ and corrective Batch 3R R1 persistence is complete. R1 adds only inactive
 control-plane schema and development seed records; it has no runtime reader or
 traffic effect. R2 additive actor backfill completed on 2026-09-08, R3 Realm
 Auth shadow completed on 2026-09-09, and R4 staged admin split completed on
-2026-09-12. R5 dormant receivers are next. The implemented
+2026-09-12. Further F4 tenant implementation remains paused under the backend
+demo roadmap. The implemented
 membership and resolver remain default-realm compatibility evidence, not the
 final realm-qualified design.
 Tenant, Site, Channel, Application, WebOrigin,

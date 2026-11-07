@@ -14,7 +14,7 @@ const tseslint = authServiceRequire("typescript-eslint");
 
 export default tseslint.config(
   {
-    ignores: ["eslint.config.mjs", "prisma/generated/**"],
+    ignores: ["eslint.config.mjs", "src/generated/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -27,11 +27,23 @@ export default tseslint.config(
       },
       sourceType: "commonjs",
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["test/*.ts"],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    files: ["test/**/*.ts"],
+    languageOptions: {
+      parserOptions: { projectService: false, project: "./tsconfig.spec.json" },
+    },
+  },
+  {
+    files: ["prisma.config.ts", "prisma/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.tools.json",
       },
     },
   },

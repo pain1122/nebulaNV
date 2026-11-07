@@ -1,14 +1,17 @@
-import { PrismaClient, Prisma } from './generated/client';
-const prisma = new PrismaClient();
+import { PrismaClient, Prisma } from "../src/generated/prisma/client";
+import { settingsPrismaOptions } from "../src/prisma-options";
+const prisma = new PrismaClient(settingsPrismaOptions());
 
 async function upsertJson(
   ns: string,
   key: string,
   value: Prisma.InputJsonValue,
-  env = 'default',
+  env = "default",
 ) {
   await prisma.setting.upsert({
-    where: { namespace_environment_key: { namespace: ns, environment: env, key } },
+    where: {
+      namespace_environment_key: { namespace: ns, environment: env, key },
+    },
     update: {
       valueJson: value,
       valueString: null,
@@ -19,9 +22,16 @@ async function upsertJson(
   });
 }
 
-async function upsertString(ns: string, key: string, value: string, env = 'default') {
+async function upsertString(
+  ns: string,
+  key: string,
+  value: string,
+  env = "default",
+) {
   await prisma.setting.upsert({
-    where: { namespace_environment_key: { namespace: ns, environment: env, key } },
+    where: {
+      namespace_environment_key: { namespace: ns, environment: env, key },
+    },
     update: {
       valueString: value,
       valueNumber: null,
@@ -33,9 +43,16 @@ async function upsertString(ns: string, key: string, value: string, env = 'defau
 }
 
 // (optional) if you ever want pure numeric settings
-async function upsertNumber(ns: string, key: string, value: number, env = 'default') {
+async function upsertNumber(
+  ns: string,
+  key: string,
+  value: number,
+  env = "default",
+) {
   await prisma.setting.upsert({
-    where: { namespace_environment_key: { namespace: ns, environment: env, key } },
+    where: {
+      namespace_environment_key: { namespace: ns, environment: env, key },
+    },
     update: {
       valueNumber: value,
       valueString: null,
@@ -48,27 +65,34 @@ async function upsertNumber(ns: string, key: string, value: number, env = 'defau
 
 async function main() {
   // existing
-  await upsertJson('i18n', 'supported_locales', ['en', 'de', 'fa']);
+  await upsertJson("i18n", "supported_locales", ["en", "de", "fa"]);
 
   // 💰 currencies (ONLY symbol info, no TTL here)
-  await upsertJson('pricing', 'currencies', {
-    USD: { symbol: '$' },
-    EUR: { symbol: '€' },
-    RIAL: { symbol: '﷼' },
+  await upsertJson("pricing", "currencies", {
+    USD: { symbol: "$" },
+    EUR: { symbol: "€" },
+    RIAL: { symbol: "﷼" },
   });
 
   // default currency string (product-service can read this)
-  await upsertString('pricing', 'default_currency', 'USD');
+  await upsertString("pricing", "default_currency", "USD");
 
   // ⏱ cart TTL – completely separate from currencies
-  await upsertNumber('order', 'cart_ttl_minutes', 30);
+  await upsertNumber("order", "cart_ttl_minutes", 30);
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
+async function runSeed() {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  } finally {
     await prisma.$disconnect();
-  });
+  }
+}
+
+void runSeed().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

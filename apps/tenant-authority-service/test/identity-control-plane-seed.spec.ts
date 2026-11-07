@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { PrismaClient } from "../prisma/generated/client";
+import type { PrismaClient } from "../src/generated/prisma/client";
 import type { AuthorityAuditSigner } from "../src/authority/authority-audit.signer";
 import { DEFAULT_DEVELOPMENT_AUTHORITY } from "../src/authority/default-development-authority.manifest";
 import { seedIdentityControlPlane } from "../src/authority/identity-control-plane.seed";
@@ -11,6 +11,7 @@ const UUID_V4 =
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
+    if (path === join(process.cwd(), "src", "generated", "prisma")) return [];
     return entry.isDirectory()
       ? sourceFiles(path)
       : entry.isFile() && entry.name.endsWith(".ts")

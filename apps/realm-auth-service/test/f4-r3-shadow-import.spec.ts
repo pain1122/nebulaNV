@@ -8,7 +8,7 @@ import {
   importF4R3ShadowArtifacts,
   legacySessionBridgeFingerprint,
 } from "../src/migration/f4-r3-shadow-import";
-import type { PrismaClient } from "../prisma/generated/client";
+import type { PrismaClient } from "../src/generated/prisma/client";
 
 const realmId = "b1000000-0000-4000-8000-000000000001";
 const migrationId = "e2000000-0000-4000-8000-000000000001";

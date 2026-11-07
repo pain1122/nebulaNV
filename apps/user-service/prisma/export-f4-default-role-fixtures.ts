@@ -1,5 +1,5 @@
-/* eslint-disable no-console */
-import { PrismaClient } from './generated';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { userPrismaOptions } from '../src/prisma-options';
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
@@ -11,7 +11,7 @@ async function main(): Promise<void> {
     editor: process.env.SEED_EDITOR_EMAIL ?? 'editor@example.com',
     user: process.env.SEED_USER_EMAIL ?? 'user@example.com',
   } as const;
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(userPrismaOptions());
   try {
     const rows = await prisma.user.findMany({
       where: { email: { in: Object.values(emails) } },

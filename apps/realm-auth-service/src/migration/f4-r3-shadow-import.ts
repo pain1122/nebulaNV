@@ -5,7 +5,7 @@ import type {
   MigrationRecord,
   OpenedMigrationArtifact,
 } from "@nebula/migration-artifacts";
-import type { Prisma, PrismaClient } from "../../prisma/generated/client";
+import type { Prisma, PrismaClient } from "../generated/prisma/client";
 import { REALM_AUTH_DEPLOYMENTS } from "../config/realm-deployments";
 
 const UUID_V4 =

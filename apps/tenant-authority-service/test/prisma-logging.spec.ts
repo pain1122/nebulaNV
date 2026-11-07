@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaService } from "../src/prisma.service";
 
 const mockOptions = jest.fn<void, [unknown]>();
@@ -7,7 +8,7 @@ const mockDisconnect = jest
   .fn<Promise<void>, []>()
   .mockResolvedValue(undefined);
 
-jest.mock("../prisma/generated/client", () => ({
+jest.mock("../src/generated/prisma/client", () => ({
   PrismaClient: class {
     constructor(options: unknown) {
       mockOptions(options);
@@ -20,7 +21,15 @@ jest.mock("../prisma/generated/client", () => ({
 }));
 
 describe("Prisma bounded logging", () => {
-  afterEach(() => jest.restoreAllMocks());
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  beforeEach(() => {
+    process.env.DATABASE_URL = "postgresql://fixture:fixture@localhost/shadow";
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalDatabaseUrl;
+  });
 
   it("emits only the bounded error marker and disconnects on shutdown", async () => {
     const error = jest
@@ -28,6 +37,7 @@ describe("Prisma bounded logging", () => {
       .mockImplementation(() => undefined);
     const service = new PrismaService();
     expect(mockOptions).toHaveBeenCalledWith({
+      adapter: expect.any(PrismaPg) as unknown,
       log: [{ emit: "event", level: "error" }],
     });
     const onError = mockHandlers.get("error");

@@ -3531,3 +3531,1207 @@ the safe storage example is included. The generic YAML parser warns on Compose's
 acceptance. Existing native selected-topology evidence remains separately recorded.
 Final scoped formatting and staged whitespace checks pass. Normal main publication
 will trigger CI; no hosted outcome is claimed in this source checkpoint.
+
+### November 7 D4 resume - readiness, updater and publication review
+
+User requests D4 continuation with VPN enabled. Working tree starts clean at
+2ee4107. Docker reports7 CPUs/about13.1GiB; all16 active main-stack containers
+are healthy and all11 backend readiness reads pass. Stopped MinIO and completed
+Seaweed initializer are expected, not startup failures. PostgreSQL reports18.6.
+Redis/default-realm Redis still run7-alpine. Scanner uses the older pinned image,
+with engine1.4.6/signatures28145 datedOctober6. Prepared Redis7.4.12 and newer
+ClamAV1.4.6 image references are locally present; their rollout is unaccepted.
+
+FreshClam inspection: exactly one existing updater (PID31) and one clamd (PID33).
+Original official DatabaseMirror and NotifyClamd remain configured. Persistent
+freshclam.dat/signatures are untouched. Last recorded cooldown ends Nov4
+10:52:58UTC; container time is Nov7. A single supported SIGUSR1 wakeup is now
+eligible. This does not prove VPN routing/download success; inspect official
+updater output and loaded daemon VERSION afterward, never delete cooldown state
+or start a duplicate updater. No topology/image/settings changes are needed for
+this attempt. Any new403/429/cooldown stops retries.
+
+Publication CI41849532008 failed in backend lint, after frozen install, tooling,
+storage/build/watch/context/security and protobuf checks passed. Live job skipped.
+Failure is two import-layout errors in exact consumers
+apps/order-service/test/utils/checkout-attempt.fixture.ts and
+apps/order-service/test/utils/checkout.fixture.ts. This is a confirmed preparation
+miss, not new Order behavior. Trace: these import Prisma/CheckoutAttempt and
+Prisma/CheckoutReceipt from the new owner client; fix formatting only,
+retain all exports/assertions and use the existing typed owner lint check.
+Record the CI outcome under B5 and do not claim hosted acceptance or weaken lint.
+
+D4 operational trace: docker-compose.yml and release defaults/scanner limits;
+existing scanner process/config/log/signature volume; loaded image references;
+scripts/backend.mjs readiness; docs/current-focus.md and this canonical report.
+No service/API/schema/SQL change is planned for this wakeup. Existing passing
+Product/Order/Media preparation remains valid; Media full CLI proofs stay D7.
+Redis/scanner image replacement and full native/live proofs remain operator-owned
+long work after their explicit receipts. No forced rebuild or data deletion.
+The one authorized wakeup reaches the official updater but again receives403
+for both cdiff and full daily.cvd. Remote advertises28176; loaded28145 remains.
+The new persisted cooldown ends **November8 07:13:48UTC / 10:43:48Tehran**.
+FreshClam exits (old PID becomes a zombie); clamd stays healthy. No further
+request, cooldown deletion, duplicate updater, alternate signature supply or AV
+bypass is authorized by this failure. The planned existing scanner image
+replacement will restart its normal updater and must preserve this same volume
+and cooldown. Engine/image patching does not prove restored CDN access.
+
+The two actual CI failures are fixture formatting (confirmed from exact log
+paths). Both fixture imports are now formatted and focused typed lint passes;
+source counterparts were inspected and unchanged. Record this missed helper
+format boundary in the preparation ledger. No Order behavior/assertion changes.
+
+Next D4 preparation: render active Compose without exposing env values; select
+only redis, realm-auth-default-redis and media-scanner, preserving Seaweed.
+Exact locally cached selected pins match the prior reviewed cohort. Both Redis
+servers currently use7.4.8 with RDB enabled/AOF disabled; each has an existing
+anonymous /data volume. Scanner has its named signature volume. Prepare one
+owned expiring Redis witness per cache, save RDB and journal actual containers/
+volumes before handing the long no-build/no-deps recreation to Salar. Require
+post-recreation version, same mounted volumes, exact witness survival, cleanup
+and backend readiness; no cache flush or anonymous-volume renewal. This is a
+bounded maintenance witness, not a proof that every live-changing key is static.
+
+#### November 7 D4 rollout preparation receipt
+
+Actual active Compose rendering retains Seaweed and selects the exact previously
+reviewed cached Redis7.4.12/Bookworm digest and ClamAV1.4.6/Alpine3.24.3 digest.
+No source pins are replaced. Source counterparts for the two formatting errors
+are unchanged; corrected fixtures pass typed lint. All26 actual Order generated
+client consumer files pass formatting. The diff changes import layout only,
+so prior behavior/types/native proofs remain valid and new behavior tests or
+external contract regeneration are inapplicable.
+
+Both Redis witnesses now exist with seven-day expiry and their RDB SAVE commands
+succeed. The first SAVE collided with an automatic background save; preserve
+`d4-nov7-rollout-first-observation.json`. A bounded persistence-state wait/retry
+then saved both caches without clearing keys or changing persistence settings.
+`d4-nov7-rollout.json` records exact IDs, images, /data volumes, owned key/value
+and scanner's named signature volume. Stage=prepared, no recreation yet. This
+is diagnostic evidence in the existing ignored owner, not a maintained new tool.
+Retain until post-rollout verification, then delete only the two owned witness
+keys after exact value/ownership checks; expiry bounds abandoned witness waste.
+
+Requirement: replace only selected Redis/scanner images while preserving local
+state, cooldown and service policy. Consumer trace and passing prerequisite image
+reviews are recorded above; source and report formatting/diff checks pass.
+All11 backend readiness probes pass before rollout. Long execution stays Salar's.
+No archive/cache/volume deletion, flush, anonymous-volume renewal, migrations,
+application builds, current lock refresh or fresh signature download is required
+for this command. The new scanner's normal updater must honor existing cooldown.
+
+READY FOR NAMED INFRASTRUCTURE ROLLOUT (native post-rollout proof pending):
+
+```powershell
+docker compose up -d --no-build --no-deps --pull never --wait --wait-timeout 240 redis realm-auth-default-redis media-scanner
+```
+
+Run from the repository root and stop if it fails. Expected: all three healthy.
+Agent follows by checking exact deployed image/version, same recorded volumes,
+witness survival/cleanup, benign/infected scanning, and all backend readiness.
+The scanner must still report its real loaded signature version; healthy-old
+signatures cannot be labeled fresh. No CDN retry before November8 10:43:48Tehran.
+Do not rerun preparation or create new witnesses after recreation; consume this
+same receipt. Media's two full CLI proofs remain pending under D7. No new GitHub
+commit/push or hosted green claim is made in this operational handoff.
+
+#### November 7 D4 post-rollout observation and application restoration
+
+Salar's selected three-image rollout is now observed: both recreated Redis
+containers are7.4.12 on the exact selected image; both original anonymous /data
+volumes and saved witnesses survive. The recreated scanner uses the selected
+reviewed digest and same named signature volume, healthy with1.4.6/28145/Oct6.
+Its normal updater acknowledges the unchanged November8 07:13:48UTC cooldown.
+The existing receipt now says persistence-verified, with actual new IDs captured.
+
+All eleven application containers are stopped with exit255, no OOM flag and no
+recorded State.Error. This observation does not establish why they stopped.
+Backend health fails at unavailable User, so do not treat it as an image/build
+failure. Restore these exact existing app containers using docker start; do not
+recreate them from drifted source, change image IDs or rebuild. PostgreSQL, both
+Redis caches, Seaweed and scanner are healthy. After restoration check actual
+readiness, exact witness cleanup and scanner benign/EICAR controls. Preserve
+loaded-signature/freshness limitations and pending Media7 native CLI evidence.
+
+#### November 7 D4 native rollout verified - resume Media CLI proofs
+
+Native post-rollout acceptance now passes for the selected infrastructure:
+both recreated Redis containers run7.4.12 on the exact reviewed digest, keep the
+original /data volume identities, and return both pre-recreation witnesses.
+Guarded compare/delete removes only the matching owned keys, then SAVE persists
+both cleanups. The existing private rollout receipt records infra-verified;
+no abandoned witness or new permanent script is left behind.
+
+Scanner uses the exact selected image with the original named signature volume.
+Native stdin control accepts benign bytes with exit0/OK and rejects standard
+EICAR bytes with exit1/FOUND. No upload/file artifact is written to the host or
+ordinary Media objects. Loaded engine/version remains1.4.6/28145/October6; retained
+cooldown is November8 07:13:48UTC / 10:43:48Tehran. Functionality is accepted,
+fresh signatures and successful official updating are not. D4 stays open.
+
+Direct-start restoration of the eleven stopped app containers completes without
+recreating images or changing their environment. An early readiness pass during
+startup stopped at Media; scoped logs then show normal successful bootstrap,
+not a crash. Final observation: all16 active Docker containers healthy and all11
+backend readiness reads pass. Stopped MinIO and completed initializer remain
+expected. The cause of the earlier common exit255 is not established; do not
+claim OOM, application defects or a Docker-pause explanation without evidence.
+
+Next requirement: finish the two installed Media7 native CLI proofs. The full
+pre-edit/caller trace and installed type/lint/unit/security/preflight prerequisites
+are in the November4 handoff; no relevant implementation input changed since.
+Today's Order fixture changes are formatting only and have their scoped checks.
+Media owner manifest still selects matching CLI/client/adapter7.10.1 and pg8.23.1;
+actual generated source exists. These SQL proofs do not require a new app image.
+Do not repeat unrelated successful Product/Order proofs or frozen installation.
+
+READY FOR NAMED OPERATOR-OWNED PROOFS (not yet executed):
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd db:verify:media
+fnm exec --using=24.22.2 pnpm.cmd db:verify:media:upgrade
+```
+
+Run individually, stopping at the first error. The first verifies native clean
+migration/status, constraints and both guarded processing/derivative DB suites;
+the second verifies populated upgrade/preservation/failure rollback/rerun.
+Both retain owned disposable-database cleanup. Results must be recorded against
+the installed7 cohort, not substituted with older candidate receipts. No live
+S3/scanner/API proof or whole-service image acceptance is claimed. Remaining
+six Prisma owners/root reconciliation, grouped D8 rollout and B5 hosted CI remain
+separate pending work. Current-focus is updated to this precise continuation.
+
+#### November 7 Media host proofs accepted - Taxonomy pre-edit trace
+
+Salar reports both named Media7 proofs completed successfully: db:verify:media
+and db:verify:media:upgrade. Accept installed-owner native clean migrations,
+constraint/job suites and populated preservation/rollback/rerun for those inputs.
+No transcript counts are invented. Product, Order and Media host acceptance is
+retained; all running application images still need D8 dependency reconciliation.
+D4 signature freshness remains open under the recorded cooldown.
+
+Next D7 owner is Taxonomy. Existing owner uses6.16.2, one unchanged migration and
+one Taxonomy model; service implements classification/tree/system behavior and
+an intentionally empty base seed. Change only the private database dependency/
+configuration boundary using the same already-audited7.10.1 cohort. Do not expand
+taxonomy behavior, public APIs, generators, tenant features or demo seeds.
+
+| Exact affected owner / consumer                                                                                                                                                                                                                                  | Planned action or unchanged/deferred reason                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| apps/taxonomy-service/package.json; prisma/schema.prisma; new prisma.config.ts                                                                                                                                                                                   | CLI/client/adapter7.10.1, pg8.23.1, dotenv17.2.3; CJS src generator and URL/shadow/seed config. Preserve the entire model body and original migration.                                                                                                                                                                                       |
+| src/prisma.service.ts; new src/prisma-options.ts; new test/prisma-options.unit.spec.ts                                                                                                                                                                           | Reuse validated explicit URL/schema/pool/timeout factory, typed error event registration. Preserve Taxonomy's existing catch/warn initialization and shutdown, not Media's fail-fast variant.                                                                                                                                                |
+| src/taxonomy/taxonomy.service.ts                                                                                                                                                                                                                                 | Only generated Prisma/model import moves. Preserve normalization, JSON nulls, transactions, list counts/grouping, tree moves/cycles, system ownership and error translation.                                                                                                                                                                 |
+| prisma/seed.ts; scripts/backend.test.mjs base seed ownership                                                                                                                                                                                                     | Base seed is intentionally empty; remove unused client creation while retaining no data writes. Existing exact CLI seed command moves to owner config; no new demo/default taxonomy records. Ownership regression remains.                                                                                                                   |
+| jest.unit.config.ts; eslint.config.mjs; new tsconfig.test.json/tsconfig.tools.json; existing tsconfig/build/main Jest/test setup                                                                                                                                 | Add new options suite to the explicit unit inventory. Use real typed test/tools projects without increasing fallback limits. Keep unit setup and exclude the main runner's network startup hook. Eight existing test/helper paths stay covered.                                                                                              |
+| test/taxonomy.ensure-system.unit.spec.ts; taxonomy.http-validation.unit.spec.ts; grpc/helpers.ts; grpc/taxonomy.e2e.spec.ts; http/taxonomy.http.e2e.spec.ts; setup/wait-for-services.ts; utils/http.ts; jest.env.ts                                              | No legacy client constructors/imports in tests; preserve public/codec/native HTTP/RPC expectations. Type-check all consumers, run focused unit cases; live proofs wait D8 images.                                                                                                                                                            |
+| docker/backend.Dockerfile; scripts/docker/backend-build-graph.mjs; benchmark-build-graph.mjs; benchmark-runtime-packaging.mjs; verify-runtime-imports.mjs; scripts/backend-dev.mjs; ignore files                                                                 | Add legacy Taxonomy config COPY. Existing generic config projection, generated input excludes, manifest-driven modern runtime checks and structural watch apply unchanged; no duplicate tooling. Runtime/image acceptance D8.                                                                                                                |
+| scripts/backend.mjs clean migration runner; scripts/check-backend-test-types.mjs; root package scripts; packages/clients/src/taxonomy.client.ts; packages/protos/taxonomy.proto; Gateway scoped taxonomy callers; Product/Blog facades; API-client/demo fixtures | No external contracts or constructor consumers change. Keep command registration, signed receivers, DTOs, inventories/hashes and protobuf/OpenAPI/generated SDK untouched. Native candidate service CRUD/tree/JSON/uniqueness/rollback/pool/seed controls before install; full root/native CLI and live consumer acceptance remain distinct. |
+| docs/current-focus.md; docs/services/taxonomy-service.md; docs/docker-configs.md; this report                                                                                                                                                                    | Record exact candidate/installed/image scopes and pending five other owners. Preserve historical evidence and avoid claiming D4/D7/B0 completion.                                                                                                                                                                                            |
+
+Candidate preparation uses cached audited installed Product7 dependency realpaths
+in the existing ignored d7-prisma/taxonomy owner; no network install or root lock
+mutation until operator handoff. Full source/test/tools and affected import/
+fixture formatting/lint gates must pass. Actual native SQL uses a guarded owned
+local disposable DB and must clean connections/data even on failure. No wire
+contract changes mean external preflight regeneration is inapplicable to this
+private-client slice; prior unaffected contract evidence stays valid.
+
+#### Taxonomy candidate preparation receipt - installation handoff
+
+All planned private-client changes are implemented. Post-edit consumer review:
+
+| Consumer / check                                         | Actual result / remaining scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest/config/schema/factory/service                   | Candidate generation without runtime DATABASE_URL/shadow inputs passes. Matching CLI/client/adapter7.10.1, pg8.23.1 and dotenv17.2.3 resolve to the identical physical installed Product dependency cohort. Model body and original migration are byte-identical to their before/current copies. Existing Taxonomy initialization catch/warn and shutdown are preserved.                                                                                                                                      |
+| Source/test/tools projects and generated imports         | Source compiles into real CJS/declaration outputs; test/tool no-emit checks pass. Focused typed lint passes for service/factory/business import/options/config/seed/unit config, with no findings. Real typed projects cover new tests/tools; no increased fallback limits.                                                                                                                                                                                                                                   |
+| Explicit unit config and existing suites                 | All three selected unit suites pass19/19, zero skips. Existing ensure-system and HTTP validation assertions remain; the new options suite covers explicit schema, defaults, zero timeout and rejected configuration. Main integration runner/global startup hook is unchanged and not used for candidate unit preparation.                                                                                                                                                                                    |
+| Actual compiled owner and TaxonomyService against PG18.6 | Normalization, object JSON with false/zero, tree depth/path, groupBy child counts, duplicate P2002-to-public error translation, cycle/parent-delete/invalid-child-P2003 denial, system rerun/no rewrite/delete protection, concurrent system ensure, omitted JSON retention, explicit SQL DbNull, transaction rollback, empty-parent detachment and legitimate deletion all pass. Deliberate duplicate/FK controls emit expected sanitized error logs; these are passing negative cases, not hidden failures. |
+| CLI config and empty base seed                           | Actual selected7 CLI auto-loads owner config and runs the intentionally empty seed; row count stays0. Source/model tests are real; native clean deploy/status remains the later complete installed CLI gate. The CLI's latest8 RC notice does not change the approved stable cohort.                                                                                                                                                                                                                          |
+| SQL ownership/cleanup                                    | Guarded local nebula*taxonomy_verify*<12hex> database, exactly the unchanged migration. Actual service onModuleDestroy closes the pool; zero connections before owned DB drop. Native receipt success=true/cleaned=true. No regular database, image or runtime object was changed.                                                                                                                                                                                                                            |
+| Root seed ownership/command consumers                    | Two focused existing backend tooling tests pass: base-seed ownership excludes domain data writes; Prisma actions select expected package commands. New unit registration is explicit. Generated private imports move only in the two owner source callers plus factory; tests have no old direct client consumers.                                                                                                                                                                                            |
+| Docker/watch/packaging and public consumers              | Add the exact Taxonomy config COPY. Existing generic prune/config/source exclusion and modern manifest-driven runtime loader apply unchanged; preserve prior tooling evidence, no new maintained script. No HTTP/RPC/protobuf/OpenAPI/SDK/receiver/hash change; preserve external contracts and previous unaffected preflight. In-image/live acceptance remains D8.                                                                                                                                           |
+
+Local evidence owner: existing ignored
+.ci-evidence/dependency-review/d7-prisma/taxonomy/ contains candidate.json,
+dependency-identity.json, generate.log, source-build.log, tsconfig.test.json.log,
+tsconfig.tools.json.log, focused-unit.log, focused-lint.log, cli-seed.log and
+native-result.json. The bounded candidate/check/native diagnostics are local
+preparation evidence, not new project tools. Keep their junctions through D7
+acceptance; D11 cleanup must unlink rather than traverse real workspace targets.
+No new npm download or root lock/install mutation was used to prepare this slice.
+The reused dependency cohort was already audited; verify the resolved installed
+graph freshly after the necessary operator install, retaining the strict policy.
+
+Requirement/finding: migrate the fourth database owner to the adopted stable
+Prisma7 cohort without taxonomy policy/contract/data changes.
+Changed-file impact: exact pre-edit table reviewed above; all edited, unchanged
+and D8-deferred callers have named scope. Source diff is private imports,
+configuration/adapter wiring, intentionally empty seed and typed/unit registration.
+Format/syntax/lint/types: all edited TS/JSON/MJS files formatted; source/test/tools
+and scoped typed lint pass; final diff/import/inventory review has no known cheap
+failure. New owner config syntax is exercised by actual generate/seed commands.
+Focused behavior/SQL:19 unit cases plus actual native service/seed/SQL and zero
+connection/owned database cleanup pass. Fresh installed root types/security,
+complete clean CLI deploy/status and images are not candidate evidence.
+Readiness: READY FOR SERIALIZED TAXONOMY INSTALL; root source/lock intentionally
+remain out of sync until that install. Do not run broader root suites, Docker
+builds or a hosted publish against this half-installed owner.
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --no-frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-taxonomy-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-taxonomy-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+After success, agent checks actual root client/config/adapter versions, narrow
+lock diff/19 importers, strict security and source/test/tool/all-owner test types.
+Then prepare the complete native Taxonomy clean migration gate. Do not rebuild
+application images per owner; five further owner migrations/root reconciliation
+and D8/B0 remain open. Redis/scanner native replacement acceptance stays valid;
+FreshClam freshness and hosted CI are separate recorded blockers.
+
+#### Taxonomy installed acceptance - scoped runner preparation gap
+
+Salar's serialized install passes in4m54.3s/exit0. Actual four migrated owners
+agree on CLI/client/adapter7.10.1 and pg8.23.1; Taxonomy generated source exists.
+Installed source/test/tool types, all19 units and typed lint pass. Eight-service
+test/helper types pass129 files/zero errors. Fresh strict backend audit is
+runtime0/tooling0/unresolved0, deferred-Web47. The native source/installed-client
+service/CLI-seed/tree/JSON/uniqueness/concurrency/rollback/pool/cleanup proof passes
+with a separately owned database and success/cleanup receipt.
+
+Lock review: only Taxonomy's importer changes. All19 manifests match their
+specifiers, with the12 observed declared auto-installed peers and identical
+runtime/dev duplicates normalized. Package keys/integrities and every snapshot's
+actual dependency map are unchanged. Three deferred Web CKEditor snapshots only
+refresh supports-color transitive peer metadata (fullscreen/highlight/list);
+no Web version, runtime edge or security policy changes. Preserve scoped
+fast-uri3.1.9. Do not blindly revert informational pnpm metadata.
+
+Pre-handoff inspection finds the backend scope map accepts only Authority,
+Product, Order and Media. There is no db:verify:taxonomy alias. This is a confirmed
+runner capability gap before handoff, not an installed client failure. Narrow
+correction: add Taxonomy to the existing finite scope map and documented usage;
+reuse `pnpm db:verify:migrations taxonomy` instead of adding a script/alias.
+
+Exact new impact: scripts/backend.mjs migrationVerificationServices (also shared
+by runLocalDatabaseMigration), main database verify-migrations dispatcher and
+usage; scripts/backend.test.mjs existing scoped selection regression; unchanged
+root db:verify:migrations registration and Taxonomy inventory; current-focus,
+service note and this report. Preserve undefined=>all behavior, prior valid
+scopes and unknown-scope rejection. Test only the named bounded scope; actual
+native clean CLI migration remains operator-owned. No public service contract,
+schema, generated SDK or image change is introduced by this correction.
+
+#### Taxonomy installed preparation complete - full clean CLI handoff
+
+The narrow runner correction adds only Taxonomy to the existing finite map and
+usage. Existing scoped-selection regression includes its exact single owner;
+prior scopes/default-all and unknown rejection remain. Three focused selection/
+seed/command checks and three clean-migration selection/cleanup/fail-fast checks
+pass, plus a read-only native import confirms one Taxonomy owner only. Both
+changed MJS files pass scoped lint and formatting. No new package script, alias,
+public RPC/HTTP route, schema or test suppression was introduced.
+
+Actual installed Taxonomy preparation now has independent native results:
+installed-native-result.json executes root src/generated/prisma through the
+actual owner/factory, not a candidate compiled module; all service/tree/JSON/
+uniqueness/system concurrency/transaction rollback/CLI empty seed and pool/DB
+cleanup controls pass. Expected negative-case sanitized logs are retained.
+A second guarded original-schema SQL row, written independently of Prisma7,
+preserves UUID/scope/identity, parent null, system/hidden/sort flags, JSON false/
+zero/array and exact millisecond created/updated timestamps. Native selected7
+empty seed rerun leaves one row and its complete SQL JSON snapshot unchanged;
+all connections close and the owned database is dropped. This is populated
+client/seed compatibility, not a new schema migration or full native deploy proof.
+
+Evidence stays in the existing ignored Taxonomy owner: installed-identity.json,
+installed-source-build.log (no emit), installed-tsconfig.test.json.log,
+installed-tsconfig.tools.json.log, installed-focused-unit.log (19/19, zero skips),
+installed-focused-lint.log (no findings), installed-all-test-types.log (129 files,
+zero errors), installed-security.log (runtime0/tooling0/unresolved0, Web47),
+installed-lock-review.json and installed-lock-diff.json, installed-native-result.json,
+installed-cli-seed.log and installed-legacy-row.json. No SQL app/schema/wire
+behavior changed during installed verification. Keep earlier accepted owner and
+contract evidence; external contract preflight regeneration is inapplicable to
+the private client/CLI-only selector correction.
+
+Requirement: native clean migration/status against installed Taxonomy7 and one
+owned disposable database, via the existing runner. Exact impact tables were
+revisited; source/config consumers are updated, other service/public consumers
+unchanged for the reasons above, D8 image/live acceptance explicitly deferred.
+Cheap prerequisites: installed version/lock/security/type/lint/unit/native
+primitive/data-preservation checks pass. PostgreSQL readiness is observed.
+The corrected command has no dedicated db:verify:taxonomy alias; do not invent
+one or omit its scope (which would select all database owners).
+
+READY FOR NAMED OPERATOR PROOF, actual full clean CLI result pending:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd db:verify:migrations taxonomy
+```
+
+Expected: only Taxonomy's one original migration applies in a fresh _verify_
+database; native status is current and the owned database is cleaned. Stop on
+failure and preserve the first error. The existing runner supplies the correct
+root pnpm lifecycle and owner URL/config; no inline launcher or env rewrite is
+needed. No install repetition, container restart or app image build is required.
+After acceptance trace the next D7 owner (Settings); five remaining owners/root
+reconciliation and the grouped D8 rollout remain separate. D4 signature freshness
+and B5 hosted CI are not cleared by this host-only gate.
+
+#### November 7 Taxonomy clean proof accepted - Settings pre-edit trace
+
+Salar supplies successful Taxonomy7 native migrate-deploy/status output for its
+one original migration in nebula_taxonomy_verify_c254a6a60905. Accept this exact
+host clean CLI result; prior native owner/populated row/empty seed evidence stays.
+Product/Order/Media/Taxonomy host acceptance is retained, not image acceptance.
+
+Settings is the fifth D7 owner. It uses6.16.2, one app_settings model/migration,
+fail-fast Prisma initialization and a real four-default base seed. Preserve the
+exact locale/currency/TTL values, Unicode symbols, compound-key identity, typed
+value clearing and rerun behavior. This is private ORM/config maintenance, not
+settings policy, API, trust, secret-store or demo-seed redesign.
+
+| Exact affected consumer                                                                                                                                                                                                                    | Planned action / unchanged or deferred reason                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| apps/settings-service/package.json; prisma/schema.prisma; new prisma.config.ts                                                                                                                                                             | Adopt same audited CLI/client/adapter7.10.1, pg8.23.1, dotenv17.2.3; CJS src generator; move URL/shadow/seed command into config. Preserve model/migration bytes.                                                                                                                                                |
+| src/prisma.service.ts; new src/prisma-options.ts; new test/prisma-options.unit.spec.ts                                                                                                                                                     | Reuse bounded explicit URL/schema/pool/timeouts factory, preserve Settings' existing fail-fast initialization, event sanitization and shutdown.                                                                                                                                                                  |
+| src/settings.service.ts                                                                                                                                                                                                                    | Move its Setting type-only generated import. Preserve string upsert/read/delete, normalization, environments, missing behavior and P2025 translation.                                                                                                                                                            |
+| prisma/seed.ts                                                                                                                                                                                                                             | Move Prisma imports, construct with owner adapter. Preserve every helper/body/default/Unicode symbol; compare normalized TS AST after formatting. Actual seed create/update/rerun and unrelated legacy-row preservation need native PG18 proof.                                                                  |
+| eslint.config.mjs; new tsconfig.test.json/tsconfig.tools.json; jest.unit.config.ts; existing TS/Jest/build/setup files                                                                                                                     | Real typed test/tool projects; generated lint exclusion. Existing unit glob automatically registers new options suite. Preserve unit setup; main runner's integration startup hook stays outside focused preparation.                                                                                            |
+| test/settings.bootstrap.unit.spec.ts; settings.http-validation.unit.spec.ts; grpc/helpers.ts; grpc/settings.e2e.spec.ts; http/settings.http.e2e.spec.ts; setup/wait-for-services.ts; utils/http.ts; jest.env.ts                            | No old direct client imports/constructors found; preserve protobuf/bootstrap authorization and HTTP validation fixtures, type-check all test helpers.                                                                                                                                                            |
+| docker/backend.Dockerfile; existing selected graph/config, watch, snapshot excludes and modern runtime checks                                                                                                                              | Add Settings config COPY to legacy install stage. Existing generic modern-owner tooling applies unchanged; no duplicated scripts or image build. D8 owns image/live dependency acceptance.                                                                                                                       |
+| scripts/backend.mjs migrationVerificationServices/usage/shared migrate helper; scripts/backend.test.mjs existing scoped regression/base seed ownership                                                                                     | Add Settings to the finite existing selector before operator handoff; reuse db:verify:migrations settings. Retain all prior scopes/default-all/unknown rejection and Prisma upsert seed ownership. No new alias or launcher.                                                                                     |
+| packages/clients/src/settings.client.ts; packages/protos/settings.proto; src/grpc/settings-grpc.controller.ts; src/settings.controller.ts; src/error.utils.ts; src/dto/; Gateway Settings facade; Product/Order consumers and demo runners | Public/source method bodies and policies unchanged. Native actual SettingsService/seed assertions plus existing controller/validation units cover ORM wiring; preserve external operation/hash inventories. No generated external contract changes or preflight regeneration. Live integration remains D8-owned. |
+| current-focus, AI_CONTEXT, Settings/Taxonomy service notes, Docker notes and this report                                                                                                                                                   | Record current candidate/installed/image scopes, accepted Taxonomy and four remaining owner migrations after Settings. Do not close D4 signature freshness, D7, D8 or B0.                                                                                                                                        |
+
+Use an owned ignored d7-prisma/settings snapshot with identical already-audited
+installed Product7 dependency realpaths. No root install/lock mutation during
+preparation. Actual native candidate proof uses local guarded disposable DB,
+original SQL-authored typed row, real selected CLI seed twice, actual service,
+rollback/uniqueness and pool cleanup. Broad/long commands remain Salar-owned.
+Settings preparation observation: candidate source/test/tool types and23 units
+pass; native original-row, four-default seed/create/rerun/type-clearing, Unicode,
+service, compound uniqueness/rollback/delete and owned cleanup also pass.
+The newly typed tools project exposes the old seed's async Promise.finally
+callback as no-misused-promises. Do not suppress the rule or drop the await.
+Narrow change: an awaited seed runner with try/catch/finally, exitCode1 on error
+and an awaited disconnect; report a cleanup error separately, preserving the
+primary error. Only completion/error-resource handling changes; compare the four
+existing helper/main function ASTs and native seed values again. Add a focused
+in-memory failure-path probe, not another maintained seeder or broad test suite.
+
+#### Settings candidate preparation receipt - installation handoff
+
+Implemented the exact pre-edit consumer trace. Settings selects the same cached
+previously audited CLI/client/adapter7.10.1, pg8.23.1 and dotenv17.2.3 physical
+Product package bytes; root Settings installation/lock still use6 until handoff.
+Generation without runtime URL/shadow env passes. Original model body and single
+migration remain byte-identical. Actual SettingsService changes only its Setting
+type import; PrismaService retains fail-fast initialization and sanitized events.
+
+Post-edit acceptance:
+
+| Consumer / boundary                                   | Result / explicit pending scope                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New config/CJS/factory and source/test/tools projects | Actual candidate generation and source compilation pass. Test/tool no-emit types pass. Focused typed lint is clean after the completion-wrapper correction; no fallback increase, rule suppression or skipped case.                                                                                                                                                                                   |
+| Unit registration and public fixture consumers        | Existing Settings unit glob registers the new factory suite automatically. Three unit suites pass23/23, zero skips, preserving bootstrap authorization and HTTP validation. Eight existing test/helpers are covered by the candidate test project. Public controllers/DTOs/protobuf/SDK/inventories are unchanged; no external preflight regeneration applies.                                        |
+| Seed policy and symbols                               | Four helper/main ASTs are identical before/after, independent of formatting/import/wrapper changes. Exact locales en/de/fa, USD/EUR/RIAL symbols, default_currency USD and cart_ttl_minutes30 are preserved. Model/migration are unchanged.                                                                                                                                                           |
+| Seed completion/resources                             | Replaced the legacy async-finally callback rejected by typed lint with explicit awaited try/catch/finally. Primary failure sets exitCode1 and is reported; disconnect still runs and is awaited; cleanup failure is separately reported with exitCode1. Three in-memory execution cases prove success, main failure and combined primary/cleanup failure. No helper/default/ownership policy changed. |
+| Actual compiled service/selected CLI/PG18             | SQL-authored legacy string-empty/number-zero/bool-false/JSON/date facts read correctly. Native seed creates exactly four defaults beside that row. Force stale competing typed columns in those owned seed fixtures, rerun real CLI, and verify corrected values, SQL DbNulls, original IDs/createdAt and unrelated complete legacy row preservation. Every native assertion passes.                  |
+| Real string owner / adapter errors                    | Normalization, found-empty versus missing, separate environments, invalid namespace denial, compound uniqueness P2002 transaction rollback, legitimate deletion and missing-delete P2025 handling pass. Negative-case sanitized Prisma logs are expected.                                                                                                                                             |
+| Cleanup                                               | Actual owner shutdown leaves zero connections; both before/after completion-wrapper proof databases are removed. No ordinary Settings database, real defaults, cache, application image or storage/scanner state changed.                                                                                                                                                                             |
+| Root scope/seed consumers and Docker                  | Reuse the finite Settings scope in existing runner/help and regression; four focused selector/clean-migration cleanup/fail-fast/base-seed ownership tests pass. Changed backend MJS lint/format pass. Add Settings config COPY; existing generic prune/watch/generated-exclusion/runtime-loader contracts apply unchanged. Full installed and image/native clean acceptance stay distinct.            |
+
+Evidence owner: .ci-evidence/dependency-review/d7-prisma/settings/ contains
+candidate.json, dependency-identity.json, source-compatibility.json,
+generate.log, source-build.log, tsconfig.test.json.log, tsconfig.tools.json.log,
+tools-recheck.log, focused-unit.log, focused-lint.log, seed-lifecycle-proof.json,
+cli-seed-create.log, cli-seed-rerun.log and native-result.json (success/cleaned).
+Diagnostics/snapshot live only in this existing ignored evidence tree; no new
+maintained seeder/tool/report is added. D11 cleanup must unlink dependency
+junctions without traversing real targets after D7 evidence acceptance.
+
+Requirement: move fifth owner onto adopted cohort while preserving real seed,
+configuration and service contracts. Pre/post impact table is reconciled: edited
+callers complete, external/body consumers unchanged for listed reasons, runtime
+images/live integration deferred to D8. Format/syntax/scoped lint/types/unit/
+native seed and SQL preparation pass; exact root lock divergence is intentional
+until the necessary operator install. Prior Taxonomy full native migration and
+observed disposable cleanup are accepted; earlier Product/Order/Media evidence
+stays valid. Root installed Settings/all-service type and fresh resolved security
+checks remain pending after generation; candidate results cannot certify them.
+
+READY FOR SERIALIZED SETTINGS INSTALL; no broader root suite or image build:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --no-frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-settings-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-settings-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+After success, verify actual installed CLI/client/adapter/config, narrow lock,
+strict dependency gate and affected/all-service test types; prepare the existing
+`pnpm db:verify:migrations settings` (already scoped and tested). Do not invent
+another alias or inline launcher. No current image or demo-data rebuild is needed
+now. Four other owner migrations/root reconciliation, D8, signature freshness
+and current-snapshot hosted CI/B0 remain explicitly open.
+Final indirect consumer trace (unchanged): packages/clients/src/settings.client.ts,
+settings.types.ts and dormant-v3.client.ts;
+apps/gateway/src/settings/gateway-settings-api.service.ts;
+apps/product-service/src/default-product-taxonomy.initializer.ts and
+src/product/product.service.ts; apps/order-service/src/order/order.service.ts;
+apps/blog-service/src/default-blog-taxonomy.initializer.ts;
+scripts/demo/runner.mjs and commerce-runner.mjs. These consume the unchanged
+GetString/value/found and bootstrap/write contracts. Settings RPC controller
+inspection confirms the same public read/default environment mapping, protected
+write receiver and finite Product/Blog bootstrap caller/key rules. The native
+owner preserves that value/found behavior; existing controller units preserve
+authorization. Keep their signatures, generated codecs, hashes and live image
+acceptance unchanged/deferred rather than refreshing public contracts.
+
+#### Settings installed acceptance - complete clean CLI proof handoff
+
+Salar reports install exit0 in1m27.3s. Actual Settings/Product/Order/Media/
+Taxonomy CLI/client/adapter7.10.1 and pg8.23.1 agree, with generated clients.
+Installed Settings source/test/tools types and scoped typed lint pass; three
+unit suites pass23/23, no skips. Eight-service helper/type gate passes130 files,
+zero errors. Fresh unchanged dependency gate passes runtime0/tooling0/unresolved0,
+with47 deferred-Web findings and the existing CKEditor/React peer warning retained.
+
+Lock review confirms all19 importer declarations,12 declared auto-installed
+peers and the fast-uri3.1.9 override. Compared with published HEAD only Settings
+and the previously accepted Taxonomy importers differ. Every package identity/
+integrity and snapshot runtime dependency map is unchanged. This install's
+informational supports-color peer metadata normalization remains limited to
+CKEditor highlight/mention snapshots; no Web version or runtime edge changes.
+No lock metadata is blindly reverted or security policy weakened.
+
+Actual installed root source/client/factory native proof independently passes:
+SQL-authored legacy empty/zero/false/JSON/millisecond dates, exact real CLI seed
+create and rerun, four defaults/Unicode symbols, type-column clearing, original
+seed identities/createdAt, unrelated legacy-row preservation, actual string
+normalization/found semantics/environments, compound uniqueness/rollback and
+missing-delete handling. Owner shutdown leaves zero connections and the owned
+database is removed. The candidate's compiled proof remains separately scoped.
+
+Evidence: existing ignored d7-prisma/settings/installed-identity.json,
+installed-source-build.log (no emit), installed-tsconfig.test.json.log,
+installed-tsconfig.tools.json.log, installed-focused-unit.log,
+installed-focused-lint.log, installed-all-test-types.log, installed-security.log,
+installed-lock-review.json, installed-native-result.json,
+installed-cli-seed-create.log and installed-cli-seed-rerun.log. No new script,
+model, seed default, wire contract or application image changed in verification.
+
+Handoff receipt: exact pre/post consumer trace remains reconciled; installed
+version/type/lint/unit/security/native data and seed checks pass. Source/doc
+format and whitespace checks pass. Existing root generic command and native
+selector select exactly Settings; prior scoped cleanup/fail-fast/ownership
+regressions remain valid. Public contract preflight regeneration is inapplicable
+to unchanged service/RPC/DTO/SDK inputs. PostgreSQL is accepting connections.
+Full native clean CLI deploy/status is explicitly pending; no native primitive
+or candidate receipt substitutes for that complete command.
+
+READY FOR NAMED OPERATOR PROOF:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd db:verify:migrations settings
+```
+
+Expected: only Settings' one original migration in an owned _verify_ database,
+up-to-date status and owned cleanup. Stop on first error; no install repetition,
+container restart or application rebuild. After acceptance trace Blog next.
+Four remaining owners/root reconciliation, D8 image rollout, D4 FreshClam
+freshness and B5 hosted CI/B0 remain open. Current-focus/AI/service/Docker notes
+now point at this exact installed checkpoint.
+
+#### November 7 Settings clean proof accepted - Blog pre-edit trace
+
+Salar reports the named Settings scoped native clean CLI proof completed. Accept
+that operator-reported deploy/status result without inventing counts/transcript.
+Product, Order, Media, Taxonomy and Settings host acceptance remain separate from
+D8 images. Continue with Blog, the sixth D7 database owner, on the same adopted
+stable7.10.1 cohort; no feature expansion or fresh dependency selection.
+
+| Exact consumer / owner                                                                                                                                                                                                                                                                                                                  | Required action or unchanged/deferred reason                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| apps/blog-service/package.json; prisma/schema.prisma; new prisma.config.ts                                                                                                                                                                                                                                                              | Match client/CLI/adapter7.10.1, pg8.23.1, dotenv17.2.3; new CJS src generator and URL/shadow/seed config. Preserve all three models, enum and original migration.                                                                      |
+| src/prisma.service.ts; new src/prisma-options.ts; new test/prisma-options.unit.spec.ts                                                                                                                                                                                                                                                  | Validated explicit schema/pool/timeouts factory and typed error registration; retain Blog's existing catch/warn startup behavior, sanitization and shutdown.                                                                           |
+| src/blog/blog.service.ts; blog.types.ts; blog.mapper.ts; dto/post.dto.ts; src/blog/grpc/blog-grpc.controller.ts                                                                                                                                                                                                                         | Move only generated imports in the first two files. Preserve enum/status conversion, mapper, public publication filters, slug uniqueness, arrays/metadata, timestamps, archive behavior and transport contracts.                       |
+| prisma/seed.ts; scripts/backend.test.mjs base seed ownership                                                                                                                                                                                                                                                                            | Existing empty seed remains byte-unchanged; no new demo/default post/category/comment records. Native CLI seed on populated original SQL data must leave facts unchanged.                                                              |
+| eslint.config.mjs; new tsconfig.test.json/tsconfig.tools.json; existing Jest/unit/build/TS/setup                                                                                                                                                                                                                                        | Real typed test/tool projects, generated lint exclusion; existing unit glob registers new options case. Preserve network-free unit setup and separate main integration startup hook; all12 existing tests/helpers remain type covered. |
+| test/blog.error-translation.unit.spec.ts; blog.grpc-validation.unit.spec.ts; blog.http-validation.unit.spec.ts; default-blog-taxonomy.initializer.unit.spec.ts; test/grpc/{helpers,taxonomy.e2e.spec,blog.e2e.spec}.ts; test/http/{taxonomy.http.e2e.spec,blog.http.e2e.spec}.ts; test/{jest.env,setup/wait-for-services,utils/http}.ts | No old direct Prisma constructors/imports; keep authorization/validation/error fixtures and initializers unchanged. Native real owner/model proof supplements existing units; image/live acceptance D8.                                |
+| src/default-blog-taxonomy.initializer.ts; taxonomy-client.module.ts; settings-client.module.ts; taxonomy facade                                                                                                                                                                                                                         | Preserve existing scoped remote Taxonomy/Settings bootstrap; ORM maintenance does not redesign the service taxonomy or merge databases. Native proof does not call bootstrap services.                                                 |
+| docker/backend.Dockerfile; selected graph/config projection, generated excludes, watch and runtime modern-client tooling                                                                                                                                                                                                                | Add Blog config COPY. Reuse existing generic contracts without another build tool. No image export; all six migrated-owner image acceptances remain D8.                                                                                |
+| scripts/backend.mjs finite migrationVerificationServices/help; scripts/backend.test.mjs scoped selection/cleanup and base-seed ownership; root generic command                                                                                                                                                                          | Add Blog to existing scoped runner; no new alias/script. Preserve prior scopes/default-all and unknown rejection. Operator full clean proof after installed acceptance: db:verify:migrations blog.                                     |
+| packages/clients/src/blog.client.ts; packages/protos/blog.proto; apps/gateway/src/blog/gateway-blog-api.service.ts; scripts/backend.mjs seedBackendDemo; external SDK/demo consumers                                                                                                                                                    | Private database path only; no route/message/body/count/hash/signature changes. Keep DTO/protobuf/generated SDK contracts and old feature evidence; no external preflight regeneration.                                                |
+| AI_CONTEXT/current-focus; Blog/Settings service notes; Docker notes; this report                                                                                                                                                                                                                                                        | Mark Settings host gate accepted and exact Blog candidate/installed/image stages. Three remaining owners/root reconciliation stay D7; D4 freshness/CI/B0 remain open.                                                                  |
+
+Preparation uses the same already-audited installed Product7 bytes in an owned
+ignored d7-prisma/blog snapshot. Actual PG18 proof must preserve SQL-authored
+published post/category/comment facts, arrays/nulls/dates and enum, run existing
+empty CLI seed, exercise actual owner publication/archive/slug and rollback/FK
+behavior, close pools and remove only its guarded disposable DB. Root install
+and image/live/full native clean CLI acceptance remain explicit later gates.
+
+#### Blog candidate preparation receipt - serialized installation handoff
+
+Settings' operator-reported full clean CLI gate is accepted; a read-only catalog
+query observes zero Settings _verify_ databases remaining. No result counts were
+invented. Blog's post-edit impact table is reconciled: source service/types only
+move generated imports; mapper/DTO/RPC bodies, bootstrap, three models/enum,
+migration and empty seed are unchanged. The actual controller path is
+apps/blog-service/src/blog/grpc/blog-grpc.controller.ts; all test/helper paths
+remain typed. No external contract, receiver/hash, generated SDK or storage
+policy is modified. Existing Blog cover-image string compatibility is preserved.
+
+Prepared checks pass:
+
+- Matching cached audited client/CLI/adapter7.10.1, pg8.23.1, dotenv17.2.3 physical
+  Product dependencies; no root install or lock mutation for this preparation.
+- Actual owner config/generation without runtime URL/shadow inputs; source CJS/
+  declaration compilation, test/tools types and clean focused typed lint.
+- Five network-free unit suites,28/28, zero skips, including current error,
+  HTTP/RPC validation and bootstrap plus new driver configuration checks.
+- Original SQL-authored category/post/comment data read through the compiled7
+  owner: status enum, string arrays, nulls, legacy cover string, metadata, dates
+  and relations. Empty native CLI seed leaves every populated fact unchanged.
+- Actual BlogService public list/search/tag/category filters, draft denial,
+  publication, stable publication timestamp, archive hiding and slug reservation.
+  Actual existing mapper plus real protobuf encode/decode retain expected arrays,
+  status, empty strings and exact dates; this proves compatibility, not a new API.
+- Deliberate P2002 whole-row transaction rollback and invalid-child P2003; original
+  category SET NULL and comment CASCADE SQL actions. Negative logs are expected.
+- Owner disconnect/zero connections and owned disposable database removal.
+- Four focused existing scope/clean-verification cleanup/fail-fast/base-seed
+  ownership regressions. Root backend MJS lint and formatting pass. Blog is added
+  only to the finite existing selector/help; no new alias/script or launcher.
+
+The existing generic selected config projection, modern runtime loader, generated
+excludes, packaging and structural watch apply unchanged. Blog adds its legacy
+config COPY; no image export or actual application dependency replacement. D8
+owns those inputs. Prior passing untouched tooling/public-contract evidence is
+retained; external preflight regeneration does not apply to private ORM imports.
+
+Evidence stays in ignored .ci-evidence/dependency-review/d7-prisma/blog/:
+candidate.json, dependency-identity.json, schema-before.prisma, seed-before.ts,
+generate.log, source-build.log, tsconfig.test.json.log, tsconfig.tools.json.log,
+focused-unit.log, focused-lint.log, cli-seed.log, native-result.json and
+previous-owner-cleanup.json. Native success/cleanup flags are true. Candidate
+and bounded diagnostics are evidence, not new maintained tools; retain through
+D7 acceptance, then unlink dependency junctions safely under D11. No ordinary
+DB, seeded demo object, scanner, cache or volume was changed.
+
+Handoff receipt: exact consumer trace reviewed; scoped format/lint/types/unit,
+real SQL/codec/seed and guarded cleanup prerequisites pass. Root Blog source/
+manifest/lock remain intentionally out of sync until installation; do not run
+broader root suites, images or publish against that incomplete installation.
+Candidate success does not establish installed security/types or full native
+CLI deployment. Fresh resolved root audit and all-service types follow install.
+
+READY FOR SERIALIZED BLOG INSTALL:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --no-frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-blog-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-blog-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+After success verify actual installed client/CLI/config/adapter, narrow lock,
+strict security and affected/all-service test types. Then hand off the already
+scoped existing `pnpm db:verify:migrations blog`. No repeated accepted owner SQL,
+app image rebuild or broader feature work is needed now. User, Realm Auth,
+Tenant Authority and root tooling remain D7; D8, D4 freshness and B5/B0 stay open.
+
+#### Blog installed acceptance - complete clean CLI handoff
+
+Salar reports serialized install exit0 in27.8s. Actual Blog plus five migrated
+owners agree on CLI/client/adapter7.10.1 and pg8.23.1, with regenerated source.
+Installed source/test/tool types and clean scoped typed lint pass. Five units
+pass28/28, zero skips. Eight-service test/helper types pass131 files/zero errors.
+Fresh strict dependency gate is runtime0/tooling0/unresolved0, deferred-Web47;
+known CKEditor/React peer warning remains deferred, not a backend downgrade.
+
+All19 manifest importers match,12 declared auto-installed peers normalize as
+before, and fast-uri3.1.9 remains. Compared with published HEAD, only cumulative
+Blog/Settings/Taxonomy importers differ. Package identities/integrities and all
+snapshot runtime dependency maps are unchanged; informational supports-color
+peer metadata normalizes in four CKEditor snapshots (fullscreen/highlight/
+language/list). No Web version or runtime edge changed; do not blindly revert
+metadata or misclassify the existing47 deferred findings.
+
+Independent installed root source/client/factory proof passes against PG18.6:
+original populated category/post/comment/arrays/nulls/status/dates and legacy
+cover string, actual selected CLI empty seed preservation, actual BlogService
+publication/filter/archive/slug logic, mapper with real protobuf roundtrip,
+P2002 whole-row rollback, invalid-child P2003 and original SET NULL/CASCADE.
+Expected negative-case sanitized logs are retained. Owner disconnect leaves
+zero connections and the owned DB is removed. This is installed native primitive/
+compatibility evidence, distinct from the candidate compiled receipt and full
+native deploy/status proof. No business/DTO/mapper/protobuf/schema change in this
+installation-verification step; preserve prior consumer trace and passing
+unaffected contract/tooling evidence, without unnecessary preflight regeneration.
+
+Existing ignored d7-prisma/blog evidence: installed-identity.json,
+installed-source-build.log (no emit), installed-tsconfig.test.json.log,
+installed-tsconfig.tools.json.log, installed-focused-unit.log,
+installed-focused-lint.log, installed-all-test-types.log, installed-security.log,
+installed-lock-review.json, installed-native-result.json and
+installed-cli-seed.log. No new maintained tool, ordinary DB mutation or app image
+replacement occurred. Source/doc format and whitespace checks pass.
+
+Handoff receipt: exact impact/caller table reconciled, cheap installed identity/
+lock/security/types/lint/units and actual native data/codec/seed/cleanup pass.
+PostgreSQL accepts connections; a read-only actual selector check confirms only
+Blog. Earlier finite-scope cleanup/fail-fast/ownership regressions remain valid.
+No public contract source changed; current-snapshot hosted CI is still B5-owned.
+Full native clean CLI proof is the named remaining gate, not inferred from these
+primitive or candidate results.
+
+READY FOR NAMED OPERATOR PROOF:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd db:verify:migrations blog
+```
+
+Expected: only Blog's one original migration applies in an owned _verify_ DB,
+status is current, and cleanup completes. Stop on first failure. No install
+repetition, container restart or image build required. After acceptance trace
+User service next; three remaining owners/root reconciliation, D8 images,
+FreshClam freshness and B5/B0 stay open. Current-focus/AI/service/Docker notes
+point to this installed checkpoint rather than a pending installation.
+
+#### November 7 Blog host proof accepted - User pre-edit trace
+
+Salar reports the scoped Blog clean CLI proof done; accept that operator result,
+without inventing transcript counts. Product/Order/Media/Taxonomy/Settings/Blog
+host acceptance stays distinct from D8 images. User is the seventh D7 owner,
+not a restart of tenant/F4 feature implementation. Preserve its current model,
+password/role/API boundaries, local seed policy and migration artifact format.
+
+| Exact User owner / consumer paths                                                                                                                                                                                                                                                                                      | Required change or unchanged/deferred reason                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| apps/user-service/package.json; prisma/schema.prisma; new prisma.config.ts                                                                                                                                                                                                                                             | Matching adopted CLI/client/adapter7.10.1, pg8.23.1, dotenv17.2.3; CJS src client; URL/shadow/seed config. Preserve User model and both migration files. Seed config keeps ts-node --project tsconfig.json.                                                                                                      |
+| src/prisma.service.ts; new src/prisma-options.ts; new test/prisma-options.unit.spec.ts                                                                                                                                                                                                                                 | Same validated explicit URL/schema/pool/timeout factory and typed error event. Preserve User's fail-fast connect, sanitized logs and shutdown.                                                                                                                                                                   |
+| src/user/user.service.ts                                                                                                                                                                                                                                                                                               | Type-only User import moves; no password hashing/verification, normalization, roles, ownership, projection or error-handling behavior change.                                                                                                                                                                    |
+| prisma/seed.ts; seed-f4-editor-user.ts                                                                                                                                                                                                                                                                                 | Update generated client/owner factory only. Preserve main function ASTs: production refusal, existing env/default credentials, bcrypt cost10, roles, upserts and id/role-only output. Any newly exposed cleanup lint defect gets a separately verified awaited wrapper, not a rule suppression.                  |
+| prisma/audit-f4-legacy-roles.ts; export-f4-default-role-fixtures.ts; export-f4-r3-credentials.ts                                                                                                                                                                                                                       | Update each constructor/import to owner options; preserve frozen role classifier/hash-only audit, four-user/distinct-role fixture, serializable bounded credential read, encryption/HMAC, exclusive file targets, metadata-only stdout and cleanup. Native CLI checks use only synthetic owned users/keys/paths. |
+| src/migration/f4-legacy-role-migration.ts; f4-r3-credential-export.ts; packages/migration-artifacts/                                                                                                                                                                                                                   | Unchanged role decisions, normalization/quarantine, 10000-user bound, encoded credentials, schema/crypto/expiry. Existing unit assertions plus actual private CLI export/open/selection checks; no new F4 import, production data or secret logs.                                                                |
+| eslint.config.mjs; new tsconfig.test.json/tsconfig.tools.json; existing unit/main Jest/build/setup configs                                                                                                                                                                                                             | Typed tests and all five tool scripts, no raised default-project limit. Existing unit glob includes new factory test; main integration startup hook remains outside focused work. Existing ten test/helper paths stay covered.                                                                                   |
+| test/f4-legacy-role-migration.unit.spec.ts; f4-r3-credential-export.unit.spec.ts; user-list.unit.spec.ts; user.http-validation.unit.spec.ts; test/grpc/{helpers,user.e2e.spec}.ts; http/user.http.e2e.spec.ts; setup/wait-for-services.ts; utils/http.ts; jest.env.ts                                                  | Preserve role/audit/crypto/privacy/validation fixtures and receiver/response expectations; only the imported CLI's new dependency construction needs compatibility.                                                                                                                                              |
+| src/user/user.controller.ts; user/grpc/user-grpc.controller.ts; dto/update-profile.dto.ts; src/health.controller.ts; apps/auth-service/src/auth/auth.service.ts and auth/grpc/grpc-auth.service.ts; packages/clients/src/user.client.ts; apps/gateway/src/user/gateway-user-api.service.ts; packages/protos/user.proto | Public/internal source bodies and serialized fields stay; roles/self-admin/private credential boundaries unchanged. Native service/hash/list and existing privacy/role units supplement types. No contract inventory/hash/protobuf/SDK regeneration or public-route change.                                      |
+| scripts/backend.mjs migration scope/help plus verifyF4R3ShadowImport/verifyF4Batch3RoleSeeds; scripts/backend.test.mjs scope/seed/F4 orchestration; root package commands                                                                                                                                              | Add User to existing finite selector; all CLI command registrations stay. Preserve existing encrypted export/audit/fixture callers; run focused orchestration tests, not actual tenant migration.                                                                                                                |
+| docker/backend.Dockerfile and generic selected schema/config, generated excludes, watch, runtime/packaging checks                                                                                                                                                                                                      | Add User config COPY. Reuse modern-owner checks; generated client travels with dist. Images/live sign-in validation remain D8-owned.                                                                                                                                                                             |
+| current-focus/AI/User/Blog/Docker notes and this existing report                                                                                                                                                                                                                                                       | Record actual scope/status, two remaining owners/root tooling after User. D4 signature freshness/B5/B0 stay open.                                                                                                                                                                                                |
+
+Prepare an owned ignored d7-prisma/user snapshot with the identical already-
+audited Product7 dependency bytes, no root install or lock mutation. Native PG18
+proof uses original populated User rows and hashes, actual dev/editor seeds and
+rerun, owned auth/profile/list operations, role audit/fixture and encrypted CLI
+artifact. Generate migration keys in memory, never print passwords/hashes/keys
+or decrypted data, clean only owned artifact paths and disposable DB/pools.
+User candidate source/test/tools types and29 focused units pass. Newly typed CLI
+coverage finds one known lifecycle pattern: editor seed's async finally callback
+fails no-misused-promises. Use the already-validated awaited runSeed wrapper,
+preserving its main AST/production guard/role/password-cost policy and error
+prefix. Five obsolete no-console disable comments produce unused warnings and
+can be removed without changing any rule. No audit/export/helper policy change.
+
+#### November 7 User candidate preparation receipt
+
+Blog's operator-reported scoped clean CLI proof is accepted; a read-only catalog
+check confirms zero Blog verification databases remain. Six installed host owners
+are accepted. User is prepared as the seventh owner; its root importer is still
+installed on6.16.2 until the required serialized install below.
+
+Revisited the preceding exact impact table after editing. All five CLI imports
+and constructors use the new owner factory. UserService's model import is type
+only; its business-body AST is unchanged. The User model and both original
+migration files are unchanged. Five CLI main/helper policy AST comparisons pass
+(only Prisma constructor arguments normalized). The editor seed's completion
+wrapper now awaits disconnect; four focused in-memory cases verify success,
+main failure, combined main/cleanup failure and production refusal without writes.
+All five obsolete no-console suppressions were removed, with no rule weakening.
+
+Candidate dependencies resolve to identical already-audited installed Product7
+physical bytes: CLI/client/adapter7.10.1, pg8.23.1 and dotenv17.2.3. Generation,
+actual source compilation, test/tools type projects and scoped typed lint pass.
+All29 unit assertions across five suites pass, with no skips. Existing generic
+migration orchestration's six scoped seed/selector/cleanup/F4 regression checks
+pass; the finite selector/help now include User. Those checks prove orchestration,
+not full native clean CLI deployment. Source/config/tool/test/MJS formatting and
+whitespace gates pass. Prettier has no Prisma parser here: schema validation is
+provided by actual7 generation and exact model/migration preservation, not an
+invented formatting pass.
+
+Actual PG18 native evidence uses owned disposable
+nebula_users_verify_719a97e6949c and synthetic users only. Both original migrations
+preserve legacy identity/hash/dates while removing only the unused refresh field.
+Actual base and editor seed commands reject production without writes, create the
+existing expected roles and bcrypt credentials, and rerun without changing IDs,
+created dates, roles or unrelated legacy data. Actual role audit and four-distinct-
+user fixture CLI output pass. Actual encrypted credential export uses in-memory
+keys, bounded serializable selection, matching subject/hash/date preservation,
+legacy-phone quarantine and no-overwrite checks; encrypted bytes contain no raw
+fixture password/hash. The artifact is opened through its existing consumer.
+Only owned artifacts/empty directory are removed; no key file is written.
+
+Actual compiled UserService login/wrong-password, normalized lookup, hashed create,
+password/profile update, ownership/admin-role denial, safe admin list and
+prehashed-input behavior pass. Email/phone P2002 and transaction rollback preserve
+the complete legacy credential row. Pools close, zero DB connections remain,
+owned artifacts and database are cleaned. This does not certify running Auth/JWT,
+Gateway sign-in, F4 activation or packaged images.
+
+Consumer reconciliation: src/migration helper and migration-artifacts policy,
+Auth/Gateway/client/proto/DTO/controller bodies and public serializations remain
+unchanged for the documented reasons. No public contract regeneration, inventory,
+hash or broad preflight refresh is needed. Existing generic graph/config projection,
+generated-source exclusion, watch and modern runtime checks already handle User;
+only the legacy Docker install config COPY changes. Grouped image/build-context/
+live acceptance remains D8. Current-focus/AI/service/Docker docs now point to User
+installation; no new maintained script or report is introduced.
+
+Ignored evidence under .ci-evidence/dependency-review/d7-prisma/user:
+candidate.json, dependency-identity.json, generate.log, source-build.log,
+tsconfig.test.json.log, tsconfig.tools.json.log, focused-unit.log,
+focused-lint.log, tools-recheck.log, policy-compatibility.json,
+editor-lifecycle-proof.json, native-result.json and previous-owner-cleanup.json.
+Candidate/native helpers are disposable diagnostics, not new application tooling.
+Candidate node_modules/packages junctions target existing workspace dependencies;
+D11 must unlink them without recursively traversing targets.
+
+Handoff receipt: pre-edit consumer table reconciled; generation/compilation/types/
+lint/29 units, policy/lifecycle comparisons, focused orchestration and actual
+native owner/five-CLI/crypto/SQL/cleanup pass. Existing passing external-contract
+evidence remains valid. Root install, resulting lock/importer review, fresh audit,
+installed checks and complete native clean CLI proof are explicitly pending.
+Realm Auth, Tenant Authority and root tooling reconciliation remain D7;
+seven prepared owner images remain D8; D4 signature freshness and B5/B0 remain open.
+
+READY FOR NAMED OPERATOR INSTALL (no Docker rebuild):
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --no-frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-user-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-user-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+Stop on failure. After reviewing actual installed dependencies and cheap/native
+checks, hand off the existing pnpm db:verify:migrations user command. Do not
+infer installed or image acceptance from the candidate or restart tenant work.
+
+#### November 7 User installed checkpoint - clean CLI handoff
+
+Salar reports serialized install success in1m42.1s, exit0. Actual Node24.22.2
+owner resolution confirms Prisma CLI/client/adapter7.10.1, pg8.23.1 and
+dotenv17.2.3; physical dependency bytes match the tested candidate. Root installed
+source compilation, test/tools type projects, scoped typed lint and all29 unit
+tests pass. The eight-service no-emit test gate passes132 files with zero errors
+(User11/Auth17/Settings9/Media22/Taxonomy9/Product28/Blog13/Order23).
+
+Fresh strict backend dependency gate passes: runtime0, tooling0, unresolved0,
+deferred-Web47. All19 importer specifiers match manifests;12 extra importer
+entries exactly match declared peers. Cumulative changed importers versus HEAD
+are Blog/Settings/Taxonomy/User only. Package identities/integrities, overrides
+and all snapshot runtime/development dependency maps are unchanged. Only four
+CKEditor supports-color transitive-peer metadata entries differ; those do not
+change installed package versions/runtime maps and remain deferred Web. The
+scoped fast-uri3.1.9 override remains. No blind lock refresh or Web repair.
+
+Actual compiled installed UserService and all five CLI consumers repeat the
+candidate native proof against nebula_users_verify_f7885f087c62: original
+populated upgrade/hash/date preservation, production guards, base/editor seed
+and rerun, role audit/distinct-role fixture, bounded encrypted export/open/
+selection/no-overwrite, auth/profile/ownership/safe list, unique errors and
+transaction rollback. Synthetic users and in-memory keys only. Owned artifacts,
+pools and disposable DB are cleaned; native receipt success=true. Expected
+negative unique cases emit only sanitized prisma_error. Running Auth/JWT and
+images remain untested by this host proof.
+
+Installed evidence under the existing ignored d7-prisma/user owner:
+installed-identity.json, installed-lock-review.json, installed-source-build.log,
+installed-tsconfig.test.json.log, installed-tsconfig.tools.json.log,
+installed-focused-unit.log, installed-focused-lint.log,
+installed-all-test-types.log, installed-security.log, installed-native-result.json,
+installed-selector.json and bounded installed CLI logs. Reused owned diagnostics
+run actual root owner dependencies; no candidate substitution. A read-only
+selector probe initially used a nonexistent diagnostic property; corrected it
+to the implementation's packageName, then verified exact User-only selection.
+No repository contract change was necessary.
+
+Handoff receipt: prior exact consumer table reconciled; actual installed
+identity/lock/security/types/lint/units/native cleanup and source/doc whitespace
+checks pass. Finite-scope orchestration regressions remain valid. No public
+contract change requires regeneration/preflight. The complete native clean CLI
+proof below remains pending and is not inferred from SQL primitive checks.
+
+READY FOR NAMED OPERATOR PROOF:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd db:verify:migrations user
+```
+
+Expected: only User's two original migrations apply in an owned _verify_ DB,
+status is current and cleanup completes. Stop on first failure. No reinstall,
+container restart or image build. After acceptance trace Realm Auth next for
+dependency compatibility only; tenant implementation stays paused. Two further
+owners/root tooling, D8 packaged cohort, D4 signatures and B5/B0 remain open.
+
+#### November 7 User host accepted - Realm Auth pre-edit trace
+
+Salar reports User's scoped clean migration proof done; accept that operator
+result. Seven owners have host acceptance. Realm Auth is dependency maintenance
+only, preserving SHADOW admission, fixed deployments, paused F4 rollout and all
+13 models/enums/one original migration. No session issuer or tenant activation.
+
+| Exact owner/consumer                                                                                                                                                                                                                                                | Required action or unchanged/deferred reason                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| apps/realm-auth-service/package.json; prisma/schema.prisma; new prisma.config.ts                                                                                                                                                                                    | Adopt matching approved CLI/client/adapter7.10.1, pg8.23.1/dotenv17.2.3; CJS generated source. Preserve model/enum body and migration bytes; retain five CLI command registrations and DEFAULT seed argument.                                                   |
+| src/prisma.service.ts; new src/prisma-options.ts/test/prisma-options.spec.ts; test/prisma-logging.spec.ts                                                                                                                                                           | Wire owner adapter with validated pool/schema/timeout behavior. Preserve lazy connection (no onModuleInit), sanitized error event and disconnect. Logging mock moves and verifies adapter as well as unchanged exact error marker.                              |
+| src/migration/shadow-boundary.seed.ts; f4-r3-shadow-import.ts; f4-r3-shadow-login.ts; r4-operator-staging.ts                                                                                                                                                        | Generated type imports only; preserve transaction retries/locks, frozen artifact/receipt/crypto/role rules, login comparison, operator password limits and rollback. Compare policy bodies after editing; native candidate checks use owned synthetic fixtures. |
+| prisma/seed-shadow-boundary.ts; import-f4-r3-shadow.ts; rollback-f4-r3-shadow.ts; compare-f4-r3-shadow-login.ts; r4-operator-staging.ts                                                                                                                             | Move each generated client import/constructor to owner factory, including concurrent client factories. Preserve deployment checks, CLI args/stdin, metadata-only output, encryption and awaited shutdown.                                                       |
+| test/f4-r3-shadow-import.spec.ts; f4-r3-shadow-login.spec.ts; shadow-boundary-seed.spec.ts; r4-operator-staging.spec.ts                                                                                                                                             | Generated type import moves; preserve all negative/retry/idempotency/crypto assertions. Existing schema/deployment-config tests remain unchanged because public/config/body semantics stay.                                                                     |
+| eslint.config.mjs; tsconfig.spec.json; new tsconfig.tools.json; existing jest.config.ts                                                                                                                                                                             | Use actual test/tools typed projects instead of default-project20 fallback. Retain stricter Realm rules, no copied User rule relaxations. Existing Jest has no global live startup and includes the new spec.                                                   |
+| src/realm-boundary.service.ts; health.controller.ts; config/{realm-deployments,env.validation}.ts; main.ts; realm-auth-redis.service.ts; app.module.ts                                                                                                              | Unchanged readiness/config/Redis/HTTP and SHADOW ownership. Native boundary checks supplement source/tests; no new external DTO/proto/client/inventory/hash generation.                                                                                         |
+| packages/migration-artifacts/src; apps/user-service/prisma/export-f4-r3-credentials.ts; apps/auth-service/prisma/export-f4-r3-sessions.ts; scripts/backend.mjs verifyF4R3ShadowImport/verifyF4R4OperatorStaging/verifyRealmAuthFoundation; scripts/backend.test.mjs | Artifact source/consumer policies unchanged. Existing composite heavy cross-service proofs remain distinct, not run as feature rollout. Extend only existing finite clean migration selector/help/test for realm-auth.                                          |
+| docker/backend.Dockerfile; scripts/docker/backend-build-graph.mjs; verify-runtime-imports.mjs; scripts/backend-dev.mjs; packaging/context benchmarks                                                                                                                | Add owner config COPY; generic modern owner generation/dist/watch/exclusion handling reused. Existing DEFAULT/OPERATOR image sharing preserved. In-image and grouped rollout acceptance stays D8.                                                               |
+| docs/current-focus.md; AI_CONTEXT.md; docs/services/{user,realm-auth}-service.md; docs/docker-configs.md; this report                                                                                                                                               | Record User acceptance and explicit Realm preparation versus installation/native/image status. One further owner/root reconciliation remains after Realm; tenant implementation remains paused.                                                                 |
+
+Use an owned ignored realm-auth candidate with identical audited Product7
+dependency bytes, no root lock mutation. Check original SQL/DEFAULT and OPERATOR
+seed/rerun/conflict, readiness, preserved shadow triggers and operator stage/
+verify/rollback. Exercise encrypted import/login/rollback against synthetic
+artifacts with ephemeral keys, not real accounts. Keep transaction/error mapping
+and complete CLI launch checks distinct from mocked tests and D8 transport.
+
+#### November 7 Realm Auth candidate receipt - install handoff
+
+Revisited the preceding consumer table: all five CLI constructors (including
+concurrent factories), four migration helpers and their typed test consumers
+use the new generated path/factory. All nine policy-body AST comparisons pass
+with only Prisma constructor arguments normalized; every model/enum and the
+original migration remain unchanged. Seed config preserves the existing DEFAULT
+argument; no migration path override, new authority or tenant rollout.
+
+Actual candidate CLI/client/adapter7.10.1, pg8.23.1/dotenv17.2.3 use identical
+audited installed Product bytes without changing the root lock. Generation and
+source compilation pass. Actual spec/tools projects, strict typed lint and all56
+assertions across eight test suites pass, no skips. Existing Realm lint rules
+are preserved, replacing default-project20 fallback with actual projects. The
+deployment-isolation test's existing selector-union inference error becomes
+visible under the repaired spec project; an explicit string|number selector
+return type fixes it without changing assertions. Logging mock moves with the
+client, supplies a synthetic URL, checks the adapter and retains the exact
+sanitized error/shutdown assertions; no rule suppression or assertion removal.
+Four obsolete no-console comments are removed without rule changes.
+
+Actual PG18 native checks apply original SQL to two owned databases. A real
+Prisma6 client populates DEFAULT boundary/keys before the7 CLI; snapshots retain
+all row facts and reruns do not rewrite them. OPERATOR seed creates the exact
+separate tuple; crossed seeds fail without mutation. Actual readiness accepts
+correct tuples and rejects the crossed issuer. Actual operator CLI concurrently
+stages credentials, retries/reruns, verifies/rejects passwords, preserves the
+shadow generation fence and rolls back idempotently.
+
+Actual importer CLI authenticates/decrypts ephemeral paired artifacts, concurrently
+imports once, reruns exactly, preserves bcrypt credentials, creates one terminal
+bridge and no AuthSession, compares normalized login/wrong-password, then rolls
+back idempotently retaining two terminal manifests/receipts. All five CLI tools
+run with synthetic users/passwords and in-memory keys only; raw keys/hashes/
+passwords are not printed. Owned artifact files/directory, both pools and both
+disposable databases are cleaned. Actual composite User/Auth/Redis publication
+and running images remain separate, not inferred from these candidate checks.
+
+Seven focused root seed/scope/foundation/partial-failure/cleanup orchestration
+tests pass. The existing finite clean selector/help now supports realm-auth;
+native read-only selection confirms only that owner. All59 local Docker COPY
+inputs exist; selected Realm graph includes no sibling application. Those are
+static checks, not BuildKit/image acceptance. Source/config/test/tool/MJS
+formatting and focused tooling lint pass. Prisma schema validation is actual
+generation plus exact model/enum preservation, not a nonexistent Prettier parser.
+Read-only catalog observation confirms zero User verification databases remain.
+
+Evidence: existing ignored d7-prisma/realm-auth/{candidate.json,
+dependency-identity.json,generate.log,source-build.log,tsconfig.spec.json.log,
+tsconfig.tools.json.log,focused-unit.log,focused-lint.log,
+focused-orchestration.log,focused-tooling-lint.log,policy-compatibility.json,
+native-result.json,pre-handoff-review.json} and bounded native CLI logs.
+Source-before/candidate copies and helper diagnostics stay ignored; their
+node_modules/packages junction targets must be unlinked safely under D11.
+No new maintained script/report or public contract surface is added. Existing
+public-contract evidence remains valid; no public preflight regeneration needed.
+
+Handoff receipt: exact consumer table reconciled; generation/source/spec/tools,
+strict lint/56 tests, frozen policy checks, scoped orchestration and actual native
+both-deployment/five-CLI/crypto/SQL/cleanup pass. Root install, installed identity/
+lock/fresh audit/types/tests/native and complete dual-deployment foundation proof
+remain pending. Seven installed owners have host acceptance. Tenant Authority
+and root tooling remain D7; eight prepared owner images remain D8; D4 signatures
+and B5/B0 remain open.
+
+READY FOR NAMED OPERATOR INSTALL (no Docker rebuild):
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --no-frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-realm-auth-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-realm-auth-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+Stop on failure. Review installed results before handing off the existing
+db:verify:f4-r3-realm-auth-foundation proof (both deployments). No reinstall of
+earlier owners, image rollout or resumed F4 feature implementation is needed.
+
+#### November 7 Realm Auth installed checkpoint - foundation handoff
+
+Salar reports install success in1m30.8s, exit0. Actual owner CLI/client/adapter
+resolve7.10.1, pg8.23.1 and dotenv17.2.3, identical physical candidate bytes.
+Node24.22.2 installed source compilation, spec/tools type projects, strict
+source/test/tool lint and all56 tests across eight suites pass. The previous
+132-file eight-service test-type evidence remains applicable: this isolated
+owner has no sibling application dependency and its own spec project covers
+Realm Auth (which has no test:e2e registration in that generic gate).
+
+Fresh dependency gate passes runtime0/tooling0/unresolved0, deferred-Web47.
+All19 lock importers match manifests;12 additional entries match declared peers.
+Cumulative changed importers versus HEAD are Blog/Realm Auth/Settings/Taxonomy/
+User only. Package identities/integrities, overrides and complete snapshot
+dependency maps are unchanged. Seven CKEditor supports-color transitive-peer
+metadata entries differ without changing package versions/runtime maps; they
+remain deferred Web. Scoped fast-uri3.1.9 is preserved. No blind lock revert,
+new dependency pin or Web implementation change.
+
+Actual compiled installed PrismaService and all five CLI tools repeat the
+candidate proof on two owned disposable databases: original migration SQL,
+Prisma6-populated DEFAULT boundary/key preservation, separate OPERATOR seed,
+both reruns/crossed conflicts/readiness, concurrent operator stage/retry/verify/
+password denial/generation guard/rollback, authenticated encrypted concurrent
+import/rerun/login/rollback and terminal receipts. Synthetic users/passwords
+and in-memory keys only. Owned artifacts/directory, pools and both databases
+are cleaned; installed-native-result reports success=true/cleaned=true and
+ownedArtifactsCleaned=true. The sanitized prisma_error from the deliberate
+generation denial is expected, not an unexamined container fault.
+
+Installed evidence under ignored d7-prisma/realm-auth: installed-identity.json,
+installed-lock-review.json, installed-source-build.log,
+installed-tsconfig.spec.json.log, installed-tsconfig.tools.json.log,
+installed-focused-unit.log, installed-focused-lint.log, installed-security.log,
+installed-native-result.json, installed-launch-review.json and bounded CLI logs.
+Diagnostics load the actual root owner, not the candidate. Read-only selector/
+manifest/config review confirms Realm-only scope and the unchanged DEFAULT seed
+command. The complete root foundation command supplies real pnpm lifecycle and
+tests both deployments; no inline runner workaround is required.
+
+Handoff receipt: exact earlier consumer table reconciled. Installed identity/
+lock/security/types/lint/units/native/cleanup pass; prior seven orchestration
+scope/foundation/failure/cleanup tests remain valid. Source/consumer bodies and
+public contracts did not change during installation, so no external preflight
+regeneration or repeat broad suites are needed. Current-focus/AI/service/Docker
+notes distinguish this host checkpoint from running images and full clean CLI.
+
+READY FOR NAMED OPERATOR PROOF:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd db:verify:f4-r3-realm-auth-foundation
+```
+
+Expected: both isolated DEFAULT/OPERATOR clean migration/status/seed-rerun and
+existing SQL boundary/guard proofs pass; owned databases are cleaned. Stop on
+first failure. No reinstall, container restart or image rebuild. After acceptance,
+trace Tenant Authority for dependency compatibility only, keeping tenant feature
+implementation paused. Root tooling/D7, grouped D8 images, D4 signature freshness
+and B5/B0 remain open; installed candidate primitives do not certify those gates.
+
+#### November 7 Realm Auth accepted - Tenant Authority/root pre-edit trace
+
+Salar supplies the successful full foundation transcript: OPERATOR verified,
+both deployments complete, two disposable databases removed. Eight owners now
+have host acceptance. Final owner maintenance is Tenant Authority; its existing
+compatibility graph is preserved and F4 feature implementation remains paused.
+Root Prisma pins are reconciled in the same required install to avoid a second
+install cycle; no new version cohort or architectural mechanism is introduced.
+
+| Exact owner/consumer paths                                                                                                                                                                                                                                                                                                                                      | Required action or unchanged/deferred reason                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| apps/tenant-authority-service/package.json; prisma/schema.prisma; new prisma.config.ts; root package.json Prisma/client pins                                                                                                                                                                                                                                    | Adopt exact approved7.10.1 CLI/client/adapter, pg8.23.1/dotenv17.2.3. Preserve all models/enums and eight migrations. Root6 pins have no direct root/Web/SDK runtime import; commands delegate to owner CLI, so align rather than delete or introduce another release.                  |
+| src/prisma.service.ts; new src/prisma-options.ts/test/prisma-options.spec.ts; test/prisma-logging.spec.ts                                                                                                                                                                                                                                                       | Validated adapter/pool/schema/timeouts with lazy connection, exact sanitized logging and shutdown. Preserve test error-marker/privacy/disconnect assertions and verify adapter construction.                                                                                            |
+| src/authority/{authority-audit.repository,default-actor-backfill,identity-control-plane.seed,legacy-role-backfill,default-development-authority.seed}.ts                                                                                                                                                                                                        | Type imports only; preserve audit/HMAC chain/outbox/serializable locks, development guards, role grants, identity control plane and actor evidence. Compare frozen policy bodies after edit.                                                                                            |
+| prisma/{seed,backfill-f4-default-actors,backfill-f4-legacy-roles,seed-f4-default-role-fixtures,verify-batch2-exit,verify-batch3-actor-resolution}.ts                                                                                                                                                                                                            | All six CLI imports/constructors use adapter. Preserve args/stdin/role inputs/signing/output and main policy. Await shutdown wrappers where newly typed tools expose async-finally misuse; verify success and failure order without rule suppression.                                   |
+| test/{identity-control-plane-seed,default-development-authority-seed,default-actor-backfill,prisma-logging}.spec.ts; eslint.config.mjs; tsconfig.spec.json; new tsconfig.tools.json; existing jest.config.ts                                                                                                                                                    | Update generated type/mock imports, keep all assertions and strict Realm-style rules. Fix real spec inclusion; replace fallback20 with explicit typed projects. No live global setup in existing suite.                                                                                 |
+| src/authority/{authority.repository,authority.service,authority-grpc.controller,authority-read.types,registration-mutation.repository,registration-mutation.service,registration-mutation.types,authority-domain,membership-epoch-ref}.ts; src/{health.controller,main,app.module,auth-client.module}.ts; config/env.validation.ts                              | Public/resolver/registration/authorization/HTTP/signing bodies unchanged. Native owner/readiness/audit/role CLI checks supplement existing assertions. No active traffic admission, new policy or feature scope.                                                                        |
+| remaining test/{app-wiring,authority-foundation,authority-readiness,authority-entitlement-scope,authority-read-contract,authority-domain,authority-actor-rpc,authority-membership-foundation,authority-actor-resolution,authority-registration-records,authority-registration-audit,default-actor-migrations,membership-epoch-ref,legacy-role-backfill}.spec.ts | Preserve existing schema/domain/ownership/role/HMAC/rollback assertions; actual typed suite covers them. Only confirmed surfaced preparation defects may receive narrow fixes.                                                                                                          |
+| scripts/backend.mjs runPrismaOperation/verifyCleanMigrations/verifyF4Batch3RoleSeeds/verifyF4R2SchemaUpgrades/verifyF4R4OperatorStaging; scripts/backend.test.mjs optional-peer runtime inventory and scope/seed/F4 tests                                                                                                                                       | Existing tenant-authority scoped selector and command already exist, no new alias. Preserve optional-CLI-peer synthetic6 fixture and legacy recovery coverage: those are deliberate compatibility tests, not installed version declarations. Root update must not blindly refresh them. |
+| scripts/docker/{backend-build-graph,verify-runtime-imports}.mjs and tests; scripts/backend-dev.mjs/tests; runtime-packaging tests; packages/api-client/test/media-processing-recovery.test.mjs                                                                                                                                                                  | Generic modern manifest/config/client checks already apply. Deliberate6 recovery fixtures stay until D8 old-image transition is complete. Shared build/watch projection and schema generation remain owner-scoped.                                                                      |
+| docker/backend.Dockerfile; .gitignore/.dockerignore; docs/current-focus.md; AI_CONTEXT.md; docs/services/{realm-auth,tenant-authority}-service.md; docs/docker-configs.md                                                                                                                                                                                       | Add final owner config COPY; reuse modern generated exclusion/dist/runtime handling. Record installed versus candidate/image proof separately. Full runtime/CI acceptances remain D8/B5.                                                                                                |
+
+Before install, use an owned ignored tenant-authority candidate with identical
+audited Product7 bytes. Check generation/source/spec/tools/lint/all existing
+units, AST/model/migration preservation, actual original clean/populated SQL,
+all six CLI seed/role/backfill/verifier paths, audit/outbox/hash preservation and
+shutdown failures. Use only synthetic identities and ephemeral signing keys on
+owned disposable databases. Root lock/security/installed-wide checks remain
+explicitly pending until the serialized combined install.
+
+Tenant preparation observations before handoff: the source scan in
+test/identity-control-plane-seed.spec.ts and sourceTree in
+test/default-actor-migrations.spec.ts must omit only the exact generated Prisma
+directory now located under src; all handwritten readers and negative regex
+assertions stay covered. Candidate setup also supplies the exact sibling
+User schema and Media/Order/Product SQL/source readers these existing tests
+inspect. Those are test input dependencies, not application build dependencies.
+
+Strict tool lint confirms four async-finally lifecycle defects in seed,
+default-actor backfill and both batch verifiers; use awaited wrappers with
+success/main/cleanup/combined failure evidence. The two stdin readers now narrow
+unknown Node chunks to string/Uint8Array before Buffer.from rather than carrying
+Buffer<any> into typed lint. Valid UTF-8/string/byte/empty input stays; malformed
+non-stream values fail explicitly. No role/HMAC/authorization rule changes.
+
+Confirmed stale implementation: verify-batch2-exit counts all tenant revision1
+outbox rows, while the already-existing base seed also writes inactive control-
+plane rows at that revision. The candidate native CLI fails seed*observability*
+mismatch after both legitimate seeds. Narrow its query to the exact manifest
+TENANT/SITE/CHANNEL/APPLICATION pairs; preserve the required nine-event count
+and successful seed audit assertion. Do not accept a larger arbitrary count.
+Actual native evidence must include those additional control-plane rows and
+prove both the corrected nine-event check and their preservation. No runtime
+feature or database mutation rule is changed by this maintenance-only verifier fix.
+
+#### November 7 Tenant Authority/root candidate receipt - combined install
+
+Post-edit consumer table reconciled. All17 authority source policy bodies are
+AST-identical after imports;21 models/27 enums and eight original migrations are
+unchanged. Four existing CLI main bodies remain identical except the explicitly
+reviewed Batch2 outbox query narrowing; all other differences are constructor
+arguments. The base/default-actor CLI main functions preserve their original
+awaited call/output order. Root manifest differs only in the two intended6.16.2
+to7.10.1 pins. Existing deliberate6 optional-peer/recovery fixtures stay intact.
+
+Candidate resolves identical audited Product7 CLI/client/adapter7.10.1,
+pg8.23.1/dotenv17.2.3 bytes; no root install or lock rewrite has run. Generation,
+source compilation, actual spec/tools projects, strict source/test/tool lint and
+all92 tests across19 suites pass, no skips. Four awaited wrappers pass16 real-
+AST VM success/main-failure/cleanup-failure/combined-failure cases. Both stdin
+readers pass eight empty/Unicode/string/byte/invalid-chunk controls. No lint rule
+is weakened. Generated-only source-scan exclusions retain the existing forbidden
+reader/actor assertions and all handwritten source coverage.
+
+Native candidate proof deploys/status-checks all eight original migrations on an
+owned PG18 database. A real6 client creates unrelated legacy bigint/date facts;
+the7 owner preserves them through base seed/rerun, production refusal and rollback.
+All six CLI tools run: base seed, legacy-role backfill, four-role/editor fixture,
+default actor evidence, Batch2 exit and Batch3 actor resolution. Three production
+guards reject writes; role/fixture/evidence reruns are exact. Four synthetic
+memberships/epochs and existing site/tenant/platform role decisions are verified.
+
+The stale Batch2 query fix passes with20 actual tenant revision-one outbox rows:
+exactly nine belong to the default manifest; other control-plane rows and all
+audit/outbox facts remain unchanged by the verifier. Independent canonical HMAC
+reconstruction verifies the complete v1/v2 audit chain and derived epoch ref;
+append-only denial, P2002 rollback and original bigint/date preservation pass.
+Expected negative cases emit sanitized prisma_error. Ephemeral signing keys stay
+in child environments, no secrets printed. Client pool and owned disposable
+database nebula_authority_verify_32fa5758adb1 are cleaned; receipt success=true.
+
+Preparation failures are retained as observations, not silently counted as pass:
+first candidate lacked sibling schemas/source needed by existing static tests;
+those exact inputs are now supplied. A diagnostic CLI seed initially lacked
+pnpm's node_modules/.bin PATH; the corrected owned launcher includes it, then
+production refusal and actual configured CLI seed both pass. Failed diagnostic
+databases were cleaned. AST comparison needed NodeArray trailing-comma metadata
+preserved when isolating the one query change; policy comparison now passes.
+These were diagnostic setup issues, not runtime authorization changes.
+
+Nine focused orchestration/optional-CLI-peer/seed/scope/F4/cleanup tests pass.
+All60 local COPY inputs exist; Tenant's selected graph contains no sibling app.
+All nine owner source manifests/configs now name7.10.1; installed root/Tenant
+and lock/security/runtime acceptance remain pending. Read-only catalog confirms
+zero Realm verification DBs after the operator's full foundation acceptance.
+No public DTO/proto/route/inventory/hash changes require preflight regeneration.
+
+Evidence remains under ignored d7-prisma/tenant-authority: candidate.json,
+dependency-identity.json,generate.log,source-build.log,tsconfig.spec.json.log,
+tsconfig.tools.json.log,focused-unit.log,focused-lint.log,
+focused-orchestration.log,policy-lifecycle-result.json,native-result.json,
+pre-handoff-review.json and bounded CLI logs. Source-before/candidate snapshots
+and diagnostic helpers are not maintained tools. D11 must unlink their dependency/
+packages junctions without traversing the actual workspace. Existing canonical
+current-focus/AI/service/Docker notes own this checkpoint; no new roadmap/report.
+
+Handoff receipt: exact consumer trace reconciled; generation/source/spec/tools,
+strict lint/92 tests, frozen policy/model/migrations, lifecycle/stdin checks,
+orchestration and actual native six-CLI/SQL/HMAC/cleanup pass. Source/doc format
+and whitespace gates pass. Combined install and final installed identities/lock/
+fresh audit/types/tests/native/clean CLI proof remain explicitly pending. D7 is
+not closed; all nine owner images are D8-owned. D4 signatures and B5/B0 stay open.
+
+READY FOR NAMED OPERATOR INSTALL (no Docker rebuild):
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --no-frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-tenant-authority-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-tenant-authority-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+Stop on failure. After final installed review, hand off the existing
+pnpm db:verify:tenant-authority proof; do not add a parallel runner or activate
+tenant features. Grouped image/version/live/CI verification remains separate.
+
+#### November 7 synchronization publication receipt
+
+Salar requests pushing the project for synchronization. The pre-publication
+review identifies117 intended source/config/test/documentation files (89 tracked
+modifications and28 new files), with no private env/storage/evidence/archive paths.
+Bounded private-key/token-pattern inspection reports no matches. This is a scoped
+review, not a newly executed comprehensive secret/image scan.
+
+The root/Tenant source pins still differed from their lock importers, so merely
+committing that lock would prevent a reproducible frozen install. Run the pinned
+package manager offline with --lockfile-only --ignore-scripts: exit0 in27.1s,
+no downloads/additions or generation/install scripts. All19 importers now match
+manifests, including exactly declared extra peers; no new package identities,
+versions or integrity values are introduced and overrides stay unchanged.
+Seventeen obsolete Prisma6/CLI-only package records are pruned. Common snapshot
+runtime maps must remain unchanged; CKEditor peer metadata is separately checked.
+Installed root/Tenant remain6.16.2 until the named full install.
+
+Actual BuildKit scratch/context-only proof verifies all60 local COPY inputs,
+without compiler/install RUNs or image export. Existing owner candidate/installed
+unit/type/native and scoped tooling evidence remains valid for unchanged source
+and identical physical dependencies. No external contract changed, so preflight
+regeneration is inapplicable. Final formatting/whitespace and staged-path checks
+are required before this checkpoint commit. No broad suite or new runtime
+acceptance is claimed; D7/D4/D8/B0 and current hosted CI remain open.
+
+Origin main initially matches local HEAD2ee4107 exactly after fetch; publication
+uses an ordinary fast-forward push, never force. Review every staged path and
+retain the essential new configs/factories/tests. Private ignored native proof
+receipts are not included; this canonical report owns their portable summary.
+
+The previous no-frozen install handoff is superseded for publication by:
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-tenant-authority-install.log
+```
+
+Then inspect actual installed identities, final lock/security/types/unit/native
+evidence and hand off pnpm db:verify:tenant-authority. Do not treat this push as
+installation, image rollout, green hosted CI or tenant feature completion.
+
+Publication cheap gates complete: all109 formatter-supported changed/new files
+pass Prettier; generated lock stays package-manager-authored and Prisma schemas
+retain generation/model-preservation evidence. Whitespace checks pass (one
+existing Taxonomy CRLF normalization warning only). All common lock snapshot
+dependency maps are unchanged;25 CKEditor transitive-peer metadata entries differ
+without package/runtime-map changes. The exact117-file staging manifest excludes
+private/ignored/generated artifacts; staged path and whitespace review precede
+commit. Full root/Tenant installation and corresponding native gates remain
+the next action on this or another device, not a publication completion claim.

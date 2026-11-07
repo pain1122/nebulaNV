@@ -5,6 +5,7 @@ const config: Config = {
   testEnvironment: "node",
   roots: ["<rootDir>/test"],
   testMatch: [
+    "<rootDir>/test/prisma-options.unit.spec.ts",
     "<rootDir>/test/taxonomy.ensure-system.unit.spec.ts",
     "<rootDir>/test/taxonomy.http-validation.unit.spec.ts",
   ],

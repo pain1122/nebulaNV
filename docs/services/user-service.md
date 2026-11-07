@@ -1,6 +1,32 @@
 # User Service
 
-Last reviewed: 2026-08-31
+Last reviewed: 2026-11-07
+
+## Prisma 7 preparation (November 7)
+
+Source uses matching client/CLI/adapter-pg7.10.1, pg8.23.1 and dotenv17.2.3.
+`prisma.config.ts` owns URL/shadow and the unchanged seed command. The CJS client
+generates under `src/generated/prisma` and compiles into dist. The owner factory
+preserves explicit schema/pool/timeout settings; startup remains fail-fast.
+The User model, both migrations and public contracts are unchanged.
+
+All five CLI consumers use that factory: base/editor seeds, legacy-role audit,
+default-role fixture export and encrypted credential export. Their main policies
+remain unchanged; the editor seed awaits disconnect on success and failure.
+This is compatibility maintenance; F4 tenant implementation remains paused.
+
+Candidate compilation, test/tools types, typed lint and29 units pass. Actual
+PG18 checks cover populated upgrade, seed/rerun/production refusal, login/profile/
+ownership/role and password-free list behavior, audit/fixture and encrypted
+export/open/no-overwrite, uniqueness rollback and owned DB/artifact cleanup.
+Only synthetic users and in-memory keys were used. Root installation succeeds;
+actual versions, installed source/test/tools types/lint/29 units, shared test
+types, lock/security and the same actual native controls pass. Full
+`pnpm db:verify:migrations user` is now accepted from Salar; zero User verification
+databases remain. These host checks do not
+establish running Auth/JWT or image acceptance (D8).
+
+## Identity ownership
 
 Current implementation: User-service owns one platform-global persisted user
 account table, password hashes, compatibility roles, and profile operations.

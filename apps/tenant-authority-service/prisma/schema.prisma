@@ -1,12 +1,12 @@
 generator client {
-  provider      = "prisma-client-js"
-  output        = "./generated"
-  binaryTargets = ["native", "linux-musl"]
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  importFileExtension = ""
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum TenantSiteLifecycle {

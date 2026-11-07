@@ -4,23 +4,19 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
-import { Prisma, PrismaClient } from "../prisma/generated/client";
-const prismaClientOptions = {
-  log: [{ emit: "event" as const, level: "error" as const }],
-} satisfies Prisma.PrismaClientOptions;
+import { PrismaClient } from "./generated/prisma/client";
+import { blogPrismaOptions } from "./prisma-options";
 
 @Injectable()
 export class PrismaService
-  extends PrismaClient<typeof prismaClientOptions>
+  extends PrismaClient<ReturnType<typeof blogPrismaOptions>>
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly log = new Logger("PrismaService");
 
   constructor() {
-    // configure Prisma’s event emitter
-    super(prismaClientOptions);
+    super(blogPrismaOptions());
 
-    // 👇 use bracket syntax to bypass Prisma’s generic overloads safely
     this.$on("error", () => {
       this.log.error("prisma_error");
     });

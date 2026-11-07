@@ -31,6 +31,7 @@ function sourceTree(service: string): string {
   const visit = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
       const entryPath = path.join(directory, entry.name);
+      if (entryPath === path.join(root, "generated", "prisma")) return [];
       if (entry.isDirectory()) return visit(entryPath);
       return entry.isFile() && entry.name.endsWith(".ts") ? [entryPath] : [];
     });

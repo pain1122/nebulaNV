@@ -1,11 +1,12 @@
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { realmAuthPrismaOptions } from "../src/prisma-options";
 import { realmAuthDeployment } from "../src/config/realm-deployments";
 import { seedShadowBoundary } from "../src/migration/shadow-boundary.seed";
 
 async function main(): Promise<void> {
   const name = process.argv[2] ?? process.env.REALM_AUTH_DEPLOYMENT;
   realmAuthDeployment(name);
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(realmAuthPrismaOptions());
   try {
     const result = await seedShadowBoundary(
       prisma,

@@ -1,5 +1,5 @@
 import * as bcrypt from "bcryptjs";
-import type { PrismaClient } from "../prisma/generated/client";
+import type { PrismaClient } from "../src/generated/prisma/client";
 import { compareF4R3ShadowLogin } from "../src/migration/f4-r3-shadow-login";
 
 describe("F4 R3 shadow login comparison", () => {

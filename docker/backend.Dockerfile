@@ -64,7 +64,9 @@ COPY --from=deps /app/packages ./packages
 # concurrent Prisma engine downloads can exhaust/reset the Docker TLS path.
 # Later source copies merge with this tree.
 COPY apps/blog-service/prisma/schema.prisma apps/blog-service/prisma/schema.prisma
+COPY apps/blog-service/prisma.config.ts apps/blog-service/prisma.config.ts
 COPY apps/tenant-authority-service/prisma/schema.prisma apps/tenant-authority-service/prisma/schema.prisma
+COPY apps/tenant-authority-service/prisma.config.ts apps/tenant-authority-service/prisma.config.ts
 COPY apps/media-service/prisma/schema.prisma apps/media-service/prisma/schema.prisma
 COPY apps/media-service/prisma.config.ts apps/media-service/prisma.config.ts
 COPY apps/order-service/prisma/schema.prisma apps/order-service/prisma/schema.prisma
@@ -72,9 +74,13 @@ COPY apps/order-service/prisma.config.ts apps/order-service/prisma.config.ts
 COPY apps/product-service/prisma/schema.prisma apps/product-service/prisma/schema.prisma
 COPY apps/product-service/prisma.config.ts apps/product-service/prisma.config.ts
 COPY apps/settings-service/prisma/schema.prisma apps/settings-service/prisma/schema.prisma
+COPY apps/settings-service/prisma.config.ts apps/settings-service/prisma.config.ts
 COPY apps/taxonomy-service/prisma/schema.prisma apps/taxonomy-service/prisma/schema.prisma
+COPY apps/taxonomy-service/prisma.config.ts apps/taxonomy-service/prisma.config.ts
 COPY apps/user-service/prisma/schema.prisma apps/user-service/prisma/schema.prisma
+COPY apps/user-service/prisma.config.ts apps/user-service/prisma.config.ts
 COPY apps/realm-auth-service/prisma/schema.prisma apps/realm-auth-service/prisma/schema.prisma
+COPY apps/realm-auth-service/prisma.config.ts apps/realm-auth-service/prisma.config.ts
 
 RUN --mount=type=cache,id=nebula-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile \

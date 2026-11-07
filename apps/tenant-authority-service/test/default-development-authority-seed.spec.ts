@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { PrismaClient } from "../prisma/generated/client";
+import type { PrismaClient } from "../src/generated/prisma/client";
 import type { AuthorityAuditSigner } from "../src/authority/authority-audit.signer";
 import { DEFAULT_DEVELOPMENT_AUTHORITY } from "../src/authority/default-development-authority.manifest";
 import { seedDefaultDevelopmentAuthority } from "../src/authority/default-development-authority.seed";

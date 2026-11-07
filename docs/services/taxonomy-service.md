@@ -1,5 +1,29 @@
 # Taxonomy Service
 
+## Prisma 7 preparation (November 7)
+
+Source selects matching Prisma CLI/client/adapter-pg7.10.1, pg8.23.1 and
+dotenv17.2.3. URL/shadow/empty seed configuration moves to `prisma.config.ts`;
+the CJS client is generated under `src/generated/prisma` and compiled into dist.
+`src/prisma-options.ts` preserves explicit schema/connection-limit/timeout
+settings with the adopted bounded defaults. Existing initialization catch/warn,
+sanitized errors and shutdown remain; no taxonomy policy or external API changes.
+The model and single migration are unchanged. Base seed remains intentionally
+empty: domain owners create their defaults; no unused Prisma connection is opened.
+
+Candidate source compilation, test/tools types, typed lint and all19 unit tests
+pass using the identical audited installed Product7 dependency bytes. Native
+PG18 checks cover service CRUD/tree/grouped counts, JSON omission/DbNull,
+uniqueness/error translation, system ownership/concurrent ensure, rollback,
+empty CLI seed and pool/database cleanup. Root install now passes; installed
+identity/three type projects/lint/19 units, lock/security and eight-service test
+types (129 files) pass. Actual installed owner SQL and a SQL-authored legacy row
+preserve JSON/flags/timestamps and empty seed rerun, with owned DB cleanup.
+November7 supplied clean CLI migration/status proof now passes; the exact owned
+database is confirmed removed. The existing command is
+`pnpm db:verify:migrations taxonomy`; the finite selector supports this owner.
+Candidate/installed evidence is not image/live acceptance; rollout stays D8-owned.
+
 Taxonomy-service owns reusable classification records such as product categories, blog categories, tags, brands, and future scoped taxonomy trees.
 
 It is the global taxonomy store. Domain services should usually expose scoped facades instead of letting callers use global taxonomy IDs directly.

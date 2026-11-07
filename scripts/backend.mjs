@@ -693,6 +693,11 @@ export function migrationVerificationServices(scope) {
     product: "@nebula/product-service",
     order: "@nebula/order-service",
     media: "@nebula/media-service",
+    taxonomy: "@nebula/taxonomy-service",
+    settings: "@nebula/settings-service",
+    blog: "@nebula/blog-service",
+    user: "@nebula/user-service",
+    "realm-auth": "@nebula/realm-auth-service",
   };
   const packageName = scopedPackages[scope];
   if (packageName) {
@@ -5642,7 +5647,7 @@ function usage() {
     "  node scripts/backend.mjs build-images [service ...] [--pull|--clean] [--plan]",
     "  node scripts/backend.mjs prisma <generate|migrate-dev|migrate-deploy|migrate-status|push|seed>",
     "  node scripts/backend.mjs seed",
-    "  node scripts/backend.mjs database verify-migrations [tenant-authority|product|order|media]",
+    "  node scripts/backend.mjs database verify-migrations [tenant-authority|product|order|media|taxonomy|settings|blog|user|realm-auth]",
     "  node scripts/backend.mjs database migrate-deploy <tenant-authority|product|order|media>",
     "  node scripts/backend.mjs database migrate-status <tenant-authority|product|order|media>",
     "  pnpm db:prepare (local owner migrations, status and base seeds; no image build)",

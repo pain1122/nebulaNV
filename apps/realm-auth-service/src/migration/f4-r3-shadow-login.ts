@@ -1,5 +1,5 @@
 import * as bcrypt from "bcryptjs";
-import type { PrismaClient } from "../../prisma/generated/client";
+import type { PrismaClient } from "../generated/prisma/client";
 import { REALM_AUTH_DEPLOYMENTS } from "../config/realm-deployments";
 
 export type F4R3ShadowLoginInput = Readonly<{

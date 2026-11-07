@@ -259,6 +259,14 @@ new task hierarchy or repeat unrelated expensive proofs.
 | 2026-11-04: PG18/Node24 proof preparation missed diagnostic and config-loader boundaries | Parent RESTRICT changed from 23503 to 23001; Prisma 6.16.2 also leaves it unmapped. Node24 native TS loading cannot resolve Media's inherited config import. Migration/source checks did not establish these consumers. | Correct only parent SQL expectations; preserve P2003 runtime assertions and make D7 compatibility a PG18 prerequisite. Explicit existing ts-node loader passes actual config/selection/proof-flag checks; native client failure stays recorded. | [PG18 regression trace](../reports/2026-10-31-dependency-maintenance-execution.md#november-4-postgresql-18-regression-failures---preparation-trace); five actual FK definitions checked; temporary SQL controls pass; Media full retry pending.          |
 | 2026-11-04: Product pilot omitted its dependency audit                                   | The isolated Prisma7 trial checked generation/types/native behavior but did not audit the new CLI graph before workspace installation; fast-uri3.1.0 introduced eight high unresolved findings.                         | Audit isolated trials before promotion; preserve the strict gate, patch only Ajv8.17.1's compatible fast-uri edge to3.1.9 and verify installed binding/security before stock handoff.                                                           | [Product installed dependency correction](../reports/2026-10-31-dependency-maintenance-execution.md#product-workspace-installation-accepted---fast-uri-dependency-correction); original failing report retained in D7 evidence.                          |
 
+November7 addition: import/generator-path migrations must format every changed
+consumer, including test/utils fixtures. Type checking and owner-source-only lint
+cannot certify the remaining helpers. CI41849532008 found missed formatting in
+Order checkout-attempt.fixture.ts and checkout.fixture.ts; formatting-only fixes,
+focused typed lint and all26 generated-client consumer formatting checks now pass.
+No tests/rules were removed. Details are in the maintenance report's November7
+D4 resume section; hosted acceptance remains pending.
+
 This document enforces the assistant's preparation workflow. The automated
 command detects the existing contract/inventory regressions; it does not
 automatically discover every semantic dependency or certify SQL, containers or

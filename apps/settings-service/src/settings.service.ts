@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { safeErrorName } from "@packages/config";
-import type { Setting } from "../prisma/generated/client";
+import type { Setting } from "./generated/prisma/client";
 import { prismaErrorCode } from "./error.utils";
 import { PrismaService } from "./prisma.service";
 

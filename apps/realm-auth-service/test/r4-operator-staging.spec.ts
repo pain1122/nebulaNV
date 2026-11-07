@@ -1,5 +1,5 @@
 import * as bcrypt from "bcryptjs";
-import type { PrismaClient } from "../prisma/generated/client";
+import type { PrismaClient } from "../src/generated/prisma/client";
 import { REALM_AUTH_DEPLOYMENTS } from "../src/config/realm-deployments";
 import {
   rollbackStagedOperator,

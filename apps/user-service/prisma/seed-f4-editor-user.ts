@@ -1,9 +1,9 @@
-/* eslint-disable no-console */
 import * as bcrypt from 'bcryptjs';
 
-import { PrismaClient } from './generated';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { userPrismaOptions } from '../src/prisma-options';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(userPrismaOptions());
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
@@ -23,11 +23,18 @@ async function main(): Promise<void> {
   console.log('[seed:f4-editor-user] editor ->', editor);
 }
 
-void main()
-  .catch((error: unknown) => {
+async function runSeed() {
+  try {
+    await main();
+  } catch (error) {
     console.error('[seed:f4-editor-user] ERROR:', error);
     process.exitCode = 1;
-  })
-  .finally(async () => {
+  } finally {
     await prisma.$disconnect();
-  });
+  }
+}
+
+void runSeed().catch((error: unknown) => {
+  console.error('[seed:f4-editor-user] ERROR:', error);
+  process.exitCode = 1;
+});

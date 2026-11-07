@@ -1,7 +1,7 @@
-/* eslint-disable no-console */
 import { createHash } from 'node:crypto';
 
-import { PrismaClient } from './generated';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { userPrismaOptions } from '../src/prisma-options';
 import {
   classifyF4LegacyRole,
   type F4LegacyRole,
@@ -95,7 +95,7 @@ export function buildF4LegacyRoleAudit(
 }
 
 async function main(): Promise<void> {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(userPrismaOptions());
   try {
     const users = await prisma.user.findMany({
       select: { id: true, role: true },

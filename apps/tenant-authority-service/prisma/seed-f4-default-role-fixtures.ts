@@ -1,5 +1,5 @@
-/* eslint-disable no-console */
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { tenantAuthorityPrismaOptions } from "../src/prisma-options";
 import {
   parseDefaultDevelopmentRoleFixture,
   seedDefaultDevelopmentRoleFixtures,
@@ -7,7 +7,16 @@ import {
 
 async function readStandardInput(): Promise<string> {
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  for await (const chunk of process.stdin) {
+    const value: unknown = chunk;
+    if (typeof value === "string") {
+      chunks.push(Buffer.from(value));
+    } else if (value instanceof Uint8Array) {
+      chunks.push(Buffer.from(value));
+    } else {
+      throw new Error("default_role_fixture_input_chunk_invalid");
+    }
+  }
   return Buffer.concat(chunks).toString("utf8");
 }
 
@@ -17,7 +26,7 @@ async function main(): Promise<void> {
   const fixture = parseDefaultDevelopmentRoleFixture(
     JSON.parse(raw) as unknown,
   );
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(tenantAuthorityPrismaOptions());
   try {
     console.log(await seedDefaultDevelopmentRoleFixtures(prisma, fixture));
   } finally {

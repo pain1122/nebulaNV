@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { safeErrorName } from "@packages/config";
 import { PrismaService } from "../prisma.service";
-import { Prisma, Taxonomy } from "../../prisma/generated";
+import { Prisma, type Taxonomy } from "../generated/prisma/client";
 import type { CreateTaxonomyDto } from "./dto/create-taxonomy.dto";
 import type { ListTaxonomiesQueryDto } from "./dto/list-taxonomies-query.dto";
 import type { UpdateTaxonomyDto } from "./dto/update-taxonomy.dto";

@@ -18,9 +18,10 @@ pass; all owned proof databases and pools close. Fourteen recovery helper tests
 pass, including strict modern selection and compatibility with existing legacy
 images. Root install/generation now succeeds; actual installed versions,
 source/test/tool types, focused lint, 63 tests, lock review, dependency security
-and the eight-service type gate (128 files) pass. Complete native CLI clean/
-populated upgrade proofs remain pending. Candidate native results are not native
-CLI deployment acceptance; image/storage/scanner acceptance remains D8-owned.
+and the eight-service type gate (128 files) pass. November7: Salar reports both
+complete native CLI clean/populated upgrade proofs pass on the installed7 cohort.
+Image/storage/scanner acceptance for the new application dependency cohort stays
+D8-owned; retain earlier accepted Media feature evidence for its tested images.
 
 Last reviewed: 2026-11-02 (SeaweedFS active; native feature/recovery and Product/Gateway regressions accepted)
 

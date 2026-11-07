@@ -1,11 +1,11 @@
-/* eslint-disable no-console */
 import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   canonicalMigrationJson,
   migrationKeyFromBase64url,
 } from '@nebula/migration-artifacts';
-import { PrismaClient } from './generated';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { userPrismaOptions } from '../src/prisma-options';
 import {
   createF4R3UserCredentialArtifact,
   F4_R3_MAX_USERS,
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     environment('F4_R3_USER_HMAC_KEY_ID'),
     environment('F4_R3_USER_HMAC_KEY'),
   );
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(userPrismaOptions());
   try {
     const rows = await prisma.$transaction(
       (tx) =>

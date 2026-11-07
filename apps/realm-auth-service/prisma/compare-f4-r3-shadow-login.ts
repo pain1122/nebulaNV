@@ -1,5 +1,5 @@
-/* eslint-disable no-console */
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { realmAuthPrismaOptions } from "../src/prisma-options";
 import { compareF4R3ShadowLogin } from "../src/migration/f4-r3-shadow-login";
 
 function argument(name: string): string {
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   if (legacyAccepted !== "true" && legacyAccepted !== "false") {
     throw new Error("f4_r3_shadow_login_legacy_result_required");
   }
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(realmAuthPrismaOptions());
   try {
     const result = await compareF4R3ShadowLogin(prisma, {
       kind,

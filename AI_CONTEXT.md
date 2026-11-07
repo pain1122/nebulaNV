@@ -1,12 +1,23 @@
 # AI Context: NebulaNV
 
-Last updated: 2026-11-04
+Last updated: 2026-11-07
 Purpose: fast, safe handoff for AI/developer sessions without re-discovering the whole repo.
 
-Resume at the [November 4 handoff](docs/current-focus.md#november-4-device-handoff):
-D7 Media is installed on Prisma7.10.1; finish its installed acceptance and native
-CLI proofs before migrating another owner. Product/Order host SQL gates pass;
-six owners remain on6.16.2. D4/D7/D8 and B0 are still open. Read the linked
+Resume at the [Tenant Authority/root handoff](docs/current-focus.md#november-7-d7-tenant-authority-and-root):
+Eight Prisma7.10.1 owners have host acceptance, including Realm Auth's full
+both-deployment foundation proof and two-DB cleanup. Final Tenant Authority
+source/six CLI clients and root CLI/client pins are prepared on the same cohort.
+Candidate types/strict lint/92 tests, frozen policies, lifecycle/stdin checks and
+actual PG18 seed/role/resolver/audit-HMAC/rollback/cleanup pass. The stale Batch2
+verifier now checks exact default pairs (nine), preserving20 real revision-one
+rows. Publication preparation synchronizes the final lock offline (19 matching
+importers, no new package versions); BuildKit verifies60 COPY inputs. Installed
+root/Tenant still resolve6.16.2. Next: serialized frozen Tenant Authority/root install, then final installed
+lock/security/types/native review and `pnpm db:verify:tenant-authority`.
+All nine owner source manifests/configs match; installed root/Tenant and D7
+sign-off remain pending. Nine prepared owner images remain D8. Tenant feature
+implementation stays paused. D4 Redis/scanner replacements
+are verified; signature freshness stays open. D4/D7/D8 and B0 are still open. Read the linked
 canonical maintenance report; ignored local logs/candidates are not portable.
 Use Node24.22.2/pnpm10.17.1. Do not mistake existing Docker images or prior hosted
 CI for acceptance of this dependency cohort. Long execution stays with Salar.

@@ -33,14 +33,17 @@ describe("realm Auth deployment configuration", () => {
       REALM_AUTH_DEPLOYMENTS.DEFAULT,
       REALM_AUTH_DEPLOYMENTS.OPERATOR,
     ] as const;
-    for (const select of [
+    const selectors: ReadonlyArray<
+      (item: (typeof values)[number]) => string | number
+    > = [
       (item: (typeof values)[number]) => item.identityRealmId,
       (item: (typeof values)[number]) => item.authRouteRef,
       (item: (typeof values)[number]) => item.databaseName,
       (item: (typeof values)[number]) => item.runtimeRole,
       (item: (typeof values)[number]) => item.issuer,
       (item: (typeof values)[number]) => item.defaultHttpPort,
-    ]) {
+    ];
+    for (const select of selectors) {
       expect(new Set(values.map(select))).toHaveProperty("size", values.length);
     }
     const registrations = values.flatMap((item) => [

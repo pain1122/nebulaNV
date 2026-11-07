@@ -2,7 +2,7 @@ import type {
   Prisma,
   PrismaClient,
   RealmKeyPurpose,
-} from "../../prisma/generated/client";
+} from "../generated/prisma/client";
 import {
   realmAuthDeployment,
   type RealmAuthDeploymentName,

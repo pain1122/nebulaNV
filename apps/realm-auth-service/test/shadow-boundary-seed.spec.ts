@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PrismaClient } from "../prisma/generated/client";
+import type { PrismaClient } from "../src/generated/prisma/client";
 import {
   expectedShadowBoundary,
   seedShadowBoundary,

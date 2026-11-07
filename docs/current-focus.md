@@ -1,9 +1,220 @@
 # Current Focus - Media, Dependency Maintenance And B0
 
-Updated: 2026-11-04. Execution order: **M -> D -> B**. Resume at **D7 Media**;
-D4 remains open behind dependency and image compatibility gates.
+Updated: 2026-11-07. Execution order: **M -> D -> B**. Realm Auth host proof passes;
+resume **D7 Tenant Authority/root installation**. D4 signature freshness remains open.
 This checklist ends at backend ecommerce release B0. F7/D3 Vite admin integration
 will receive a separate checklist; it is outside this implementation scope.
+
+## November 7 D7 Tenant Authority And Root
+
+Salar's full Realm foundation transcript verifies both deployments and removal
+of two disposable DBs; agent confirms zero Realm verification DBs remain. Eight
+owners have host acceptance. Tenant Authority is the final owner prepared on the
+approved CLI/client/adapter7.10.1, pg8.23.1/dotenv17.2.3 cohort. Root CLI/client
+pins join the same install. All nine owner manifests/configs now match in source;
+The publication preparation now synchronizes the root/Tenant lock importers;
+installed identities and final installed verification remain pending.
+
+Candidate generation/source/spec/tools types, strict lint and92 tests pass.
+All17 authority policy bodies,21 models/27 enums and eight migrations are
+unchanged. All six CLI clients use the adapter. Four awaited cleanup wrappers
+pass16 lifecycle cases; stdin narrowing passes eight byte/string/error cases.
+Source scans omit only generated Prisma, retaining handwritten-code assertions.
+Batch2 verifier now counts exact default manifest pairs: its required nine events
+pass with20 real revision-one rows present, preserving later control-plane data.
+
+Actual PG18 checks pass for original native migrations, Prisma6-populated bigint/
+dates, base/role/editor seed guards/reruns, actor resolution, default actor
+evidence, independent audit v1/v2 HMAC chain and epoch reference, append-only/
+uniqueness/rollback and owned DB/pool cleanup. Nine focused orchestration/legacy
+optional-peer checks pass. Static60-input COPY existence and owner graph checks
+pass; sibling schemas/source copied for tests are not app build dependencies.
+
+Publication checkpoint: offline lockfile-only synchronization passes; all19
+importers match and no new package identities are introduced. BuildKit verifies
+all60 COPY inputs. No dependency installation or application rebuild ran.
+
+Next: Salar runs the serialized combined frozen install into
+`.ci-evidence/dependency-review/d7-tenant-authority-install.log`. Then review
+actual installed versions, final lock/security/types/tests/native checks before
+the existing `pnpm db:verify:tenant-authority` clean proof. No image rebuild or
+tenant feature implementation here. D7 sign-off remains open until installed
+reconciliation/proof; nine prepared owner images remain D8. D4 signatures/B5/B0
+remain open. Exact files, findings and evidence:
+[maintenance report](reports/2026-10-31-dependency-maintenance-execution.md).
+
+```powershell
+fnm exec --using=24.22.2 pnpm.cmd install --frozen-lockfile --child-concurrency=1 *> .ci-evidence/dependency-review/d7-tenant-authority-install.log
+$installExit = $LASTEXITCODE
+Get-Content .ci-evidence/dependency-review/d7-tenant-authority-install.log -Tail 20
+"exit_code=$installExit"
+```
+
+## November 7 D7 Realm Auth
+
+Salar accepts User's scoped clean CLI proof; zero User verification DBs remain.
+Seven owners have host acceptance. Realm Auth source is prepared on matching
+CLI/client/adapter7.10.1, pg8.23.1 and dotenv17.2.3 using the same audited bytes.
+Its13 models/enums, original migration, fixed DEFAULT/OPERATOR deployments and
+all nine migration/CLI policy bodies remain unchanged. No F4 activation.
+
+Candidate generation/source compilation, actual spec/tools types, strict typed
+lint and all56 tests pass. Test typing replaces the default-project20 fallback;
+one existing deployment-selector inference error is corrected without changing
+assertions. Logging checks retain the exact sanitized marker and shutdown check.
+Seven focused runner scope/seed/foundation/cleanup regressions pass.
+
+Native PG18 checks pass for both deployments: Prisma6-populated DEFAULT boundary/
+key preservation, seeds/reruns/crossed conflicts/readiness, concurrent operator
+staging/verify/password denial/generation guard/rollback, actual encrypted
+concurrent import/rerun/login/rollback and terminal receipts. All five CLI tools
+run against owned synthetic fixtures. Keys stay in memory; artifacts/pools/two
+DBs are cleaned. Static59-input Docker COPY existence and isolated graph checks
+pass; BuildKit/runtime acceptance remains D8.
+
+Root install succeeds in1m30.8s/exit0. Installed CLI/client/adapter7.10.1,
+pg8.23.1/dotenv17.2.3 match candidate bytes. Actual source/spec/tools types,
+strict lint/all56 tests, narrow lock review and fresh dependency gate
+(runtime0/tooling0/unresolved0; deferred-Web47) pass. Installed native checks
+repeat both-deployment seed/readiness/stage/encrypted import/login/rollback and
+owned cleanup successfully. All19 importer specifiers match; package identities,
+integrities and snapshot runtime maps are unchanged.
+
+The full clean CLI/SQL foundation proof now passes both deployments; Salar's
+transcript confirms cleanup of two DBs and agent observes no remaining Realm
+verification DB. Resume Tenant Authority/root above; host acceptance does not
+certify running images. Tenant features stay paused.
+Exact consumer/evidence trace:
+[maintenance report](reports/2026-10-31-dependency-maintenance-execution.md).
+
+## November 7 D7 User
+
+Salar reports Blog's scoped clean CLI proof done; agent confirms zero remaining
+Blog verification databases. Six owners have host acceptance. User source is
+prepared on the same audited Prisma7.10.1/client/adapter, pg8.23.1 and
+dotenv17.2.3 cohort. Its model, both migrations and public contracts are unchanged.
+All five Prisma CLI consumers use the owner factory; their role/password/export
+policies stay. The editor seed now awaits cleanup, including failure paths.
+
+Candidate generation/source compilation, test/tools types, scoped typed lint
+and29 units pass. Actual PG18 checks pass for populated upgrade, both seeds and
+reruns/production refusal, login/profile/ownership/password-free lists, role
+audit/fixture, encrypted export/open/no-overwrite and uniqueness rollback. Only
+synthetic users and in-memory keys were used; owned artifacts, pools and DB were
+cleaned. UserService/CLI policy AST comparisons and cleanup regressions pass.
+The existing generic migration selector includes User; focused seed/scope/F4
+orchestration/cleanup checks pass. No tenant feature implementation resumes.
+
+Root install passes in1m42.1s/exit0. Actual CLI/client/adapter7.10.1,
+pg8.23.1 and dotenv17.2.3 match candidate bytes. Installed source/test/tools types,
+typed lint/all29 units, eight-service test types (132 files), narrow lock review,
+dependency gate (runtime0/tooling0/unresolved0; deferred-Web47) and actual native
+owner/five-CLI/legacy/crypto/SQL/cleanup checks pass. All19 lock importers match;
+package identities/integrities and snapshot runtime maps are unchanged.
+
+The full scoped clean CLI proof is now accepted from Salar's done; zero User
+verification databases remain. Resume Realm Auth above. Host results do not
+certify running images. Detailed evidence and consumer trace:
+[maintenance report](reports/2026-10-31-dependency-maintenance-execution.md).
+
+## November 7 D7 Blog
+
+Salar accepts the scoped Settings clean CLI proof; agent confirms no Settings
+disposable verification database remains. Five owners now have host acceptance.
+Blog source is prepared on the identical audited7.10.1 client/CLI/adapter and
+pg8.23.1 cohort. All three models/enum, original migration, empty seed and public
+method/mapper/DTO bodies stay unchanged. Catch/warn startup behavior is preserved.
+
+Candidate generation/compilation, test/tools types, typed lint and all28 units
+pass. Actual PG18 legacy category/post/comment/arrays/nulls/dates, empty seed,
+publication/archive/slug rules, mapper with real protobuf roundtrip, uniqueness/
+rollback/FK actions and zero-connection cleanup pass. The finite generic migration
+selector includes Blog with focused scope/cleanup/seed regressions passing.
+Root install now passes in27.8s/exit0. Actual six owner CLI/client/adapter versions
+agree7.10.1 with pg8.23.1. Installed Blog source/test/tool types, typed lint/all28
+units, eight-service test types (131 files), strict dependency gate, narrow lock
+and actual owner/legacy/empty seed/mapper-codec/SQL/cleanup checks pass. All19
+lock importers match; package identities/integrities and snapshot runtime maps
+are unchanged apart from the intended cumulative owner importer changes.
+The complete scoped clean CLI proof is now accepted from Salar's DONE; zero Blog
+verification databases remain. Resume User above. Host acceptance does not
+certify new images; grouped D8 images, signature freshness and hosted CI stay open.
+
+## November 7 D7 Settings
+
+Taxonomy's supplied native clean deploy/status succeeds for its single migration;
+agent confirms the exact disposable database is removed. Product, Order, Media
+and Taxonomy host acceptance stays valid. Settings source is now prepared using
+the identical audited7.10.1 client/CLI/adapter and pg8.23.1 cohort. Its model and
+migration are unchanged. The four existing seed helper/main ASTs and exact
+locales/currency symbols/default currency/cart TTL stay unchanged; cleanup now
+awaits disconnect on both success and failure without suppressing typed lint.
+
+Candidate generation/compilation, test/tools types, focused typed lint, all23
+units and native PG18 legacy typed-row/real seed create-rerun/value clearing/
+service/rollback/cleanup checks pass. Three in-memory lifecycle cases verify
+disconnect and primary/cleanup error reporting. Settings is also added to the
+existing finite migration scope; focused selection/cleanup/ownership checks pass.
+Root install now passes in1m27.3s/exit0. Actual Settings and the four earlier owners
+match CLI/client/adapter7.10.1 and pg8.23.1. Installed source/test/tool types,
+typed lint/all23 units, eight-service test types (130 files), strict dependency
+gate and actual owner/legacy-row/seed/rerun/type clearing/rollback/cleanup pass.
+All19 lock importers match; package versions/integrities and snapshot dependency
+maps are preserved, with only named deferred-Web peer metadata normalization.
+The named `fnm exec --using=24.22.2 pnpm.cmd db:verify:migrations settings` is now
+operator-accepted; no Settings disposable databases remain. This does not certify
+new application images. Resume Blog's handoff above; no Settings repetition.
+Blog, User, Realm Auth and Tenant Authority plus inherited root tooling remain;
+grouped D8 images, D4 signature freshness and B5 hosted CI are still open.
+
+## November 7 D7 Taxonomy
+
+Salar reports both installed Media7 clean/populated CLI proofs pass. Product,
+Order and Media host SQL acceptance is retained. Taxonomy source is prepared on
+the same audited CLI/client/adapter7.10.1, pg8.23.1 cohort. Its model and single
+migration are unchanged. Candidate generation/compilation, test/tool types,
+typed lint, all19 unit tests, empty CLI seed and real PG18 service/tree/JSON/
+uniqueness/concurrent system ensure/rollback/shutdown/owned cleanup checks pass.
+
+Salar's root install now passes in4m54.3s/exit0. Actual client/CLI/adapter versions
+match7.10.1 and pg8.23.1. Installed source/test/tool types, typed lint, all19 units,
+eight-service test types (129 files), strict dependency gate and actual native
+owner/seed/SQL checks pass. A separately SQL-authored legacy row preserves UUID,
+JSON false/zero/arrays, flags and millisecond timestamps through7 reads and seed
+rerun; owned databases/pools are cleaned. All19 lock importers match; package
+versions/integrities remain unchanged outside the intended Taxonomy importer.
+
+The supplied `fnm exec --using=24.22.2 pnpm.cmd db:verify:migrations taxonomy`
+proof now passes. The existing runner accepts this finite Taxonomy scope;
+selection, cleanup/fail-fast regressions, syntax/lint/format pass. This reuses the
+generic command, without a new alias or whole-backend verification. Complete
+native clean CLI deploy/status is accepted; this does not establish image acceptance. Settings, Blog, User,
+Realm Auth and Tenant Authority plus inherited root tooling still need D7 work.
+Retain pending grouped D8 application images and B5 hosted CI; no app rebuild now.
+
+## November 7 D4 resume
+
+All sixteen active containers and eleven backend readiness checks pass after
+restoring the eleven stopped existing application containers (exit255, no OOM;
+cause unproven). PG18.6 is running. Both recreated Redis containers now run7.4.12
+on the selected digest, preserving both original /data volumes and saved witnesses.
+Both owned witnesses are removed and cleanup persisted in RDB. The new reviewed
+ClamAV image preserves its named signature volume and passes benign/EICAR controls.
+The existing ignored dependency-review d4-nov7-rollout.json receipt now records
+infra-verified with exact identities and completed cleanup. No app image rebuilt.
+
+Media's subsequent clean/populated CLI proofs are now operator-accepted; use the
+Taxonomy handoff above next. No further infrastructure recreation is needed. FreshClam's single
+supported retry again received403; signatures remain28145
+datedOct6. Preserve cooldown until **Nov8 10:43:48 Tehran / 07:13:48UTC**. New
+scanner-image health does not prove fresh signatures or close D4.
+
+Hosted CI41849532008 failed on two Order test-fixture import-format errors;
+they are corrected locally, focused typed lint and all26 affected Order generated
+client import formatting checks pass. CI is still unaccepted under B5; do not
+mistake local formatting for a new hosted run. The report and preparation ledger
+record the missed helper boundary. The accepted Media host proofs and successful
+installed checks stay valid.
 
 ## November 4 device handoff
 
@@ -747,10 +958,42 @@ their remediation; the accepted D2 high/critical production gate stays valid.
       pass; models/eight migrations and external contracts are unchanged.
       Media root install now passes. Installed identity/lock/security/types,
       63 focused tests and eight-service types (128 files) pass; current-snapshot
-      contract preflight passes24 tests. Next: the complete native clean/populated
-      Media CLI proofs, db:verify:media then db:verify:media:upgrade.
-      Candidate results do not certify the installed graph or running image.
-      Six other owners and all three runtime images remain separate; D7/PG18
+      contract preflight passes24 tests. Salar now accepts Media's complete native
+      clean/populated CLI proofs. Taxonomy source/config/client preparation,
+      compilation, all19 units, typed lint and native service/seed/SQL/cleanup
+      controls pass in the isolated candidate. Taxonomy install now passes;
+      installed identity/lock/security, all19 units, source/test/tools and
+      all-service test types (129 files), native owner and populated-row/seed
+      preservation pass. Next: db:verify:migrations taxonomy, using the narrowly
+      extended existing scoped runner. That native clean CLI proof now passes;
+      the exact owned database is cleaned. Settings candidate/source preparation
+      passes23 units, source/test/tools, typed lint, original typed legacy row,
+      exact four-default seed/rerun/type clearing, lifecycle and native cleanup.
+      Settings install now passes; actual versions, source/test/tools/lint,
+      all23 units, all-service test types (130 files), lock/security and actual
+      native owner/seed/populated-data preservation/cleanup pass. Next:
+      db:verify:migrations settings now passes; no owned verify database remains.
+      Blog candidate generation/compilation/types/lint/28 units and native
+      legacy/owner/empty seed/mapper-protobuf/rollback/FK/cleanup pass. Next:
+      Blog install now passes. Actual versions, source/test/tools/lint/28 units,
+      all-service types (131 files), lock/security and installed native owner/
+      legacy/empty seed/mapper-codec/SQL/cleanup pass. Blog's complete scoped
+      clean CLI proof is accepted; no verification DB remains. User candidate
+      generation/compilation/test/tools types/lint/29 units and native populated
+      upgrade, five CLI consumers, auth/profile/roles/crypto/rollback/cleanup
+      checks pass. User root install now passes; actual identity, installed
+      source/test/tools/lint/29 units,132-file shared test types, lock/security
+      and native owner/five-CLI/legacy/crypto/SQL/cleanup pass. User scoped clean
+      CLI proof is accepted. Realm Auth candidate compilation/spec/tools/lint/56
+      tests, frozen policy checks and native both-deployment/seed/stage/encrypted
+      import/login/rollback/cleanup pass. Realm Auth install succeeds; installed
+      identities/lock/security, source/spec/tools/lint/56 tests and native
+      both-deployment/five-CLI/crypto/SQL/cleanup pass. Realm's complete foundation
+      proof now passes both deployments and cleanup. Final Tenant Authority/root
+      source is prepared; candidate types/lint/92 tests, frozen policy/lifecycle
+      and original native six-CLI/audit/role/rollback/cleanup checks pass. Next:
+      combined install, installed final reconciliation and existing clean proof.
+      All nine prepared owner runtime images remain separate; D7/PG18
       sign-off stays open. The missed pilot audit remains in the preparation ledger.
 
 - [ ] **D8 - Reconcile the installed and packaged dependency cohort.**

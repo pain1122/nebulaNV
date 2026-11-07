@@ -1,4 +1,4 @@
-import { BlogPostStatus, type BlogPost } from "../../prisma/generated";
+import { BlogPostStatus, type BlogPost } from "../generated/prisma/client";
 import { BlogPostStatusDto } from "./dto/post.dto";
 
 export type BlogPostRecord = BlogPost;

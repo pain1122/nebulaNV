@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
-import { User } from '../../prisma/generated/client';
+import type { User } from '../generated/prisma/client';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { toRpc } from '@nebula/grpc-auth';
 import { status } from '@grpc/grpc-js';

@@ -3305,6 +3305,32 @@ test("product migration verification executes the inventory and variant database
 test("migration verification can select one scoped service", () => {
   assert.deepEqual(migrationVerificationServices(), prismaServices);
   assert.deepEqual(
+    migrationVerificationServices("realm-auth").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/realm-auth-service"],
+  );
+  assert.deepEqual(
+    migrationVerificationServices("user").map((service) => service.packageName),
+    ["@nebula/user-service"],
+  );
+  assert.deepEqual(
+    migrationVerificationServices("blog").map((service) => service.packageName),
+    ["@nebula/blog-service"],
+  );
+  assert.deepEqual(
+    migrationVerificationServices("settings").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/settings-service"],
+  );
+  assert.deepEqual(
+    migrationVerificationServices("taxonomy").map(
+      (service) => service.packageName,
+    ),
+    ["@nebula/taxonomy-service"],
+  );
+  assert.deepEqual(
     migrationVerificationServices("product").map(
       (service) => service.packageName,
     ),

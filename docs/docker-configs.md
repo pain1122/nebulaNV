@@ -1,19 +1,24 @@
 ﻿# Docker Configs
 
-## Product, Order and Media Prisma 7 preparation (November 4)
+## Prisma 7 owner preparation (November 7)
 
 Each migrated owner's `prisma.config.ts` joins selected schema generation and
 legacy install inputs. Its CJS client compiles under `dist/generated/prisma`
 and travels with the existing application dist copy. Generated source is excluded
 from Docker/snapshot/cache inputs. Runtime checks require the new client/options
-instead of accepting a stale legacy client; six unmigrated owners retain their
-engine checks. Product and Order installed host SQL gates pass. Media's candidate
-types, focused units, actual database suites and compiled-client selection pass.
-Media root install/generation, installed types/lint/63 tests, lock/security and
-eight-service type checks now pass; complete native CLI upgrade gates remain pending.
-Its recovery helper selects legacy versus modern clients from the image manifest,
+instead of accepting a stale legacy client. Product/Order/Media/Taxonomy/Settings/
+Blog/User/Realm Auth installed host gates, including clean migration proofs,
+pass. Realm DEFAULT/OPERATOR still share one image. Tenant Authority adds the
+final config COPY; its candidate compilation/spec/tools types, strict lint/92
+tests and native populated/seed/role/resolver/audit/rollback/cleanup pass. Root
+CLI/client pins and final owner now match7.10.1 in source; offline lockfile-only
+publication synchronization passes. Combined frozen install and installed final
+reconciliation remain pending. BuildKit verifies all60 local COPY inputs and
+the selected graph has no sibling application dependency (static graph check,
+not an application image proof). Sibling source/schema test inputs do not enter the app graph.
+Media's recovery helper selects legacy versus modern clients from the image manifest,
 supporting existing images while refusing stale output in a modern image.
-All three image acceptances remain D8 work. The maintenance report records exact
+All nine prepared owner image acceptances remain D8 work. The maintenance report records exact
 input cohorts and detailed evidence.
 
 ## Purpose

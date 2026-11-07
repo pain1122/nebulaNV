@@ -1,6 +1,6 @@
-/* eslint-disable no-console */
 import { readFileSync } from "node:fs";
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { realmAuthPrismaOptions } from "../src/prisma-options";
 import {
   rollbackStagedOperator,
   stageOperatorRecoveryCredential,
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   const operation = process.argv[2];
   const clients = Array.from(
     { length: operation === "stage-concurrent" ? 2 : 1 },
-    () => new PrismaClient(),
+    () => new PrismaClient(realmAuthPrismaOptions()),
   );
   const prisma = clients[0];
   try {

@@ -5,7 +5,7 @@ import {
   UpdatePostDto,
   ListPostsQueryDto,
 } from "./dto/post.dto";
-import { BlogPostStatus, Prisma } from "../../prisma/generated";
+import { BlogPostStatus, Prisma } from "../generated/prisma/client";
 import { toBlogPostView } from "./blog.mapper";
 import { toPrismaBlogPostStatus } from "./blog.types";
 

@@ -2,6 +2,26 @@
 
 Last reviewed: 2026-08-22
 
+## Prisma 7 preparation (November 7)
+
+Source adopts matching client/CLI/adapter-pg7.10.1, pg8.23.1 and dotenv17.2.3.
+`prisma.config.ts` owns URL/shadow/seed; the CJS client generates under
+`src/generated/prisma` and compiles into dist. The owner factory preserves
+explicit schema/connection/timeout settings and the adopted bounded defaults.
+Catch/warn startup, sanitized events and shutdown stay. Three models/enum,
+original migration, empty base seed, public method/mapper/DTO bodies are unchanged.
+
+Candidate source compilation/test/tools types, typed lint and28 unit tests pass.
+Native PG18 checks cover SQL-authored legacy category/post/comment facts, arrays,
+nulls/dates/status, empty seed preservation, actual owner publication/archive/
+slug rules and mapper with real protobuf roundtrip, uniqueness rollback, FK
+SET NULL/CASCADE, pool closure and owned cleanup. Root install now passes; actual
+versions, three installed type projects/lint/28 units, all-service test types
+(131 files), narrow lock/security and actual installed owner/legacy/codec/SQL
+checks pass. Salar accepts `pnpm db:verify:migrations blog`; the agent confirms
+zero remaining Blog verification databases. These host results do not certify images/live
+consumers; grouped rollout stays D8-owned.
+
 ## Purpose
 
 Blog-service owns blog posts, public blog read APIs, admin blog write APIs, SEO metadata for posts, and a blog-scoped taxonomy facade.

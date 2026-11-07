@@ -1,12 +1,12 @@
-/* eslint-disable no-console */
 import { randomUUID } from "node:crypto";
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { tenantAuthorityPrismaOptions } from "../src/prisma-options";
 import { AuthorityRepository } from "../src/authority/authority.repository";
 import { AuthorityService } from "../src/authority/authority.service";
 import { DEFAULT_DEVELOPMENT_AUTHORITY as manifest } from "../src/authority/default-development-authority.manifest";
 import type { PrismaService } from "../src/prisma.service";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(tenantAuthorityPrismaOptions());
 const authority = new AuthorityService(
   new AuthorityRepository(prisma as PrismaService),
 );
@@ -121,12 +121,24 @@ async function main(): Promise<void> {
   );
 }
 
-void main()
-  .catch((error: unknown) => {
+async function run(): Promise<void> {
+  try {
+    await main();
+  } catch (error: unknown) {
     console.error(
       "[verify:tenant-authority-batch3-actor-resolution] ERROR:",
       error,
     );
     process.exitCode = 1;
-  })
-  .finally(async () => prisma.$disconnect());
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+void run().catch((error: unknown) => {
+  console.error(
+    "[verify:tenant-authority-batch3-actor-resolution] ERROR:",
+    error,
+  );
+  process.exitCode = 1;
+});

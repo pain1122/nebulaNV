@@ -1,6 +1,31 @@
 # Realm Auth Service
 
-Last reviewed: 2026-09-12
+Last reviewed: 2026-11-07
+
+## Prisma 7 preparation (November 7)
+
+Source adopts matching CLI/client/adapter-pg7.10.1, pg8.23.1 and dotenv17.2.3.
+`prisma.config.ts` owns URL/shadow and the existing DEFAULT boundary seed command.
+The CJS client generates into `src/generated/prisma` and compiles into dist;
+the factory preserves explicit schema/pool/timeout settings and bounded defaults.
+Lazy connection, exact sanitized error marker and disconnect remain unchanged.
+
+All five CLI tools and four migration helpers use the updated client wiring.
+Their policy bodies,13 models/enums, original migration and fixed deployments
+remain unchanged. Spec/tools typed projects replace the default-project fallback;
+deployment-isolation assertions remain intact. No paused F4 feature resumes.
+
+Candidate generation/compilation/spec/tools types/strict lint and56 tests pass.
+Actual PG18 DEFAULT/OPERATOR checks cover populated legacy preservation, seed/
+rerun/conflict/readiness, concurrent operator staging/verify/rollback and shadow
+generation guards, encrypted concurrent import/rerun/login/rollback/receipts.
+Only owned synthetic data and ephemeral keys were used; artifacts/pools/two DBs
+are cleaned. Root install succeeds; actual versions/lock/security, installed
+source/spec/tools types/strict lint/56 tests and the same native controls pass.
+Complete dual-deployment `pnpm db:verify:f4-r3-realm-auth-foundation` now passes;
+Salar's transcript confirms both deployments and two-DB cleanup. No verification
+DB remains. These results do not establish runtime image
+acceptance or active Realm Auth token/session authority.
 
 ## Purpose
 

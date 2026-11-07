@@ -1,8 +1,8 @@
-/* eslint-disable no-console */
-import { PrismaClient } from './generated';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { userPrismaOptions } from '../src/prisma-options';
 import * as bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(userPrismaOptions());
 
 async function main() {
   if (process.env.NODE_ENV === 'production') {

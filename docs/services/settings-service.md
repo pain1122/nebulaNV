@@ -1,5 +1,30 @@
 # Settings Service
 
+## Prisma 7 preparation (November 7)
+
+Source selects matching client/CLI/adapter-pg7.10.1, pg8.23.1 and dotenv17.2.3.
+`prisma.config.ts` owns URL/shadow/seed configuration; generated CJS source moves
+under `src/generated/prisma` and compiles into dist. The owner factory preserves
+explicit schema/pool/timeout settings and adopted bounded defaults. Existing
+fail-fast startup, sanitized events and shutdown stay. Model/migration and
+service/API/bootstrap policies are unchanged.
+
+The real base seed retains its four defaults: locales, currency symbols, shop
+currency and cart TTL. AST comparison preserves its helper/main function bodies
+and values. An awaited completion wrapper now disconnects on success/failure
+and reports primary/cleanup errors with a failing exit code; typed lint is kept.
+Candidate source/test/tools types, typed lint and23 unit tests pass. Native PG18
+controls prove legacy typed data, exact Unicode values, create/rerun/type clearing,
+row identity, unrelated-row preservation, service normalization/environments,
+compound-key rollback, deletion and pool/DB cleanup. Lifecycle probes cover
+success, main failure and combined main/cleanup failure. Root install now passes;
+actual versions, three installed type projects/lint/23 units, all-service test
+types (130 files), narrow lock/security review and actual installed native
+seed/data preservation/rollback/cleanup pass. The complete scoped clean CLI proof
+is now operator-accepted; no Settings verification databases remain afterward.
+`pnpm db:verify:migrations settings` selects only this owner.
+Existing running images are separate D8 inputs; no per-owner rebuild is requested.
+
 Settings-service owns safe runtime configuration values that other services can read or write through HTTP, gRPC, or the typed `@nebula/clients` settings proxy.
 
 Use it for app/business defaults and admin-managed configuration. Do not use it as a secret store or as the source of auth/trust policy.

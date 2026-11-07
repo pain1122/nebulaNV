@@ -1,5 +1,5 @@
-/* eslint-disable no-console */
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { realmAuthPrismaOptions } from "../src/prisma-options";
 import { rollbackF4R3ShadowImport } from "../src/migration/f4-r3-shadow-import";
 
 function argument(name: string): string {
@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   if (process.env.REALM_AUTH_DEPLOYMENT !== "DEFAULT") {
     throw new Error("f4_r3_shadow_rollback_default_deployment_required");
   }
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient(realmAuthPrismaOptions());
   try {
     const result = await rollbackF4R3ShadowImport(prisma, {
       migrationId: argument("migration-id"),

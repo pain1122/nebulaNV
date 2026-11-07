@@ -1,4 +1,7 @@
-import { Prisma, type CheckoutAttempt } from "../../src/generated/prisma/client";
+import {
+  Prisma,
+  type CheckoutAttempt,
+} from "../../src/generated/prisma/client";
 
 // Storage double for service decisions, not a PostgreSQL/concurrency proof.
 export function attemptStore() {
